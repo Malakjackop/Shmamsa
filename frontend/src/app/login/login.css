@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Playfair Display', serif;
+  overflow: hidden;
+}
+
+.login-wrapper {
+  position: relative;
+  min-height: 100vh;
+  background: url('/assets/images/church-bg.jpg') center center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.login-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 0;
+}
+
+.login-container {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 40px 35px;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  max-width: 400px;
+  width: 90%;
+}
+
+.logo {
+  width: 200px;
+  margin-bottom: 10px;
+}
+
+.login-header h1 {
+  font-size: 22px;
+  color: #1d2b44;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.input-group {
+  margin: 20px 0;
+  position: relative;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 15px;
+  background-color: #f8f8f8;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+/* Hide browser’s built-in password eye */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-password-toggle-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.input-group input:focus {
+  border-color: #4a8ed4;
+  box-shadow: 0 0 0 3px rgba(74, 142, 212, 0.3);
+  background-color: #fff;
+}
+
+.password-group input {
+  padding-right: 35px; /* space for custom eye icon */
+}
+
+.password-eye {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #666;
+  font-size: 1rem;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: #3a2929;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s, box-shadow 0.3s;
+  margin-top: 25px;
+}
+
+.login-btn:hover {
+  background-color: #306090;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.links {
+  margin-top: 20px;
+}
+
+.links a {
+  color: #3f7bbf;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.links a:hover {
+  text-decoration: underline;
+  color: #306090;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.85em;
+  margin-top: 5px;
+  text-align: left;
+  padding-left: 15px;
+}
+
+.error-message.error-center {
+  text-align: center;
+  padding-left: 0;
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 30px 20px;
+  }
+
+  .login-header h1 {
+    font-size: 20px;
+  }
+
+  .logo {
+    width: 120px;
+  }
+}

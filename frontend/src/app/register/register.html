@@ -1,0 +1,88 @@
+<div class="login-wrapper">
+  <div class="login-container">
+    <div class="login-header">
+      <img src="assets/images/church-logo.png" alt="Church Logo" class="logo">
+      <h1>DEACONS FAMILY <br> St Mary Church - Omrania</h1>
+    </div>
+
+    <form [formGroup]="registerForm" class="login-form" (ngSubmit)="onSubmit()">
+
+      <!-- Row 1: Username + Phone + National ID + DOB -->
+      <div class="input-row">
+        <div class="input-group small">
+          <input type="text" formControlName="username" placeholder="USERNAME" required>
+        </div>
+
+        <div class="input-group small">
+          <input type="text" formControlName="phoneNumber" placeholder="PHONE NUMBER">
+        </div>
+
+        <div class="input-group small">
+          <input type="text" formControlName="nationalId" placeholder="NATIONAL ID">
+        </div>
+
+        <div class="input-group small">
+          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH">
+        </div>
+      </div>
+
+      <small *ngIf="registerForm.get('nationalId')?.hasError('pattern')" class="error-message">
+        National ID must be exactly 14 digits
+      </small>
+
+      <!-- Row 2: Mother Phone + Father Phone + Mother Job + Father Job -->
+      <div class="input-row">
+        <div class="input-group small">
+          <input type="text" formControlName="motherPhone" placeholder="MOTHER PHONE">
+        </div>
+
+        <div class="input-group small">
+          <input type="text" formControlName="fatherPhone" placeholder="FATHER PHONE">
+        </div>
+
+        <div class="input-group small">
+          <input type="text" formControlName="motherJob" placeholder="MOTHER JOB">
+        </div>
+
+        <div class="input-group small">
+          <input type="text" formControlName="fatherJob" placeholder="FATHER JOB">
+        </div>
+      </div>
+
+      <small *ngIf="registerForm.errors?.['samePhoneAsParent']" class="error-message">
+        Your phone number cannot match mother or father phone.
+      </small>
+
+      <!-- Row 3: Password + Confirm Password -->
+      <div class="input-row">
+        <div class="input-group small password-group">
+          <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required>
+          <span class="password-eye" (click)="toggleShowPassword()">
+            <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+          </span>
+        </div>
+
+        <div class="input-group small password-group">
+          <input [type]="showConfirmPassword ? 'text' : 'password'" formControlName="confirmPassword"
+            placeholder="CONFIRM PASSWORD" required>
+          <span class="password-eye" (click)="toggleShowConfirmPassword()">
+            <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+          </span>
+        </div>
+      </div>
+
+      <small *ngIf="registerForm.hasError('passwordsMismatch') && registerForm.touched" class="error-message">
+        Passwords do not match
+      </small>
+
+      <button type="submit" class="login-btn">REGISTER</button>
+
+      <div class="links">
+        <a routerLink="/login">Already have an account? Login</a>
+      </div>
+    </form>
+
+    <p *ngIf="registerError" class="error-message error-center">{{ registerError }}</p>
+    <p *ngIf="registerSuccess" class="success-message error-center">{{ registerSuccess }}</p>
+  </div>
+</div>

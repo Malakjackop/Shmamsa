@@ -1,0 +1,42 @@
+<div class="login-wrapper">
+  <div class="login-container">
+    <div class="login-header">
+      <img src="assets/images/church-logo.png" alt="Church Logo" class="logo">
+      <h1>DEACONS FAMILY <br> St Mary Church - Omrania</h1>
+    </div>
+
+    <form [formGroup]="loginForm" class="login-form" (ngSubmit)="onSubmit()">
+
+      <!-- Username -->
+      <div class="input-group">
+        <input type="text" formControlName="username" placeholder="USERNAME" required>
+      </div>
+      <p class="error-message" *ngIf="loginForm.get('username')?.invalid && loginForm.get('username')?.touched">
+        Username is required.
+      </p>
+
+      <!-- Password with custom eye icon -->
+      <div class="input-group password-group">
+        <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required>
+        <span class="password-eye" (click)="toggleShowPassword()">
+          <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+        </span>
+      </div>
+      <p class="error-message" *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
+        Password is required.
+      </p>
+
+      <button type="submit" class="login-btn">LOGIN</button>
+
+      <div class="links">
+        <a href="#">Forgot Username/Password?</a><br>
+        <a routerLink="/register">Create Account</a><br>
+            <!-- <a routerLink="/register" class="login-link">Create Account</a> -->
+
+
+      </div>
+    </form>
+
+    <p *ngIf="loginError" class="error-message error-center">{{ loginError }}</p>
+  </div>
+</div>
