@@ -7,20 +7,27 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
   width: 100%;
-  font-family: 'Playfair Display', serif;
-  overflow: hidden;
+  height: 100%;
+  overflow: hidden; /* remove scrollbars to avoid white gap */
+  background-color: black; /* fallback for slow image load */
 }
 
 .login-wrapper {
-  position: relative;
-  min-height: 100vh;
-  background: url('/assets/images/church-bg.jpg') center center / cover no-repeat;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;          /* not 100vw */
+  height: 100%;         /* not 100vh */
+  background: url('/assets/images/church-bg.jpg') no-repeat center center fixed;
+  background-size: cover;
+  background-attachment: fixed;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 0;
 }
+
 
 
 .login-wrapper::before {

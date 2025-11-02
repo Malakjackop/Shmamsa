@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap');
 
+/* Reset and base styles */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -7,20 +8,33 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
   width: 100%;
+  height: 100%;
   font-family: 'Playfair Display', serif;
-  overflow-y: auto;
-  background: url('/assets/images/church-bg.jpg') center center / cover no-repeat;
+  background: url('/assets/images/church-bg.jpg') no-repeat center center fixed;
+  background-size: cover;
+  background-color: #000; /* fallback background */
+  overflow-x: hidden; /* prevents white border caused by scrollbar width */
 }
 
+/* Edge/Chromium-specific rounding fix */
+html {
+  overflow-x: clip;
+}
+
+/* Main wrapper */
 .login-wrapper {
-  position: relative;
-  min-height: 100vh;
+  position: fixed; /* fixed ensures full coverage of the viewport */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: url('/assets/images/church-bg.jpg') center center / cover no-repeat;
+  background: url('/assets/images/church-bg.jpg') no-repeat center center fixed;
+  background-size: cover;
+  z-index: 0;
 }
 
 .login-wrapper::before {
@@ -31,6 +45,7 @@ html, body {
   z-index: 0;
 }
 
+/* Login container */
 .login-container {
   position: relative;
   z-index: 1;
@@ -39,10 +54,11 @@ html, body {
   padding: 40px 35px;
   border-radius: 14px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  max-width: 800px; /* ✅ wider for multiple inputs */
+  max-width: 800px;
   width: 95%;
 }
 
+/* Logo and header */
 .logo {
   width: 100px;
   margin-bottom: 10px;
@@ -51,15 +67,15 @@ html, body {
 .login-header h1 {
   font-size: 18px;
   color: #1d2b44;
-  margin: 12;
+  margin: 0;
   line-height: 1.4;
 }
 
-/* ✅ Arrange inputs side by side */
+/* Input layout */
 .input-row {
   display: flex;
   justify-content: space-between;
-  flex-wrap: wrap; /* wrap on smaller screens */
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 15px;
 }
@@ -69,13 +85,12 @@ html, body {
   margin: 0;
 }
 
-/* ✅ Shorter input boxes */
 .input-group.small {
-  flex: 1 1 calc(25% - 12px); /* 4 per row */
+  flex: 1 1 calc(25% - 12px);
   min-width: 160px;
 }
 
-/* Input style */
+/* Input styles */
 .input-group input {
   width: 100%;
   padding: 12px 15px;
@@ -92,7 +107,7 @@ html, body {
   background-color: #fff;
 }
 
-/* Eye icon for passwords */
+/* Password field */
 .password-group input {
   padding-right: 35px;
 }
@@ -142,7 +157,7 @@ html, body {
   color: #306090;
 }
 
-/* Error & success messages */
+/* Messages */
 .error-message {
   color: #dc3545;
   font-size: 0.85em;
@@ -163,16 +178,16 @@ html, body {
   padding-left: 0;
 }
 
-/* Responsive */
+/* Responsive design */
 @media (max-width: 768px) {
   .input-group.small {
-    flex: 1 1 calc(50% - 12px); /* 2 per row on tablets */
+    flex: 1 1 calc(50% - 12px);
   }
 }
 
 @media (max-width: 480px) {
   .input-group.small {
-    flex: 1 1 100%; /* 1 per row on mobile */
+    flex: 1 1 100%;
   }
 
   .login-container {
@@ -185,5 +200,9 @@ html, body {
 
   .login-header h1 {
     font-size: 18px;
+  }
+
+  .login-wrapper {
+    background-position: center top;
   }
 }
