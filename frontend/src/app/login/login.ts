@@ -2,17 +2,20 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { MessageService } from 'primeng/api';
 
 @Component({
   selector: 'app-login',
   standalone: false,
   templateUrl: './login.html',
-  styleUrls: ['./login.css']
+  styleUrls: ['./login.css'],
+  providers: [MessageService]
 })
 export class LoginComponent {
   fb = inject(FormBuilder);
   router = inject(Router);
   authService = inject(AuthService);
+  messageService = inject(MessageService);
 
   loginForm: FormGroup = this.fb.group({
     username: ['', Validators.required],
@@ -20,7 +23,7 @@ export class LoginComponent {
   });
 
   loginError: string | null = null;
-  showPassword = false; // control for password visibility
+  showPassword = false;
 
   toggleShowPassword(): void {
     this.showPassword = !this.showPassword;
@@ -29,6 +32,11 @@ export class LoginComponent {
   onSubmit(): void {
     if (this.loginForm.invalid) {
       this.loginForm.markAllAsTouched();
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Validation Error',
+        detail: 'Please fill in all required fields.',
+      });
       return;
     }
 
@@ -37,11 +45,23 @@ export class LoginComponent {
     this.authService.login(username, password).subscribe({
       next: (res) => {
         localStorage.setItem('token', res.token);
-        this.router.navigate(['/dashboard']);
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Login Successful',
+          detail: `Welcome back, ${username}!`,
+        });
+
+        // Navigate to dashboard after short delay
+        setTimeout(() => this.router.navigate(['/dashboard']), 1500);
       },
       error: (err) => {
         this.loginError = err.error?.error || 'Invalid username or password';
-      }
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Login Failed',
+          detail: this.loginError ?? 'Invalid username or password',
+        });
+      },
     });
   }
 }
