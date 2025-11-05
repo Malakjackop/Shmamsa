@@ -14,13 +14,15 @@ import { ToastModule } from 'primeng/toast';
 import { ButtonModule } from 'primeng/button';
 import { MessageService } from 'primeng/api';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { DashBoard } from './dash-board/dash-board';
 
 
 @NgModule({
   declarations: [
     App,
     LoginComponent,
-    RegisterComponent
+    RegisterComponent,
+    DashBoard
   ],
   imports: [
     BrowserModule,

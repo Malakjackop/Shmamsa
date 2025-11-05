@@ -6,7 +6,7 @@
     </div>
 
     <!-- ✅ PrimeNG Toast -->
-    <p-toast position="top-right"></p-toast>
+    <p-toast ></p-toast>
 
     <form [formGroup]="registerForm" class="login-form" (ngSubmit)="onSubmit()">
       <!-- Row 1 -->
@@ -32,17 +32,6 @@
         </div>
       </div>
 
-      <!-- Status -->
-      <div class="input-row">
-        <div class="input-group small">
-          <select formControlName="status">
-            <option value="" disabled selected>Choose Status</option>
-            <option value="student">Student</option>
-            <option value="graduate">Graduate</option>
-          </select>
-        </div>
-      </div>
-
       <!-- ✅ Deacon Family + Degree -->
       <div class="input-row">
         <!-- Deacon Family -->
@@ -62,15 +51,26 @@
           </select>
         </div>
 
-        <!-- ✅ New: Deacon Degree -->
+        <!-- ✅ Deacon Degree -->
         <div class="input-group small">
           <select formControlName="deaconDegree" required>
             <option value="" disabled selected>What's your Deacon Degree?</option>
-            <option >ابصالتس</option>
-            <option >اغنسطس</option>
-            <option >ايبودياكون</option>
-            <option >دياكون</option>
-            <option >ارشي دياكون</option>
+            <option>ابصالتس</option>
+            <option>اغنسطس</option>
+            <option>ايبودياكون</option>
+            <option>دياكون</option>
+            <option>ارشي دياكون</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="input-row">
+        <div class="input-group small">
+          <select formControlName="status">
+            <option value="" disabled selected>Choose Status</option>
+            <option value="student">Student</option>
+            <option value="graduate">Graduate</option>
           </select>
         </div>
       </div>
@@ -125,7 +125,7 @@
           </div>
         </div>
 
-        <!-- Ask if Working -->
+        <!-- Work Info -->
         <div class="input-row">
           <div class="input-group small">
             <select formControlName="isWorking">
@@ -136,7 +136,6 @@
           </div>
         </div>
 
-        <!-- Work Details -->
         <div *ngIf="registerForm.get('isWorking')?.value === 'yes'" class="input-row">
           <div class="input-group small">
             <input type="text" formControlName="workDetails" placeholder="What is your job?" />
@@ -162,15 +161,22 @@
       <!-- Password Section -->
       <div class="input-row">
         <div class="input-group small password-group">
-          <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required />
+          <input
+            [type]="showPassword ? 'text' : 'password'"
+            formControlName="password"
+            placeholder="PASSWORD"
+            required />
           <span class="password-eye" (click)="toggleShowPassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
         </div>
 
         <div class="input-group small password-group">
-          <input [type]="showConfirmPassword ? 'text' : 'password'" formControlName="confirmPassword"
-            placeholder="CONFIRM PASSWORD" required />
+          <input
+            [type]="showConfirmPassword ? 'text' : 'password'"
+            formControlName="confirmPassword"
+            placeholder="CONFIRM PASSWORD"
+            required />
           <span class="password-eye" (click)="toggleShowConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>

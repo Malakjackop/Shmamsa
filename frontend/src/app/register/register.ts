@@ -31,7 +31,7 @@ export class RegisterComponent {
       dateOfBirth: ['', Validators.required],
       status: ['', Validators.required],
       deaconFamily: ['', Validators.required],
-      deaconDegree: ['', Validators.required], // ✅ new field
+      deaconDegree: ['', Validators.required],
       graduatedFrom: [''],
       graduateJob: [''],
       studyType: [''],
@@ -49,7 +49,7 @@ export class RegisterComponent {
     });
   }
 
-  // 🔒 Validators
+  // ✅ Validators
   passwordMatchValidator(formGroup: AbstractControl): ValidationErrors | null {
     const pass = formGroup.get('password')?.value;
     const confirm = formGroup.get('confirmPassword')?.value;
@@ -71,7 +71,7 @@ export class RegisterComponent {
     this.showConfirmPassword = !this.showConfirmPassword;
   }
 
-  // 🚀 Submit Form
+  // ✅ Submit form
   onSubmit() {
     if (this.registerForm.invalid) {
       this.showValidationErrors();
@@ -82,7 +82,8 @@ export class RegisterComponent {
       this.messageService.add({
         severity: 'error',
         summary: 'Invalid Input',
-        detail: 'Your phone number cannot match your guardian’s phone number.'
+        detail: 'Your phone number cannot match your guardian’s phone number.',
+        life: 4000
       });
       return;
     }
@@ -104,23 +105,27 @@ export class RegisterComponent {
       next: () => {
         this.messageService.add({
           severity: 'success',
-          summary: 'Registration Successful',
-          detail: 'Your account has been created successfully!'
+          summary: 'Registration Successful 🎉',
+          detail: 'Your account has been created successfully!',
+          life: 4000
         });
-        this.router.navigate(['/login']);
+        this.registerForm.reset();
+
+        setTimeout(() => this.router.navigate(['/login']), 2000);
       },
       error: (err) => {
         console.error('❌ Registration error:', err);
         this.messageService.add({
           severity: 'error',
-          summary: 'Registration Failed',
-          detail: err.error?.message || 'Something went wrong. Please try again.'
+          summary: 'Registration Failed ❌',
+          detail: err.error?.message || 'Something went wrong. Please try again.',
+          life: 5000
         });
       }
     });
   }
 
-  // 🧠 Show invalid fields in toast
+  // ✅ Toast for invalid form
   showValidationErrors() {
     const controls = this.registerForm.controls;
     const invalidFields: string[] = [];
@@ -147,7 +152,8 @@ export class RegisterComponent {
       this.messageService.add({
         severity: 'error',
         summary: 'Password Error',
-        detail: 'Passwords do not match.'
+        detail: 'Passwords do not match.',
+        life: 4000
       });
     }
 
@@ -155,7 +161,8 @@ export class RegisterComponent {
       this.messageService.add({
         severity: 'error',
         summary: 'Invalid Form',
-        detail: `Please correct: ${invalidFields.join(', ')}`
+        detail: `Please correct: ${invalidFields.join(', ')}`,
+        life: 5000
       });
     }
   }

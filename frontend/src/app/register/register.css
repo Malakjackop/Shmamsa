@@ -233,3 +233,34 @@ select {
   font-size: 15px;
   color: #1a1a1a;
 }
+
+/* ✅ Fix date picker icon visibility */
+input[type="date"] {
+  appearance: auto; /* allows the browser's default date UI */
+  -webkit-appearance: textfield; /* reset Safari iOS weird behavior */
+  -moz-appearance: textfield;
+  background-color: #f8f8f8;
+  color: #1a1a1a;
+  padding: 12px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* ✅ Make sure the calendar icon (Chrome/Edge) is visible */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: block;
+  color: transparent;
+  background: url("data:image/svg+xml,%3Csvg fill='gray' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z'/%3E%3C/svg%3E") no-repeat center;
+  opacity: 0.6;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+}
+
+/* ✅ Optional: improve hover effect */
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
