@@ -106,6 +106,9 @@ public class User {
     @Column(length = 100)
     private String deaconFamily;
 
+    @Column(length = 50)
+    private String deaconDegree; // ✅ new field
+
     // 16️⃣ Role
     private String role = "USER";
 }

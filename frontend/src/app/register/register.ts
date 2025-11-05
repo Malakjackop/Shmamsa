@@ -31,6 +31,7 @@ export class RegisterComponent {
       dateOfBirth: ['', Validators.required],
       status: ['', Validators.required],
       deaconFamily: ['', Validators.required],
+      deaconDegree: ['', Validators.required], // ✅ new field
       graduatedFrom: [''],
       graduateJob: [''],
       studyType: [''],
@@ -46,19 +47,9 @@ export class RegisterComponent {
     }, {
       validators: [this.passwordMatchValidator, this.phoneNotEqualGuardian]
     });
-
-    // Auto-clear logic
-    this.registerForm.get('status')?.valueChanges.subscribe((status) => {
-      if (status === 'graduate') this.clearStudentFields();
-      else if (status === 'student') this.clearGraduateFields();
-    });
-
-    this.registerForm.get('studyType')?.valueChanges.subscribe((type) => {
-      if (type === 'university') this.clearGuardianFields();
-    });
   }
 
-  // ---------------- Validators ----------------
+  // 🔒 Validators
   passwordMatchValidator(formGroup: AbstractControl): ValidationErrors | null {
     const pass = formGroup.get('password')?.value;
     const confirm = formGroup.get('confirmPassword')?.value;
@@ -72,36 +63,6 @@ export class RegisterComponent {
     return phone === guardian ? { sameAsGuardian: true } : null;
   }
 
-  // ---------------- Helpers ----------------
-  clearStudentFields() {
-    this.registerForm.patchValue({
-      studyType: '',
-      schoolName: '',
-      schoolGrade: '',
-      universityName: '',
-      faculty: '',
-      universityGrade: '',
-      isWorking: '',
-      workDetails: '',
-      guardianPhone: '',
-      guardianRelation: ''
-    });
-  }
-
-  clearGraduateFields() {
-    this.registerForm.patchValue({
-      graduatedFrom: '',
-      graduateJob: ''
-    });
-  }
-
-  clearGuardianFields() {
-    this.registerForm.patchValue({
-      guardianPhone: '',
-      guardianRelation: ''
-    });
-  }
-
   toggleShowPassword() {
     this.showPassword = !this.showPassword;
   }
@@ -110,7 +71,7 @@ export class RegisterComponent {
     this.showConfirmPassword = !this.showConfirmPassword;
   }
 
-  // ---------------- Submission ----------------
+  // 🚀 Submit Form
   onSubmit() {
     if (this.registerForm.invalid) {
       this.showValidationErrors();
@@ -126,17 +87,15 @@ export class RegisterComponent {
       return;
     }
 
-    // ✅ Normalize payload before sending to backend
     const raw = this.registerForm.value;
-
     const payload = {
       ...raw,
       status: raw.status?.toLowerCase() || '',
       studyType: raw.studyType?.toLowerCase() || '',
       dateOfBirth: raw.dateOfBirth
-        ? new Date(raw.dateOfBirth).toISOString().split('T')[0] // Convert to ISO "YYYY-MM-DD"
+        ? new Date(raw.dateOfBirth).toISOString().split('T')[0]
         : '',
-      isWorking: raw.isWorking === 'yes' ? true : false
+      isWorking: raw.isWorking === 'yes'
     };
 
     console.log('📤 Sending payload:', payload);
@@ -161,7 +120,7 @@ export class RegisterComponent {
     });
   }
 
-  // ---------------- Toast Validation ----------------
+  // 🧠 Show invalid fields in toast
   showValidationErrors() {
     const controls = this.registerForm.controls;
     const invalidFields: string[] = [];
@@ -172,14 +131,14 @@ export class RegisterComponent {
         switch (name) {
           case 'fullName': invalidFields.push('Full Name'); break;
           case 'username': invalidFields.push('Username'); break;
-          case 'phoneNumber': invalidFields.push('Phone Number (must be 11 digits)'); break;
-          case 'nationalId': invalidFields.push('National ID (must be 14 digits)'); break;
+          case 'phoneNumber': invalidFields.push('Phone Number'); break;
+          case 'nationalId': invalidFields.push('National ID'); break;
           case 'dateOfBirth': invalidFields.push('Date of Birth'); break;
           case 'status': invalidFields.push('Status'); break;
           case 'deaconFamily': invalidFields.push('Deacon Family'); break;
+          case 'deaconDegree': invalidFields.push('Deacon Degree'); break;
           case 'password': invalidFields.push('Password'); break;
           case 'confirmPassword': invalidFields.push('Confirm Password'); break;
-          case 'guardianPhone': invalidFields.push('Guardian Phone'); break;
         }
       }
     }
@@ -196,7 +155,7 @@ export class RegisterComponent {
       this.messageService.add({
         severity: 'error',
         summary: 'Invalid Form',
-        detail: `Please correct the following fields: ${invalidFields.join(', ')}`
+        detail: `Please correct: ${invalidFields.join(', ')}`
       });
     }
   }

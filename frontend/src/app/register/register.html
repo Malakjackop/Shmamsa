@@ -1,35 +1,34 @@
 <div class="login-wrapper">
   <div class="login-container">
     <div class="login-header">
-      <img src="assets/images/church-logo.png" alt="Church Logo" class="logo">
-      <h1>DEACONS FAMILY <br> St Mary Church - Omrania</h1>
+      <img src="assets/images/church-logo.png" alt="Church Logo" class="logo" />
+      <h1>DEACONS FAMILY <br />St Mary Church - Omrania</h1>
     </div>
 
     <!-- ✅ PrimeNG Toast -->
     <p-toast position="top-right"></p-toast>
 
     <form [formGroup]="registerForm" class="login-form" (ngSubmit)="onSubmit()">
-
       <!-- Row 1 -->
       <div class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="fullName" placeholder="Full Name" required>
+          <input type="text" formControlName="fullName" placeholder="Full Name" required />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="username" placeholder="USERNAME" required>
+          <input type="text" formControlName="username" placeholder="USERNAME" required />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="phoneNumber" placeholder="PHONE NUMBER">
+          <input type="text" formControlName="phoneNumber" placeholder="PHONE NUMBER" />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="nationalId" placeholder="NATIONAL ID">
+          <input type="text" formControlName="nationalId" placeholder="NATIONAL ID" />
         </div>
 
         <div class="input-group small">
-          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH">
+          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" />
         </div>
       </div>
 
@@ -44,21 +43,34 @@
         </div>
       </div>
 
-      <!-- ✅ Deacon Family Dropdown -->
+      <!-- ✅ Deacon Family + Degree -->
       <div class="input-row">
+        <!-- Deacon Family -->
         <div class="input-group small">
-          <select formControlName="deaconFamily">
+          <select formControlName="deaconFamily" required>
             <option value="" disabled selected>What's your Deacon Family?</option>
-            <option value="St Mark">اسرة السمائين</option>
-            <option value="St George">اسرة القديس ابانوب</option>
-            <option value="St George">اسرة القديس ديسقورس</option>
-            <option value="St George">اسرة القديس سيدهم بشاي</option>
-            <option value="St George">اسرة القديس اسكلابيوس</option>
-            <option value="St George">اسرة القديس البابا كيرلس ( أ )</option>
-            <option value="St George">اسرة القديس البابا كيرلس ( ب )</option>
-            <option value="St George">اسرة القديس الانبا ابرام ( أ )</option>
-            <option value="St George">اسرة القديس الانبا ابرام ( ب )</option>
-            <option value="St George">اسرة القديس اسطفانوس </option>
+            <option value="اسرة السمائين">اسرة السمائين</option>
+            <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
+            <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
+            <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
+            <option value="اسرة القديس اسكلابيوس">اسرة القديس اسكلابيوس</option>
+            <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
+            <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
+            <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
+            <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
+            <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
+          </select>
+        </div>
+
+        <!-- ✅ New: Deacon Degree -->
+        <div class="input-group small">
+          <select formControlName="deaconDegree" required>
+            <option value="" disabled selected>What's your Deacon Degree?</option>
+            <option >ابصالتس</option>
+            <option >اغنسطس</option>
+            <option >ايبودياكون</option>
+            <option >دياكون</option>
+            <option >ارشي دياكون</option>
           </select>
         </div>
       </div>
@@ -66,11 +78,11 @@
       <!-- Graduate Section -->
       <div *ngIf="registerForm.get('status')?.value === 'graduate'" class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="graduatedFrom" placeholder="Graduated From (e.g., University Name)">
+          <input type="text" formControlName="graduatedFrom" placeholder="Graduated From (e.g., University Name)" />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="graduateJob" placeholder="Current Job">
+          <input type="text" formControlName="graduateJob" placeholder="Current Job" />
         </div>
       </div>
 
@@ -90,26 +102,26 @@
         <!-- School Section -->
         <div *ngIf="registerForm.get('studyType')?.value === 'school'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="schoolName" placeholder="School Name">
+            <input type="text" formControlName="schoolName" placeholder="School Name" />
           </div>
 
           <div class="input-group small">
-            <input type="text" formControlName="schoolGrade" placeholder="Grade">
+            <input type="text" formControlName="schoolGrade" placeholder="Grade" />
           </div>
         </div>
 
         <!-- University Section -->
         <div *ngIf="registerForm.get('studyType')?.value === 'university'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="universityName" placeholder="University Name">
+            <input type="text" formControlName="universityName" placeholder="University Name" />
           </div>
 
           <div class="input-group small">
-            <input type="text" formControlName="faculty" placeholder="Faculty">
+            <input type="text" formControlName="faculty" placeholder="Faculty" />
           </div>
 
           <div class="input-group small">
-            <input type="text" formControlName="universityGrade" placeholder="Year/Level">
+            <input type="text" formControlName="universityGrade" placeholder="Year/Level" />
           </div>
         </div>
 
@@ -127,14 +139,14 @@
         <!-- Work Details -->
         <div *ngIf="registerForm.get('isWorking')?.value === 'yes'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="workDetails" placeholder="What is your job?">
+            <input type="text" formControlName="workDetails" placeholder="What is your job?" />
           </div>
         </div>
 
         <!-- Guardian (only for students in SCHOOL) -->
         <div *ngIf="registerForm.get('studyType')?.value === 'school'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="guardianPhone" placeholder="Guardian Phone" required>
+            <input type="text" formControlName="guardianPhone" placeholder="Guardian Phone" required />
           </div>
 
           <div class="input-group small">
@@ -150,7 +162,7 @@
       <!-- Password Section -->
       <div class="input-row">
         <div class="input-group small password-group">
-          <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required>
+          <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required />
           <span class="password-eye" (click)="toggleShowPassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
@@ -158,7 +170,7 @@
 
         <div class="input-group small password-group">
           <input [type]="showConfirmPassword ? 'text' : 'password'" formControlName="confirmPassword"
-            placeholder="CONFIRM PASSWORD" required>
+            placeholder="CONFIRM PASSWORD" required />
           <span class="password-eye" (click)="toggleShowConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
