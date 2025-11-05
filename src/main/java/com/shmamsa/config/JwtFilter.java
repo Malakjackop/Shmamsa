@@ -24,24 +24,31 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String path = request.getRequestURI();
+        System.out.println("🔍 Incoming path: " + request.getRequestURI());
+        if (path.startsWith("/api/auth")) {
+            // ✅ Skip authentication for login/register/test
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             if (jwtUtils.validateToken(token)) {
                 String username = jwtUtils.extractUsername(token);
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    username,
-                                    null,
-                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                            );
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                username, null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         }
+
         filterChain.doFilter(request, response);
     }
 }

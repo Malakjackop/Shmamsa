@@ -9,11 +9,13 @@ public class DifferentParentPhonesValidator implements ConstraintValidator<Diffe
     @Override
     public boolean isValid(User user, ConstraintValidatorContext context) {
         if (user == null) return true;
-        String father = user.getFatherPhone();
-        String mother = user.getMotherPhone();
 
-        if (father == null || mother == null) return true;
+        String guardianPhone = user.getGuardiansPhone();
+        String userPhone = user.getPhoneNumber();
 
-        return !father.equals(mother);
+        if (guardianPhone == null || userPhone == null) return true;
+
+        return !guardianPhone.equals(userPhone);
     }
+
 }

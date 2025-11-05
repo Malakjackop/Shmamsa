@@ -5,10 +5,17 @@
       <h1>DEACONS FAMILY <br> St Mary Church - Omrania</h1>
     </div>
 
+    <!-- ✅ PrimeNG Toast -->
+    <p-toast position="top-right"></p-toast>
+
     <form [formGroup]="registerForm" class="login-form" (ngSubmit)="onSubmit()">
 
-      <!-- Row 1: Username + Phone + National ID + DOB -->
+      <!-- Row 1 -->
       <div class="input-row">
+        <div class="input-group small">
+          <input type="text" formControlName="fullName" placeholder="Full Name" required>
+        </div>
+
         <div class="input-group small">
           <input type="text" formControlName="username" placeholder="USERNAME" required>
         </div>
@@ -26,34 +33,121 @@
         </div>
       </div>
 
-      <small *ngIf="registerForm.get('nationalId')?.hasError('pattern')" class="error-message">
-        National ID must be exactly 14 digits
-      </small>
-
-      <!-- Row 2: Mother Phone + Father Phone + Mother Job + Father Job -->
+      <!-- Status -->
       <div class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="motherPhone" placeholder="MOTHER PHONE">
-        </div>
-
-        <div class="input-group small">
-          <input type="text" formControlName="fatherPhone" placeholder="FATHER PHONE">
-        </div>
-
-        <div class="input-group small">
-          <input type="text" formControlName="motherJob" placeholder="MOTHER JOB">
-        </div>
-
-        <div class="input-group small">
-          <input type="text" formControlName="fatherJob" placeholder="FATHER JOB">
+          <select formControlName="status">
+            <option value="" disabled selected>Choose Status</option>
+            <option value="student">Student</option>
+            <option value="graduate">Graduate</option>
+          </select>
         </div>
       </div>
 
-      <small *ngIf="registerForm.errors?.['samePhoneAsParent']" class="error-message">
-        Your phone number cannot match mother or father phone.
-      </small>
+      <!-- ✅ Deacon Family Dropdown -->
+      <div class="input-row">
+        <div class="input-group small">
+          <select formControlName="deaconFamily">
+            <option value="" disabled selected>What's your Deacon Family?</option>
+            <option value="St Mark">اسرة السمائين</option>
+            <option value="St George">اسرة القديس ابانوب</option>
+            <option value="St George">اسرة القديس ديسقورس</option>
+            <option value="St George">اسرة القديس سيدهم بشاي</option>
+            <option value="St George">اسرة القديس اسكلابيوس</option>
+            <option value="St George">اسرة القديس البابا كيرلس ( أ )</option>
+            <option value="St George">اسرة القديس البابا كيرلس ( ب )</option>
+            <option value="St George">اسرة القديس الانبا ابرام ( أ )</option>
+            <option value="St George">اسرة القديس الانبا ابرام ( ب )</option>
+            <option value="St George">اسرة القديس اسطفانوس </option>
+          </select>
+        </div>
+      </div>
 
-      <!-- Row 3: Password + Confirm Password -->
+      <!-- Graduate Section -->
+      <div *ngIf="registerForm.get('status')?.value === 'graduate'" class="input-row">
+        <div class="input-group small">
+          <input type="text" formControlName="graduatedFrom" placeholder="Graduated From (e.g., University Name)">
+        </div>
+
+        <div class="input-group small">
+          <input type="text" formControlName="graduateJob" placeholder="Current Job">
+        </div>
+      </div>
+
+      <!-- Student Section -->
+      <div *ngIf="registerForm.get('status')?.value === 'student'">
+        <!-- Study Type -->
+        <div class="input-row">
+          <div class="input-group small">
+            <select formControlName="studyType">
+              <option value="" disabled selected>Study In</option>
+              <option value="school">School</option>
+              <option value="university">University</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- School Section -->
+        <div *ngIf="registerForm.get('studyType')?.value === 'school'" class="input-row">
+          <div class="input-group small">
+            <input type="text" formControlName="schoolName" placeholder="School Name">
+          </div>
+
+          <div class="input-group small">
+            <input type="text" formControlName="schoolGrade" placeholder="Grade">
+          </div>
+        </div>
+
+        <!-- University Section -->
+        <div *ngIf="registerForm.get('studyType')?.value === 'university'" class="input-row">
+          <div class="input-group small">
+            <input type="text" formControlName="universityName" placeholder="University Name">
+          </div>
+
+          <div class="input-group small">
+            <input type="text" formControlName="faculty" placeholder="Faculty">
+          </div>
+
+          <div class="input-group small">
+            <input type="text" formControlName="universityGrade" placeholder="Year/Level">
+          </div>
+        </div>
+
+        <!-- Ask if Working -->
+        <div class="input-row">
+          <div class="input-group small">
+            <select formControlName="isWorking">
+              <option value="" disabled selected>Do you work?</option>
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Work Details -->
+        <div *ngIf="registerForm.get('isWorking')?.value === 'yes'" class="input-row">
+          <div class="input-group small">
+            <input type="text" formControlName="workDetails" placeholder="What is your job?">
+          </div>
+        </div>
+
+        <!-- Guardian (only for students in SCHOOL) -->
+        <div *ngIf="registerForm.get('studyType')?.value === 'school'" class="input-row">
+          <div class="input-group small">
+            <input type="text" formControlName="guardianPhone" placeholder="Guardian Phone" required>
+          </div>
+
+          <div class="input-group small">
+            <select formControlName="guardianRelation">
+              <option value="" disabled selected>Who is the Guardian?</option>
+              <option value="mom">Mom</option>
+              <option value="dad">Dad</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password Section -->
       <div class="input-row">
         <div class="input-group small password-group">
           <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required>
@@ -71,18 +165,11 @@
         </div>
       </div>
 
-      <small *ngIf="registerForm.hasError('passwordsMismatch') && registerForm.touched" class="error-message">
-        Passwords do not match
-      </small>
-
       <button type="submit" class="login-btn">REGISTER</button>
 
       <div class="links">
         <a routerLink="/login">Already have an account? Login</a>
       </div>
     </form>
-
-    <p *ngIf="registerError" class="error-message error-center">{{ registerError }}</p>
-    <p *ngIf="registerSuccess" class="success-message error-center">{{ registerSuccess }}</p>
   </div>
 </div>
