@@ -3,6 +3,7 @@ package com.shmamsa.config;
 import com.shmamsa.util.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,25 +29,43 @@ public class JwtFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        System.out.println("🔍 Incoming path: " + request.getRequestURI());
-        if (path.startsWith("/api/auth")) {
-            // ✅ Skip authentication for login/register/test
+
+        // ✅ Skip public endpoints
+        if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        String token = null;
+
+        // ✅ Try Authorization header (for Postman)
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            if (jwtUtils.validateToken(token)) {
-                String username = jwtUtils.extractUsername(token);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                username, null,
-                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                        );
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            token = authHeader.substring(7);
+        }
+
+        // ✅ Try JWT cookie (for Angular)
+        if (token == null && request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("jwt".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
             }
+        }
+
+        // ✅ Validate & set authentication if valid
+        if (token != null && jwtUtils.validateToken(token)) {
+            String username = jwtUtils.extractUsername(token);
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            username,
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                    );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
         filterChain.doFilter(request, response);

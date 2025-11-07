@@ -17,19 +17,16 @@ public class AuthService {
 
     // ✅ Register new user
     public void register(User user) {
-        // Check if username already exists
         userRepository.findByUsername(user.getUsername())
                 .ifPresent(existing -> {
                     throw new RuntimeException("Username already in use");
                 });
 
-        // Encode password and save
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
     }
 
-
-    // ✅ Login and return JWT token
+    // ✅ Login user and return token
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -38,7 +35,18 @@ public class AuthService {
             throw new RuntimeException("Invalid username or password");
         }
 
-        return jwtUtils.generateToken(user.getUsername()); // generate token using username
+        return jwtUtils.generateToken(user.getUsername());
     }
 
+    // ✅ Decode token and return user
+    public User getUserFromToken(String token) {
+        String username = jwtUtils.extractUsername(token);
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    // ✅ Helper method for cleaner profile endpoint
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username).orElse(null);
+    }
 }

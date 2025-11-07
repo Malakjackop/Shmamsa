@@ -1,1 +1,94 @@
-<p>dash-board works!</p>
+<div class="dashboard">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <img src="assets/images/church-logo.png" alt="Logo" class="logo" />
+      <h2>Deacons Family</h2>
+      <p>St Mary Church – Omrania</p>
+    </div>
+
+    <ul class="menu">
+      <li class="active"><i class="pi pi-home"></i> Dashboard</li>
+      <li><i class="pi pi-book"></i> My Courses</li>
+      <li><i class="pi pi-chart-bar"></i> Grades</li>
+      <li><i class="pi pi-calendar"></i> Schedule</li>
+      <li><i class="pi pi-pencil"></i> Assignments</li>
+      <li><i class="pi pi-envelope"></i> Profile</li>
+      <li><i class="pi pi-cog"></i> Settings</li>
+    </ul>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <h1>Welcome back, {{user.fullName }} 👋</h1>
+        <p>We are very happy to have you as part of our <strong>Deacons Family</strong>. </p>
+      </div>
+
+    </header>
+
+    <!-- Stats -->
+    <section class="stats">
+      <p-card class="stat-card gpa">
+        <h3>Current Family</h3>
+        <h1>{{ user.deaconFamily }}</h1>
+      </p-card>
+      <p-card class="stat-card credits">
+        <h3>Completed Credits</h3>
+        <h1>45</h1>
+      </p-card>
+      <p-card class="stat-card assignments">
+        <h3>Pending Assignments</h3>
+        <h1>2</h1>
+      </p-card>
+      <p-card class="stat-card classes">
+        <h3>Upcoming Classes</h3>
+        <h1>3</h1>
+      </p-card>
+    </section>
+
+    <!-- Panels -->
+    <section class="panels">
+      <p-panel header="Today's Schedule" class="content-panel">
+        <ul class="schedule">
+          <li>
+            <div>
+              <strong>History 201</strong><br />
+              <small>8:00 AM - 1:30 PM • Dr. Smith</small>
+            </div>
+            <p-button label="Join" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
+          </li>
+          <li>
+            <div>
+              <strong>Biology 150</strong><br />
+              <small>11:00 AM - 1:30 PM • Prof. Johnson</small>
+            </div>
+            <p-button label="Join" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
+          </li>
+          <li>
+            <div>
+              <strong>Art 210</strong><br />
+              <small>1:00 PM - 2:30 PM • Mrs. Williams</small>
+            </div>
+            <p-button label="Join" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
+          </li>
+        </ul>
+      </p-panel>
+
+      <p-panel header="Recent Activity" class="content-panel">
+        <ul class="activity">
+          <li><i class="pi pi-check-circle text-green-600"></i> You submitted Assignment 3 for History 201 <span>(3 days ago)</span></li>
+          <li><i class="pi pi-trophy text-yellow-600"></i> Grade posted for Exam 1 in Biology <span>(Yesterday)</span></li>
+          <li><i class="pi pi-megaphone text-blue-600"></i> New announcement from Mrs. Williams <span>(2 days ago)</span></li>
+          <li><i class="pi pi-file-edit text-red-600"></i> Assignment 2 due for Art 210 <span>(Tomorrow)</span></li>
+        </ul>
+      </p-panel>
+    </section>
+
+    <footer class="footer">
+      © 2025 Deacons Family — All Rights Reserved
+    </footer>
+  </main>
+</div>

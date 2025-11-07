@@ -1,0 +1,206 @@
+.dashboard {
+  display: flex;
+  height: 100vh;
+  width: 100vw;          /* ✅ make it fill entire browser width */
+  overflow: hidden;
+  background-color: #faf6ef;
+  font-family: "Poppins", sans-serif;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 210px;
+  background-color: #5e2b20;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  padding: 1.5rem 1rem;
+  box-sizing: border-box;
+}
+
+.sidebar-header {
+  text-align: center;
+}
+
+.sidebar-header .logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 1rem;
+}
+
+.sidebar-header h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.sidebar-header p {
+  color: #e6d0c2;
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+}
+
+.menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;  /* ✅ keep items vertically centered */
+  align-items: center;
+  flex-grow: 1;             /* fills remaining space to center block */
+  width: 100%;
+  gap: 0.88rem;                /* ✅ add spacing between menu items */
+}
+
+/* Menu items styling */
+.menu li {
+  width: 100%;
+  text-align: center;       /* ✅ center horizontally too */
+  padding: 0.75rem 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.menu li:hover,
+.menu li.active {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Main Area */
+.main {
+  flex: 1;
+  padding: 2rem;
+}
+
+/* Header */
+.header {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #5e2b20;
+}
+
+.header p {
+  color: #7a7a7a;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.search-input {
+  width: 15rem;
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  text-align: center;
+  border-radius: 10px !important;
+  padding: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.stat-card h1 {
+  font-size: 2rem;
+  margin: 0.3rem 0 0;
+}
+
+.gpa {
+  background-color: #eaf6ec;
+}
+
+.credits {
+  background-color: #fff7db;
+}
+
+.assignments {
+  background-color: #fde3e3;
+}
+
+.classes {
+  background-color: #e7f0e5;
+}
+
+/* Panels */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.content-panel {
+  border-radius: 10px;
+}
+
+.schedule li,
+.activity li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.schedule li:last-child,
+.activity li:last-child {
+  border-bottom: none;
+}
+
+.activity li {
+  gap: 0.75rem;
+}
+
+.activity span {
+  color: #999;
+  font-size: 0.8rem;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  color: #5e2b20;
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+    
+
+/* Ensure PrimeNG panels or cards don’t trigger scroll */
+body::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard * {
+  max-height: 100%;
+  overflow: hidden !important;
+}
+
+/* Prevent PrimeNG cards/panels from causing layout overflow */
+p-card, p-panel {
+  max-width: 100%;
+  box-sizing: border-box;
+}
