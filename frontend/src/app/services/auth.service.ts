@@ -10,21 +10,37 @@ export class AuthService {
   private http = inject(HttpClient);
   private baseUrl = 'http://localhost:8080/api/auth';
 
-  // ✅ Login (cookie-based JWT)
+  // ✅ Login
   login(username: string, password: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/login`, { username, password }, { withCredentials: true })
-      .pipe(catchError((error: HttpErrorResponse) => throwError(() => error)));
+    return this.http
+      .post(`${this.baseUrl}/login`, { username, password }, { withCredentials: true })
+      .pipe(catchError(this.handleError));
   }
 
-  // ✅ Register (optional)
+  // ✅ Register
   register(user: any): Observable<any> {
-    return this.http.post(`${this.baseUrl}/register`, user, { withCredentials: true })
-      .pipe(catchError((error: HttpErrorResponse) => throwError(() => error)));
+    return this.http
+      .post(`${this.baseUrl}/register`, user, { withCredentials: true })
+      .pipe(catchError(this.handleError));
   }
 
-  // ✅ Profile (automatically includes JWT cookie)
-getUserData(): Observable<any> {
-  return this.http.get(`${this.baseUrl}/user`, { withCredentials: true });
-}
+  // ✅ Get user data
+  getUserData(): Observable<any> {
+    return this.http
+      .get(`${this.baseUrl}/user`, { withCredentials: true })
+      .pipe(catchError(this.handleError));
+  }
 
+  // ✅ Logout
+  logout(): Observable<any> {
+    return this.http
+      .post(`${this.baseUrl}/logout`, {}, { withCredentials: true })
+      .pipe(catchError(this.handleError));
+  }
+
+  // ✅ Centralized error handler
+  private handleError(error: HttpErrorResponse) {
+    console.error('AuthService error:', error);
+    return throwError(() => error);
+  }
 }

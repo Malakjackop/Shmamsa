@@ -1,3 +1,5 @@
+<p-toast></p-toast>
+
 <div class="dashboard">
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -15,6 +17,8 @@
       <li><i class="pi pi-pencil"></i> Assignments</li>
       <li><i class="pi pi-envelope"></i> Profile</li>
       <li><i class="pi pi-cog"></i> Settings</li>
+      <!-- ✅ Add logout item -->
+      <li (click)="logout()"><i class="pi pi-sign-out"></i> Logout</li>
     </ul>
   </aside>
 

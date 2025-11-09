@@ -1,17 +1,20 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
+import { Router } from '@angular/router';
+import { MessageService } from 'primeng/api'; // ✅ Import PrimeNG toast service
 
 @Component({
   selector: 'app-dash-board',
   standalone: false,
   templateUrl: './dash-board.html',
-  styleUrls: ['./dash-board.css']
+  styleUrls: ['./dash-board.css'],
+  providers: [MessageService] // ✅ Provide it locally or globally in app.module.ts
 })
 export class DashBoard implements OnInit {
-
   private authService = inject(AuthService);
+  private router = inject(Router);
+  private messageService = inject(MessageService);
 
-  // ✅ Hold all user info
   user: any = {
     fullName: '',
     username: '',
@@ -27,14 +30,42 @@ export class DashBoard implements OnInit {
     this.loadUserData();
   }
 
-  // ✅ Fetch the full user object
   loadUserData(): void {
     this.authService.getUserData().subscribe({
       next: (data) => {
-        this.user = data; // store all user info
+        this.user = data;
       },
       error: (err) => {
         console.error('Failed to load user info:', err);
+      }
+    });
+  }
+
+  // ✅ Logout with toast + redirect
+  logout(): void {
+    this.authService.logout().subscribe({
+      next: () => {
+        // Show a success toast
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Logged out',
+          detail: 'You have been logged out successfully.',
+          life: 2000
+        });
+
+        // Delay redirect slightly so the toast is visible
+        setTimeout(() => {
+          this.router.navigate(['/login']);
+        }, 2000);
+      },
+      error: (err) => {
+        console.error('Logout failed:', err);
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Logout Failed',
+          detail: 'Something went wrong while logging out.',
+          life: 3000
+        });
       }
     });
   }

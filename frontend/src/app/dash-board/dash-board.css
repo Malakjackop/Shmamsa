@@ -1,10 +1,44 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* removes scroll */
+  background-color: #faf6ef;
+}
+
+/* Main wrapper */
 .dashboard {
   display: flex;
-  height: 100vh;
-  width: 100vw;          /* ✅ make it fill entire browser width */
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background-color: #faf6ef;
-  font-family: "Poppins", sans-serif;
+  position: fixed; /* 👈 prevents any vertical overflow */
+  top: 0;
+  left: 0;
+}
+
+/* ✅ Remove black border / outer box */
+body {
+  border: none;
+  outline: none;
+  background-color: #faf6ef;
+  box-shadow: none;
+}
+
+/* ✅ Hide all scrollbars */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+
+
+p-card, p-panel {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Sidebar */

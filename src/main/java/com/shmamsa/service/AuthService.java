@@ -7,6 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -14,6 +18,9 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+
+    // Temporary in-memory store for reset tokens (for demo)
+    private final Map<String, String> resetTokens = new HashMap<>();
 
     // ✅ Register new user
     public void register(User user) {
@@ -26,7 +33,7 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    // ✅ Login user and return token
+    // ✅ Login user and return JWT token
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -48,5 +55,37 @@ public class AuthService {
     // ✅ Helper method for cleaner profile endpoint
     public User findByUsername(String username) {
         return userRepository.findByUsername(username).orElse(null);
+    }
+
+    // ✅ Generate reset token (temporary in-memory storage)
+    public String generateResetToken(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Create reset token using JWT (or you can use UUID)
+        String token = jwtUtils.generateToken(username);
+
+        // Store token temporarily
+        resetTokens.put(token, username);
+
+        return token;
+    }
+
+    // ✅ Reset password using token
+    public void resetPassword(String token, String newPassword) {
+        String username = resetTokens.get(token);
+        if (username == null) {
+            throw new RuntimeException("Invalid or expired reset token");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Remove token after successful reset
+        resetTokens.remove(token);
     }
 }

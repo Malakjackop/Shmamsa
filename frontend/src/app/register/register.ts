@@ -100,29 +100,28 @@ export class RegisterComponent {
     };
 
     console.log('📤 Sending payload:', payload);
-
-    this.authService.register(payload).subscribe({
-      next: () => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Registration Successful 🎉',
-          detail: 'Your account has been created successfully!',
-          life: 4000
-        });
-        this.registerForm.reset();
-
-        setTimeout(() => this.router.navigate(['/login']), 2000);
-      },
-      error: (err) => {
-        console.error('❌ Registration error:', err);
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Registration Failed ❌',
-          detail: err.error?.message || 'Something went wrong. Please try again.',
-          life: 5000
-        });
-      }
+this.authService.register(payload).subscribe({
+  next: (res: any) => {   // 👈 added : any
+    this.messageService.add({
+      severity: 'success',
+      summary: 'Registration Successful 🎉',
+      detail: 'Your account has been created successfully!',
+      life: 4000
     });
+    this.registerForm.reset();
+    setTimeout(() => this.router.navigate(['/login']), 2000);
+  },
+  error: (err: any) => {  // 👈 added : any
+    console.error('❌ Registration error:', err);
+    this.messageService.add({
+      severity: 'error',
+      summary: 'Registration Failed ❌',
+      detail: err.error?.message || 'Something went wrong. Please try again.',
+      life: 5000
+    });
+  }
+});
+
   }
 
   // ✅ Toast for invalid form
