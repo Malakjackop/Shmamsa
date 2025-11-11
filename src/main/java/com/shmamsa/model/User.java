@@ -47,14 +47,15 @@ public class User {
     private String nationalId;
 
     // 5️⃣ Phone Number
-    @Pattern(regexp = "\\d{11}", message = "Phone number must be 11 digits")
+    @Pattern(regexp = "^$|\\d{11}", message = "Phone number must be 11 digits or empty")
     @Column(length = 15)
     private String phoneNumber;
 
     // 6️⃣ Guardian’s Phone
-    @Pattern(regexp = "\\d{11}", message = "Guardian phone must be 11 digits")
+    @Pattern(regexp = "^$|\\d{11}", message = "Guardian phone must be 11 digits or empty")
     @Column(length = 15)
     private String guardiansPhone;
+
 
     // 7️⃣ Guardian Relation (mom or dad)
     @Column(length = 20)

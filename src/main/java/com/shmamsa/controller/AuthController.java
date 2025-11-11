@@ -1,5 +1,6 @@
 package com.shmamsa.controller;
 
+import com.shmamsa.dto.ProfileUpdateRequest; // ✅ make sure this import exists
 import com.shmamsa.model.User;
 import com.shmamsa.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -38,27 +39,27 @@ public class AuthController {
         try {
             String token = authService.login(username, password);
 
-            // ✅ Create secure HttpOnly cookie for JWT
             ResponseCookie cookie = ResponseCookie.from("jwt", token)
                     .httpOnly(true)
-                    .secure(false) // change to true if you're using HTTPS
+                    .secure(false)
                     .path("/")
-                    .maxAge(24 * 60 * 60) // 1 day
+                    .maxAge(24 * 60 * 60)
                     .sameSite("Lax")
                     .build();
 
-            // ✅ Add cookie to response
             response.addHeader("Set-Cookie", cookie.toString());
-
             return ResponseEntity.ok(Map.of("message", "Login successful"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    // ✅ Protected profile endpoint — reads user from SecurityContext
     @GetMapping("/user")
     public ResponseEntity<?> getFullUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+
         String username = authentication.getName();
         User user = authService.findByUsername(username);
 
@@ -66,14 +67,12 @@ public class AuthController {
             return ResponseEntity.status(404).body(Map.of("error", "User not found"));
         }
 
-        // ✅ Don’t send password for security reasons
         user.setPassword(null);
-
         return ResponseEntity.ok(user);
     }
 
 
-    // ✅ Optional: Logout (clears cookie)
+    // ✅ Logout
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
@@ -87,15 +86,25 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
+    // ✅ Forgot password endpoints
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
-        String username = request.get("username");
-
+        String phoneNumber = request.get("phoneNumber");
         try {
-            String token = authService.generateResetToken(username);
-            // TODO: send via email in production
-            System.out.println("🔑 Password reset token for " + username + ": " + token);
-            return ResponseEntity.ok(Map.of("message", "Reset link sent (check console for token)", "token", token));
+            Map<String, Object> result = authService.generateResetToken(phoneNumber);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/forgot-password/select")
+    public ResponseEntity<?> forgotPasswordSelect(@RequestBody Map<String, String> request) {
+        String phoneNumber = request.get("phoneNumber");
+        String username = request.get("username");
+        try {
+            String code = authService.generateResetTokenForUser(phoneNumber, username);
+            return ResponseEntity.ok(Map.of("code", code));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -105,7 +114,6 @@ public class AuthController {
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         String token = request.get("token");
         String newPassword = request.get("newPassword");
-
         try {
             authService.resetPassword(token, newPassword);
             return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
@@ -114,4 +122,35 @@ public class AuthController {
         }
     }
 
+    // ✅ Update Profile
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest updated, Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            User existingUser = authService.findByUsername(username);
+
+            if (existingUser == null) {
+                return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+            }
+
+            existingUser.setFullName(updated.getFullName());
+            existingUser.setPhoneNumber(updated.getPhoneNumber());
+            existingUser.setGuardiansPhone(updated.getGuardiansPhone());
+            existingUser.setGuardianRelation(updated.getGuardianRelation());
+            existingUser.setDeaconFamily(updated.getDeaconFamily());
+            existingUser.setDeaconDegree(updated.getDeaconDegree());
+            existingUser.setStatus(updated.getStatus());
+            existingUser.setStudyType(updated.getStudyType());
+            existingUser.setSchoolName(updated.getSchoolName());
+            existingUser.setUniversityName(updated.getUniversityName());
+            existingUser.setFaculty(updated.getFaculty());
+            existingUser.setUniversityGrade(updated.getUniversityGrade());
+            existingUser.setWorkDetails(updated.getWorkDetails());
+
+            authService.saveUser(existingUser);
+            return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

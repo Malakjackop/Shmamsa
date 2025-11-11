@@ -33,10 +33,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ Public endpoints
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
-                        // ✅ Protected endpoints
-                        .requestMatchers("/api/auth/profile").authenticated()
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/forgot-password",
+                                "/api/auth/forgot-password/select",
+                                "/api/auth/reset-password",
+                                "/api/auth/user"   // ✅ changed from /profile to /user
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

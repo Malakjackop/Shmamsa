@@ -11,12 +11,11 @@
 
     <ul class="menu">
       <li class="active"><i class="pi pi-home"></i> Dashboard</li>
-      <li><i class="pi pi-book"></i> My Courses</li>
       <li><i class="pi pi-chart-bar"></i> Grades</li>
       <li><i class="pi pi-calendar"></i> Schedule</li>
       <li><i class="pi pi-pencil"></i> Assignments</li>
-      <li><i class="pi pi-envelope"></i> Profile</li>
-      <li><i class="pi pi-cog"></i> Settings</li>
+      <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> Profile</li>
+      <li><i class="pi pi-cog"></i> about us</li>
       <!-- ✅ Add logout item -->
       <li (click)="logout()"><i class="pi pi-sign-out"></i> Logout</li>
     </ul>
@@ -55,7 +54,7 @@
 
     <!-- Panels -->
     <section class="panels">
-      <p-panel header="Today's Schedule" class="content-panel">
+      <p-panel header="week's Schedule" class="content-panel">
         <ul class="schedule">
           <li>
             <div>

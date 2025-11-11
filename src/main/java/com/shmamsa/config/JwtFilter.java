@@ -31,10 +31,16 @@ public class JwtFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
 
         // ✅ Skip public endpoints
-        if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")) {
+        if (
+                path.startsWith("/api/auth/login") ||
+                        path.startsWith("/api/auth/register") ||
+                        path.startsWith("/api/auth/forgot-password") ||
+                        path.startsWith("/api/auth/reset-password")
+        ) {
             filterChain.doFilter(request, response);
             return;
         }
+
 
         String token = null;
 

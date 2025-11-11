@@ -26,7 +26,7 @@ export class RegisterComponent {
       username: ['', Validators.required],
       password: ['', Validators.required],
       confirmPassword: ['', Validators.required],
-      phoneNumber: ['', [Validators.required, Validators.pattern(/^\d{11}$/)]],
+      phoneNumber: ['', [Validators.pattern(/^\d{11}$/)]],
       nationalId: ['', [Validators.required, Validators.pattern(/^\d{14}$/)]],
       dateOfBirth: ['', Validators.required],
       status: ['', Validators.required],
@@ -42,7 +42,7 @@ export class RegisterComponent {
       universityGrade: [''],
       isWorking: [''],
       workDetails: [''],
-      guardianPhone: [''],
+      guardiansPhone: [''],
       guardianRelation: ['']
     }, {
       validators: [this.passwordMatchValidator, this.phoneNotEqualGuardian]
@@ -58,18 +58,13 @@ export class RegisterComponent {
 
   phoneNotEqualGuardian(formGroup: AbstractControl): ValidationErrors | null {
     const phone = formGroup.get('phoneNumber')?.value;
-    const guardian = formGroup.get('guardianPhone')?.value;
+    const guardian = formGroup.get('guardiansPhone')?.value;
     if (!phone || !guardian) return null;
     return phone === guardian ? { sameAsGuardian: true } : null;
   }
 
-  toggleShowPassword() {
-    this.showPassword = !this.showPassword;
-  }
-
-  toggleShowConfirmPassword() {
-    this.showConfirmPassword = !this.showConfirmPassword;
-  }
+  toggleShowPassword() { this.showPassword = !this.showPassword; }
+  toggleShowConfirmPassword() { this.showConfirmPassword = !this.showConfirmPassword; }
 
   // ✅ Submit form
   onSubmit() {
@@ -78,91 +73,50 @@ export class RegisterComponent {
       return;
     }
 
-    if (this.registerForm.errors?.['sameAsGuardian']) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Invalid Input',
-        detail: 'Your phone number cannot match your guardian’s phone number.',
-        life: 4000
-      });
-      return;
-    }
-
     const raw = this.registerForm.value;
+
+    // ✅ Clean payload to match backend model
     const payload = {
       ...raw,
       status: raw.status?.toLowerCase() || '',
       studyType: raw.studyType?.toLowerCase() || '',
       dateOfBirth: raw.dateOfBirth
         ? new Date(raw.dateOfBirth).toISOString().split('T')[0]
-        : '',
-      isWorking: raw.isWorking === 'yes'
+        : null,
+      isWorking: raw.isWorking === 'yes',  // ✅ convert string to boolean
+      guardiansPhone: raw.guardiansPhone?.trim() || null, // ✅ convert empty string to null
+      phoneNumber: raw.phoneNumber?.trim() || null,
     };
 
-    console.log('📤 Sending payload:', payload);
-this.authService.register(payload).subscribe({
-  next: (res: any) => {   // 👈 added : any
-    this.messageService.add({
-      severity: 'success',
-      summary: 'Registration Successful 🎉',
-      detail: 'Your account has been created successfully!',
-      life: 4000
+    this.authService.register(payload).subscribe({
+      next: (res: any) => {
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Registration Successful 🎉',
+          detail: 'Your account has been created successfully!',
+          life: 4000
+        });
+        this.registerForm.reset();
+        setTimeout(() => this.router.navigate(['/login']), 2000);
+      },
+      error: (err: any) => {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Registration Failed ❌',
+          detail: err.error?.error || 'Something went wrong. Please try again.',
+          life: 5000
+        });
+      }
     });
-    this.registerForm.reset();
-    setTimeout(() => this.router.navigate(['/login']), 2000);
-  },
-  error: (err: any) => {  // 👈 added : any
-    console.error('❌ Registration error:', err);
-    this.messageService.add({
-      severity: 'error',
-      summary: 'Registration Failed ❌',
-      detail: err.error?.message || 'Something went wrong. Please try again.',
-      life: 5000
-    });
-  }
-});
-
   }
 
   // ✅ Toast for invalid form
   showValidationErrors() {
-    const controls = this.registerForm.controls;
-    const invalidFields: string[] = [];
-
-    for (const name in controls) {
-      const control = controls[name];
-      if (control.invalid) {
-        switch (name) {
-          case 'fullName': invalidFields.push('Full Name'); break;
-          case 'username': invalidFields.push('Username'); break;
-          case 'phoneNumber': invalidFields.push('Phone Number'); break;
-          case 'nationalId': invalidFields.push('National ID'); break;
-          case 'dateOfBirth': invalidFields.push('Date of Birth'); break;
-          case 'status': invalidFields.push('Status'); break;
-          case 'deaconFamily': invalidFields.push('Deacon Family'); break;
-          case 'deaconDegree': invalidFields.push('Deacon Degree'); break;
-          case 'password': invalidFields.push('Password'); break;
-          case 'confirmPassword': invalidFields.push('Confirm Password'); break;
-        }
-      }
-    }
-
-    if (this.registerForm.errors?.['passwordsMismatch']) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Password Error',
-        detail: 'Passwords do not match.',
-        life: 4000
-      });
-    }
-
-    if (invalidFields.length > 0) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Invalid Form',
-        detail: `Please correct: ${invalidFields.join(', ')}`,
-        life: 5000
-      });
-    }
+    this.messageService.add({
+      severity: 'warn',
+      summary: 'Invalid Form',
+      detail: 'Please fill in all required fields correctly.',
+      life: 4000
+    });
   }
 }
