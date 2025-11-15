@@ -24,18 +24,17 @@
   <main class="main">
 <header class="header profile-header">
   <div class="profile-title">
-    <h2>👤 My Profile</h2>
+    <h2>👤 My Profile  </h2>
   </div>
 
   <div class="qr-section">
     <qrcode
       *ngIf="qrData"
       [qrdata]="qrData"
-      [width]="120"
+      [width]="180"
       [errorCorrectionLevel]="'M'"
       [allowEmptyString]="true">
     </qrcode>
-    <p class="qr-label">📱 Scan for Attendance</p>
   </div>
 </header>
 

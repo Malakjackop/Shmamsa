@@ -204,15 +204,7 @@ input:disabled {
   font-weight: 500;
 }
 
-.profile-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
 
-.qr-section {
-  text-align: center;
-}
 /* === PROFILE HEADER (Title + QR Alignment) === */
 .profile-header {
   display: flex;
@@ -235,14 +227,10 @@ input:disabled {
   gap: 0.5rem;
 }
 
-.qr-section {
-  text-align: center;
+.qr-section  {
+  display: block;
 }
 
-.qr-section qrcode {
-  display: block;
-  margin-bottom: 0.5rem;
-}
 
 .qr-label {
   font-size: 0.85rem;
