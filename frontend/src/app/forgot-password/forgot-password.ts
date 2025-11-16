@@ -74,7 +74,6 @@ export class ForgotPasswordComponent {
           summary: 'Code Sent',
           detail: 'Reset code sent (check console).'
         });
-        console.log('🔑 Reset Code for user:', res.code);
         setTimeout(() => {
           this.router.navigate(['/reset-password'], { queryParams: { code: res.code } });
         }, 1500);

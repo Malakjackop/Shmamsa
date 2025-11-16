@@ -11,69 +11,70 @@ import java.util.Map;
 @Service
 public class WhatsAppService {
 
-    @Value("${whatsapp.api.url:https://graph.facebook.com/v19.0/PLACEHOLDER/messages}")
-    private String apiUrl;
+    @Value("${node.whatsapp.url:http://localhost:3000}")
+    private String nodeUrl;
 
-    @Value("${whatsapp.token:PLACEHOLDER}")
-    private String token;
+    @Value("${node.secret.key}")
+    private String secretKey;
 
-    // ✅ Use your WhatsApp business number here
-    private static final String SENDER_PHONE = "01033646696"; // your sender number
+    private final RestTemplate rest = new RestTemplate();
 
-    // ✅ Simulation mode (set to false if you have real API access)
-    private static final boolean SIMULATION_MODE = true;
 
-    /**
-     * Send WhatsApp reset code message
-     *
-     * @param user       The user to send the message to
-     * @param tokenCode  The 5-digit reset code
-     */
-    public void sendResetCode(User user, String tokenCode) {
-        String phoneNumber = user.getPhoneNumber() != null && !user.getPhoneNumber().isEmpty()
-                ? user.getPhoneNumber()
-                : user.getGuardiansPhone();
+    // ----- SEND OTP -----
+    public void sendResetCode(User user, String code) {
 
-        if (phoneNumber == null || phoneNumber.isEmpty()) {
-            System.out.println("⚠️ No valid phone number found for user: " + user.getUsername());
-            return;
-        }
+        String phone = user.getPhoneNumber() != null ?
+                user.getPhoneNumber() :
+                user.getGuardiansPhone();
 
-        // ✅ The message content with name and code
-        String message = String.format(
-                "👋 Hello %s!\n\nYour Deacons Family password reset code is: *%s*\n\n" +
-                        "Sent from St. Mary Church – Omrania ❤️\n(WhatsApp Service: %s)",
-                user.getFullName(), tokenCode, SENDER_PHONE
-        );
+        if (phone == null || phone.isEmpty()) return;
 
-        if (SIMULATION_MODE) {
-            System.out.println("📱 Simulating WhatsApp send:");
-            System.out.println("To: " + phoneNumber);
-            System.out.println("Message:\n" + message);
-            return;
-        }
+        String msg =
+                "👋 Hello " + user.getFullName() + " !\n\n" +
+                        "Your account (" + user.getUsername() + ") password reset code is: *" + code + "*\n" +
+                        "It’s valid for 5 minutes.\n\n" +
+                        "Sent from St. Mary Church – Omrania ❤";
 
-        // ✅ Real API mode
-        RestTemplate restTemplate = new RestTemplate();
+        sendMessage(phone, msg);
+    }
 
-        Map<String, Object> body = Map.of(
-                "messaging_product", "whatsapp",
-                "to", phoneNumber,
-                "type", "text",
-                "text", Map.of("preview_url", false, "body", message)
-        );
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(token);
+    // ----- SEND SUCCESS MESSAGE -----
+    public void sendPasswordChangedMessage(User user) {
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        String phone = user.getPhoneNumber() != null ?
+                user.getPhoneNumber() :
+                user.getGuardiansPhone();
 
+        String msg =
+                "✅ Hi " + user.getFullName() + ",\n\n" +
+                        "Your password has been changed successfully.\n" +
+                        "If this wasn’t you, please contact support immediately.";
+
+        sendMessage(phone, msg);
+    }
+
+
+    // ----- SEND WHATSAPP MESSAGE USING NODE JS -----
+    private void sendMessage(String phone, String msg) {
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, entity, String.class);
-            System.out.println("✅ WhatsApp API Response: " + response.getBody());
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.add("x-api-key", secretKey);
+
+            Map<String, String> body = Map.of(
+                    "phone", phone,
+                    "message", msg
+            );
+
+            rest.postForEntity(
+                    nodeUrl + "/send-message",
+                    new HttpEntity<>(body, headers),
+                    String.class
+            );
+
         } catch (Exception e) {
-            System.err.println("❌ Failed to send WhatsApp message: " + e.getMessage());
+            System.out.println("❌ WhatsApp send error: " + e.getMessage());
         }
     }
 }
