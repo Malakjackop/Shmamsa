@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -29,20 +28,23 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(Customizer.withDefaults())
+                .cors(cors -> {}) // uses corsConfigurationSource below
                 .authorizeHttpRequests(auth -> auth
+                        // ✅ PUBLIC AUTH ENDPOINTS
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
                                 "/api/auth/forgot-password",
-                                "/api/auth/forgot-password/select",
-                                "/api/auth/reset-password",
-                                "/api/auth/user"   // ✅ changed from /profile to /user
+                                "/api/auth/reset-password"
                         ).permitAll()
+
+                        // 🔐 EVERYTHING ELSE NEEDS LOGIN
                         .anyRequest().authenticated()
                 )
+                // ✅ IMPORTANT: add jwtFilter so /api/auth/user works
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -56,11 +58,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+
+        // ✅ allow Angular dev server
         configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+
+        // ✅ allow sending cookies
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

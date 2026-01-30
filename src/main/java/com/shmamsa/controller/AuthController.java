@@ -1,15 +1,15 @@
 package com.shmamsa.controller;
 
-import com.shmamsa.dto.ProfileUpdateRequest; // ✅ make sure this import exists
+import com.shmamsa.dto.ProfileUpdateRequest;
 import com.shmamsa.model.User;
 import com.shmamsa.service.AuthService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 
 @RestController
@@ -41,7 +41,7 @@ public class AuthController {
 
             ResponseCookie cookie = ResponseCookie.from("jwt", token)
                     .httpOnly(true)
-                    .secure(false)
+                    .secure(false) // ✅ true in production with HTTPS
                     .path("/")
                     .maxAge(24 * 60 * 60)
                     .sameSite("Lax")
@@ -54,8 +54,10 @@ public class AuthController {
         }
     }
 
+    // ✅ Get logged in user data (requires JWT)
     @GetMapping("/user")
     public ResponseEntity<?> getFullUser(Authentication authentication) {
+
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
         }
@@ -71,60 +73,71 @@ public class AuthController {
         return ResponseEntity.ok(user);
     }
 
-
     // ✅ Logout
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
+
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(false) // ✅ true in production with HTTPS
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
                 .build();
+
         response.addHeader("Set-Cookie", cookie.toString());
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
-    // ✅ Forgot password endpoints
+    // ✅ Forgot Password (EMAIL) -> sends OTP by email
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
-        String phoneNumber = request.get("phoneNumber");
+
+        String email = request.get("email");
+
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        }
+
         try {
-            Map<String, Object> result = authService.generateResetToken(phoneNumber);
+            Map<String, Object> result = authService.generateResetTokenByEmail(email.trim());
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @PostMapping("/forgot-password/select")
-    public ResponseEntity<?> forgotPasswordSelect(@RequestBody Map<String, String> request) {
-        String phoneNumber = request.get("phoneNumber");
-        String username = request.get("username");
-        try {
-            String code = authService.generateResetTokenForUser(phoneNumber, username);
-            return ResponseEntity.ok(Map.of("code", code));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
+    // ✅ Reset Password (OTP + New Password)
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+
         String token = request.get("token");
         String newPassword = request.get("newPassword");
+
+        if (token == null || token.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "OTP code is required"));
+        }
+
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "New password is required"));
+        }
+
         try {
-            authService.resetPassword(token, newPassword);
+            authService.resetPassword(token.trim(), newPassword.trim());
             return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    // ✅ Update Profile
+    // ✅ Update Profile (requires JWT)
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest updated, Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+
         try {
             String username = authentication.getName();
             User existingUser = authService.findByUsername(username);
@@ -148,6 +161,7 @@ public class AuthController {
             existingUser.setWorkDetails(updated.getWorkDetails());
 
             authService.saveUser(existingUser);
+
             return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

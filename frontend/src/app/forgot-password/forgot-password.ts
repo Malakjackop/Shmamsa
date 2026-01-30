@@ -18,66 +18,33 @@ export class ForgotPasswordComponent {
   router = inject(Router);
 
   forgotForm = this.fb.group({
-    phoneNumber: ['', Validators.required],
-    username: ['']
+    email: ['', [Validators.required, Validators.email]]
   });
 
-  multipleUsers: any[] = [];
-  step = 1;
-
-  // ✅ Step 1: Submit phone number
   onSubmit() {
     if (this.forgotForm.invalid) {
       this.messageService.add({
         severity: 'warn',
         summary: 'Missing Field',
-        detail: 'Please enter your phone number.'
+        detail: 'Please enter a valid email.'
       });
       return;
     }
 
-    const { phoneNumber } = this.forgotForm.value;
-    this.authService.forgotPassword(phoneNumber!).subscribe({
-      next: (res: any) => {
-        if (res.multipleUsers) {
-          this.multipleUsers = res.users;
-          this.step = 2;
-        } else {
-          this.messageService.add({
-            severity: 'success',
-            summary: 'Code Sent',
-            detail: 'A 5-digit reset code has been sent (check console for now).'
-          });
-          console.log('🔑 Reset Code:', res.code);
-          setTimeout(() => {
-            this.router.navigate(['/reset-password'], { queryParams: { code: res.code } });
-          }, 1500);
-        }
-      },
-      error: (err: any) => {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: err.error?.error || 'Something went wrong.'
-        });
-      }
-    });
-  }
+    const { email } = this.forgotForm.value;
 
-  // ✅ Step 2: Select user if multiple
-  onSelectUser(username: string) {
-    const { phoneNumber } = this.forgotForm.value;
-    this.authService.forgotPasswordWithUsername(phoneNumber!, username).subscribe({
-      next: (res: any) => {
+    this.authService.forgotPassword(email!).subscribe({
+      next: () => {
         this.messageService.add({
           severity: 'success',
           summary: 'Code Sent',
-          detail: 'Reset code sent (check console).'
+          detail: 'A 5-digit reset code has been sent to your email.',
+          life: 2500
         });
-        console.log('🔑 Reset Code for user:', res.code);
+
         setTimeout(() => {
-          this.router.navigate(['/reset-password'], { queryParams: { code: res.code } });
-        }, 1500);
+          this.router.navigate(['/reset-password']);
+        }, 1200);
       },
       error: (err: any) => {
         this.messageService.add({

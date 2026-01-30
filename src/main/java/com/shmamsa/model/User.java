@@ -110,6 +110,11 @@ public class User {
     @Column(length = 50)
     private String deaconDegree; // ✅ new field
 
+
+    @NotBlank(message = "Email is required")
+    @Column(nullable = false, unique = true, length = 120)
+    private String email;
+
     // 16️⃣ Role
     private String role = "USER";
 }

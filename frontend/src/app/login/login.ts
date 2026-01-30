@@ -43,24 +43,14 @@ export class LoginComponent {
     const { username, password } = this.loginForm.value;
 
 this.authService.login(username, password).subscribe({
-  next: (res: any) => {   // 👈 added : any
-    localStorage.setItem('token', res.token);
-    this.messageService.add({
-      severity: 'success',
-      summary: 'Login Successful',
-      detail: `Welcome back, ${username}!`,
-    });
-    setTimeout(() => this.router.navigate(['/dashboard']), 1500);
+  next: () => {
+    this.messageService.add({ severity:'success', summary:'Login Successful', detail:`Welcome back, ${username}!` });
+    setTimeout(() => this.router.navigate(['/dashboard']), 1000);
   },
-error: (err: any) => {
-  this.loginError = err.error?.error || 'Invalid username or password';
-  this.messageService.add({
-    severity: 'error',
-    summary: 'Login Failed',
-    detail: this.loginError || '', // 👈 ensures type safety
-  });
-}
-
+  error: (err) => {
+    this.loginError = err.error?.error || 'Invalid username or password';
+  }
 });
+
   }
 }

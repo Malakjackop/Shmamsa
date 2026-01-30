@@ -7,10 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -19,23 +16,45 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
-    private final WhatsAppService whatsAppService;
+    private final EmailService emailService;
 
-    // Temporary in-memory store for reset tokens (for demo)
-    private final Map<String, String> resetTokens = new HashMap<>();
+    // ===============================
+    // OTP storage with expiry + user
+    // ===============================
+    private static class OtpData {
+        String username;
+        long expiresAt; // ms
+        OtpData(String username, long expiresAt) {
+            this.username = username;
+            this.expiresAt = expiresAt;
+        }
+    }
 
-    // ✅ Register new user
+    private final Map<String, OtpData> otpStore = new HashMap<>();         // otp -> data
+    private final Map<String, Long> otpTimestamps = new HashMap<>();       // username -> last otp send time
+    private final Map<String, Integer> hourlyRequests = new HashMap<>();   // username -> count last hour
+
+    private static final long OTP_TTL_MS = 5 * 60 * 1000;   // 5 minutes
+    private static final long COOLDOWN_MS = 45_000;         // 45 seconds
+    private static final int HOURLY_LIMIT = 5;
+
+    // -----------------------------------------------------------
+    // REGISTER
+    // -----------------------------------------------------------
     public void register(User user) {
         userRepository.findByUsername(user.getUsername())
-                .ifPresent(existing -> {
-                    throw new RuntimeException("Username already in use");
-                });
+                .ifPresent(existing -> { throw new RuntimeException("Username already in use"); });
+
+        userRepository.findByEmail(user.getEmail())
+                .ifPresent(existing -> { throw new RuntimeException("Email already in use"); });
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
     }
 
-    // ✅ Login user and return JWT token
+    // -----------------------------------------------------------
+    // LOGIN
+    // -----------------------------------------------------------
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -47,92 +66,106 @@ public class AuthService {
         return jwtUtils.generateToken(user.getUsername());
     }
 
-    // ✅ Decode token and return user
+    // -----------------------------------------------------------
+    // GET USER FROM TOKEN
+    // -----------------------------------------------------------
     public User getUserFromToken(String token) {
         String username = jwtUtils.extractUsername(token);
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    // ✅ Helper method for cleaner profile endpoint
-    public User findByUsername(String username) {
-        return userRepository.findByUsername(username).orElse(null);
+    // -----------------------------------------------------------
+    // FORGOT PASSWORD (Email)
+    // -----------------------------------------------------------
+    public Map<String, Object> generateResetTokenByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Email is required");
+        }
+
+        User user = userRepository.findByEmail(email.trim())
+                .orElseThrow(() -> new RuntimeException("No user found with this email"));
+
+        sendOtpForUserByEmail(user);
+
+        return Map.of("message", "OTP sent successfully to your email");
     }
 
-    // ✅ Generate reset token and send via WhatsApp (simulation mode for now)
-    public Map<String, Object> generateResetToken(String phoneNumber) {
-        // Find all users with this phone (either personal or guardian)
-        List<User> matches = userRepository.findAll().stream()
-                .filter(u -> phoneNumber.equals(u.getPhoneNumber()) || phoneNumber.equals(u.getGuardiansPhone()))
-                .toList();
+    // -----------------------------------------------------------
+    // OTP send helper (limits + ttl) - EMAIL
+    // -----------------------------------------------------------
+    private void sendOtpForUserByEmail(User user) {
+        String username = user.getUsername();
+        long now = System.currentTimeMillis();
 
-        if (matches.isEmpty()) {
-            throw new RuntimeException("No user found with this number");
+        // Cooldown
+        if (otpTimestamps.containsKey(username)) {
+            long lastSent = otpTimestamps.get(username);
+            if (now - lastSent < COOLDOWN_MS) {
+                throw new RuntimeException("Wait 45 seconds before requesting another code.");
+            }
         }
 
-        // If multiple users share same guardian phone — ask frontend to choose
-        if (matches.size() > 1) {
-            List<Map<String, String>> usersList = matches.stream()
-                    .map(u -> Map.of(
-                            "username", u.getUsername(),
-                            "fullName", u.getFullName(),
-                            "deaconFamily", u.getDeaconFamily()
-                    ))
-                    .toList();
-
-            return Map.of(
-                    "multipleUsers", true,
-                    "users", usersList
-            );
+        // Hourly limit
+        int count = hourlyRequests.getOrDefault(username, 0);
+        if (count >= HOURLY_LIMIT) {
+            throw new RuntimeException("Too many OTP requests. Try again in 1 hour.");
         }
+        hourlyRequests.put(username, count + 1);
 
-        // ✅ Otherwise, generate the reset code directly
-        User user = matches.get(0);
+        // auto reset hourly counter
+        new Timer().schedule(new TimerTask() {
+            @Override public void run() { hourlyRequests.remove(username); }
+        }, 3600_000);
+
+        // Generate OTP
         String code = String.format("%05d", new Random().nextInt(100000));
-        resetTokens.put(code, user.getUsername());
-        whatsAppService.sendResetCode(user, code);
 
-        return Map.of(
-                "multipleUsers", false,
-                "code", code,
-                "message", "Reset code sent successfully"
-        );
+        // Store OTP with expiry
+        otpStore.put(code, new OtpData(username, now + OTP_TTL_MS));
+
+        otpTimestamps.put(username, now);
+
+        // Send Email
+        emailService.sendOtpEmail(user.getEmail(), user.getFullName(), user.getUsername(), code);
+
+        // auto remove OTP after TTL
+        new Timer().schedule(new TimerTask() {
+            @Override public void run() { otpStore.remove(code); }
+        }, OTP_TTL_MS);
     }
 
-    public String generateResetTokenForUser(String phoneNumber, String username) {
-        User user = userRepository.findByUsername(username)
-                .filter(u -> phoneNumber.equals(u.getPhoneNumber()) || phoneNumber.equals(u.getGuardiansPhone()))
-                .orElseThrow(() -> new RuntimeException("User not found for this number"));
+    // -----------------------------------------------------------
+    // RESET PASSWORD (OTP + new pass)
+    // -----------------------------------------------------------
+    public void resetPassword(String otp, String newPassword) {
+        if (otp == null || otp.isBlank()) throw new RuntimeException("OTP is required");
+        if (newPassword == null || newPassword.isBlank()) throw new RuntimeException("New password is required");
 
-        String code = String.format("%05d", new Random().nextInt(100000));
-        resetTokens.put(code, username);
-        whatsAppService.sendResetCode(user, code);
+        OtpData data = otpStore.get(otp);
+        if (data == null) throw new RuntimeException("Invalid or expired OTP");
 
-        return code;
-    }
-
-
-
-    // ✅ Reset password using token
-    public void resetPassword(String token, String newPassword) {
-        String username = resetTokens.get(token);
-        if (username == null) {
-            throw new RuntimeException("Invalid or expired reset token");
+        if (System.currentTimeMillis() > data.expiresAt) {
+            otpStore.remove(otp);
+            throw new RuntimeException("OTP expired");
         }
+
+        String username = data.username;
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Update password
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
-        // Remove token after successful reset
-        resetTokens.remove(token);
+        otpStore.remove(otp);
+    }
+
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username).orElse(null);
     }
 
     public void saveUser(User user) {
         userRepository.save(user);
     }
-
 }
