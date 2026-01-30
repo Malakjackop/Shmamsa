@@ -32,6 +32,7 @@ export class RegisterComponent {
       status: ['', Validators.required],
       deaconFamily: ['', Validators.required],
       deaconDegree: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
       graduatedFrom: [''],
       graduateJob: [''],
       studyType: [''],

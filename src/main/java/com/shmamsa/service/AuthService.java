@@ -16,32 +16,41 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
-    private final WhatsAppService whatsAppService;
+    private final EmailService emailService;
 
-    // OTP storage
-    private final Map<String, String> otpUserMap = new HashMap<>();        // otp → username
+    // ===============================
+    // OTP storage with expiry + user
+    // ===============================
+    private static class OtpData {
+        String username;
+        long expiresAt; // ms
+        OtpData(String username, long expiresAt) {
+            this.username = username;
+            this.expiresAt = expiresAt;
+        }
+    }
 
-    // OTP limits PER ACCOUNT (username)
-    private final Map<String, Long> otpTimestamps = new HashMap<>();       // username → last OTP time
-    private final Map<String, Integer> otpAttempts = new HashMap<>();      // username → failed attempts
-    private final Map<String, Integer> hourlyRequests = new HashMap<>();   // username → OTP count last hour
+    private final Map<String, OtpData> otpStore = new HashMap<>();         // otp -> data
+    private final Map<String, Long> otpTimestamps = new HashMap<>();       // username -> last otp send time
+    private final Map<String, Integer> hourlyRequests = new HashMap<>();   // username -> count last hour
 
-
+    private static final long OTP_TTL_MS = 5 * 60 * 1000;   // 5 minutes
+    private static final long COOLDOWN_MS = 45_000;         // 45 seconds
+    private static final int HOURLY_LIMIT = 5;
 
     // -----------------------------------------------------------
     // REGISTER
     // -----------------------------------------------------------
     public void register(User user) {
         userRepository.findByUsername(user.getUsername())
-                .ifPresent(existing -> {
-                    throw new RuntimeException("Username already in use");
-                });
+                .ifPresent(existing -> { throw new RuntimeException("Username already in use"); });
+
+        userRepository.findByEmail(user.getEmail())
+                .ifPresent(existing -> { throw new RuntimeException("Email already in use"); });
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
     }
-
-
 
     // -----------------------------------------------------------
     // LOGIN
@@ -57,10 +66,8 @@ public class AuthService {
         return jwtUtils.generateToken(user.getUsername());
     }
 
-
-
     // -----------------------------------------------------------
-    // GET USER FROM JWT TOKEN
+    // GET USER FROM TOKEN
     // -----------------------------------------------------------
     public User getUserFromToken(String token) {
         String username = jwtUtils.extractUsername(token);
@@ -68,172 +75,82 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-
-
     // -----------------------------------------------------------
-    // GENERATE OTP FROM PHONE NUMBER
-    // (Handles 1 user OR returns user list for selection)
+    // FORGOT PASSWORD (Email)
     // -----------------------------------------------------------
-    public Map<String, Object> generateResetToken(String phoneNumber) {
-
-        // Find users matching phone number
-        List<User> matches = userRepository.findAll().stream()
-                .filter(u -> phoneNumber.equals(u.getPhoneNumber())
-                        || phoneNumber.equals(u.getGuardiansPhone()))
-                .toList();
-
-        if (matches.isEmpty()) {
-            throw new RuntimeException("No user found with this phone number");
+    public Map<String, Object> generateResetTokenByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Email is required");
         }
 
-        // MULTIPLE USERS FOUND → return list to front-end
-        if (matches.size() > 1) {
-            List<Map<String, String>> usersList = matches.stream()
-                    .map(u -> Map.of(
-                            "username", u.getUsername(),
-                            "fullName", u.getFullName(),
-                            "deaconFamily", u.getDeaconFamily()
-                    ))
-                    .toList();
+        User user = userRepository.findByEmail(email.trim())
+                .orElseThrow(() -> new RuntimeException("No user found with this email"));
 
-            return Map.of(
-                    "multipleUsers", true,
-                    "users", usersList
-            );
-        }
+        sendOtpForUserByEmail(user);
 
-        // ONLY ONE USER
-        User user = matches.get(0);
+        return Map.of("message", "OTP sent successfully to your email");
+    }
+
+    // -----------------------------------------------------------
+    // OTP send helper (limits + ttl) - EMAIL
+    // -----------------------------------------------------------
+    private void sendOtpForUserByEmail(User user) {
         String username = user.getUsername();
         long now = System.currentTimeMillis();
 
-        // ---- 45 second cooldown per account ----
+        // Cooldown
         if (otpTimestamps.containsKey(username)) {
             long lastSent = otpTimestamps.get(username);
-            if (now - lastSent < 45_000) {
-                throw new RuntimeException("Wait 45 seconds before requesting another code.");
-            }
-        }
-
-        // ---- Hourly limit: Max 5 per account ----
-        int count = hourlyRequests.getOrDefault(username, 0);
-        if (count >= 5) {
-            throw new RuntimeException("Too many OTP requests. Try again in 1 hour.");
-        }
-        hourlyRequests.put(username, count + 1);
-
-        // Reset counter after 1 hour
-        new Timer().schedule(new TimerTask() {
-            @Override
-            public void run() {
-                hourlyRequests.remove(username);
-            }
-        }, 3600_000);
-
-        // ---- Generate OTP ----
-        String code = String.format("%05d", new Random().nextInt(100000));
-
-        otpUserMap.put(code, username);
-        otpTimestamps.put(username, now);
-        otpAttempts.put(username, 0);
-
-        // ---- Send via WhatsApp ----
-        whatsAppService.sendResetCode(user, code);
-
-        return Map.of(
-                "multipleUsers", false,
-                "message", "OTP sent successfully"
-        );
-    }
-
-
-
-    // -----------------------------------------------------------
-    // GENERATE OTP WHEN USER IS SELECTED FROM LIST
-    // (Called when multiple users use the same phone number)
-    // -----------------------------------------------------------
-    public String generateResetTokenForUser(String phoneNumber, String username) {
-
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Validate phone belongs to this user
-        if (!phoneNumber.equals(user.getPhoneNumber()) &&
-                !phoneNumber.equals(user.getGuardiansPhone())) {
-            throw new RuntimeException("Phone number does not belong to this user");
-        }
-
-        long now = System.currentTimeMillis();
-
-        // 45-second cooldown
-        if (otpTimestamps.containsKey(username)) {
-            long lastSent = otpTimestamps.get(username);
-            if (now - lastSent < 45_000) {
+            if (now - lastSent < COOLDOWN_MS) {
                 throw new RuntimeException("Wait 45 seconds before requesting another code.");
             }
         }
 
         // Hourly limit
         int count = hourlyRequests.getOrDefault(username, 0);
-        if (count >= 5) {
+        if (count >= HOURLY_LIMIT) {
             throw new RuntimeException("Too many OTP requests. Try again in 1 hour.");
         }
         hourlyRequests.put(username, count + 1);
 
-        // Auto-reset limit
+        // auto reset hourly counter
         new Timer().schedule(new TimerTask() {
-            @Override
-            public void run() {
-                hourlyRequests.remove(username);
-            }
+            @Override public void run() { hourlyRequests.remove(username); }
         }, 3600_000);
 
         // Generate OTP
         String code = String.format("%05d", new Random().nextInt(100000));
 
-        otpUserMap.put(code, username);
+        // Store OTP with expiry
+        otpStore.put(code, new OtpData(username, now + OTP_TTL_MS));
+
         otpTimestamps.put(username, now);
-        otpAttempts.put(username, 0);
 
-        whatsAppService.sendResetCode(user, code);
+        // Send Email
+        emailService.sendOtpEmail(user.getEmail(), user.getFullName(), user.getUsername(), code);
 
-        return code;
+        // auto remove OTP after TTL
+        new Timer().schedule(new TimerTask() {
+            @Override public void run() { otpStore.remove(code); }
+        }, OTP_TTL_MS);
     }
 
-
-
     // -----------------------------------------------------------
-    // VERIFY OTP
-    // -----------------------------------------------------------
-    public void verifyOtp(String otp) {
-
-        String username = otpUserMap.get(otp);
-
-        if (username == null) {
-            throw new RuntimeException("Invalid or expired OTP");
-        }
-
-        int attempts = otpAttempts.getOrDefault(username, 0);
-
-        if (attempts >= 5) {
-            throw new RuntimeException("Too many failed attempts. Try again later.");
-        }
-
-        // OTP is correct → reset attempts
-        otpAttempts.remove(username);
-    }
-
-
-
-    // -----------------------------------------------------------
-    // RESET PASSWORD
+    // RESET PASSWORD (OTP + new pass)
     // -----------------------------------------------------------
     public void resetPassword(String otp, String newPassword) {
+        if (otp == null || otp.isBlank()) throw new RuntimeException("OTP is required");
+        if (newPassword == null || newPassword.isBlank()) throw new RuntimeException("New password is required");
 
-        String username = otpUserMap.get(otp);
+        OtpData data = otpStore.get(otp);
+        if (data == null) throw new RuntimeException("Invalid or expired OTP");
 
-        if (username == null)
-            throw new RuntimeException("Invalid or expired OTP");
+        if (System.currentTimeMillis() > data.expiresAt) {
+            otpStore.remove(otp);
+            throw new RuntimeException("OTP expired");
+        }
+
+        String username = data.username;
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -241,27 +158,14 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
-        // Clear OTP
-        otpUserMap.remove(otp);
-
-        // Send confirmation message
-        whatsAppService.sendPasswordChangedMessage(user);
+        otpStore.remove(otp);
     }
 
-
-
-    // -----------------------------------------------------------
-    // FIND USER BY USERNAME (Controller uses this)
-    // -----------------------------------------------------------
     public User findByUsername(String username) {
         return userRepository.findByUsername(username).orElse(null);
     }
 
-    // -----------------------------------------------------------
-// SAVE USER (USED BY CONTROLLER)
-// -----------------------------------------------------------
     public void saveUser(User user) {
         userRepository.save(user);
     }
-
 }

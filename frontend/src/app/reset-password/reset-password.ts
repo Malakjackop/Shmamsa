@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-reset-password',
-    standalone:false,
+  standalone:false,
   templateUrl: './reset-password.html',
   styleUrls: ['./reset-password.css'],
   providers: [MessageService]
@@ -31,6 +31,7 @@ export class ResetPasswordComponent {
     }
 
     const { token, newPassword } = this.resetForm.value;
+
     this.authService.resetPassword(token!, newPassword!).subscribe({
       next: () => {
         this.messageService.add({
@@ -38,7 +39,7 @@ export class ResetPasswordComponent {
           summary: 'Password Reset',
           detail: 'Your password has been updated successfully!'
         });
-        setTimeout(() => this.router.navigate(['/login']), 2000);
+        setTimeout(() => this.router.navigate(['/login']), 1500);
       },
       error: (err) => {
         this.messageService.add({
