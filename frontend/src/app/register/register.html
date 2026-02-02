@@ -24,19 +24,21 @@
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="nationalId" placeholder="NATIONAL ID" />
+          <input type="text" formControlName="nationalId"  name="national-id" autocomplete="off" placeholder="NATIONAL ID" (blur)="onNationalIdBlur()" />
         </div>
-        
+
         <div class="input-group small">
   <input type="email" formControlName="email" placeholder="EMAIL" required />
 </div>
 
 
         <div class="input-group small">
-          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" />
+          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" [readonly]="true"          autocomplete="off"
+                 (keydown)="$event.preventDefault()"
+                 (click)="$event.preventDefault()" />
         </div>
-      </div>
 
+      </div>
       <!-- ✅ Deacon Family + Degree -->
       <div class="input-row">
         <!-- Deacon Family -->

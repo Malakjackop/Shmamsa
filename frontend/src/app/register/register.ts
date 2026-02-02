@@ -19,6 +19,7 @@ export class RegisterComponent {
   registerForm: FormGroup;
   showPassword = false;
   showConfirmPassword = false;
+  submitted = false;
 
   constructor() {
     this.registerForm = this.fb.group({
@@ -27,7 +28,14 @@ export class RegisterComponent {
       password: ['', Validators.required],
       confirmPassword: ['', Validators.required],
       phoneNumber: ['', [Validators.pattern(/^\d{11}$/)]],
-      nationalId: ['', [Validators.required, Validators.pattern(/^\d{14}$/)]],
+      nationalId: [
+        '',
+        [
+          Validators.required,
+          Validators.pattern(/^\d{14}$/),
+          this.nationalIdAgeValidator
+        ]
+      ],
       dateOfBirth: ['', Validators.required],
       status: ['', Validators.required],
       deaconFamily: ['', Validators.required],
@@ -50,12 +58,112 @@ export class RegisterComponent {
     });
   }
 
+
+    // ✅ Triggered when leaving the National ID input
+    onNationalIdBlur(){
+      const value = this.registerForm.get('nationalId')?.value;
+      const dobControl = this.registerForm.get('dateOfBirth');
+
+      // ✅ if NationalId less than 14 digit
+      if (!value || value.length !== 14) {
+        dobControl?.setValue('');
+        dobControl?.enable();
+        if (value) {
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Wrong NationalID',
+            detail: 'National ID must be 14 digits',
+            life: 4000
+          });
+        }
+        return;
+      }
+
+
+      const birthDate = this.extractBirthDateFromNationalId(value);
+
+      if (!birthDate) {
+        dobControl?.setValue('');
+        dobControl?.enable();
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Wrong NationalID',
+          detail: 'Invalid NationalID',
+          life: 4000
+        });
+        return;
+      }
+
+
+      dobControl?.setValue(birthDate.toISOString().split('T')[0]);
+      dobControl?.disable();
+      const age = this.calculateAge(birthDate);
+      if (age < 6) {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Age is less than 6 years',
+          detail: 'Age must be older than 6 years',
+          life: 4000
+        });
+      }
+  }
+
+  // ✅ Calculate Age
+  calculateAge(birthDate: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  }
+
   // ✅ Validators
   passwordMatchValidator(formGroup: AbstractControl): ValidationErrors | null {
     const pass = formGroup.get('password')?.value;
     const confirm = formGroup.get('confirmPassword')?.value;
     return pass === confirm ? null : { passwordsMismatch: true };
   }
+
+  nationalIdAgeValidator = (control: AbstractControl): ValidationErrors | null => {
+    const nationalId = control.value;
+    if (!nationalId || nationalId.length !== 14) return null;
+
+    const century = nationalId[0] === '2' ? 1900 : 2000;
+    const year = century + parseInt(nationalId.substring(1, 3));
+    const month = parseInt(nationalId.substring(3, 5)) - 1;
+    const day = parseInt(nationalId.substring(5, 7));
+
+    const birthDate = new Date(year, month, day);
+
+    if (isNaN(birthDate.getTime())) {
+      return { invalidNationalId: true };
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    return age < 6 ? { underAge: true } : null;
+  };
+
+  extractBirthDateFromNationalId(nationalId: string): Date | null {
+    if (!nationalId || nationalId.length !== 14) return null;
+
+    const century = nationalId[0] === '2' ? 1900 : 2000;
+    const year = century + parseInt(nationalId.substring(1, 3));
+    const month = parseInt(nationalId.substring(3, 5)) - 1; // JS months 0-11
+    const day = parseInt(nationalId.substring(5, 7));
+
+    const date = new Date(Date.UTC(year, month, day));
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+
 
   phoneNotEqualGuardian(formGroup: AbstractControl): ValidationErrors | null {
     const phone = formGroup.get('phoneNumber')?.value;
@@ -69,6 +177,7 @@ export class RegisterComponent {
 
   // ✅ Submit form
   onSubmit() {
+    this.submitted = true;
     if (this.registerForm.invalid) {
       this.showValidationErrors();
       return;
