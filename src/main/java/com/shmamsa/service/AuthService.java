@@ -4,6 +4,7 @@ import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,9 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
+
+    @Value("${app.servant-register-secret:CHANGE_ME}")
+    private String servantRegisterSecret;
 
     // ===============================
     // OTP storage with expiry + user
@@ -48,11 +52,35 @@ public class AuthService {
         userRepository.findByEmail(user.getEmail())
                 .ifPresent(existing -> { throw new RuntimeException("Email already in use"); });
 
+        // ✅ Force default role for normal registration
+        user.setRole("MAKHDOM");
+
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
     }
 
-    // -----------------------------------------------------------
+    
+
+// -----------------------------------------------------------
+// REGISTER SERVANT (Special link)
+// -----------------------------------------------------------
+public void registerServant(User user, String secret) {
+    if (secret == null || !secret.equals(servantRegisterSecret)) {
+        throw new RuntimeException("Invalid registration link");
+    }
+
+    userRepository.findByUsername(user.getUsername())
+            .ifPresent(existing -> { throw new RuntimeException("Username already in use"); });
+
+    userRepository.findByEmail(user.getEmail())
+            .ifPresent(existing -> { throw new RuntimeException("Email already in use"); });
+
+    user.setRole("KHADIM"); // ✅ Force servant role
+    user.setPassword(passwordEncoder.encode(user.getPassword()));
+    userRepository.save(user);
+}
+
+// -----------------------------------------------------------
     // LOGIN
     // -----------------------------------------------------------
     public String login(String username, String password) {
@@ -63,7 +91,7 @@ public class AuthService {
             throw new RuntimeException("Invalid username or password");
         }
 
-        return jwtUtils.generateToken(user.getUsername());
+        return jwtUtils.generateToken(user.getUsername(), user.getRole());
     }
 
     // -----------------------------------------------------------

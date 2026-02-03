@@ -15,6 +15,7 @@ export class ProfileComponent implements OnInit {
   authService = inject(AuthService);
   messageService = inject(MessageService);
 
+    
   editMode = false;
   qrData = ''; // ✅ holds QR content
   user: any;
@@ -38,10 +39,12 @@ export class ProfileComponent implements OnInit {
 ngOnInit() {
   this.authService.getUserData().subscribe({
     next: (user) => {
-      this.profileForm.patchValue(user);
-      // ✅ Generate QR code content dynamically
-      this.qrData = JSON.stringify({
-        name: user.fullName,
+        this.user = user;
+        this.profileForm.patchValue(user);
+        this.qrData = JSON.stringify({
+        id: user.id,
+        fullName: user.fullName,
+        deaconFamily: user.deaconFamily
       });
     },
     error: () => this.messageService.add({
@@ -51,6 +54,10 @@ ngOnInit() {
     }),
   });
 }
+isServantOrAbove(): boolean {
+  return ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
+}
+
 
 
   toggleEdit() {

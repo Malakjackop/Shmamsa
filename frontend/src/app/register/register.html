@@ -8,7 +8,7 @@
     <!-- ✅ PrimeNG Toast -->
     <p-toast ></p-toast>
 
-    <form [formGroup]="registerForm" class="login-form" (ngSubmit)="onSubmit()">
+    <form [formGroup]="registerForm" class="login-form" (ngSubmit)="submit()">
       <!-- Row 1 -->
       <div class="input-row">
         <div class="input-group small">
@@ -135,11 +135,11 @@
         <!-- Work Info -->
         <div class="input-row">
           <div class="input-group small">
-            <select formControlName="isWorking">
-              <option value="" disabled selected>Do you work?</option>
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
+          <select formControlName="isWorking">
+            <option value="" disabled selected>Do you work?</option>
+            <option [ngValue]="false">No</option>
+            <option [ngValue]="true">Yes</option>
+          </select>
           </div>
         </div>
 
@@ -189,6 +189,14 @@
           </span>
         </div>
       </div>
+      <div class="input-group" *ngIf="isServant">
+        <label for="secret">Secret</label>
+        <input id="secret" type="password" formControlName="secret" placeholder="Enter secret" />
+        <small class="error" *ngIf="registerForm.get('secret')?.touched && registerForm.get('secret')?.invalid">
+          Secret is required.
+        </small>
+      </div>
+
 
       <button type="submit" class="login-btn">REGISTER</button>
 

@@ -9,16 +9,28 @@
       <p>St Mary Church – Omrania</p>
     </div>
 
-    <ul class="menu">
-      <li class="active"><i class="pi pi-home"></i> Dashboard</li>
-      <li><i class="pi pi-chart-bar"></i> Grades</li>
-      <li><i class="pi pi-calendar"></i> Schedule</li>
-      <li><i class="pi pi-pencil"></i> Assignments</li>
-      <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> Profile</li>
-      <li><i class="pi pi-cog"></i> about us</li>
-      <!-- ✅ Add logout item -->
-      <li (click)="logout()"><i class="pi pi-sign-out"></i> Logout</li>
-    </ul>
+    
+<ul class="menu">
+  <li routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">
+    <i class="pi pi-home"></i> Dashboard
+  </li>
+
+  <!-- MAKHDOM sees old labels (no special pages) -->
+  <ng-container *ngIf="user?.role === 'MAKHDOM'; else servantMenu">
+    <li><i class="pi pi-chart-bar"></i> Grades</li>
+    <li><i class="pi pi-pencil"></i> Assignments</li>
+  </ng-container>
+
+  <ng-template #servantMenu>
+    <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> Attendance</li>
+    <li routerLink="/family" routerLinkActive="active"><i class="pi pi-users"></i> Members of your family</li>
+  </ng-template>
+
+  <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> Profile</li>
+  <li routerLink="/about" routerLinkActive="active"><i class="pi pi-info-circle"></i> About us</li>
+  <li (click)="logout()"><i class="pi pi-sign-out"></i> Logout</li>
+</ul>
+
   </aside>
 
   <!-- Main -->

@@ -30,7 +30,23 @@ public class AuthController {
         }
     }
 
-    // ✅ Login endpoint — sets JWT as HttpOnly cookie
+    
+
+// ✅ Register-servant endpoint (special link)
+@PostMapping("/register-servant")
+public ResponseEntity<?> registerServant(
+        @RequestHeader(value = "X-REG-SECRET", required = false) String secret,
+        @RequestBody User user
+) {
+    try {
+        authService.registerServant(user, secret);
+        return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
+    } catch (RuntimeException e) {
+        return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+    }
+}
+
+// ✅ Login endpoint — sets JWT as HttpOnly cookie
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request, HttpServletResponse response) {
         String username = request.get("username");

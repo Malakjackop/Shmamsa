@@ -1,232 +1,211 @@
-import { Component, inject } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
-import { AuthService } from '../services/auth.service';
-import { Router } from '@angular/router';
+import { Component, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Router, RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
+
+import { ToastModule } from 'primeng/toast';
+import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { InputIconModule } from 'primeng/inputicon';
 
 @Component({
   selector: 'app-register',
-  standalone: false,
   templateUrl: './register.html',
-  styleUrls: ['./register.css']
+  styleUrls: ['./register.css'],
+    standalone: true,
+  imports: [
+    CommonModule,
+    RouterModule,
+    ReactiveFormsModule,
+    ToastModule,
+    ButtonModule,
+    InputTextModule,
+    InputIconModule
+  ],
+  providers: [MessageService]
 })
 export class RegisterComponent {
-  fb = inject(FormBuilder);
-  authService = inject(AuthService);
-  router = inject(Router);
-  messageService = inject(MessageService);
+  @Input() isServant: boolean = false;
 
-  registerForm: FormGroup;
+  registerForm!: FormGroup;
+
   showPassword = false;
   showConfirmPassword = false;
-  submitted = false;
 
-  constructor() {
-    this.registerForm = this.fb.group({
-      fullName: ['', Validators.required],
-      username: ['', Validators.required],
-      password: ['', Validators.required],
-      confirmPassword: ['', Validators.required],
-      phoneNumber: ['', [Validators.pattern(/^\d{11}$/)]],
-      nationalId: [
-        '',
-        [
-          Validators.required,
-          Validators.pattern(/^\d{14}$/),
-          this.nationalIdAgeValidator
-        ]
-      ],
-      dateOfBirth: ['', Validators.required],
-      status: ['', Validators.required],
-      deaconFamily: ['', Validators.required],
-      deaconDegree: ['', Validators.required],
-      email: ['', [Validators.required, Validators.email]],
-      graduatedFrom: [''],
-      graduateJob: [''],
-      studyType: [''],
-      schoolName: [''],
-      schoolGrade: [''],
-      universityName: [''],
-      faculty: [''],
-      universityGrade: [''],
-      isWorking: [''],
-      workDetails: [''],
-      guardiansPhone: [''],
-      guardianRelation: ['']
-    }, {
-      validators: [this.passwordMatchValidator, this.phoneNotEqualGuardian]
-    });
+  constructor(
+    private fb: FormBuilder,
+    private http: HttpClient,
+    private router: Router,
+    private messageService: MessageService
+  ) {
+    this.buildForm();
   }
 
+private buildForm() {
+  this.registerForm = this.fb.group({
+    fullName: ['', Validators.required],
+    username: ['', Validators.required],
+    phoneNumber: [''],
+    nationalId: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    dateOfBirth: [''],
 
-    // ✅ Triggered when leaving the National ID input
-    onNationalIdBlur(){
-      const value = this.registerForm.get('nationalId')?.value;
-      const dobControl = this.registerForm.get('dateOfBirth');
+    deaconFamily: ['', Validators.required],
+    deaconDegree: ['', Validators.required],
 
-      // ✅ if NationalId less than 14 digit
-      if (!value || value.length !== 14) {
-        dobControl?.setValue('');
-        dobControl?.enable();
-        if (value) {
-          this.messageService.add({
-            severity: 'error',
-            summary: 'Wrong NationalID',
-            detail: 'National ID must be 14 digits',
-            life: 4000
-          });
-        }
-        return;
-      }
+    status: [''],            
+    graduatedFrom: [''],
+    graduateJob: [''],
 
+    studyType: [''],         
+    schoolName: [''],
+    schoolGrade: [''],
+    universityName: [''],
+    faculty: [''],
+    universityGrade: [''],
 
-      const birthDate = this.extractBirthDateFromNationalId(value);
+    isWorking: [''],         
+    workDetails: [''],
 
-      if (!birthDate) {
-        dobControl?.setValue('');
-        dobControl?.enable();
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Wrong NationalID',
-          detail: 'Invalid NationalID',
-          life: 4000
-        });
-        return;
-      }
+    guardiansPhone: [''],
+    guardianRelation: [''],
+
+    password: ['', Validators.required],
+    confirmPassword: ['', Validators.required],
+
+    secret: ['']
+  });
+
+  if (this.isServant) {
+    this.registerForm.get('secret')?.setValidators([Validators.required]);
+  }
+  this.registerForm.get('secret')?.updateValueAndValidity();
+}
 
 
-      dobControl?.setValue(birthDate.toISOString().split('T')[0]);
-      dobControl?.disable();
-      const age = this.calculateAge(birthDate);
-      if (age < 6) {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Age is less than 6 years',
-          detail: 'Age must be older than 6 years',
-          life: 4000
-        });
-      }
+  togglePassword() {
+    this.showPassword = !this.showPassword;
   }
 
-  // ✅ Calculate Age
-  calculateAge(birthDate: Date): number {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
+  toggleConfirmPassword() {
+    this.showConfirmPassword = !this.showConfirmPassword;
   }
+onSubmit() {
+  this.submit();
+}
 
-  // ✅ Validators
-  passwordMatchValidator(formGroup: AbstractControl): ValidationErrors | null {
-    const pass = formGroup.get('password')?.value;
-    const confirm = formGroup.get('confirmPassword')?.value;
-    return pass === confirm ? null : { passwordsMismatch: true };
-  }
+onNationalIdBlur() {
+  const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
 
-  nationalIdAgeValidator = (control: AbstractControl): ValidationErrors | null => {
-    const nationalId = control.value;
-    if (!nationalId || nationalId.length !== 14) return null;
+  if (!/^\d{14}$/.test(nid)) return;
 
-    const century = nationalId[0] === '2' ? 1900 : 2000;
-    const year = century + parseInt(nationalId.substring(1, 3));
-    const month = parseInt(nationalId.substring(3, 5)) - 1;
-    const day = parseInt(nationalId.substring(5, 7));
+  const centuryCode = nid[0]; 
+  const yy = nid.substring(1, 3);
+  const mm = nid.substring(3, 5);
+  const dd = nid.substring(5, 7);
 
-    const birthDate = new Date(year, month, day);
+  const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
+  if (yearBase === null) return;
 
-    if (isNaN(birthDate.getTime())) {
-      return { invalidNationalId: true };
-    }
+  const year = yearBase + Number(yy);
+  const month = Number(mm);
+  const day = Number(dd);
 
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return;
 
-    return age < 6 ? { underAge: true } : null;
-  };
+  const iso = `${year.toString().padStart(4,'0')}-${mm}-${dd}`;
 
-  extractBirthDateFromNationalId(nationalId: string): Date | null {
-    if (!nationalId || nationalId.length !== 14) return null;
-
-    const century = nationalId[0] === '2' ? 1900 : 2000;
-    const year = century + parseInt(nationalId.substring(1, 3));
-    const month = parseInt(nationalId.substring(3, 5)) - 1; // JS months 0-11
-    const day = parseInt(nationalId.substring(5, 7));
-
-    const date = new Date(Date.UTC(year, month, day));
-    return isNaN(date.getTime()) ? null : date;
-  }
+  this.registerForm.get('dateOfBirth')?.setValue(iso);
+}
 
 
+toggleShowPassword() {
+  this.togglePassword();
+}
 
-  phoneNotEqualGuardian(formGroup: AbstractControl): ValidationErrors | null {
-    const phone = formGroup.get('phoneNumber')?.value;
-    const guardian = formGroup.get('guardiansPhone')?.value;
-    if (!phone || !guardian) return null;
-    return phone === guardian ? { sameAsGuardian: true } : null;
-  }
+toggleShowConfirmPassword() {
+  this.toggleConfirmPassword();
+}
 
-  toggleShowPassword() { this.showPassword = !this.showPassword; }
-  toggleShowConfirmPassword() { this.showConfirmPassword = !this.showConfirmPassword; }
 
-  // ✅ Submit form
-  onSubmit() {
-    this.submitted = true;
+  submit() {
     if (this.registerForm.invalid) {
-      this.showValidationErrors();
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields.' });
       return;
     }
 
-    const raw = this.registerForm.value;
+    const formValue = this.registerForm.value;
 
-    // ✅ Clean payload to match backend model
-    const payload = {
-      ...raw,
-      status: raw.status?.toLowerCase() || '',
-      studyType: raw.studyType?.toLowerCase() || '',
-      dateOfBirth: raw.dateOfBirth
-        ? new Date(raw.dateOfBirth).toISOString().split('T')[0]
-        : null,
-      isWorking: raw.isWorking === 'yes',  // ✅ convert string to boolean
-      guardiansPhone: raw.guardiansPhone?.trim() || null, // ✅ convert empty string to null
-      phoneNumber: raw.phoneNumber?.trim() || null,
-    };
+    if (formValue.password !== formValue.confirmPassword) {
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Passwords do not match.' });
+      return;
+    }
 
-    this.authService.register(payload).subscribe({
-      next: (res: any) => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Registration Successful 🎉',
-          detail: 'Your account has been created successfully!',
-          life: 4000
+const payload: any = {
+  fullName: formValue.fullName,
+  username: formValue.username,
+  email: formValue.email,
+  password: formValue.password,
+  deaconFamily: formValue.deaconFamily,
+
+  phoneNumber: formValue.phoneNumber,
+  nationalId: formValue.nationalId,
+  dateOfBirth: formValue.dateOfBirth,
+  deaconDegree: formValue.deaconDegree,
+
+  status: formValue.status,
+  graduatedFrom: formValue.graduatedFrom,
+  graduateJob: formValue.graduateJob,
+
+  studyType: formValue.studyType,
+  schoolName: formValue.schoolName,
+  schoolGrade: formValue.schoolGrade,
+  universityName: formValue.universityName,
+  faculty: formValue.faculty,
+  universityGrade: formValue.universityGrade,
+
+  isWorking: formValue.isWorking,
+  workDetails: formValue.workDetails,
+
+  guardiansPhone: formValue.guardiansPhone,
+  guardianRelation: formValue.guardianRelation
+};
+
+
+
+    if (this.isServant) {
+      // ✅ Register servant
+      const headers = new HttpHeaders({
+        'X-REG-SECRET': String(formValue.secret || '').trim()
+      });
+
+      this.http.post('http://localhost:8080/api/auth/register-servant', payload, { headers })
+        .subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
+            this.router.navigate(['/login']);
+          },
+          error: (err) => {
+            const msg = err?.error?.error || err?.error?.message || 'Registration failed.';
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: msg });
+          }
         });
-        this.registerForm.reset();
-        setTimeout(() => this.router.navigate(['/login']), 2000);
-      },
-      error: (err: any) => {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Registration Failed ❌',
-          detail: err.error?.error || 'Something went wrong. Please try again.',
-          life: 5000
-        });
-      }
-    });
-  }
 
-  // ✅ Toast for invalid form
-  showValidationErrors() {
-    this.messageService.add({
-      severity: 'warn',
-      summary: 'Invalid Form',
-      detail: 'Please fill in all required fields correctly.',
-      life: 4000
-    });
+    } else {
+      // ✅ Register normal (MAKHDOM)
+      this.http.post('http://localhost:8080/api/auth/register', payload)
+        .subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Registered successfully.' });
+            this.router.navigate(['/login']);
+          },
+          error: (err) => {
+            const msg = err?.error?.error || err?.error?.message || 'Registration failed.';
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: msg });
+          }
+        });
+    }
   }
 }

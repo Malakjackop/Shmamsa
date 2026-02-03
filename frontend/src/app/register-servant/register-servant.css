@@ -1,0 +1,266 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap');
+
+/* Reset and base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: 'Playfair Display', serif;
+  background: url('/assets/images/church-bg.jpg') no-repeat center center fixed;
+  background-size: cover;
+  background-color: #000; /* fallback background */
+  overflow-x: hidden; /* prevents white border caused by scrollbar width */
+  overflow-y:auto;
+}
+
+/* Edge/Chromium-specific rounding fix */
+html {
+  overflow-x: clip;
+}
+
+/* Main wrapper */
+/* Main wrapper */
+.login-wrapper {
+  position: relative; /* changed from fixed */
+  width: 100%;
+  min-height: 100vh; /* allow content to expand */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: url('/assets/images/church-bg.jpg') no-repeat center center fixed;
+  background-size: cover;
+  z-index: 0;
+  overflow-y: auto; /* ✅ allow vertical scrolling */
+  padding: 40px 0; /* add space for scrolling */
+}
+
+.login-wrapper::before {
+  content: "";
+  position: fixed; /* ✅ fixed overlay */
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 0;
+}
+
+
+/* Login container */
+.login-container {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 40px 35px;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  max-width: 800px;
+  width: 95%;
+  margin: 40px 0; /* ✅ ensures spacing if content is long */
+}
+
+
+/* Logo and header */
+.logo {
+  width: 100px;
+  margin-bottom: 10px;
+}
+
+.login-header h1 {
+  font-size: 18px;
+  color: #1d2b44;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Input layout */
+.input-row {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.input-group {
+  position: relative;
+  margin: 0;
+}
+
+.input-group.small {
+  flex: 1 1 calc(25% - 12px);
+  min-width: 160px;
+}
+
+/* Input styles */
+.input-group input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 15px;
+  background-color: #f8f8f8;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input-group input:focus {
+  border-color: #4a8ed4;
+  box-shadow: 0 0 0 3px rgba(74, 142, 212, 0.3);
+  background-color: #fff;
+}
+
+/* Password field */
+.password-group input {
+  padding-right: 35px;
+}
+
+.password-eye {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #666;
+  font-size: 1rem;
+}
+
+/* Buttons and links */
+.login-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: #3a2929;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s, box-shadow 0.3s;
+  margin-top: 25px;
+}
+
+.login-btn:hover {
+  background-color: #306090;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.links {
+  margin-top: 20px;
+}
+
+.links a {
+  color: #3f7bbf;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.links a:hover {
+  text-decoration: underline;
+  color: #306090;
+}
+
+/* Messages */
+.error-message {
+  color: #dc3545;
+  font-size: 0.85em;
+  margin-top: 5px;
+  text-align: left;
+  padding-left: 15px;
+}
+
+.success-message {
+  color: #28a745;
+  font-size: 0.9em;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.error-message.error-center {
+  text-align: center;
+  padding-left: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .input-group.small {
+    flex: 1 1 calc(50% - 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  .input-group.small {
+    flex: 1 1 100%;
+  }
+
+  .login-container {
+    padding: 25px 20px;
+  }
+
+  .logo {
+    width: 120px;
+  }
+
+  .login-header h1 {
+    font-size: 18px;
+  }
+
+  .login-wrapper {
+    background-position: center top;
+  }
+}
+
+
+.input-group input {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 15px;
+  background-color: #f8f8f8;
+  color: #1a1a1a; /* 👈 Make input text visible (dark gray/black) */
+  transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+}
+
+select {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  background-color: #f8f8f8;
+  font-size: 15px;
+  color: #1a1a1a;
+}
+
+/* ✅ Fix date picker icon visibility */
+input[type="date"] {
+  appearance: auto; /* allows the browser's default date UI */
+  -webkit-appearance: textfield; /* reset Safari iOS weird behavior */
+  -moz-appearance: textfield;
+  background-color: #f8f8f8;
+  color: #1a1a1a;
+  padding: 12px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* ✅ Make sure the calendar icon (Chrome/Edge) is visible */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: block;
+  color: transparent;
+  background: url("data:image/svg+xml,%3Csvg fill='gray' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z'/%3E%3C/svg%3E") no-repeat center;
+  opacity: 0.6;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+}
+
+/* ✅ Optional: improve hover effect */
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+

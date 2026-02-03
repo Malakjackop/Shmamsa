@@ -5,7 +5,8 @@ import { HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router'; // ✅ Needed for <router-outlet>
-import { QRCodeModule } from 'angularx-qrcode';
+import { QRCodeComponent } from 'angularx-qrcode';
+import { ZXingScannerModule } from '@zxing/ngx-scanner';
 
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
@@ -15,6 +16,10 @@ import { DashBoard } from './dash-board/dash-board';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password';
 import { ResetPasswordComponent } from './reset-password/reset-password';
 import { ProfileComponent } from './profile/profile';
+import { RegisterServantComponent } from './register-servant/register-servant';
+import { AboutComponent } from './about/about';
+import { FamilyComponent } from './family/family';
+import { AttendanceComponent } from './attendance/attendance';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -33,14 +38,18 @@ import { InputIconModule } from 'primeng/inputicon';
   declarations: [
     App,
     LoginComponent,
-    RegisterComponent,
     DashBoard,
     ForgotPasswordComponent,
     ResetPasswordComponent,
-    ProfileComponent
+    ProfileComponent,
+    AboutComponent,
+    FamilyComponent,
+    AttendanceComponent
   ],
   imports: [
     BrowserModule,
+    RegisterComponent,
+    RegisterServantComponent,
     AppRoutingModule,
     HttpClientModule,
     ReactiveFormsModule,
@@ -48,7 +57,8 @@ import { InputIconModule } from 'primeng/inputicon';
     CommonModule,
     BrowserAnimationsModule,
     RouterModule, // ✅ Fixes "router-outlet is not a known element"
-    QRCodeModule,
+    QRCodeComponent,
+    ZXingScannerModule,
     // ✅ PrimeNG imports
     ToastModule,
     ButtonModule,

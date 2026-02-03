@@ -1,0 +1,76 @@
+
+<p-toast></p-toast>
+
+<div class="page">
+  <h1>Members of your family</h1>
+
+  <div class="top" *ngIf="isAminKhedmaOrDev()">
+    <label>Family</label>
+    <select [(ngModel)]="selectedFamily" (change)="loadMembers()">
+      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button pButton type="button" label="Export Excel" (click)="exportExcel()"></button>
+    <button pButton type="button" label="Export PDF" (click)="exportPdf()"></button>
+  </div>
+
+  <div *ngIf="loading" class="hint">Loading...</div>
+
+  <div class="tableWrap" *ngIf="!loading">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>قداس الجمعة</th>
+          <th>تسبحة</th>
+          <th>اجتماع الأسرة</th>
+          <th>Details</th>
+          <th *ngIf="canEditRoles()">Change role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of members">
+          <td>{{m.fullName}}</td>
+          <td>{{m.role}}</td>
+          <td>{{m.fridayLiturgy}}</td>
+          <td>{{m.tasbeeha}}</td>
+          <td>{{m.familyMeeting}}</td>
+          <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
+
+          <td *ngIf="canEditRoles()">
+            <select [value]="m.role" (change)="changeRole(m, $any($event.target).value)">
+              <option *ngFor="let r of allRoles" [value]="r" [disabled]="r==='DEVELOPER'">{{r}}</option>
+            </select>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal" *ngIf="detailsFor">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <div class="title">{{ detailsFor.fullName }}</div>
+          <div class="sub">{{ detailsFor.role }}</div> 
+        </div>
+        <button pButton type="button" icon="pi pi-times" (click)="closeDetails()">➖</button>
+      </div>
+
+      <div class="detailList" *ngIf="details.length; else noDetails">
+        <div class="detailRow" *ngFor="let d of details">
+          <div class="dTitle">{{d.type}}</div>
+          <div class="dSub">{{d.date}} • {{d.createdAt}}</div>
+          <div class="dSub">Attended that day (same event): {{d.attendedCountThatDay}}</div>
+        </div>
+      </div>
+
+      <ng-template #noDetails>
+        <div class="hint">No attendance records.</div>
+      </ng-template>
+    </div>
+  </div>
+</div>

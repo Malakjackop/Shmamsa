@@ -37,11 +37,24 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
+                                "/api/auth/register-servant",
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password"
                         ).permitAll()
 
-                        // 🔐 EVERYTHING ELSE NEEDS LOGIN
+                        // ✅ Attendance: KHADIM and above
+.requestMatchers("/api/attendance/**")
+.hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
+
+// ✅ Family pages: KHADIM and above
+.requestMatchers("/api/family/**")
+.hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
+
+// ✅ Role management: AMIN_KHEDMA and DEVELOPER
+.requestMatchers("/api/admin/**")
+.hasAnyRole("AMIN_KHEDMA","DEVELOPER")
+
+// 🔐 EVERYTHING ELSE NEEDS LOGIN
                         .anyRequest().authenticated()
                 )
                 // ✅ IMPORTANT: add jwtFilter so /api/auth/user works
@@ -64,7 +77,7 @@ public class SecurityConfig {
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-REG-SECRET"));
 
         // ✅ allow sending cookies
         configuration.setAllowCredentials(true);

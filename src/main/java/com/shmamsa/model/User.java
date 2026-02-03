@@ -116,5 +116,5 @@ public class User {
     private String email;
 
     // 16️⃣ Role
-    private String role = "USER";
+    private String role = "MAKHDOM";
 }

@@ -34,6 +34,7 @@ public class JwtFilter extends OncePerRequestFilter {
         if (
                 path.startsWith("/api/auth/login") ||
                         path.startsWith("/api/auth/register") ||
+                        path.startsWith("/api/auth/register-servant") ||
                         path.startsWith("/api/auth/forgot-password") ||
                         path.startsWith("/api/auth/reset-password")
         ) {
@@ -68,7 +69,7 @@ public class JwtFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(
                             username,
                             null,
-                            List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                            List.of(new SimpleGrantedAuthority("ROLE_" + (jwtUtils.extractRole(token) != null ? jwtUtils.extractRole(token) : "MAKHDOM")))
                     );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);

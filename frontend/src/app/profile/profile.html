@@ -1,30 +1,8 @@
 <p-toast></p-toast>
 
-<div class="dashboard">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <img src="assets/images/church-logo.png" alt="Logo" class="logo" />
-      <h2>Deacons Family</h2>
-      <p>St Mary Church – Omrania</p>
-    </div>
-
-    <ul class="menu">
-      <li routerLink="/dashboard" routerLinkActive="active"><i class="pi pi-home"></i> Dashboard</li>
-      <li><i class="pi pi-chart-bar"></i> Grades</li>
-      <li><i class="pi pi-calendar"></i> Schedule</li>
-      <li><i class="pi pi-pencil"></i> Assignments</li>
-      <li class="active"><i class="pi pi-user"></i> Profile</li>
-      <li><i class="pi pi-cog"></i> About Us</li>
-      <li (click)="logout()"><i class="pi pi-sign-out"></i> Logout</li>
-    </ul>
-  </aside>
-
-  <!-- Main -->
-  <main class="main">
 <header class="header profile-header">
   <div class="profile-title">
-    <h2>👤 My Profile  </h2>
+    <h2>👤 My Profile</h2>
   </div>
 
   <div class="qr-section">
@@ -38,82 +16,87 @@
   </div>
 </header>
 
-    <section class="profile-container">
-      <form [formGroup]="profileForm" (ngSubmit)="saveChanges()">
-        <div class="form-grid">
-          <div>
-            <label>Full Name</label>
-            <input formControlName="fullName" />
-          </div>
-          <div>
-            <label>Phone Number</label>
-            <input formControlName="phoneNumber" />
-          </div>
-          <div>
-            <label>Guardian’s Phone</label>
-            <input formControlName="guardiansPhone" />
-          </div>
-          <div>
-            <label>Guardian Relation</label>
-            <input formControlName="guardianRelation" />
-          </div>
-          <div>
-            <label>Deacon Family</label>
-            <input formControlName="deaconFamily" />
-          </div>
-          <div>
-            <label>Deacon Degree</label>
-            <input formControlName="deaconDegree" />
-          </div>
-          <div>
-            <label>Status</label>
-            <input formControlName="status" />
-          </div>
-          <div>
-            <label>Study Type</label>
-            <input formControlName="studyType" />
-          </div>
-          <div>
-            <label>School Name</label>
-            <input formControlName="schoolName" />
-          </div>
-          <div>
-            <label>University Name</label>
-            <input formControlName="universityName" />
-          </div>
-          <div>
-            <label>Faculty</label>
-            <input formControlName="faculty" />
-          </div>
-          <div>
-            <label>University Grade</label>
-            <input formControlName="universityGrade" />
-          </div>
-          <div class="wide">
-            <label>Work Details</label>
-            <input formControlName="workDetails" />
-          </div>
-        </div>
+<section class="profile-container">
+  <form [formGroup]="profileForm" (ngSubmit)="saveChanges()">
+    <div class="form-grid">
+      <div>
+        <label>Full Name</label>
+        <input formControlName="fullName" />
+      </div>
 
-        <div class="buttons">
-          <button type="button" class="edit-btn" (click)="toggleEdit()" *ngIf="!editMode">
-            ✏️ Edit Profile
-          </button>
+      <div>
+        <label>Phone Number</label>
+        <input formControlName="phoneNumber" />
+      </div>
 
-          <button type="submit" class="save-btn" *ngIf="editMode">
-            💾 Save Changes
-          </button>
+      <div>
+        <label>Guardian’s Phone</label>
+        <input formControlName="guardiansPhone" />
+      </div>
 
-          <button type="button" class="cancel-btn" (click)="toggleEdit()" *ngIf="editMode">
-            ❌ Cancel
-          </button>
-        </div>
-      </form>
-    </section>
+      <div>
+        <label>Guardian Relation</label>
+        <input formControlName="guardianRelation" />
+      </div>
 
-    <footer class="footer">
-      © 2025 Deacons Family — All Rights Reserved
-    </footer>
-  </main>
-</div>
-    
+      <div>
+        <label>Deacon Family</label>
+        <input formControlName="deaconFamily" />
+      </div>
+
+      <div>
+        <label>Deacon Degree</label>
+        <input formControlName="deaconDegree" />
+      </div>
+
+      <div>
+        <label>Status</label>
+        <input formControlName="status" />
+      </div>
+
+      <div>
+        <label>Study Type</label>
+        <input formControlName="studyType" />
+      </div>
+
+      <div>
+        <label>School Name</label>
+        <input formControlName="schoolName" />
+      </div>
+
+      <div>
+        <label>University Name</label>
+        <input formControlName="universityName" />
+      </div>
+
+      <div>
+        <label>Faculty</label>
+        <input formControlName="faculty" />
+      </div>
+
+      <div>
+        <label>University Grade</label>
+        <input formControlName="universityGrade" />
+      </div>
+
+      <div class="wide">
+        <label>Work Details</label>
+        <input formControlName="workDetails" />
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button type="button" class="edit-btn" (click)="toggleEdit()" *ngIf="!editMode">
+        ✏️ Edit Profile
+      </button>
+
+      <button type="submit" class="save-btn" *ngIf="editMode">
+        💾 Save Changes
+      </button>
+
+      <button type="button" class="cancel-btn" (click)="toggleEdit()" *ngIf="editMode">
+        ❌ Cancel
+      </button>
+    </div>
+  </form>
+</section>
