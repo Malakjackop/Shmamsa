@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -42,10 +43,12 @@ public class SecurityConfig {
                                 "/api/auth/reset-password"
                         ).permitAll()
 
-                        // ✅ Attendance: KHADIM and above
-.requestMatchers("/api/attendance/**")
-.hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
+                        // ✅ Attendance stats: any logged-in user can view *their own* stats
+                        .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
 
+                        // ✅ Attendance submit/management: KHADIM and above
+                        .requestMatchers("/api/attendance/**")
+                        .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
 // ✅ Family pages: KHADIM and above
 .requestMatchers("/api/family/**")
 .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")

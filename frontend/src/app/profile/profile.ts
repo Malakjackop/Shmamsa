@@ -22,6 +22,7 @@ export class ProfileComponent implements OnInit {
 
   profileForm = this.fb.group({
     fullName: [{ value: '', disabled: true }, Validators.required],
+    email: [{ value: '', disabled: true }, [Validators.required, Validators.email]],
     phoneNumber: [{ value: '', disabled: true }],
     guardiansPhone: [{ value: '', disabled: true }],
     guardianRelation: [{ value: '', disabled: true }],
@@ -33,6 +34,7 @@ export class ProfileComponent implements OnInit {
     universityName: [{ value: '', disabled: true }],
     faculty: [{ value: '', disabled: true }],
     universityGrade: [{ value: '', disabled: true }],
+    isWorking: [{ value: false, disabled: true }],
     workDetails: [{ value: '', disabled: true }]
   });
 
@@ -41,6 +43,8 @@ ngOnInit() {
     next: (user) => {
         this.user = user;
         this.profileForm.patchValue(user);
+        // derive isWorking from workDetails
+        this.profileForm.get('isWorking')?.setValue(!!user.workDetails);
         this.qrData = JSON.stringify({
         id: user.id,
         fullName: user.fullName,
@@ -70,7 +74,11 @@ isServantOrAbove(): boolean {
   }
 
   saveChanges() {
-    this.authService.updateProfile(this.profileForm.value).subscribe({
+    const raw = this.profileForm.getRawValue();
+    const payload: any = { ...raw };
+    if (!payload.isWorking) payload.workDetails = '';
+
+    this.authService.updateProfile(payload).subscribe({
       next: () => {
         this.messageService.add({
           severity: 'success',

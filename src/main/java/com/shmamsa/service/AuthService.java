@@ -196,4 +196,11 @@ public void registerServant(User user, String secret) {
     public void saveUser(User user) {
         userRepository.save(user);
     }
+
+
+public boolean isEmailTakenByOther(String email, Long currentUserId) {
+    return userRepository.findByEmail(email)
+            .map(u -> !u.getId().equals(currentUserId))
+            .orElse(false);
+}
 }
