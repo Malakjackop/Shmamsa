@@ -8,6 +8,7 @@ import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -24,6 +25,33 @@ public class AttendanceController {
     private final UserRepository userRepo;
 
     public record AttendanceSubmitRequest(List<Long> userIds, AttendanceType type) {}
+
+    /**
+     * Returns total attendance counts (all time) for the logged-in user.
+     * Used by the Dashboard cards.
+     */
+    @GetMapping("/my-stats")
+    public ResponseEntity<?> myStats(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+
+        String username = authentication.getName();
+        User u = userRepo.findByUsername(username).orElse(null);
+        if (u == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+        }
+
+        long friday = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
+        long tasbeeha = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
+        long familyMeeting = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FAMILY_MEETING);
+
+        return ResponseEntity.ok(Map.of(
+                "FRIDAY_LITURGY", friday,
+                "TASBEEHA", tasbeeha,
+                "FAMILY_MEETING", familyMeeting
+        ));
+    }
 
     @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody AttendanceSubmitRequest req) {

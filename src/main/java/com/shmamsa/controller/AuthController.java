@@ -184,7 +184,8 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
             authService.saveUser(existingUser);
 
-            return ResponseEntity.ok(Map.of("message", "Profile updated successfully"));
+            existingUser.setPassword(null);
+            return ResponseEntity.ok(existingUser);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

@@ -50,6 +50,8 @@ getUserData() {
   }
 
   updateProfile(profileData: any): Observable<any> {
-    return this.http.put(`${this.baseUrl}/profile`, profileData, { withCredentials: true });
+    return this.http.put(`${this.baseUrl}/profile`, profileData, { withCredentials: true }).pipe(
+      tap((u) => this.user$.next(u))
+    );
   }
 }

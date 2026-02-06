@@ -25,6 +25,11 @@
       </div>
 
       <div>
+        <label>Email</label>
+        <input formControlName="email" />
+      </div>
+
+      <div>
         <label>Phone Number</label>
         <input formControlName="phoneNumber" />
       </div>
@@ -39,19 +44,19 @@
         <input formControlName="guardianRelation" />
       </div>
 
-      <div>
-        <label>Deacon Family</label>
-        <input formControlName="deaconFamily" />
-      </div>
 
       <div>
         <label>Deacon Degree</label>
         <input formControlName="deaconDegree" />
       </div>
 
-      <div>
-        <label>Status</label>
-        <input formControlName="status" />
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select formControlName="status">
+          <option value="" disabled>Choose Status</option>
+          <option value="student">Student</option>
+          <option value="graduate">Graduate</option>
+        </select>
       </div>
 
       <div>

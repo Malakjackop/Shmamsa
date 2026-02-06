@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
+import { AttendanceService } from '../services/attendance.service';
 import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api'; // ✅ Import PrimeNG toast service
 
@@ -12,6 +13,7 @@ import { MessageService } from 'primeng/api'; // ✅ Import PrimeNG toast servic
 })
 export class DashBoard implements OnInit {
   private authService = inject(AuthService);
+  private attendanceService = inject(AttendanceService);
   private router = inject(Router);
   private messageService = inject(MessageService);
 
@@ -26,8 +28,16 @@ export class DashBoard implements OnInit {
     dateOfBirth: ''
   };
 
+  // ✅ Dashboard stats (totals from database)
+  stats: { FRIDAY_LITURGY: number; TASBEEHA: number; FAMILY_MEETING: number } = {
+    FRIDAY_LITURGY: 0,
+    TASBEEHA: 0,
+    FAMILY_MEETING: 0
+  };
+
   ngOnInit(): void {
     this.loadUserData();
+    this.loadMyStats();
   }
 
   loadUserData(): void {
@@ -37,6 +47,17 @@ export class DashBoard implements OnInit {
       },
       error: (err) => {
         console.error('Failed to load user info:', err);
+      }
+    });
+  }
+
+  loadMyStats(): void {
+    this.attendanceService.getMyStats().subscribe({
+      next: (data) => {
+        this.stats = data;
+      },
+      error: (err) => {
+        console.error('Failed to load attendance stats:', err);
       }
     });
   }
