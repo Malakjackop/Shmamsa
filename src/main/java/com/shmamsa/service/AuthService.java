@@ -1,8 +1,11 @@
 package com.shmamsa.service;
 
+import com.shmamsa.dto.RegisterRequest;
+import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
+import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -28,6 +31,7 @@ public class AuthService {
     private static class OtpData {
         String username;
         long expiresAt; // ms
+
         OtpData(String username, long expiresAt) {
             this.username = username;
             this.expiresAt = expiresAt;
@@ -45,40 +49,106 @@ public class AuthService {
     // -----------------------------------------------------------
     // REGISTER
     // -----------------------------------------------------------
-    public void register(User user) {
-        userRepository.findByUsername(user.getUsername())
-                .ifPresent(existing -> { throw new RuntimeException("Username already in use"); });
+    public void register(RegisterRequest request) {
+        // check username
+        userRepository.findByUsername(request.getUsername())
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Username already in use");
+                });
 
-        userRepository.findByEmail(user.getEmail())
-                .ifPresent(existing -> { throw new RuntimeException("Email already in use"); });
+        // check email
+        userRepository.findByEmail(request.getEmail())
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Email already in use");
+                });
 
-        // ✅ Force default role for normal registration
+        // convert DTO to User entity
+        User user = new User();
+        user.setFullName(request.getFullName());
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setNationalId(request.getNationalId());
+        user.setDeaconFamily(request.getDeaconFamily());
+        user.setDeaconDegree(request.getDeaconDegree());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setGuardiansPhone(request.getGuardiansPhone());
+        user.setGuardianRelation(request.getGuardianRelation());
+
+
+        // Force default role
         user.setRole("MAKHDOM");
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
     }
 
-    
-
-// -----------------------------------------------------------
+    // -----------------------------------------------------------
 // REGISTER SERVANT (Special link)
 // -----------------------------------------------------------
-public void registerServant(User user, String secret) {
-    if (secret == null || !secret.equals(servantRegisterSecret)) {
-        throw new RuntimeException("Invalid registration link");
+    public void registerServant(RegisterServantRequest request) {
+        if (!servantRegisterSecret.equals(request.getSecret())) {
+            throw new ValidationException("Invalid registration secret");
+        }
+
+        userRepository.findByUsername(request.getUsername())
+                .ifPresent(existing -> {
+                    throw new ValidationException("Username already in use");
+                });
+
+        userRepository.findByEmail(request.getEmail())
+                .ifPresent(existing -> {
+                    throw new ValidationException("Email already in use");
+                });
+
+        // Check national ID number + age + gender
+        String nid = request.getNationalId().trim();
+
+        if (!nid.matches("\\d{14}")) {
+            throw new ValidationException("National ID must be 14 digits");
+        }
+
+        if (nid.matches("(\\d)\\1{13}")) {
+            throw new ValidationException("Fake National ID: repeated digits");
+        }
+
+
+        int century = Integer.parseInt(nid.substring(0, 1));
+        int year = (century == 2 ? 1900 : century == 3 ? 2000 : -1) + Integer.parseInt(nid.substring(1, 3));
+        int month = Integer.parseInt(nid.substring(3, 5));
+        int day = Integer.parseInt(nid.substring(5, 7));
+
+        Calendar cal = Calendar.getInstance();
+        cal.setLenient(false);
+        cal.set(year, month - 1, day);
+        try {
+            cal.getTime();
+        } catch (Exception e) {
+            throw new ValidationException("Invalid birth date inside National ID");
+        }
+
+        // Age
+        Calendar today = Calendar.getInstance();
+        int age = today.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
+        if (today.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) age--;
+        if (age < 16) throw new ValidationException("Servant must be at least 16 years old");
+
+        // Gender
+        String gender = (Integer.parseInt(nid.substring(12, 13)) % 2 == 0) ? "Female" : "Male";
+
+        // Convert DTO to Entity
+        User user = new User();
+        user.setFullName(request.getFullName());
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setNationalId(nid);
+        user.setDeaconFamily(request.getDeaconFamily());
+        user.setDeaconDegree(request.getDeaconDegree());
+        user.setRole("KHADIM");
+
+        userRepository.save(user);
     }
 
-    userRepository.findByUsername(user.getUsername())
-            .ifPresent(existing -> { throw new RuntimeException("Username already in use"); });
-
-    userRepository.findByEmail(user.getEmail())
-            .ifPresent(existing -> { throw new RuntimeException("Email already in use"); });
-
-    user.setRole("KHADIM"); // ✅ Force servant role
-    user.setPassword(passwordEncoder.encode(user.getPassword()));
-    userRepository.save(user);
-}
 
 // -----------------------------------------------------------
     // LOGIN

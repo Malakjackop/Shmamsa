@@ -6,7 +6,7 @@
     </div>
 
     <!-- ✅ PrimeNG Toast -->
-    <p-toast ></p-toast>
+    <p-toast position="top-right"></p-toast>
 
     <form [formGroup]="registerForm" class="login-form" (ngSubmit)="submit()">
       <!-- Row 1 -->
@@ -173,7 +173,7 @@
             formControlName="password"
             placeholder="PASSWORD"
             required />
-          <span class="password-eye" (click)="toggleShowPassword()">
+          <span class="password-eye" (click)="togglePassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
         </div>
@@ -184,7 +184,7 @@
             formControlName="confirmPassword"
             placeholder="CONFIRM PASSWORD"
             required />
-          <span class="password-eye" (click)="toggleShowConfirmPassword()">
+          <span class="password-eye" (click)="toggleConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
         </div>

@@ -1,9 +1,13 @@
 package com.shmamsa.controller;
 
 import com.shmamsa.dto.ProfileUpdateRequest;
+import com.shmamsa.dto.RegisterRequest;
+import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.model.User;
 import com.shmamsa.service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +25,12 @@ public class AuthController {
 
     // ✅ Register endpoint
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         try {
-            authService.register(user);
+            authService.register(request);
             return ResponseEntity.ok(Map.of("message", "User registered successfully"));
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -34,13 +40,13 @@ public class AuthController {
 
 // ✅ Register-servant endpoint (special link)
 @PostMapping("/register-servant")
-public ResponseEntity<?> registerServant(
-        @RequestHeader(value = "X-REG-SECRET", required = false) String secret,
-        @RequestBody User user
-) {
+public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
     try {
-        authService.registerServant(user, secret);
+        authService.registerServant(request);
         return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
+    } catch (ValidationException e) {
+
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
     } catch (RuntimeException e) {
         return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
     }
