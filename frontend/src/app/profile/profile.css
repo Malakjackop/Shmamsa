@@ -237,34 +237,3 @@ input:disabled {
   color: #5e2b20;
   font-weight: 500;
 }
-.form-control {
-  width: 100%;
-  padding: 10px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  outline: none;
-  background-color: #fff;
-  appearance: none;          /* مهم */
-  -webkit-appearance: none;
-  -moz-appearance: none;
-}
-
-/* السهم */
-.form-group {
-  position: relative;
-}
-
-.form-group select.form-control {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23999' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
-  cursor: pointer;
-}
-
-/* hover / focus زي input */
-.form-control:focus {
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
-}

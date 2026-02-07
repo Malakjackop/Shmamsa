@@ -6,6 +6,7 @@ import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.QrTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,8 +24,13 @@ public class AttendanceController {
 
     private final AttendanceRepository attendanceRepo;
     private final UserRepository userRepo;
+    private final QrTokenService qrTokenService;
 
     public record AttendanceSubmitRequest(List<Long> userIds, AttendanceType type) {}
+
+    public record ScanTokenRequest(String token) {}
+    public record ScanTokenResponse(Long id, String fullName, String deaconFamily) {}
+
 
     /**
      * Returns total attendance counts (all time) for the logged-in user.
@@ -53,7 +59,33 @@ public class AttendanceController {
         ));
     }
 
-    @PostMapping("/submit")
+    
+    /**
+     * Public scan endpoint (no login required):
+     * - verifies the QR token signature
+     * - ensures the user exists in DB
+     * Returns trusted user data for the scanner UI.
+     */
+    @PostMapping("/scan-token")
+    public ResponseEntity<?> scanToken(@RequestBody ScanTokenRequest req) {
+        if (req == null || req.token() == null || req.token().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "token is required"));
+        }
+
+        Long userId = qrTokenService.verifyAndExtractUserId(req.token());
+        if (userId == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "invalid QR token"));
+        }
+
+        User u = userRepo.findById(userId).orElse(null);
+        if (u == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+        }
+
+        return ResponseEntity.ok(new ScanTokenResponse(u.getId(), u.getFullName(), u.getDeaconFamily()));
+    }
+
+@PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody AttendanceSubmitRequest req) {
 
         if (req == null || req.userIds() == null || req.userIds().isEmpty() || req.type() == null) {

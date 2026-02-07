@@ -1,5 +1,6 @@
 
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { AttendanceService, AttendanceType } from '../services/attendance.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
@@ -16,6 +17,8 @@ export class AttendanceComponent implements OnInit {
   private auth = inject(AuthService);
   private message = inject(MessageService);
 
+  constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
+
   me: any;
   scanning = false;
 
@@ -25,6 +28,9 @@ export class AttendanceComponent implements OnInit {
   scanned: { id: number; fullName: string; deaconFamily?: string }[] = [];
 
   ngOnInit() {
+    // ✅ SSR: don't call protected endpoints on the server render
+    if (!isPlatformBrowser(this.platformId)) return;
+
     this.auth.getUserData().subscribe((u) => (this.me = u));
   }
 
@@ -33,20 +39,20 @@ export class AttendanceComponent implements OnInit {
   }
 
   onCodeResult(resultString: string) {
-    try {
-      const data = JSON.parse(resultString);
-      const id = Number(data.id);
-      const fullName = String(data.fullName || data.name || '').trim();
-      const deaconFamily = data.deaconFamily ? String(data.deaconFamily) : undefined;
+    const token = (resultString || '').trim();
+    if (!token) return;
 
-      if (!id || !fullName) return;
-
-      if (this.scanned.some((x) => x.id === id)) return;
-
-      this.scanned.push({ id, fullName, deaconFamily });
-    } catch {
-      // ignore invalid QR
-    }
+    // ✅ Verify token with backend (trusted source)
+    this.attendance.scanToken(token).subscribe({
+      next: (u) => {
+        if (!u?.id) return;
+        if (this.scanned.some((x) => x.id === u.id)) return;
+        this.scanned.push({ id: u.id, fullName: u.fullName, deaconFamily: u.deaconFamily });
+      },
+      error: () => {
+        this.message.add({ severity: 'warn', summary: 'Invalid QR', detail: 'This QR is not valid or user not found' });
+      }
+    });
   }
 
   remove(id: number) {

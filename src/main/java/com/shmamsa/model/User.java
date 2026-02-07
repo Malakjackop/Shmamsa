@@ -64,6 +64,10 @@ public class User {
     // 8️⃣ Date of Birth
     private LocalDate dateOfBirth;
 
+    // 8️⃣.1️⃣ Gender (derived from National ID)
+    @Column(length = 10)
+    private String gender;
+
     // 9️⃣ Status (student / graduate)
     @Column(length = 20)
     private String status;

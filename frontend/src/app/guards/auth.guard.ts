@@ -1,35 +1,42 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { CanActivate, Router, UrlTree } from '@angular/router';
+import { isPlatformBrowser } from '@angular/common';
 import { Observable, of } from 'rxjs';
 import { AuthService } from '../services/auth.service';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, filter, map } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthGuard implements CanActivate {
-  constructor(private authService: AuthService, private router: Router) {}
 
-  canActivate():
-    | Observable<boolean | UrlTree>
-    | Promise<boolean | UrlTree>
-    | boolean
-    | UrlTree {
-    // ✅ Try to fetch the current user (protected endpoint)
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
+  ) {}
+
+  canActivate(): Observable<boolean | UrlTree> | boolean {
+
+    // ✅ SSR: اسمح بالتحميل، متقررّش Auth هنا
+    if (!isPlatformBrowser(this.platformId)) {
+      return true;
+    }
+
     return this.authService.getUserData().pipe(
+
+      // ✅ تجاهل أول null (loading state)
+      filter(user => user !== undefined),
+
       map(user => {
-        if (user && user.username) {
-          return true; // ✅ Authorized
-        } else {
-          this.router.navigate(['/login']);
-          return false;
+        if (user) {
+          return true;
         }
+        return this.router.createUrlTree(['/login']);
       }),
-      catchError(() => {
-        // ❌ Invalid or expired JWT
-        this.router.navigate(['/login']);
-        return of(false);
-      })
+
+      // ✅ لو API رجعت 401/403
+      catchError(() => of(this.router.createUrlTree(['/login'])))
     );
   }
 }

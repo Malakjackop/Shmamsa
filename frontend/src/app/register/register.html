@@ -33,11 +33,16 @@
 
 
         <div class="input-group small">
-          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" [readonly]="true"          autocomplete="off"
+          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" [readonly]="true"    autocomplete="off"
                  (keydown)="$event.preventDefault()"
                  (click)="$event.preventDefault()" />
         </div>
 
+        <div class="input-group small">
+          <input type="text" formControlName="gender" placeholder="GENDER" [readonly]="true" autocomplete="off"
+                  (keydown)="$event.preventDefault()"
+                 (click)="$event.preventDefault()" />
+        </div>
       </div>
       <!-- ✅ Deacon Family + Degree -->
       <div class="input-row">

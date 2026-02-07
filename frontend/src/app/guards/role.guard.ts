@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRouteSnapshot, CanActivate, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -8,12 +9,22 @@ import { AuthService } from '../services/auth.service';
   providedIn: 'root'
 })
 export class RoleGuard implements CanActivate {
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
+  ) {}
 
   canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot
-  ): Observable<boolean | UrlTree> {
+  ): Observable<boolean | UrlTree> | boolean | UrlTree {
+
+    // ✅ SSR: allow render; browser will enforce after hydration
+    if (!isPlatformBrowser(this.platformId)) {
+      return true;
+    }
+
     const allowed = (route.data?.['roles'] as string[]) || [];
 
     return this.authService.getUserData().pipe(

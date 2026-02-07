@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-profile',
@@ -14,8 +15,9 @@ export class ProfileComponent implements OnInit {
   fb = inject(FormBuilder);
   authService = inject(AuthService);
   messageService = inject(MessageService);
+  router = inject(Router);
 
-    
+
   editMode = false;
   qrData = ''; // ✅ holds QR content
   user: any;
@@ -41,15 +43,30 @@ export class ProfileComponent implements OnInit {
 ngOnInit() {
   this.authService.getUserData().subscribe({
     next: (user) => {
+        // ممكن يحصل Refresh قبل ما يكون فيه Session صالحة → user بيبقى null
+        if (!user) {
+          this.user = null;
+          this.messageService.add({
+            severity: 'warn',
+            summary: 'Session expired',
+            detail: 'Please login again.'
+          });
+          this.router.navigate(['/login']);
+          return;
+        }
+
         this.user = user;
         this.profileForm.patchValue(user);
         // derive isWorking from workDetails
-        this.profileForm.get('isWorking')?.setValue(!!user.workDetails);
-        this.qrData = JSON.stringify({
-        id: user.id,
-        fullName: user.fullName,
-        deaconFamily: user.deaconFamily
-      });
+        this.profileForm.get('isWorking')?.setValue(!!user?.workDetails);
+        // ✅ Ask backend for a signed QR token (safe to screenshot/print)
+        this.authService.getMyQrToken().subscribe({
+          next: (res) => (this.qrData = res?.token || ''),
+          error: () => {
+            // fallback: keep something visible (NOT secure) if token fails
+            this.qrData = '';
+          }
+        });
     },
     error: () => this.messageService.add({
       severity: 'error',

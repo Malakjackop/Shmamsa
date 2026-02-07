@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { BehaviorSubject, tap } from 'rxjs';
+import { Observable, BehaviorSubject, tap, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -31,10 +31,26 @@ registerServant(user: any, secret: string): Observable<any> {
 
 getUserData() {
   if (this.user$.value) return this.user$.asObservable();
-  return this.http.get(`${this.baseUrl}/user`, { withCredentials: true }).pipe(
-    tap(u => this.user$.next(u))
+
+  return this.http.get<any>(`${this.baseUrl}/user`, { withCredentials: true }).pipe(
+    map((res) => {
+      // backend may return { authenticated: false } when not logged in
+      if (res && res.authenticated === false) return null;
+      return res;
+    }),
+    tap((u) => this.user$.next(u)),
+    catchError(() => {
+      this.user$.next(null);
+      return of(null);
+    })
   );
+
 }
+
+  // ✅ Get signed QR token for the logged-in user
+  getMyQrToken(): Observable<{ token: string }> {
+    return this.http.get<{ token: string }>(`/api/qr/me/token`, { withCredentials: true });
+  }
 
   logout(): Observable<any> {
     return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true });

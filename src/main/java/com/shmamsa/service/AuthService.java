@@ -2,15 +2,18 @@ package com.shmamsa.service;
 
 import com.shmamsa.dto.RegisterRequest;
 import com.shmamsa.dto.RegisterServantRequest;
+import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
-import jakarta.validation.ValidationException;
+import com.shmamsa.util.NationalIdUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -36,11 +39,21 @@ public class AuthService {
             this.username = username;
             this.expiresAt = expiresAt;
         }
+    private static class RateWindow {
+        int count;
+        long windowStartMs;
+
+        RateWindow(int count, long windowStartMs) {
+            this.count = count;
+            this.windowStartMs = windowStartMs;
+        }
+    }
+
     }
 
     private final Map<String, OtpData> otpStore = new HashMap<>();         // otp -> data
     private final Map<String, Long> otpTimestamps = new HashMap<>();       // username -> last otp send time
-    private final Map<String, Integer> hourlyRequests = new HashMap<>();   // username -> count last hour
+    private final Map<String, OtpData.RateWindow> hourlyRequests = new HashMap<>();   // username -> rate window   // username -> count last hour
 
     private static final long OTP_TTL_MS = 5 * 60 * 1000;   // 5 minutes
     private static final long COOLDOWN_MS = 45_000;         // 45 seconds
@@ -50,16 +63,20 @@ public class AuthService {
     // REGISTER
     // -----------------------------------------------------------
     public void register(RegisterRequest request) {
+        if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "Passwords do not match");
+        }
+
         // check username
         userRepository.findByUsername(request.getUsername())
                 .ifPresent(existing -> {
-                    throw new RuntimeException("Username already in use");
+                    throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
                 });
 
         // check email
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(existing -> {
-                    throw new RuntimeException("Email already in use");
+                    throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
                 });
 
         // convert DTO to User entity
@@ -75,6 +92,11 @@ public class AuthService {
         user.setGuardiansPhone(request.getGuardiansPhone());
         user.setGuardianRelation(request.getGuardianRelation());
 
+        // ✅ Derived fields from National ID (server-side source of truth)
+        LocalDate dob = NationalIdUtils.extractBirthDate(request.getNationalId());
+        if (dob != null) user.setDateOfBirth(dob);
+        String gender = NationalIdUtils.extractGender(request.getNationalId());
+        if (gender != null) user.setGender(gender);
 
         // Force default role
         user.setRole("MAKHDOM");
@@ -87,53 +109,25 @@ public class AuthService {
 // -----------------------------------------------------------
     public void registerServant(RegisterServantRequest request) {
         if (!servantRegisterSecret.equals(request.getSecret())) {
-            throw new ValidationException("Invalid registration secret");
+            throw new ApiException(HttpStatus.FORBIDDEN, "INVALID_SECRET", "Invalid registration secret");
+        }
+
+        if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "Passwords do not match");
         }
 
         userRepository.findByUsername(request.getUsername())
                 .ifPresent(existing -> {
-                    throw new ValidationException("Username already in use");
+                    throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
                 });
 
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(existing -> {
-                    throw new ValidationException("Email already in use");
+                    throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
                 });
 
-        // Check national ID number + age + gender
+        // NOTE: National ID format + age rules are already enforced by @ValidNationalId(minAge = 16)
         String nid = request.getNationalId().trim();
-
-        if (!nid.matches("\\d{14}")) {
-            throw new ValidationException("National ID must be 14 digits");
-        }
-
-        if (nid.matches("(\\d)\\1{13}")) {
-            throw new ValidationException("Fake National ID: repeated digits");
-        }
-
-
-        int century = Integer.parseInt(nid.substring(0, 1));
-        int year = (century == 2 ? 1900 : century == 3 ? 2000 : -1) + Integer.parseInt(nid.substring(1, 3));
-        int month = Integer.parseInt(nid.substring(3, 5));
-        int day = Integer.parseInt(nid.substring(5, 7));
-
-        Calendar cal = Calendar.getInstance();
-        cal.setLenient(false);
-        cal.set(year, month - 1, day);
-        try {
-            cal.getTime();
-        } catch (Exception e) {
-            throw new ValidationException("Invalid birth date inside National ID");
-        }
-
-        // Age
-        Calendar today = Calendar.getInstance();
-        int age = today.get(Calendar.YEAR) - cal.get(Calendar.YEAR);
-        if (today.get(Calendar.DAY_OF_YEAR) < cal.get(Calendar.DAY_OF_YEAR)) age--;
-        if (age < 16) throw new ValidationException("Servant must be at least 16 years old");
-
-        // Gender
-        String gender = (Integer.parseInt(nid.substring(12, 13)) % 2 == 0) ? "Female" : "Male";
 
         // Convert DTO to Entity
         User user = new User();
@@ -155,10 +149,10 @@ public class AuthService {
     // -----------------------------------------------------------
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid username or password"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Invalid username or password");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid username or password");
         }
 
         return jwtUtils.generateToken(user.getUsername(), user.getRole());
@@ -170,7 +164,7 @@ public class AuthService {
     public User getUserFromToken(String token) {
         String username = jwtUtils.extractUsername(token);
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
     }
 
     // -----------------------------------------------------------
@@ -178,11 +172,11 @@ public class AuthService {
     // -----------------------------------------------------------
     public Map<String, Object> generateResetTokenByEmail(String email) {
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("Email is required");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "EMAIL_REQUIRED", "Email is required");
         }
 
         User user = userRepository.findByEmail(email.trim())
-                .orElseThrow(() -> new RuntimeException("No user found with this email"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "EMAIL_NOT_FOUND", "No user found with this email"));
 
         sendOtpForUserByEmail(user);
 
@@ -200,21 +194,22 @@ public class AuthService {
         if (otpTimestamps.containsKey(username)) {
             long lastSent = otpTimestamps.get(username);
             if (now - lastSent < COOLDOWN_MS) {
-                throw new RuntimeException("Wait 45 seconds before requesting another code.");
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_COOLDOWN", "Wait 45 seconds before requesting another code.");
             }
         }
 
-        // Hourly limit
-        int count = hourlyRequests.getOrDefault(username, 0);
-        if (count >= HOURLY_LIMIT) {
-            throw new RuntimeException("Too many OTP requests. Try again in 1 hour.");
+        // Hourly limit (sliding window, best-effort in-memory)
+        OtpData.RateWindow window = hourlyRequests.get(username);
+        if (window == null || now - window.windowStartMs >= 3600_000) {
+            window = new OtpData.RateWindow(0, now);
+            hourlyRequests.put(username, window);
         }
-        hourlyRequests.put(username, count + 1);
 
-        // auto reset hourly counter
-        new Timer().schedule(new TimerTask() {
-            @Override public void run() { hourlyRequests.remove(username); }
-        }, 3600_000);
+        if (window.count >= HOURLY_LIMIT) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT", "Too many OTP requests. Try again in 1 hour.");
+        }
+
+        window.count += 1;
 
         // Generate OTP
         String code = String.format("%05d", new Random().nextInt(100000));
@@ -226,37 +221,49 @@ public class AuthService {
 
         // Send Email
         emailService.sendOtpEmail(user.getEmail(), user.getFullName(), user.getUsername(), code);
-
-        // auto remove OTP after TTL
-        new Timer().schedule(new TimerTask() {
-            @Override public void run() { otpStore.remove(code); }
-        }, OTP_TTL_MS);
     }
 
     // -----------------------------------------------------------
     // RESET PASSWORD (OTP + new pass)
     // -----------------------------------------------------------
     public void resetPassword(String otp, String newPassword) {
-        if (otp == null || otp.isBlank()) throw new RuntimeException("OTP is required");
-        if (newPassword == null || newPassword.isBlank()) throw new RuntimeException("New password is required");
+        if (otp == null || otp.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "OTP_REQUIRED", "OTP is required");
+        if (newPassword == null || newPassword.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_REQUIRED", "New password is required");
 
         OtpData data = otpStore.get(otp);
-        if (data == null) throw new RuntimeException("Invalid or expired OTP");
+        if (data == null) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_OTP", "Invalid or expired OTP");
 
         if (System.currentTimeMillis() > data.expiresAt) {
             otpStore.remove(otp);
-            throw new RuntimeException("OTP expired");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "EXPIRED_OTP", "OTP expired");
         }
 
         String username = data.username;
 
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
         otpStore.remove(otp);
+    }
+
+    /**
+     * Best-effort cleanup for in-memory OTP storage.
+     * (Production: move OTP storage to Redis/DB.)
+     */
+    public void purgeExpiredOtps() {
+        long now = System.currentTimeMillis();
+
+        // OTPs
+        otpStore.entrySet().removeIf(entry -> entry.getValue() == null || entry.getValue().expiresAt < now);
+
+        // Cooldown timestamps (keep only last 10 minutes)
+        otpTimestamps.entrySet().removeIf(e -> e.getValue() == null || now - e.getValue() > 10 * 60_000);
+
+        // Hourly windows (remove windows older than 2 hours - buffer)
+        hourlyRequests.entrySet().removeIf(e -> e.getValue() == null || now - e.getValue().windowStartMs > 2 * 3600_000);
     }
 
     public User findByUsername(String username) {

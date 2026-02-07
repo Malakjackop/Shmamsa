@@ -1,4 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
 import { Router } from '@angular/router';
@@ -16,6 +17,8 @@ export class DashBoard implements OnInit {
   private attendanceService = inject(AttendanceService);
   private router = inject(Router);
   private messageService = inject(MessageService);
+
+  constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
   user: any = {
     fullName: '',
@@ -36,6 +39,8 @@ export class DashBoard implements OnInit {
   };
 
   ngOnInit(): void {
+    // ✅ SSR: don't call protected endpoints on the server
+    if (!isPlatformBrowser(this.platformId)) return;
     this.loadUserData();
     this.loadMyStats();
   }
@@ -43,11 +48,13 @@ export class DashBoard implements OnInit {
   loadUserData(): void {
     this.authService.getUserData().subscribe({
       next: (data) => {
+        if (!data) {
+          this.router.navigate(['/login']);
+          return;
+        }
         this.user = data;
       },
-      error: (err) => {
-        console.error('Failed to load user info:', err);
-      }
+      error: () => this.router.navigate(['/login'])
     });
   }
 
@@ -56,8 +63,8 @@ export class DashBoard implements OnInit {
       next: (data) => {
         this.stats = data;
       },
-      error: (err) => {
-        console.error('Failed to load attendance stats:', err);
+      error: () => {
+        // if not authorized, user will be redirected by loadUserData()
       }
     });
   }

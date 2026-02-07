@@ -40,11 +40,17 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/register-servant",
                                 "/api/auth/forgot-password",
-                                "/api/auth/reset-password"
+                                "/api/auth/reset-password",
+                                // ✅ allow session check endpoint (returns user only if authenticated)
+                                "/api/auth/user"
                         ).permitAll()
 
                         // ✅ Attendance stats: any logged-in user can view *their own* stats
-                        .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
+                        
+
+                        // ✅ PUBLIC QR scan (no login required)
+                        .requestMatchers(HttpMethod.POST, "/api/attendance/scan-token").permitAll()
+.requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
 
                         // ✅ Attendance submit/management: KHADIM and above
                         .requestMatchers("/api/attendance/**")
