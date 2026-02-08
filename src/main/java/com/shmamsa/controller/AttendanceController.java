@@ -25,11 +25,16 @@ public class AttendanceController {
     private final AttendanceRepository attendanceRepo;
     private final UserRepository userRepo;
     private final QrTokenService qrTokenService;
+    public record AttendanceUserRef(Long id, String username) {}
 
-    public record AttendanceSubmitRequest(List<Long> userIds, AttendanceType type) {}
+    public static class AttendanceSubmitRequest {
+        public List<Long> userIds;          // backward compatible (old payload)
+        public List<AttendanceUserRef> users; // new payload: [{id, username}]
+        public AttendanceType type;
+    }
 
-    public record ScanTokenRequest(String token) {}
-    public record ScanTokenResponse(Long id, String fullName, String deaconFamily) {}
+public record ScanTokenRequest(String token) {}
+    public record ScanTokenResponse(Long id, String username, String fullName, String deaconFamily) {}
 
 
     /**
@@ -82,35 +87,55 @@ public class AttendanceController {
             return ResponseEntity.status(404).body(Map.of("error", "User not found"));
         }
 
-        return ResponseEntity.ok(new ScanTokenResponse(u.getId(), u.getFullName(), u.getDeaconFamily()));
+        return ResponseEntity.ok(new ScanTokenResponse(u.getId(), u.getUsername(), u.getFullName(), u.getDeaconFamily()));
     }
 
 @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody AttendanceSubmitRequest req) {
 
-        if (req == null || req.userIds() == null || req.userIds().isEmpty() || req.type() == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "userIds and type are required"));
+        if (req == null || req.type == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "type is required"));
+        }
+
+        // ✅ Accept either old payload {userIds:[...], type:"..."} OR new payload {users:[{id,username}], type:"..."}
+        List<AttendanceUserRef> refs = null;
+        if (req.users != null && !req.users.isEmpty()) {
+            refs = req.users;
+        } else if (req.userIds != null && !req.userIds.isEmpty()) {
+            refs = req.userIds.stream().map(id -> new AttendanceUserRef(id, null)).toList();
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("error", "userIds or users are required"));
         }
 
         LocalDate today = LocalDate.now();
         int created = 0;
         int skipped = 0;
+        int invalid = 0;
 
-        for (Long uid : req.userIds()) {
-            if (uid == null) { skipped++; continue; }
+        for (AttendanceUserRef ref : refs) {
+            if (ref == null || ref.id() == null) { skipped++; continue; }
 
-            if (attendanceRepo.existsByUser_IdAndDateAndType(uid, today, req.type())) {
+            Long uid = ref.id();
+
+            if (attendanceRepo.existsByUser_IdAndDateAndType(uid, today, req.type)) {
                 skipped++;
                 continue;
             }
 
-            User u = userRepo.findById(uid).orElse(null);
-            if (u == null) { skipped++; continue; }
+            User u;
+            // ✅ If username is provided, verify (id + username) exists in DB (prevents tampering)
+            if (ref.username() != null && !ref.username().isBlank()) {
+                u = userRepo.findByIdAndUsername(uid, ref.username().trim()).orElse(null);
+                if (u == null) { invalid++; continue; }
+            } else {
+                u = userRepo.findById(uid).orElse(null);
+                if (u == null) { invalid++; continue; }
+            }
 
             attendanceRepo.save(AttendanceRecord.builder()
                     .user(u)
                     .date(today)
-                    .type(req.type())
+                    .type(req.type)
                     .createdAt(LocalDateTime.now())
                     .build());
             created++;
@@ -120,8 +145,10 @@ public class AttendanceController {
                 "message", "Attendance saved",
                 "created", created,
                 "skipped", skipped,
+                "invalid", invalid,
                 "date", today.toString(),
-                "type", req.type().name()
+                "type", req.type.name()
         ));
     }
+
 }

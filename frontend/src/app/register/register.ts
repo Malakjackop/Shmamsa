@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -45,10 +45,10 @@ export class RegisterComponent {
 
 private buildForm() {
   this.registerForm = this.fb.group({
-    fullName: ['', Validators.required],
+fullName: ['', Validators.required],
     username: ['', Validators.required],
     phoneNumber: [''],
-    nationalId: ['', Validators.required],
+    nationalId: ['', [Validators.required, this.nationalIdValidator(6)]],
     email: ['', [Validators.required, Validators.email]],
     dateOfBirth: [''],
     gender: [''],
@@ -77,13 +77,80 @@ private buildForm() {
     confirmPassword: ['', Validators.required],
 
     secret: ['']
-  });
+  }, { updateOn: 'blur' });
 
   if (this.isServant) {
     this.registerForm.get('secret')?.setValidators([Validators.required]);
   }
   this.registerForm.get('secret')?.updateValueAndValidity();
 }
+
+
+  // ✅ National ID validator (Egyptian 14 digits) + minAge
+  private nationalIdValidator(minAge: number): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const nid = String(control.value || '').trim();
+      if (!nid) return null; // required handled separately
+      if (!/^\d{14}$/.test(nid)) return { nationalIdFormat: true };
+
+      const centuryCode = nid[0];
+      const yy = nid.substring(1, 3);
+      const mm = nid.substring(3, 5);
+      const dd = nid.substring(5, 7);
+
+      const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
+      if (yearBase === null) return { nationalIdFormat: true };
+
+      const year = yearBase + Number(yy);
+      const month = Number(mm);
+      const day = Number(dd);
+
+      const dob = new Date(year, month - 1, day);
+      if (isNaN(dob.getTime())) return { nationalIdFormat: true };
+
+      // age calculation
+      const now = new Date();
+      let age = now.getFullYear() - dob.getFullYear();
+      const m = now.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+
+      if (age < minAge) return { nationalIdMinAge: { minAge, age } };
+      return null;
+    };
+  }
+
+  // ✅ Show toast error on blur (instead of waiting submit)
+  onFieldBlur(controlName: string, label?: string) {
+    const c = this.registerForm.get(controlName);
+    if (!c) return;
+    c.markAsTouched();
+
+    if (controlName === 'confirmPassword') {
+      const p = String(this.registerForm.get('password')?.value || '');
+      const cp = String(c.value || '');
+      if (p && cp && p !== cp) {
+        c.setErrors({ ...(c.errors || {}), passwordMismatch: true });
+      }
+    }
+
+    if (c.valid) return;
+
+    const nice = label || controlName;
+
+    const e = c.errors || {};
+    let msg = 'Invalid value.';
+
+    if (e['required']) msg = `${nice} is required.`;
+    else if (e['email']) msg = `Please enter a valid email.`;
+    else if (e['nationalIdFormat']) msg = `National ID must be 14 digits and valid.`;
+    else if (e['nationalIdMinAge']) msg = `National ID age must be at least ${e['nationalIdMinAge'].minAge} years.`;
+    else if (e['passwordMismatch']) msg = `Passwords do not match.`;
+    else if (e['pattern']) msg = `${nice} format is invalid.`;
+    else if (e['minlength']) msg = `${nice} is too short.`;
+    else if (e['maxlength']) msg = `${nice} is too long.`;
+
+    this.messageService.add({ severity: 'error', summary: 'Error', detail: msg });
+  }
 
 
   togglePassword() {
