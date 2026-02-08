@@ -25,7 +25,7 @@ export class AttendanceComponent implements OnInit {
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
 
   // list of scanned users (unique by id)
-  scanned: { id: number; username: string; fullName: string; deaconFamily?: string }[] = [];
+  scanned: { id: number; fullName: string; deaconFamily?: string }[] = [];
 
   ngOnInit() {
     // ✅ SSR: don't call protected endpoints on the server render
@@ -47,7 +47,7 @@ export class AttendanceComponent implements OnInit {
       next: (u) => {
         if (!u?.id) return;
         if (this.scanned.some((x) => x.id === u.id)) return;
-        this.scanned.push({ id: u.id, username: u.username, fullName: u.fullName, deaconFamily: u.deaconFamily });
+        this.scanned.push({ id: u.id, fullName: u.fullName, deaconFamily: u.deaconFamily });
       },
       error: () => {
         this.message.add({ severity: 'warn', summary: 'Invalid QR', detail: 'This QR is not valid or user not found' });
@@ -60,13 +60,13 @@ export class AttendanceComponent implements OnInit {
   }
 
   submit() {
-    const users = this.scanned.map((x) => ({ id: x.id, username: x.username }));
-    if (users.length === 0) {
+    const ids = this.scanned.map((x) => x.id);
+    if (ids.length === 0) {
       this.message.add({ severity: 'warn', summary: 'No users', detail: 'Scan at least one QR code' });
       return;
     }
 
-    this.attendance.submit(users, this.selectedType).subscribe({
+    this.attendance.submit(ids, this.selectedType).subscribe({
       next: (res) => {
         this.message.add({
           severity: 'success',

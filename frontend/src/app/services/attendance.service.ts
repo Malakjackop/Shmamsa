@@ -10,13 +10,13 @@ export class AttendanceService {
   private http = inject(HttpClient);
   private baseUrl = '/api/attendance';
 
-  submit(users: { id: number; username?: string }[], type: AttendanceType): Observable<any> {
-    return this.http.post(`${this.baseUrl}/submit`, { users, type }, { withCredentials: true });
+  submit(userIds: number[], type: AttendanceType): Observable<any> {
+    return this.http.post(`${this.baseUrl}/submit`, { userIds, type }, { withCredentials: true });
   }
 
     // ✅ Public scan: verify signed QR token and return trusted user data
-  scanToken(token: string): Observable<{ id: number; username: string; fullName: string; deaconFamily?: string }> {
-    return this.http.post<{ id: number; username: string; fullName: string; deaconFamily?: string }>(
+  scanToken(token: string): Observable<{ id: number; fullName: string; deaconFamily?: string }> {
+    return this.http.post<{ id: number; fullName: string; deaconFamily?: string }>(
       `${this.baseUrl}/scan-token`,
       { token }
     );

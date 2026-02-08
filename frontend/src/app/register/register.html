@@ -12,11 +12,11 @@
       <!-- Row 1 -->
       <div class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="fullName" placeholder="Full Name" required (blur)="onFieldBlur('fullName', 'Full Name')" />
+          <input type="text" formControlName="fullName" placeholder="Full Name" required />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="username" placeholder="USERNAME" required (blur)="onFieldBlur('username', 'Username')" />
+          <input type="text" formControlName="username" placeholder="USERNAME" required />
         </div>
 
         <div class="input-group small">
@@ -24,12 +24,11 @@
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="nationalId"  name="national-id" autocomplete="off" placeholder="NATIONAL ID" (blur)="onNationalIdBlur(); onFieldBlur('nationalId', 'National ID')"
- />
+          <input type="text" formControlName="nationalId"  name="national-id" autocomplete="off" placeholder="NATIONAL ID" (blur)="onNationalIdBlur(); onFieldBlur('nationalId','الرقم القومي')" />
         </div>
 
         <div class="input-group small">
-  <input type="email" formControlName="email" placeholder="EMAIL" required (blur)="onFieldBlur('email', 'Email')" />
+  <input type="email" formControlName="email" placeholder="EMAIL" required />
 </div>
 
 
@@ -49,7 +48,7 @@
       <div class="input-row">
         <!-- Deacon Family -->
         <div class="input-group small">
-          <select formControlName="deaconFamily" required (blur)="onFieldBlur('deaconFamily', 'Deacon Family')">
+          <select formControlName="deaconFamily" required>
             <option value="" disabled selected>What's your Deacon Family?</option>
             <option value="اسرة السمائين">اسرة السمائين</option>
             <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
@@ -66,7 +65,7 @@
 
         <!-- ✅ Deacon Degree -->
         <div class="input-group small">
-          <select formControlName="deaconDegree" required (blur)="onFieldBlur('deaconDegree', 'Deacon Degree')">
+          <select formControlName="deaconDegree" required>
             <option value="" disabled selected>What's your Deacon Degree?</option>
             <option>ابصالتس</option>
             <option>اغنسطس</option>
@@ -178,7 +177,7 @@
             [type]="showPassword ? 'text' : 'password'"
             formControlName="password"
             placeholder="PASSWORD"
-            required (blur)="onFieldBlur('password', 'Password')" />
+            required />
           <span class="password-eye" (click)="togglePassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
@@ -189,7 +188,7 @@
             [type]="showConfirmPassword ? 'text' : 'password'"
             formControlName="confirmPassword"
             placeholder="CONFIRM PASSWORD"
-            required (blur)="onFieldBlur('confirmPassword', 'Confirm Password')"/>
+            required />
           <span class="password-eye" (click)="toggleConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>

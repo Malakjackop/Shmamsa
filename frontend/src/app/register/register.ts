@@ -1,6 +1,14 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ReactiveFormsModule,
+  AbstractControl,
+  ValidationErrors,
+  ValidatorFn
+} from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -14,7 +22,7 @@ import { InputIconModule } from 'primeng/inputicon';
   selector: 'app-register',
   templateUrl: './register.html',
   styleUrls: ['./register.css'],
-    standalone: true,
+  standalone: true,
   imports: [
     CommonModule,
     RouterModule,
@@ -43,54 +51,12 @@ export class RegisterComponent {
     this.buildForm();
   }
 
-private buildForm() {
-  this.registerForm = this.fb.group({
-fullName: ['', Validators.required],
-    username: ['', Validators.required],
-    phoneNumber: [''],
-    nationalId: ['', [Validators.required, this.nationalIdValidator(6)]],
-    email: ['', [Validators.required, Validators.email]],
-    dateOfBirth: [''],
-    gender: [''],
-
-    deaconFamily: ['', Validators.required],
-    deaconDegree: ['', Validators.required],
-
-    status: [''],
-    graduatedFrom: [''],
-    graduateJob: [''],
-
-    studyType: [''],
-    schoolName: [''],
-    schoolGrade: [''],
-    universityName: [''],
-    faculty: [''],
-    universityGrade: [''],
-
-    isWorking: [''],
-    workDetails: [''],
-
-    guardiansPhone: [''],
-    guardianRelation: [''],
-
-    password: ['', Validators.required],
-    confirmPassword: ['', Validators.required],
-
-    secret: ['']
-  }, { updateOn: 'blur' });
-
-  if (this.isServant) {
-    this.registerForm.get('secret')?.setValidators([Validators.required]);
-  }
-  this.registerForm.get('secret')?.updateValueAndValidity();
-}
-
-
-  // ✅ National ID validator (Egyptian 14 digits) + minAge
+  // ✅ National ID validator: 14 digits + valid DOB + minAge (default 6)
   private nationalIdValidator(minAge: number): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
       const nid = String(control.value || '').trim();
       if (!nid) return null; // required handled separately
+
       if (!/^\d{14}$/.test(nid)) return { nationalIdFormat: true };
 
       const centuryCode = nid[0];
@@ -105,53 +71,98 @@ fullName: ['', Validators.required],
       const month = Number(mm);
       const day = Number(dd);
 
+      // validate date parts
+      if (month < 1 || month > 12 || day < 1 || day > 31) return { nationalIdFormat: true };
+
       const dob = new Date(year, month - 1, day);
       if (isNaN(dob.getTime())) return { nationalIdFormat: true };
 
-      // age calculation
+      // ✅ age calc
       const now = new Date();
       let age = now.getFullYear() - dob.getFullYear();
       const m = now.getMonth() - dob.getMonth();
       if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
 
       if (age < minAge) return { nationalIdMinAge: { minAge, age } };
+
       return null;
     };
   }
 
-  // ✅ Show toast error on blur (instead of waiting submit)
+  private buildForm() {
+    this.registerForm = this.fb.group({
+      fullName: ['', Validators.required],
+      username: ['', Validators.required],
+      phoneNumber: [''],
+      nationalId: ['', [Validators.required, this.nationalIdValidator(6)]],
+      email: ['', [Validators.required, Validators.email]],
+      dateOfBirth: [''],
+      gender: [''],
+
+      deaconFamily: ['', Validators.required],
+      deaconDegree: ['', Validators.required],
+
+      status: [''],
+      graduatedFrom: [''],
+      graduateJob: [''],
+
+      studyType: [''],
+      schoolName: [''],
+      schoolGrade: [''],
+      universityName: [''],
+      faculty: [''],
+      universityGrade: [''],
+
+      isWorking: [''],
+      workDetails: [''],
+
+      guardiansPhone: [''],
+      guardianRelation: [''],
+
+      password: ['', Validators.required],
+      confirmPassword: ['', Validators.required],
+
+      secret: ['']
+    });
+
+    if (this.isServant) {
+      this.registerForm.get('secret')?.setValidators([Validators.required]);
+    }
+    this.registerForm.get('secret')?.updateValueAndValidity();
+  }
+
+  // ✅ Human-friendly error message (used by blur toast)
+  private getErrorMessage(controlName: string, label?: string): string | null {
+    const c = this.registerForm.get(controlName);
+    if (!c || !c.errors) return null;
+
+    const e: any = c.errors;
+
+    if (e['required']) return `${label || 'هذا الحقل'} مطلوب`;
+    if (e['email']) return 'البريد الإلكتروني غير صحيح';
+
+    // National ID
+    if (e['nationalIdFormat']) return 'الرقم القومي لازم يكون 14 رقم وتاريخ ميلاد صحيح';
+    if (e['nationalIdMinAge']) return `لازم السن يكون ${e['nationalIdMinAge']?.minAge} سنين أو أكثر`;
+
+    return label ? `قيمة ${label} غير صحيحة` : 'قيمة غير صحيحة';
+  }
+
+  // ✅ Show toast errors on blur (including required + national id age)
   onFieldBlur(controlName: string, label?: string) {
     const c = this.registerForm.get(controlName);
     if (!c) return;
-    c.markAsTouched();
 
-    if (controlName === 'confirmPassword') {
-      const p = String(this.registerForm.get('password')?.value || '');
-      const cp = String(c.value || '');
-      if (p && cp && p !== cp) {
-        c.setErrors({ ...(c.errors || {}), passwordMismatch: true });
-      }
-    }
+    c.markAsTouched();
+    c.updateValueAndValidity({ emitEvent: false });
 
     if (c.valid) return;
 
-    const nice = label || controlName;
+    const msg = this.getErrorMessage(controlName, label);
+    if (!msg) return;
 
-    const e = c.errors || {};
-    let msg = 'Invalid value.';
-
-    if (e['required']) msg = `${nice} is required.`;
-    else if (e['email']) msg = `Please enter a valid email.`;
-    else if (e['nationalIdFormat']) msg = `National ID must be 14 digits and valid.`;
-    else if (e['nationalIdMinAge']) msg = `National ID age must be at least ${e['nationalIdMinAge'].minAge} years.`;
-    else if (e['passwordMismatch']) msg = `Passwords do not match.`;
-    else if (e['pattern']) msg = `${nice} format is invalid.`;
-    else if (e['minlength']) msg = `${nice} is too short.`;
-    else if (e['maxlength']) msg = `${nice} is too long.`;
-
-    this.messageService.add({ severity: 'error', summary: 'Error', detail: msg });
+    this.messageService.add({ severity: 'error', summary: 'خطأ', detail: msg });
   }
-
 
   togglePassword() {
     this.showPassword = !this.showPassword;
@@ -160,47 +171,51 @@ fullName: ['', Validators.required],
   toggleConfirmPassword() {
     this.showConfirmPassword = !this.showConfirmPassword;
   }
-onSubmit() {
-  this.submit();
-}
 
-onNationalIdBlur() {
-  const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
+  onSubmit() {
+    this.submit();
+  }
 
-  if (!/^\d{14}$/.test(nid)) return;
+  onNationalIdBlur() {
+    const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
 
-  const centuryCode = nid[0];
-  const yy = nid.substring(1, 3);
-  const mm = nid.substring(3, 5);
-  const dd = nid.substring(5, 7);
+    // ✅ always re-validate on blur so toast shows correct reason
+    this.registerForm.get('nationalId')?.updateValueAndValidity({ emitEvent: false });
 
-  const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
-  if (yearBase === null) return;
+    if (!nid) return; // required handled by toast
 
-  const year = yearBase + Number(yy);
-  const month = Number(mm);
-  const day = Number(dd);
+    if (!/^\d{14}$/.test(nid)) return;
 
-  if (month < 1 || month > 12 || day < 1 || day > 31) return;
+    const centuryCode = nid[0];
+    const yy = nid.substring(1, 3);
+    const mm = nid.substring(3, 5);
+    const dd = nid.substring(5, 7);
 
-  const iso = `${year.toString().padStart(4,'0')}-${mm}-${dd}`;
-  this.registerForm.get('dateOfBirth')?.setValue(iso);
+    const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
+    if (yearBase === null) return;
 
-  // ✅ Gender: 13th digit (odd=Male, even=Female)
-  const genderDigit = Number(nid.charAt(12));
-  const gender = (genderDigit % 2 === 0) ? 'FEMALE' : 'MALE';
-  this.registerForm.get('gender')?.setValue(gender);
-}
+    const year = yearBase + Number(yy);
+    const month = Number(mm);
+    const day = Number(dd);
 
+    if (month < 1 || month > 12 || day < 1 || day > 31) return;
 
-toggleShowPassword() {
-  this.togglePassword();
-}
+    const iso = `${year.toString().padStart(4, '0')}-${mm}-${dd}`;
+    this.registerForm.get('dateOfBirth')?.setValue(iso);
 
-toggleShowConfirmPassword() {
-  this.toggleConfirmPassword();
-}
+    // ✅ Gender: 13th digit (odd=Male, even=Female)
+    const genderDigit = Number(nid.charAt(12));
+    const gender = (genderDigit % 2 === 0) ? 'FEMALE' : 'MALE';
+    this.registerForm.get('gender')?.setValue(gender);
+  }
 
+  toggleShowPassword() {
+    this.togglePassword();
+  }
+
+  toggleShowConfirmPassword() {
+    this.toggleConfirmPassword();
+  }
 
   submit() {
     if (this.registerForm.invalid) {
@@ -215,38 +230,38 @@ toggleShowConfirmPassword() {
       return;
     }
 
-const payload: any = {
-  fullName: formValue.fullName,
-  username: formValue.username,
-  email: formValue.email,
-  password: formValue.password,
-  deaconFamily: formValue.deaconFamily,
+    const payload: any = {
+      fullName: formValue.fullName,
+      username: formValue.username,
+      email: formValue.email,
+      password: formValue.password,
+      confirmPassword: formValue.confirmPassword, // ✅ مهم للباك
 
-  phoneNumber: formValue.phoneNumber,
-  nationalId: formValue.nationalId,
-  dateOfBirth: formValue.dateOfBirth,
-  gender: formValue.gender,
-  deaconDegree: formValue.deaconDegree,
+      deaconFamily: formValue.deaconFamily,
 
-  status: formValue.status,
-  graduatedFrom: formValue.graduatedFrom,
-  graduateJob: formValue.graduateJob,
+      phoneNumber: formValue.phoneNumber,
+      nationalId: formValue.nationalId,
+      dateOfBirth: formValue.dateOfBirth,
+      gender: formValue.gender,
+      deaconDegree: formValue.deaconDegree,
 
-  studyType: formValue.studyType,
-  schoolName: formValue.schoolName,
-  schoolGrade: formValue.schoolGrade,
-  universityName: formValue.universityName,
-  faculty: formValue.faculty,
-  universityGrade: formValue.universityGrade,
+      status: formValue.status,
+      graduatedFrom: formValue.graduatedFrom,
+      graduateJob: formValue.graduateJob,
 
-  isWorking: formValue.isWorking,
-  workDetails: formValue.workDetails,
+      studyType: formValue.studyType,
+      schoolName: formValue.schoolName,
+      schoolGrade: formValue.schoolGrade,
+      universityName: formValue.universityName,
+      faculty: formValue.faculty,
+      universityGrade: formValue.universityGrade,
 
-  guardiansPhone: formValue.guardiansPhone,
-  guardianRelation: formValue.guardianRelation
-};
+      isWorking: formValue.isWorking,
+      workDetails: formValue.workDetails,
 
-
+      guardiansPhone: formValue.guardiansPhone,
+      guardianRelation: formValue.guardianRelation
+    };
 
     if (this.isServant) {
       // ✅ Register servant
