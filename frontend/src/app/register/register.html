@@ -12,11 +12,11 @@
       <!-- Row 1 -->
       <div class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="fullName" placeholder="Full Name" required />
+          <input type="text" formControlName="fullName" placeholder="Full Name" required (blur)="onFieldBlur('fullName', 'Full Name')" />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="username" placeholder="USERNAME" required />
+          <input type="text" formControlName="username" placeholder="USERNAME" required (blur)="onFieldBlur('username', 'Username')" />
         </div>
 
         <div class="input-group small">
@@ -24,11 +24,11 @@
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="nationalId"  name="national-id" autocomplete="off" placeholder="NATIONAL ID" (blur)="onNationalIdBlur(); onFieldBlur('nationalId','الرقم القومي')" />
+          <input type="text" formControlName="nationalId"  name="national-id" autocomplete="off" placeholder="NATIONAL ID" (blur)="onNationalIdBlur(); onFieldBlur('nationalId', 'National ID')" />
         </div>
 
         <div class="input-group small">
-  <input type="email" formControlName="email" placeholder="EMAIL" required />
+  <input type="email" formControlName="email" placeholder="EMAIL" required (blur)="onFieldBlur('email', 'Email')" />
 </div>
 
 
@@ -48,8 +48,8 @@
       <div class="input-row">
         <!-- Deacon Family -->
         <div class="input-group small">
-          <select formControlName="deaconFamily" required>
-            <option value="" disabled selected>What's your Deacon Family?</option>
+          <select formControlName="deaconFamily" required (blur)="onFieldBlur('deaconFamily', 'Deacon Family')">
+            <option value="" disabled>What's your Deacon Family?</option>
             <option value="اسرة السمائين">اسرة السمائين</option>
             <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
             <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
@@ -65,8 +65,8 @@
 
         <!-- ✅ Deacon Degree -->
         <div class="input-group small">
-          <select formControlName="deaconDegree" required>
-            <option value="" disabled selected>What's your Deacon Degree?</option>
+          <select formControlName="deaconDegree" required (blur)="onFieldBlur('deaconDegree', 'Deacon Degree')">
+            <option value="" disabled>What's your Deacon Degree?</option>
             <option>ابصالتس</option>
             <option>اغنسطس</option>
             <option>ايبودياكون</option>
@@ -79,8 +79,8 @@
       <!-- Status -->
       <div class="input-row">
         <div class="input-group small">
-          <select formControlName="status">
-            <option value="" disabled selected>Choose Status</option>
+          <select formControlName="status" (change)="onStatusChange()">
+            <option value="" disabled>Choose Status</option>
             <option value="student">Student</option>
             <option value="graduate">Graduate</option>
           </select>
@@ -103,8 +103,8 @@
         <!-- Study Type -->
         <div class="input-row">
           <div class="input-group small">
-            <select formControlName="studyType">
-              <option value="" disabled selected>Study In</option>
+            <select formControlName="studyType" (change)="onStudyTypeChange()">
+              <option value="" disabled>Study In</option>
               <option value="school">School</option>
               <option value="university">University</option>
             </select>
@@ -141,7 +141,7 @@
         <div class="input-row">
           <div class="input-group small">
           <select formControlName="isWorking">
-            <option value="" disabled selected>Do you work?</option>
+            <option value="" disabled>Do you work?</option>
             <option [ngValue]="false">No</option>
             <option [ngValue]="true">Yes</option>
           </select>
@@ -162,7 +162,7 @@
 
           <div class="input-group small">
             <select formControlName="guardianRelation">
-              <option value="" disabled selected>Who is the Guardian?</option>
+              <option value="" disabled>Who is the Guardian?</option>
               <option value="mom">Mom</option>
               <option value="dad">Dad</option>
             </select>
@@ -177,7 +177,7 @@
             [type]="showPassword ? 'text' : 'password'"
             formControlName="password"
             placeholder="PASSWORD"
-            required />
+            required (blur)="onFieldBlur('password', 'Password')" />
           <span class="password-eye" (click)="togglePassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
@@ -188,7 +188,7 @@
             [type]="showConfirmPassword ? 'text' : 'password'"
             formControlName="confirmPassword"
             placeholder="CONFIRM PASSWORD"
-            required />
+            required (blur)="onFieldBlur('confirmPassword', 'Confirm Password')" />
           <span class="password-eye" (click)="toggleConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
