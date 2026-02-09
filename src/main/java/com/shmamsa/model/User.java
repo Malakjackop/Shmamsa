@@ -24,59 +24,47 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 1️⃣ Full Name
     @JsonProperty("fullName")
     @NotBlank(message = "Full name is required")
     private String fullName;
 
-    // 2️⃣ Username
     @NotBlank(message = "Username is required")
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    // 3️⃣ Password
     @NotBlank(message = "Password is required")
     @Column(nullable = false)
     private String password;
 
-    // 4️⃣ National ID
     @NotBlank(message = "National ID is required")
     @Size(min = 14, max = 14, message = "National ID must be exactly 14 digits")
     @Pattern(regexp = "\\d{14}", message = "National ID must contain only numbers")
     @Column(length = 20, unique = true)
     private String nationalId;
 
-    // 5️⃣ Phone Number
     @Pattern(regexp = "^$|\\d{11}", message = "Phone number must be 11 digits or empty")
     @Column(length = 15)
     private String phoneNumber;
 
-    // 6️⃣ Guardian’s Phone
     @Pattern(regexp = "^$|\\d{11}", message = "Guardian phone must be 11 digits or empty")
     @Column(length = 15)
     private String guardiansPhone;
 
 
-    // 7️⃣ Guardian Relation (mom or dad)
     @Column(length = 20)
     private String guardianRelation;
 
-    // 8️⃣ Date of Birth
     private LocalDate dateOfBirth;
 
-    // 8️⃣.1️⃣ Gender (derived from National ID)
     @Column(length = 10)
     private String gender;
 
-    // 9️⃣ Status (student / graduate)
     @Column(length = 20)
     private String status;
 
-    // 🔟 Study Type (school / university)
     @Column(length = 20)
     private String studyType;
 
-    // 11️⃣ School Info (only if studyType = school)
     @Column(length = 100)
     private String schoolName;
 

@@ -118,7 +118,23 @@
           </div>
 
           <div class="input-group small">
-            <input type="text" formControlName="schoolGrade" placeholder="Grade" />
+          <select class="form-select" formControlName="schoolGrade" (change)="onGradeChange()">
+            <option value="" disabled>اختر الصف</option>
+            <option value="grade1_primary">أولى ابتدائي</option>
+            <option value="grade2_primary">تانية ابتدائي</option>
+            <option value="grade3_primary">تالتة ابتدائي</option>
+            <option value="grade4_primary">رابعة ابتدائي</option>
+            <option value="grade5_primary">خامسة ابتدائي</option>
+            <option value="grade6_primary">سادسة ابتدائي</option>
+
+            <option value="grade1_prep">أولى إعدادي</option>
+            <option value="grade2_prep">تانية إعدادي</option>
+            <option value="grade3_prep">تالتة إعدادي</option>
+
+            <option value="grade1_secondary">أولى ثانوي</option>
+            <option value="grade2_secondary">تانية ثانوي</option>
+            <option value="grade3_secondary">تالتة ثانوي</option>
+          </select>
           </div>
         </div>
 

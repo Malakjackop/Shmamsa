@@ -35,7 +35,6 @@ export class RegisterComponent implements OnInit {
   showPassword = false;
   showConfirmPassword = false;
 
-  // ✅ UI toggles for immediate section display
   isStudent = false;
   isGraduate = false;
   isSchool = false;
@@ -51,44 +50,47 @@ export class RegisterComponent implements OnInit {
   }
 
 
-
-
   ngOnInit(): void {
     this.buildForm();
 
-    // ✅ Make sections open immediately when select changes
     this.registerForm.get('status')?.valueChanges.subscribe(() => this.onStatusChange());
     this.registerForm.get('studyType')?.valueChanges.subscribe(() => this.onStudyTypeChange());
 
-    // ✅ Keep confirm password mismatch updated
     this.registerForm.get('password')?.valueChanges.subscribe(() => this.applyPasswordMismatch());
     this.registerForm.get('confirmPassword')?.valueChanges.subscribe(() => this.applyPasswordMismatch());
 
-    // Initialize flags once
     this.onStatusChange();
     this.onStudyTypeChange();
   }
+
 private buildForm() {
   
     const minAge = this.isServant ? 16 : 6;
 
     this.registerForm = this.fb.group({
-fullName: ['', Validators.required],
+    fullName: ['', Validators.required],
     username: ['', Validators.required],
     phoneNumber: [''],
-    nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
     email: ['', [Validators.required, Validators.email]],
+
+    nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
     dateOfBirth: [''],
     gender: [''],
 
     deaconFamily: ['', Validators.required],
     deaconDegree: ['', Validators.required],
+  
     status: this.fb.control('', { updateOn: 'change' }),
+
     graduatedFrom: [''],
     graduateJob: [''],
+
     studyType: this.fb.control('', { updateOn: 'change' }),
+
     schoolName: [''],
     schoolGrade: [''],
+    otherGrade: [''],
+
     universityName: [''],
     faculty: [''],
     universityGrade: [''],
@@ -112,11 +114,10 @@ fullName: ['', Validators.required],
 }
 
 
-  // ✅ National ID validator (Egyptian 14 digits) + minAge
   private nationalIdValidator(minAge: number): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
       const nid = String(control.value || '').trim();
-      if (!nid) return null; // required handled separately
+      if (!nid) return null; 
       if (!/^\d{14}$/.test(nid)) return { nationalIdFormat: true };
 
       const centuryCode = nid[0];
@@ -134,7 +135,6 @@ fullName: ['', Validators.required],
       const dob = new Date(year, month - 1, day);
       if (isNaN(dob.getTime())) return { nationalIdFormat: true };
 
-      // age calculation
       const now = new Date();
       let age = now.getFullYear() - dob.getFullYear();
       const m = now.getMonth() - dob.getMonth();
@@ -145,16 +145,13 @@ fullName: ['', Validators.required],
     };
   }
 
-  // ✅ Show toast error on blur (instead of waiting submit)
   onFieldBlur(controlName: string, label?: string) {
     const c = this.registerForm.get(controlName);
     if (!c) return;
 
-    // show validation as soon as user leaves the input
     c.markAsTouched();
     c.updateValueAndValidity({ emitEvent: false });
 
-    // keep confirmPassword mismatch updated on blur/change
     if (controlName === 'confirmPassword' || controlName === 'password') {
       this.applyPasswordMismatch();
     }
@@ -164,32 +161,43 @@ fullName: ['', Validators.required],
     const msg = this.getErrorMessage(controlName, label);
     if (!msg) return;
 
-    this.messageService.add({ severity: 'error', summary: 'خطأ', detail: msg });
+    this.messageService.add({ severity: 'error', summary: 'wrong', detail: msg });
   }
 
 
 
-  // ✅ Update UI + validators immediately when user selects Student/Graduate
-  onStatusChange() {
-    const status = this.registerForm.get('status')?.value;
+onStatusChange() {
+  const status = this.registerForm.get('status')?.value;
 
-    // clear graduate fields when not graduate
-    if (status !== 'graduate') {
-      this.registerForm.get('graduatedFrom')?.setValue('', { emitEvent: false });
-      this.registerForm.get('graduateJob')?.setValue('', { emitEvent: false });
-      this.registerForm.get('graduatedFrom')?.clearValidators();
-      this.registerForm.get('graduateJob')?.clearValidators();
-    } else {
-      // optional: make them required
-      this.registerForm.get('graduatedFrom')?.setValidators([Validators.required]);
-      this.registerForm.get('graduateJob')?.setValidators([Validators.required]);
+  if (status !== 'graduate') {
+    this.registerForm.get('graduatedFrom')?.setValue('', { emitEvent: false });
+    this.registerForm.get('graduateJob')?.setValue('', { emitEvent: false });
+    this.registerForm.get('graduatedFrom')?.clearValidators();
+    this.registerForm.get('graduateJob')?.clearValidators();
+  } else {
+    this.registerForm.get('graduatedFrom')?.setValidators([Validators.required]);
+    this.registerForm.get('graduateJob')?.setValidators([Validators.required]);
+  }
+
+  this.registerForm.get('graduatedFrom')?.updateValueAndValidity({ emitEvent: false });
+  this.registerForm.get('graduateJob')?.updateValueAndValidity({ emitEvent: false });
+
+  const studyTypeCtrl = this.registerForm.get('studyType');
+
+  if (this.isServant && status === 'student') {
+    studyTypeCtrl?.setValue('university', { emitEvent: false });
+    studyTypeCtrl?.disable({ emitEvent: false });     
+    this.onStudyTypeChange();                         
+  } else {
+    studyTypeCtrl?.enable({ emitEvent: false });     
+    if (status !== 'student') {
+      studyTypeCtrl?.setValue('', { emitEvent: false });
+      this.onStudyTypeChange();
     }
-
-    this.registerForm.get('graduatedFrom')?.updateValueAndValidity({ emitEvent: false });
-    this.registerForm.get('graduateJob')?.updateValueAndValidity({ emitEvent: false });
   }
+}
 
-  // ✅ Update UI + validators immediately when user selects School/University
+
   onStudyTypeChange() {
     const studyType = this.registerForm.get('studyType')?.value;
 
@@ -223,7 +231,21 @@ fullName: ['', Validators.required],
     this.registerForm.get('universityGrade')?.updateValueAndValidity({ emitEvent: false });
   }
 
-  // ✅ Apply confirm password mismatch error to confirmPassword control
+  onGradeChange() {
+  const gradeCtrl = this.registerForm.get('schoolGrade');
+  const otherCtrl = this.registerForm.get('otherGrade');
+
+  if (gradeCtrl?.value === 'other') {
+    otherCtrl?.setValidators([Validators.required]);
+  } else {
+    otherCtrl?.setValue('', { emitEvent: false });
+    otherCtrl?.clearValidators();
+  }
+
+  otherCtrl?.updateValueAndValidity({ emitEvent: false });
+}
+
+
   applyPasswordMismatch() {
     const pass = this.registerForm.get('password')?.value;
     const confirmCtrl = this.registerForm.get('confirmPassword');
@@ -231,7 +253,6 @@ fullName: ['', Validators.required],
 
     const confirm = confirmCtrl.value;
 
-    // if empty, let required handle it
     if (!confirm) {
       const e = { ...(confirmCtrl.errors || {}) };
       delete e['mismatch'];
@@ -248,26 +269,21 @@ fullName: ['', Validators.required],
     }
   }
 
-  // ✅ Human-friendly error messages per control
   getErrorMessage(controlName: string, label?: string): string | null {
     const c = this.registerForm.get(controlName);
     if (!c || !c.errors) return null;
 
     const e: any = c.errors;
 
-    // common
-    if (e['required']) return `${label || 'هذا الحقل'} مطلوب`;
-    if (e['email']) return `البريد الإلكتروني غير صحيح`;
+    if (e['required']) return `${label || 'this field '} required`;
+    if (e['email']) return `email not correct`;
 
-    // national id custom validator keys from this project
-    if (e['nationalIdFormat']) return 'الرقم القومي لازم يكون 14 رقم وتاريخ ميلاد صحيح';
-    if (e['nationalIdMinAge']) return `لازم السن يكون ${e['nationalIdMinAge']?.minAge} سنين أو أكثر`;
+    if (e['nationalIdFormat']) return 'national id must be 14 chracters ';
+    if (e['nationalIdMinAge']) return `age must be  ${e['nationalIdMinAge']?.minAge} or more`;
 
-    // password mismatch
-    if (e['mismatch']) return 'كلمة المرور وتأكيدها مش متطابقين';
+    if (e['mismatch']) return 'password or confirm passwword not match';
 
-    // default fallback
-    return label ? `قيمة ${label} غير صحيحة` : 'قيمة غير صحيحة';
+    return label ? `Value ${label} not correct` : ' Vlaue not correct ';
   }
 
 
@@ -278,78 +294,76 @@ fullName: ['', Validators.required],
   toggleConfirmPassword() {
     this.showConfirmPassword = !this.showConfirmPassword;
   }
-onSubmit() {
-  this.submit();
-}
 
-onNationalIdBlur() {
-  const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
+  onSubmit() {
+    this.submit();
+  }
 
-  if (!/^\d{14}$/.test(nid)) return;
+  onNationalIdBlur() {
+    const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
 
-  const centuryCode = nid[0];
-  const yy = nid.substring(1, 3);
-  const mm = nid.substring(3, 5);
-  const dd = nid.substring(5, 7);
+    if (!/^\d{14}$/.test(nid)) return;
 
-  const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
-  if (yearBase === null) return;
+    const centuryCode = nid[0];
+    const yy = nid.substring(1, 3);
+    const mm = nid.substring(3, 5);
+    const dd = nid.substring(5, 7);
 
-  const year = yearBase + Number(yy);
-  const month = Number(mm);
-  const day = Number(dd);
+    const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
+    if (yearBase === null) return;
 
-  if (month < 1 || month > 12 || day < 1 || day > 31) return;
+    const year = yearBase + Number(yy);
+    const month = Number(mm);
+    const day = Number(dd);
 
-  const iso = `${year.toString().padStart(4,'0')}-${mm}-${dd}`;
-  this.registerForm.get('dateOfBirth')?.setValue(iso);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return;
 
-  // ✅ Gender: 13th digit (odd=Male, even=Female)
-  const genderDigit = Number(nid.charAt(12));
-  const gender = (genderDigit % 2 === 0) ? 'FEMALE' : 'MALE';
-  this.registerForm.get('gender')?.setValue(gender);
-}
+    const iso = `${year.toString().padStart(4,'0')}-${mm}-${dd}`;
+    this.registerForm.get('dateOfBirth')?.setValue(iso);
+
+    const genderDigit = Number(nid.charAt(12));
+    const gender = (genderDigit % 2 === 0) ? 'FEMALE' : 'MALE';
+    this.registerForm.get('gender')?.setValue(gender);
+  }
 
 
-toggleShowPassword() {
-  this.togglePassword();
-}
+  toggleShowPassword() {
+    this.togglePassword();
+  }
 
-toggleShowConfirmPassword() {
-  this.toggleConfirmPassword();
-}
+  toggleShowConfirmPassword() {
+    this.toggleConfirmPassword();
+  }
 
 
   
-  // ✅ Show backend validation / API errors in a clear way
   private showApiErrors(err: any) {
     const api = err?.error;
 
-    // Spring validation errors: { errors: { field: message, ... } }
     if (api && api.errors && typeof api.errors === 'object') {
       const fieldLabels: Record<string, string> = {
-        fullName: 'الاسم بالكامل',
-        username: 'اسم المستخدم',
-        email: 'البريد الإلكتروني',
-        password: 'كلمة المرور',
-        confirmPassword: 'تأكيد كلمة المرور',
-        nationalId: 'الرقم القومي',
-        deaconFamily: 'أسرة الشمامسة',
-        deaconDegree: 'الدرجة الشماسية',
-        phoneNumber: 'رقم الموبايل',
-        guardiansPhone: 'رقم ولي الأمر',
-        guardianRelation: 'صلة القرابة',
-        status: 'الحالة',
-        studyType: 'نوع الدراسة',
-        schoolName: 'اسم المدرسة',
-        schoolGrade: 'الصف',
-        universityName: 'اسم الجامعة/المعهد',
-        faculty: 'الكلية',
-        universityGrade: 'الفرقة',
-        graduatedFrom: 'متخرج من',
-        graduateJob: 'الوظيفة',
-        isWorking: 'هل تعمل؟',
-        workDetails: 'تفاصيل العمل',
+        fullName: 'fullName',
+        username: 'username ',
+        email: 'email ',
+        password: 'password ',
+        confirmPassword: ' confirmPassword ',
+        nationalId: 'nationalId ',
+        deaconFamily: 'deaconFamily ',
+        deaconDegree: 'deaconDegree ',
+        phoneNumber: 'phoneNumber',
+        guardiansPhone: 'guardiansPhone',
+        guardianRelation: 'guardianRelation',
+        status: 'status',
+        studyType: 'studyType ',
+        schoolName: 'schoolName',
+        schoolGrade: 'schoolGrade',
+        universityName: 'universityName',
+        faculty: 'faculty',
+        universityGrade: 'universityGrade',
+        graduatedFrom: 'graduatedFrom',
+        graduateJob: 'graduateJob',
+        isWorking: 'isWorking ?',
+        workDetails: 'workDetails',
         secret: 'Secret'
       };
 
@@ -359,10 +373,9 @@ toggleShowConfirmPassword() {
         return;
       }
 
-      // show up to 5 toasts (avoid spam)
       entries.slice(0, 5).forEach(([field, msg]) => {
         const label = fieldLabels[field] || field;
-        const detail = msg ? String(msg) : 'قيمة غير صحيحة';
+        const detail = msg ? String(msg) : 'value not correct';
         this.messageService.add({ severity: 'error', summary: label, detail });
       });
 
@@ -371,10 +384,16 @@ toggleShowConfirmPassword() {
       }
       return;
     }
+    const msg =
+      api?.message ||
+      api?.error ||
+      'An unexpected error occurred. Please try again.';
 
-    // ApiException: { message, code }
-    const msg = api?.message || api?.error || 'Registration failed.';
-    this.messageService.add({ severity: 'error', summary: 'Error', detail: msg });
+    this.messageService.add({
+      severity: 'error',
+      summary: 'Registration Error',
+      detail: msg
+    });
   }
 
 submit() {
@@ -383,7 +402,7 @@ submit() {
     return;
   }
 
-  const formValue = this.registerForm.value;
+  const formValue = this.registerForm.getRawValue();
 
   if (formValue.password !== formValue.confirmPassword) {
     this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Passwords do not match.' });
@@ -395,6 +414,7 @@ submit() {
     username: formValue.username,
     email: formValue.email,
     password: formValue.password,
+    confirmPassword: formValue.confirmPassword,
     deaconFamily: formValue.deaconFamily,
 
     phoneNumber: formValue.phoneNumber,
@@ -418,16 +438,14 @@ submit() {
     workDetails: formValue.workDetails,
 
     guardiansPhone: formValue.guardiansPhone,
-    guardianRelation: formValue.guardianRelation
+    guardianRelation: formValue.guardianRelation,
+
+    secret: String(formValue.secret || '').trim(),
   };
 
   if (this.isServant) {
-    // ✅ Register servant
-    const headers = new HttpHeaders({
-      'X-REG-SECRET': String(formValue.secret || '').trim()
-    });
 
-    this.http.post('/api/auth/register-servant', payload, { headers, withCredentials: true })
+    this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
       .subscribe({
         next: () => {
           this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
@@ -439,7 +457,6 @@ submit() {
       });
 
   } else {
-    // ✅ Register normal (MAKHDOM)
     this.http.post('/api/auth/register', payload, { withCredentials: true })
       .subscribe({
         next: () => {
