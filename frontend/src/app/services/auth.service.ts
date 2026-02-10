@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, tap, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { Observable, BehaviorSubject, of, switchMap } from 'rxjs';
+import { map, tap, catchError } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -12,8 +12,21 @@ export class AuthService {
   private user$ = new BehaviorSubject<any>(null);
 
 
+    refreshUser(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/user`, { withCredentials: true }).pipe(
+      map((res) => (res && res.authenticated === false ? null : res)),
+      tap((u) => this.user$.next(u)),
+      catchError(() => {
+        this.user$.next(null);
+        return of(null);
+      })
+    );
+    }
+
   login(username: string, password: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/login`, { username, password }, { withCredentials: true });
+    return this.http
+      .post(`${this.baseUrl}/login`, { username, password }, { withCredentials: true })
+      .pipe(switchMap(() => this.refreshUser()));
   }
 
 
@@ -29,34 +42,23 @@ registerServant(user: any, secret: string): Observable<any> {
     return this.http.post(`${this.baseUrl}/register`, user, { withCredentials: true });
   }
 
-getUserData() {
-  if (this.user$.value) return this.user$.asObservable();
+  getUserData(force = false): Observable<any> {
+    if (!force && this.user$.value !== null) {
+      return this.user$.asObservable();
+    }
+    return this.refreshUser();
+  }
 
-  return this.http.get<any>(`${this.baseUrl}/user`, { withCredentials: true }).pipe(
-    map((res) => {
-      // backend may return { authenticated: false } when not logged in
-      if (res && res.authenticated === false) return null;
-      return res;
-    }),
-    tap((u) => this.user$.next(u)),
-    catchError(() => {
-      this.user$.next(null);
-      return of(null);
-    })
-  );
-
-}
-
-  // ✅ Get signed QR token for the logged-in user
   getMyQrToken(): Observable<{ token: string }> {
     return this.http.get<{ token: string }>(`/api/qr/me/token`, { withCredentials: true });
   }
 
   logout(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true });
+    return this.http.post(`${this.baseUrl}/logout`, {}, { withCredentials: true }).pipe(
+      tap(() => this.user$.next(null))
+    );
   }
 
-  // ✅ Forgot password by EMAIL (NEW)
   forgotPassword(email: string): Observable<any> {
     return this.http.post(`${this.baseUrl}/forgot-password`, { email }, { withCredentials: true });
   }
