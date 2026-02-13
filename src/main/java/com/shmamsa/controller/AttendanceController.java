@@ -37,10 +37,7 @@ public record ScanTokenRequest(String token) {}
     public record ScanTokenResponse(Long id, String username, String fullName, String deaconFamily) {}
 
 
-    /**
-     * Returns total attendance counts (all time) for the logged-in user.
-     * Used by the Dashboard cards.
-     */
+
     @GetMapping("/my-stats")
     public ResponseEntity<?> myStats(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -65,12 +62,7 @@ public record ScanTokenRequest(String token) {}
     }
 
     
-    /**
-     * Public scan endpoint (no login required):
-     * - verifies the QR token signature
-     * - ensures the user exists in DB
-     * Returns trusted user data for the scanner UI.
-     */
+
     @PostMapping("/scan-token")
     public ResponseEntity<?> scanToken(@RequestBody ScanTokenRequest req) {
         if (req == null || req.token() == null || req.token().isBlank()) {
@@ -123,8 +115,7 @@ public record ScanTokenRequest(String token) {}
             }
 
             User u;
-            // ✅ If username is provided, verify (id + username) exists in DB (prevents tampering)
-            if (ref.username() != null && !ref.username().isBlank()) {
+                if (ref.username() != null && !ref.username().isBlank()) {
                 u = userRepo.findByIdAndUsername(uid, ref.username().trim()).orElse(null);
                 if (u == null) { invalid++; continue; }
             } else {

@@ -9,8 +9,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     Optional<User> findByIdAndUsername(Long id, String username);
+
     java.util.List<User> findByDeaconFamily(String deaconFamily);
     java.util.List<User> findByRoleAndDeaconFamily(String role, String deaconFamily);
     java.util.List<User> findByDeaconFamilyAndRoleIn(String deaconFamily, java.util.List<String> roles);
+
+    java.util.List<User> findByDeaconFamilyStartingWithAndRoleIn(String prefix, java.util.List<String> roles);
 }
+
 

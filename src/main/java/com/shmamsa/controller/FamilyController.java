@@ -24,6 +24,11 @@ public class FamilyController {
     private final UserRepository userRepo;
     private final AttendanceRepository attendanceRepo;
 
+    private String mainFamily(String family) {
+        if (family == null) return null;
+        return family.replace(" أ", "").replace(" ب", "").trim();
+    }
+
     private String authRole(Authentication auth) {
         if (auth == null || auth.getAuthorities() == null) return "MAKHDOM";
         return auth.getAuthorities().stream()
@@ -84,7 +89,8 @@ public class FamilyController {
             visibleRoles = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA");
         }
 
-        List<User> users = userRepo.findByDeaconFamilyAndRoleIn(targetFamily, visibleRoles);
+        String prefix = mainFamily(targetFamily);
+        List<User> users = userRepo.findByDeaconFamilyStartingWithAndRoleIn(prefix, visibleRoles);
 
         // Attendance counts
         List<AttendanceRecord> records = attendanceRepo.findByUser_DeaconFamily(targetFamily);
@@ -138,11 +144,11 @@ public class FamilyController {
             }
         }
 
-        if (!Objects.equals(target.getDeaconFamily(), targetFamily)) {
+        if (!Objects.equals(mainFamily(target.getDeaconFamily()), mainFamily(targetFamily))) {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
         }
 
-        // role visibility check
+
         List<String> visibleRoles;
         if ("KHADIM".equals(role)) visibleRoles = List.of("MAKHDOM");
         else if ("AMIN_OSRA".equals(role)) visibleRoles = List.of("MAKHDOM","KHADIM");
@@ -152,17 +158,17 @@ public class FamilyController {
             return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
         }
 
-        List<AttendanceRecord> records = attendanceRepo.findByUser_IdOrderByCreatedAtDesc(id);
+        String prefix = mainFamily(targetFamily);
+        List<AttendanceRecord> records = attendanceRepo.findByUser_DeaconFamilyStartingWith(prefix);
 
-        // group counts per day for summary (how many attended today by event)
         Map<String, Long> dayCounts = new HashMap<>();
-        for (AttendanceRecord r : attendanceRepo.findByUser_DeaconFamily(targetFamily)) {
+        for (AttendanceRecord r : attendanceRepo.findByUser_DeaconFamilyStartingWith(mainFamily(targetFamily)))
+            {
             String key = r.getDate().toString() + "|" + r.getType().name();
             dayCounts.put(key, dayCounts.getOrDefault(key, 0L) + 1);
         }
 
-        // NOTE: Avoid Map.of(...) here because its type inference can produce an intersection type
-        // that doesn't assign cleanly to Map<String, Object> on some Java versions.
+
         List<Map<String, Object>> out = records.stream().map(r -> {
             String key = r.getDate().toString() + "|" + r.getType().name();
             Map<String, Object> m = new HashMap<>();

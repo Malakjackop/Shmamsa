@@ -34,6 +34,7 @@ export class RegisterComponent implements OnInit {
 
   showPassword = false;
   showConfirmPassword = false;
+  showOtherGrade = false;
 
   isStudent = false;
   isGraduate = false;
@@ -61,6 +62,21 @@ export class RegisterComponent implements OnInit {
 
     this.onStatusChange();
     this.onStudyTypeChange();
+this.registerForm.get('schoolGrade')?.valueChanges.subscribe(value => {
+  this.showOtherGrade = value === 'other';
+
+  const otherCtrl = this.registerForm.get('otherGrade');
+
+  if (value === 'other') {
+    otherCtrl?.setValidators([Validators.required]);
+  } else {
+    otherCtrl?.setValue('', { emitEvent: false });
+    otherCtrl?.clearValidators();
+  }
+
+  otherCtrl?.updateValueAndValidity({ emitEvent: false });
+});
+
   }
 
 private buildForm() {
@@ -88,8 +104,8 @@ private buildForm() {
     studyType: this.fb.control('', { updateOn: 'change' }),
 
     schoolName: [''],
-    schoolGrade: [''],
-    otherGrade: [''],
+  schoolGrade: this.fb.control('', { updateOn: 'change' }),
+  otherGrade: this.fb.control('', { updateOn: 'change' }),
 
     universityName: [''],
     faculty: [''],
@@ -106,6 +122,12 @@ private buildForm() {
 
     secret: ['']
   }, { updateOn: 'blur' });
+
+  if (this.isServant) {
+  this.registerForm.get('status')?.setValue('student', { emitEvent: false });
+  this.onStatusChange(); 
+}
+
 
   if (this.isServant) {
     this.registerForm.get('secret')?.setValidators([Validators.required]);
@@ -231,19 +253,19 @@ onStatusChange() {
     this.registerForm.get('universityGrade')?.updateValueAndValidity({ emitEvent: false });
   }
 
-  onGradeChange() {
-  const gradeCtrl = this.registerForm.get('schoolGrade');
-  const otherCtrl = this.registerForm.get('otherGrade');
+//   onGradeChange() {
+//   const gradeCtrl = this.registerForm.get('schoolGrade');
+//   const otherCtrl = this.registerForm.get('otherGrade');
 
-  if (gradeCtrl?.value === 'other') {
-    otherCtrl?.setValidators([Validators.required]);
-  } else {
-    otherCtrl?.setValue('', { emitEvent: false });
-    otherCtrl?.clearValidators();
-  }
+//   if (gradeCtrl?.value === 'other') {
+//     otherCtrl?.setValidators([Validators.required]);
+//   } else {
+//     otherCtrl?.setValue('', { emitEvent: false });
+//     otherCtrl?.clearValidators();
+//   }
 
-  otherCtrl?.updateValueAndValidity({ emitEvent: false });
-}
+//   otherCtrl?.updateValueAndValidity({ emitEvent: false });
+// }
 
 
   applyPasswordMismatch() {
@@ -409,6 +431,12 @@ submit() {
     return;
   }
 
+  const schoolGradeToSend =
+  formValue.schoolGrade === 'other'
+    ? String(formValue.otherGrade || '').trim()
+    : formValue.schoolGrade;
+
+
   const payload: any = {
     fullName: formValue.fullName,
     username: formValue.username,
@@ -429,7 +457,7 @@ submit() {
 
     studyType: formValue.studyType,
     schoolName: formValue.schoolName,
-    schoolGrade: formValue.schoolGrade,
+    schoolGrade: schoolGradeToSend,
     universityName: formValue.universityName,
     faculty: formValue.faculty,
     universityGrade: formValue.universityGrade,

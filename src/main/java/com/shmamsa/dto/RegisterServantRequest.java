@@ -42,4 +42,19 @@ public class RegisterServantRequest {
 
     @NotBlank(message = "Secret is required")
     private String secret;
+
+    private String status;
+    private String studyType;
+
+    private String universityName;
+    private String faculty;
+    private String universityGrade;
+
+    private String graduatedFrom;
+    private String graduateJob;
+
+    private Boolean isWorking;
+    private String workDetails;
+
+
 }

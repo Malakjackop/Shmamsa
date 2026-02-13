@@ -34,15 +34,16 @@
         <input formControlName="phoneNumber" />
       </div>
 
-      <div>
+      <div *ngIf="!isServant()">
         <label>Guardian’s Phone</label>
         <input formControlName="guardiansPhone" />
       </div>
 
-      <div>
+      <div *ngIf="!isServant()">
         <label>Guardian Relation</label>
         <input formControlName="guardianRelation" />
       </div>
+
 
       <div>
         <label>Deacon Family</label>
@@ -63,30 +64,52 @@
         </select>
       </div>
 
-      <div>
+      <div *ngIf="!isGraduate()">
         <label>Study Type</label>
-        <input formControlName="studyType" />
+<select formControlName="studyType">
+  <option value="" disabled>Select Study Type</option>
+  <option *ngIf="!isServant()" value="school">School</option>
+  <option value="university">University</option>
+</select>
+
       </div>
 
-      <div>
-        <label>School Name</label>
-        <input formControlName="schoolName" />
-      </div>
+<div *ngIf="!isGraduate() && !isServant() && isSchool()">
+  <label>School Name</label>
+  <input formControlName="schoolName" />
+</div>
 
-      <div>
-        <label>University Name</label>
-        <input formControlName="universityName" />
-      </div>
+<div *ngIf="!isGraduate() && !isServant() && isSchool()">
+  <label>School Grade</label>
+  <input formControlName="schoolGrade" />
+</div>
 
-      <div>
-        <label>Faculty</label>
-        <input formControlName="faculty" />
-      </div>
 
-      <div>
-        <label>University Grade</label>
-        <input formControlName="universityGrade" />
-      </div>
+<div *ngIf="!isGraduate() && isUniversity()">
+  <label>University Name</label>
+  <input formControlName="universityName" />
+</div>
+
+<div *ngIf="!isGraduate() && isUniversity()">
+  <label>Faculty</label>
+  <input formControlName="faculty" />
+</div>
+
+<div *ngIf="!isGraduate() && isUniversity()">
+  <label>University Grade</label>
+  <input formControlName="universityGrade" />
+</div>
+
+<div *ngIf="isGraduate()">
+  <label>Graduated From</label>
+  <input formControlName="graduatedFrom" />
+</div>
+
+<div *ngIf="isGraduate()">
+  <label>Graduate Job</label>
+  <input formControlName="graduateJob" />
+</div>
+
 
       <div class="wide">
         <label>Work Details</label>

@@ -1,4 +1,3 @@
-/* === DASHBOARD LAYOUT (Sidebar + Main) === */
 html, body {
   margin: 0;
   padding: 0;
@@ -111,7 +110,6 @@ html, body {
   opacity: 0.8;
 }
 
-/* === PROFILE FORM STYLING === */
 .profile-container {
   background: #ffffff;
   padding: 2rem;
@@ -205,10 +203,9 @@ input:disabled {
 }
 
 
-/* === PROFILE HEADER (Title + QR Alignment) === */
 .profile-header {
   display: flex;
-  justify-content: space-between; /* 👈 My Profile on left, QR on right */
+  justify-content: space-between; 
   align-items: center;
   background: #fff;
   border-radius: 12px;
@@ -237,3 +234,21 @@ input:disabled {
   color: #5e2b20;
   font-weight: 500;
 }
+
+
+.form-grid select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  background-color: #f8f8f8;
+  color: #1a1a1a;
+  box-sizing: border-box;
+}
+
+.form-grid select:disabled {
+  background-color: #e9e9e9;
+  color: #333;
+  opacity: 1;
+}
+

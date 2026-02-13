@@ -49,18 +49,28 @@
         <!-- Deacon Family -->
         <div class="input-group small">
           <select formControlName="deaconFamily" required (blur)="onFieldBlur('deaconFamily', 'Deacon Family')">
-            <option value="" disabled>What's your Deacon Family?</option>
-            <option value="اسرة السمائين">اسرة السمائين</option>
-            <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
-            <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
-            <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-            <option value="اسرة القديس اسكلابيوس">اسرة القديس اسكلابيوس</option>
-            <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
-            <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
-            <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
-            <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
-            <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
-          </select>
+  <option value="" disabled>What's your Deacon Family?</option>
+
+  <option value="اسرة السمائين">اسرة السمائين</option>
+  <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
+  <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
+  <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
+  <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
+  
+  <ng-container *ngIf="isServant; else makhdomFamilies">
+    <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
+    <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
+  </ng-container>
+  
+  <ng-template #makhdomFamilies>
+    <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
+    <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
+    <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
+    <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
+  </ng-template>
+  <option value="اسرة القديس  اسطفانوس">اسرة القديس اسطفانوس</option>
+</select>
+
         </div>
 
         <!-- ✅ Deacon Degree -->
@@ -118,7 +128,7 @@
           </div>
 
           <div class="input-group small">
-          <select class="form-select" formControlName="schoolGrade" (change)="onGradeChange()">
+          <select class="form-select" formControlName="schoolGrade" >
             <option value="" disabled>اختر الصف</option>
             <option value="grade1_primary">أولى ابتدائي</option>
             <option value="grade2_primary">تانية ابتدائي</option>
@@ -134,8 +144,15 @@
             <option value="grade1_secondary">أولى ثانوي</option>
             <option value="grade2_secondary">تانية ثانوي</option>
             <option value="grade3_secondary">تالتة ثانوي</option>
+            <option value="other">أخر</option>
           </select>
           </div>
+            <div class="input-group small" *ngIf="showOtherGrade">
+              <input type="text"
+                    formControlName="otherGrade"
+                    placeholder="اكتب الصف الدراسي" />
+            </div>
+
         </div>
 
         <!-- University Section -->

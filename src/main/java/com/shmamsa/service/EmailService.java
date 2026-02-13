@@ -13,7 +13,6 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    // ✅ read from application.properties
     @Value("${spring.mail.username}")
     private String fromEmail;
 
@@ -21,10 +20,9 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
 
-            // true = multipart, "UTF-8" = supports emojis
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom(fromEmail);     // ✅ THIS FIXES THE ERROR
+            helper.setFrom(fromEmail);
             helper.setTo(toEmail);
             helper.setSubject("Password Reset Code");
 
@@ -42,4 +40,27 @@ public class EmailService {
             throw new RuntimeException("Failed messages: " + e.getMessage(), e);
         }
     }
+    public void sendServantSecretEmail(String toEmail, String secret, String validToText) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("Servant Registration Secret (24h)");
+
+            String body =
+                    "🛡️ Servant registration secret:\n\n" +
+                            secret + "\n\n" +
+                            "Valid until: " + validToText + "\n\n" +
+                            "St. Mary Church – Omrania ❤";
+
+            helper.setText(body, false);
+            mailSender.send(message);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to send servant secret email: " + e.getMessage(), e);
+        }
+    }
+
 }

@@ -65,8 +65,6 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
     @GetMapping("/user")
     public ResponseEntity<?> getFullUser(Authentication authentication) {
 
-        // ✅ If not authenticated, return a safe response instead of 401/403
-        // This prevents noisy console errors on SSR/refresh, without exposing any private data.
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.ok(Map.of("authenticated", false));
         }
@@ -82,13 +80,12 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
         return ResponseEntity.ok(user);
     }
 
-    // ✅ Logout
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
 
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
-                .secure(false) // ✅ true in production with HTTPS
+                .secure(false)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
@@ -98,14 +95,12 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
-    // ✅ Forgot Password (EMAIL) -> sends OTP by email
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         Map<String, Object> result = authService.generateResetTokenByEmail(request.getEmail().trim());
         return ResponseEntity.ok(result);
     }
 
-    // ✅ Reset Password (OTP + New Password)
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
 
@@ -113,7 +108,6 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
         return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
 
-    // ✅ Update Profile (requires JWT)
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest updated, Authentication authentication) {
 
@@ -132,14 +126,16 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             existingUser.setPhoneNumber(updated.getPhoneNumber());
             existingUser.setGuardiansPhone(updated.getGuardiansPhone());
             existingUser.setGuardianRelation(updated.getGuardianRelation());
-            existingUser.setDeaconFamily(updated.getDeaconFamily());
             existingUser.setDeaconDegree(updated.getDeaconDegree());
-            existingUser.setStatus(updated.getStatus());
             existingUser.setStudyType(updated.getStudyType());
             existingUser.setSchoolName(updated.getSchoolName());
+            existingUser.setStatus(updated.getStatus());
+            existingUser.setSchoolGrade(updated.getSchoolGrade());
             existingUser.setUniversityName(updated.getUniversityName());
             existingUser.setFaculty(updated.getFaculty());
             existingUser.setUniversityGrade(updated.getUniversityGrade());
+            existingUser.setGraduatedFrom(updated.getGraduatedFrom());
+            existingUser.setGraduateJob(updated.getGraduateJob());
             existingUser.setWorkDetails(updated.getWorkDetails());
 
             authService.saveUser(existingUser);

@@ -39,4 +39,20 @@ public class RegisterRequest {
     private String guardiansPhone;
     private String guardianRelation;
 
+    private String status;
+    private String studyType;
+
+    private String schoolName;
+    private String schoolGrade;
+
+    private String universityName;
+    private String faculty;
+    private String universityGrade;
+
+    private Boolean isWorking;
+    private String workDetails;
+
+    private String graduatedFrom;
+    private String graduateJob;
+
 }

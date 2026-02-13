@@ -16,8 +16,11 @@ public class ProfileUpdateRequest {
     private String status;
     private String studyType;
     private String schoolName;
+    private String schoolGrade;
     private String universityName;
     private String faculty;
     private String universityGrade;
+    private String graduatedFrom;
+    private String graduateJob;
     private String workDetails;
 }

@@ -25,12 +25,9 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
 
-    @Value("${app.servant-register-secret:CHANGE_ME}")
-    private String servantRegisterSecret;
+    private final ServantSecretService servantSecretService;
 
-    // ===============================
-    // OTP storage with expiry + user
-    // ===============================
+
     private static class OtpData {
         String username;
         long expiresAt; // ms
@@ -51,35 +48,30 @@ public class AuthService {
 
     }
 
-    private final Map<String, OtpData> otpStore = new HashMap<>();         // otp -> data
-    private final Map<String, Long> otpTimestamps = new HashMap<>();       // username -> last otp send time
-    private final Map<String, OtpData.RateWindow> hourlyRequests = new HashMap<>();   // username -> rate window   // username -> count last hour
+    private final Map<String, OtpData> otpStore = new HashMap<>();
+    private final Map<String, Long> otpTimestamps = new HashMap<>();
+    private final Map<String, OtpData.RateWindow> hourlyRequests = new HashMap<>();
 
-    private static final long OTP_TTL_MS = 5 * 60 * 1000;   // 5 minutes
-    private static final long COOLDOWN_MS = 45_000;         // 45 seconds
+    private static final long OTP_TTL_MS = 5 * 60 * 1000;
+    private static final long COOLDOWN_MS = 45_000;
     private static final int HOURLY_LIMIT = 5;
 
-    // -----------------------------------------------------------
-    // REGISTER
-    // -----------------------------------------------------------
+
     public void register(RegisterRequest request) {
         if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "Passwords do not match");
         }
 
-        // check username
         userRepository.findByUsername(request.getUsername())
                 .ifPresent(existing -> {
                     throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
                 });
 
-        // check email
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(existing -> {
                     throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
                 });
 
-        // convert DTO to User entity
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
@@ -91,26 +83,39 @@ public class AuthService {
         user.setPhoneNumber(request.getPhoneNumber());
         user.setGuardiansPhone(request.getGuardiansPhone());
         user.setGuardianRelation(request.getGuardianRelation());
+        user.setStatus(request.getStatus());
+        user.setStudyType(request.getStudyType());
 
-        // ✅ Derived fields from National ID (server-side source of truth)
+        user.setSchoolName(request.getSchoolName());
+        user.setSchoolGrade(request.getSchoolGrade());
+
+        user.setUniversityName(request.getUniversityName());
+        user.setFaculty(request.getFaculty());
+        user.setUniversityGrade(request.getUniversityGrade());
+
+        user.setIsWorking(request.getIsWorking());
+        user.setWorkDetails(request.getWorkDetails());
+
+        user.setGraduatedFrom(request.getGraduatedFrom());
+        user.setGraduateJob(request.getGraduateJob());
+
+
         LocalDate dob = NationalIdUtils.extractBirthDate(request.getNationalId());
         if (dob != null) user.setDateOfBirth(dob);
         String gender = NationalIdUtils.extractGender(request.getNationalId());
         if (gender != null) user.setGender(gender);
 
-        // Force default role
         user.setRole("MAKHDOM");
 
         userRepository.save(user);
     }
 
-    // -----------------------------------------------------------
-// REGISTER SERVANT (Special link)
-// -----------------------------------------------------------
+
     public void registerServant(RegisterServantRequest request) {
-        if (!servantRegisterSecret.equals(request.getSecret())) {
+        if (!servantSecretService.validateSecret(request.getSecret())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "INVALID_SECRET", "Invalid registration secret");
         }
+
 
         if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "Passwords do not match");
@@ -126,10 +131,8 @@ public class AuthService {
                     throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
                 });
 
-        // NOTE: National ID format + age rules are already enforced by @ValidNationalId(minAge = 16)
         String nid = request.getNationalId().trim();
 
-        // Convert DTO to Entity
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
@@ -139,6 +142,22 @@ public class AuthService {
         user.setDeaconFamily(request.getDeaconFamily());
         user.setDeaconDegree(request.getDeaconDegree());
         user.setRole("KHADIM");
+
+        user.setPhoneNumber(request.getPhoneNumber());
+
+        user.setStatus(request.getStatus());
+        user.setStudyType(request.getStudyType());
+
+        user.setUniversityName(request.getUniversityName());
+        user.setFaculty(request.getFaculty());
+        user.setUniversityGrade(request.getUniversityGrade());
+
+        user.setGraduatedFrom(request.getGraduatedFrom());
+        user.setGraduateJob(request.getGraduateJob());
+
+        user.setIsWorking(request.getIsWorking());
+        user.setWorkDetails(request.getWorkDetails());
+
 
         userRepository.save(user);
     }
