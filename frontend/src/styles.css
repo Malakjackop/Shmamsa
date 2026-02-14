@@ -1,0 +1,5 @@
+/* Make toast message text readable */
+.p-toast .p-toast-message .p-toast-detail,
+.p-toast .p-toast-message .p-toast-summary {
+  color: #000 !important;
+}

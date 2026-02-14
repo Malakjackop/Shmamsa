@@ -20,6 +20,7 @@ import { RegisterServantComponent } from './register-servant/register-servant';
 import { AboutComponent } from './about/about';
 import { FamilyComponent } from './family/family';
 import { AttendanceComponent } from './attendance/attendance';
+import { ResourcesComponent } from './resources/resources';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -33,6 +34,7 @@ import { PanelModule } from 'primeng/panel';
 import { AvatarModule } from 'primeng/avatar';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputIconModule } from 'primeng/inputicon';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 
 @NgModule({
   declarations: [
@@ -44,7 +46,8 @@ import { InputIconModule } from 'primeng/inputicon';
     ProfileComponent,
     AboutComponent,
     FamilyComponent,
-    AttendanceComponent
+    AttendanceComponent,
+    ResourcesComponent
   ],
   imports: [
     BrowserModule,
@@ -56,7 +59,7 @@ import { InputIconModule } from 'primeng/inputicon';
     FormsModule,
     CommonModule,
     BrowserAnimationsModule,
-    RouterModule, // ✅ Fixes "router-outlet is not a known element"
+    RouterModule, 
     QRCodeComponent,
     ZXingScannerModule,
     // ✅ PrimeNG imports
@@ -66,7 +69,8 @@ import { InputIconModule } from 'primeng/inputicon';
     PanelModule,
     AvatarModule,
     InputTextModule,
-    InputIconModule
+    InputIconModule,
+    ConfirmDialogModule
   ],
   providers: [
     MessageService,

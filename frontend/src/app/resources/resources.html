@@ -1,0 +1,81 @@
+<p-toast></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<div class="page">
+  <h1>Resources</h1>
+
+  <div class="top" *ngIf="isAminKhedmaOrDev()">
+    <label>Family</label>
+    <select [(ngModel)]="selectedFamily" (change)="loadResources()">
+      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+    </select>
+
+    <small class="hint" *ngIf="selectedFamily === 'ALL'">
+      ALL will not show any list, but uploads will be global for all families.
+    </small>
+  </div>
+
+  <div class="upload" *ngIf="isUploader()">
+    <h3>Upload</h3>
+
+    <div class="row">
+      <input type="text" [(ngModel)]="title" placeholder="Title (optional)" />
+      <input type="text" [(ngModel)]="description" placeholder="Description (optional)" />
+    </div>
+
+    <div class="row">
+      <input type="file" (change)="onPickFile($event)" />
+      <button pButton type="button" label="Upload" (click)="upload()"></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Files</h3>
+
+    <div *ngIf="resources.length === 0" class="empty">
+      No resources.
+    </div>
+
+    <table *ngIf="resources.length > 0">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>File</th>
+          <th>Family</th>
+          <th>Uploaded By</th>
+          <th style="width: 280px;">Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let r of resources">
+          <td>{{ r.title || '-' }}</td>
+          <td>{{ r.originalName }}</td>
+          <td>{{ r.family }}</td>
+          <td>{{ r.uploadedByUsername }}</td>
+          <td class="actions">
+            <button pButton type="button" label="Download" (click)="download(r)"></button>
+
+            <ng-container *ngIf="!isMakhdom() && isUploader()">
+              <button pButton type="button" label="Edit" (click)="openEdit(r)"></button>
+              <button pButton type="button" label="Delete" (click)="remove(r)"></button>
+            </ng-container>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="edit" *ngIf="editing">
+    <h3>Edit Resource</h3>
+    <div class="row">
+      <input type="text" [(ngModel)]="editTitle" placeholder="Title" />
+      <input type="text" [(ngModel)]="editDescription" placeholder="Description" />
+    </div>
+    <div class="row">
+      <input type="file" (change)="onEditFile($event)" />
+      <button pButton type="button" label="Save" (click)="saveEdit()"></button>
+      <button pButton type="button" label="Cancel" (click)="cancelEdit()"></button>
+    </div>
+  </div>
+</div>

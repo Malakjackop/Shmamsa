@@ -13,26 +13,25 @@
         <i class="pi pi-home"></i> Dashboard
       </li>
 
-      <!-- ✅ خادم وما فوق -->
       <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
         <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> Attendance</li>
         <li routerLink="/family" routerLinkActive="active"><i class="pi pi-users"></i> Members of your family</li>
       </ng-container>
 
-      <!-- ✅ مخدوم -->
       <ng-template #makhdomMenu>
         <li><i class="pi pi-chart-bar"></i> Grades</li>
         <li><i class="pi pi-pencil"></i> Assignments</li>
       </ng-template>
 
       <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> Profile</li>
+      <li routerLink="/resources" routerLinkActive="active">
+      <i class="pi pi-folder"></i> Resources </li>
       <li routerLink="/about" routerLinkActive="active"><i class="pi pi-info-circle"></i> About us</li>
       <li (click)="logout()"><i class="pi pi-sign-out"></i> Logout</li>
     </ul>
   </aside>
 
   <main class="main">
-    <!-- محتوى أي صفحة -->
     <router-outlet></router-outlet>
   </main>
 </div>

@@ -3,14 +3,14 @@ import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
 import { Router } from '@angular/router';
-import { MessageService } from 'primeng/api'; // ✅ Import PrimeNG toast service
+import { MessageService } from 'primeng/api'; 
 
 @Component({
   selector: 'app-dash-board',
   standalone: false,
   templateUrl: './dash-board.html',
   styleUrls: ['./dash-board.css'],
-  providers: [MessageService] // ✅ Provide it locally or globally in app.module.ts
+  providers: [MessageService] 
 })
 export class DashBoard implements OnInit {
   private authService = inject(AuthService);
@@ -31,7 +31,6 @@ export class DashBoard implements OnInit {
     dateOfBirth: ''
   };
 
-  // ✅ Dashboard stats (totals from database)
   stats: { FRIDAY_LITURGY: number; TASBEEHA: number; FAMILY_MEETING: number } = {
     FRIDAY_LITURGY: 0,
     TASBEEHA: 0,
@@ -39,7 +38,6 @@ export class DashBoard implements OnInit {
   };
 
   ngOnInit(): void {
-    // ✅ SSR: don't call protected endpoints on the server
     if (!isPlatformBrowser(this.platformId)) return;
     this.loadUserData();
     this.loadMyStats();
@@ -64,16 +62,13 @@ export class DashBoard implements OnInit {
         this.stats = data;
       },
       error: () => {
-        // if not authorized, user will be redirected by loadUserData()
       }
     });
   }
 
-  // ✅ Logout with toast + redirect
   logout(): void {
     this.authService.logout().subscribe({
       next: () => {
-        // Show a success toast
         this.messageService.add({
           severity: 'success',
           summary: 'Logged out',
@@ -81,7 +76,6 @@ export class DashBoard implements OnInit {
           life: 2000
         });
 
-        // Delay redirect slightly so the toast is visible
         setTimeout(() => {
           this.router.navigate(['/login']);
         }, 2000);

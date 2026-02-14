@@ -21,15 +21,15 @@ export class LayoutComponent implements OnInit {
   user: any = null;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
+  
+ngOnInit(): void {
+  this.auth.getUserData().subscribe({
+    next: (u) => this.user = u,
+    error: () => this.user = null
+  });
+}
 
-  ngOnInit(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
 
-    this.auth.getUserData().subscribe({
-      next: (u) => (this.user = u),
-      error: () => this.router.navigate(['/login'])
-    });
-  }
 
   isMakhdom(): boolean {
     return this.user?.role === 'MAKHDOM';

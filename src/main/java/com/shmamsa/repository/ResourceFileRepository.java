@@ -1,4 +1,13 @@
 package com.shmamsa.repository;
 
-public class ResourceFileRepository {
+import com.shmamsa.model.ResourceFile;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface ResourceFileRepository extends JpaRepository<ResourceFile, Long> {
+
+    List<ResourceFile> findByFamilyInOrderByCreatedAtDesc(List<String> families);
+
+    List<ResourceFile> findByFamilyOrderByCreatedAtDesc(String family);
 }

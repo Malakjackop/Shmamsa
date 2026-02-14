@@ -223,7 +223,6 @@ p-card, p-panel {
 }
     
 
-/* Ensure PrimeNG panels or cards don’t trigger scroll */
 body::-webkit-scrollbar {
   display: none;
 }
@@ -233,7 +232,6 @@ body::-webkit-scrollbar {
   overflow: hidden !important;
 }
 
-/* Prevent PrimeNG cards/panels from causing layout overflow */
 p-card, p-panel {
   max-width: 100%;
   box-sizing: border-box;

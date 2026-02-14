@@ -34,39 +34,29 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {}) // uses corsConfigurationSource below
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ PUBLIC AUTH ENDPOINTS
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
                                 "/api/auth/register-servant",
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password",
-                                // ✅ allow session check endpoint (returns user only if authenticated)
                                 "/api/auth/user"
                         ).permitAll()
 
-                        // ✅ Attendance stats: any logged-in user can view *their own* stats
-                        
-
-                        // ✅ PUBLIC QR scan (no login required)
-                        .requestMatchers(HttpMethod.POST, "/api/attendance/scan-token").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/attendance/scan-token").permitAll()
 .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
 
-                        // ✅ Attendance submit/management: KHADIM and above
                         .requestMatchers("/api/attendance/**")
                         .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
-// ✅ Family pages: KHADIM and above
 .requestMatchers("/api/family/**")
 .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
 
-// ✅ Role management: AMIN_KHEDMA and DEVELOPER
 .requestMatchers("/api/admin/**")
 .hasAnyRole("AMIN_KHEDMA","DEVELOPER")
 
-// 🔐 EVERYTHING ELSE NEEDS LOGIN
-                        .anyRequest().authenticated()
+                                .requestMatchers("/api/resources/**").authenticated()
+                                .anyRequest().authenticated()
                 )
-                // ✅ IMPORTANT: add jwtFilter so /api/auth/user works
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -81,14 +71,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // ✅ allow Angular dev server
         configuration.setAllowedOrigins(List.of("http://localhost:4200"));
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-REG-SECRET"));
 
-        // ✅ allow sending cookies
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
