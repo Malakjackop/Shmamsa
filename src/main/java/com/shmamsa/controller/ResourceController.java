@@ -1,22 +1,24 @@
 package com.shmamsa.controller;
 
+import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.ResourceFile;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.ResourceFileRepository;
 import com.shmamsa.repository.UserRepository;
-import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.ResourceStorageService;
+import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/resources")
@@ -27,73 +29,47 @@ public class ResourceController {
     private final UserRepository userRepo;
     private final ResourceStorageService storage;
 
-    private String authRole(Authentication auth) {
-        if (auth == null || auth.getAuthorities() == null) return "MAKHDOM";
-        return auth.getAuthorities().stream()
-                .findFirst()
-                .map(a -> a.getAuthority().replace("ROLE_", ""))
-                .orElse("MAKHDOM");
-    }
-
-    private User authedUser(Authentication auth) {
-        if (auth == null) return null;
-        String username = String.valueOf(auth.getPrincipal());
-        return userRepo.findByUsername(username).orElse(null);
-    }
-
-    private boolean isUploaderOrAbove(String role) {
-        return RoleUtil.isAtLeast(role, "KHADIM");
-    }
-
-
     @GetMapping
     public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
-        String role = authRole(auth);
-        User me = authedUser(auth);
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me =userRepo.findByUsername(auth.getName()).orElse(null);
         if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        if (RoleUtil.isAtLeast(role, "AMIN_KHEDMA")) {
-            if (family == null || family.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "family is required"));
-            }
-            String f = family.trim();
-            if ("ALL".equalsIgnoreCase(f)) {
-                return ResponseEntity.ok(List.of());
-            }
-            return ResponseEntity.ok(resourceRepo.findByFamilyInOrderByCreatedAtDesc(List.of(f, "ALL")));
+        String target = (family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+
+        if ("ALL".equalsIgnoreCase(target.trim())) {
+            return ResponseEntity.ok(
+                    resourceRepo.findAll()
+                            .stream()
+                            .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                            .toList()
+            );
         }
 
-        String myFamily = me.getDeaconFamily();
-        return ResponseEntity.ok(resourceRepo.findByFamilyInOrderByCreatedAtDesc(List.of(myFamily, "ALL")));
+        List<String> families = FamilyUtil.variantsPlusAll(target);
+        return ResponseEntity.ok(resourceRepo.findByFamilyInOrderByCreatedAtDesc(families));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) String description,
-            @RequestParam(required = false) String family,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "family", required = false) String family,
             Authentication auth
-    ) throws IOException {
+    ) throws Exception {
 
-        String role = authRole(auth);
-        User me = authedUser(auth);
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElse(null);
         if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        if (!isUploaderOrAbove(role)) {
-            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
-        }
+        String targetFamily = (family == null || family.isBlank()) ? me.getDeaconFamily() : family;
 
-        String targetFamily;
-
-        if (!RoleUtil.isAtLeast(role, "AMIN_KHEDMA")) {
-            targetFamily = me.getDeaconFamily();
+        if (!"ALL".equalsIgnoreCase(targetFamily.trim())) {
+            targetFamily = FamilyUtil.mainFamily(targetFamily);
         } else {
-            if (family == null || family.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "family is required"));
-            }
-            targetFamily = family.trim();
-            if (targetFamily.equalsIgnoreCase("ALL")) targetFamily = "ALL";
+            targetFamily = "ALL";
         }
 
         var stored = storage.store(file, targetFamily);
@@ -109,98 +85,74 @@ public class ResourceController {
                 .uploadedByUsername(me.getUsername())
                 .build();
 
-        rf = resourceRepo.save(rf);
-        return ResponseEntity.ok(rf);
+        return ResponseEntity.ok(resourceRepo.save(rf));
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> update(
             @PathVariable Long id,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) String description,
-            @RequestParam(required = false) MultipartFile file,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "family", required = false) String family,
             Authentication auth
-    ) throws IOException {
+    ) throws Exception {
 
-        String role = authRole(auth);
-        User me = authedUser(auth);
-        if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        if (!isUploaderOrAbove(role)) return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        ResourceFile existing = resourceRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
 
-        ResourceFile rf = resourceRepo.findById(id).orElse(null);
-        if (rf == null) return ResponseEntity.status(404).body(Map.of("error", "Not found"));
+        if (title != null) existing.setTitle(title);
+        if (description != null) existing.setDescription(description);
 
-        if (!RoleUtil.isAtLeast(role, "AMIN_KHEDMA")) {
-            if (!Objects.equals(rf.getFamily(), me.getDeaconFamily())) {
-                return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
-            }
+        if (family != null && !family.isBlank()) {
+            if ("ALL".equalsIgnoreCase(family.trim())) existing.setFamily("ALL");
+            else existing.setFamily(FamilyUtil.mainFamily(family));
         }
-
-        if (title != null) rf.setTitle(title);
-        if (description != null) rf.setDescription(description);
 
         if (file != null && !file.isEmpty()) {
-            storage.deletePhysical(rf.getFamily(), rf.getStoredName());
+            storage.deletePhysical(existing.getFamily(), existing.getStoredName());
 
-            var stored = storage.store(file, rf.getFamily());
-            rf.setOriginalName(stored.originalName);
-            rf.setStoredName(stored.storedName);
-            rf.setContentType(stored.contentType);
-            rf.setSize(stored.size);
+            String fam = existing.getFamily() == null ? "ALL" : existing.getFamily();
+            var stored = storage.store(file, fam);
+
+            existing.setOriginalName(stored.originalName);
+            existing.setStoredName(stored.storedName);
+            existing.setContentType(stored.contentType);
+            existing.setSize(stored.size);
         }
 
-        rf = resourceRepo.save(rf);
-        return ResponseEntity.ok(rf);
+        return ResponseEntity.ok(resourceRepo.save(existing));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
-        String role = authRole(auth);
-        User me = authedUser(auth);
-        if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        if (!isUploaderOrAbove(role)) return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        ResourceFile existing = resourceRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
 
-        ResourceFile rf = resourceRepo.findById(id).orElse(null);
-        if (rf == null) return ResponseEntity.status(404).body(Map.of("error", "Not found"));
+        storage.deletePhysical(existing.getFamily(), existing.getStoredName());
 
-        if (!RoleUtil.isAtLeast(role, "AMIN_KHEDMA")) {
-            if (!Objects.equals(rf.getFamily(), me.getDeaconFamily())) {
-                return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
-            }
-        }
-
-        storage.deletePhysical(rf.getFamily(), rf.getStoredName());
-        resourceRepo.delete(rf);
+        resourceRepo.delete(existing);
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<?> download(@PathVariable Long id, Authentication auth) {
-        String role = authRole(auth);
-        User me = authedUser(auth);
-        if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+    public ResponseEntity<?> download(@PathVariable Long id) throws Exception {
 
-        ResourceFile rf = resourceRepo.findById(id).orElse(null);
-        if (rf == null) return ResponseEntity.status(404).body(Map.of("error", "Not found"));
+        ResourceFile existing = resourceRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
 
-        boolean canSee = "ALL".equalsIgnoreCase(rf.getFamily())
-                || Objects.equals(rf.getFamily(), me.getDeaconFamily())
-                || RoleUtil.isAtLeast(role, "AMIN_KHEDMA");
+        var path = storage.resolvePath(existing.getFamily(), existing.getStoredName());
+        if (!Files.exists(path)) throw new ApiException(HttpStatus.NOT_FOUND, "Stored file missing");
 
-        if (!canSee) return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
-
-        Path path = storage.resolvePath(rf.getFamily(), rf.getStoredName());
-        Resource fileRes = new FileSystemResource(path.toFile());
-        if (!fileRes.exists()) return ResponseEntity.status(404).body(Map.of("error", "File missing"));
-
-        String ct = rf.getContentType() != null ? rf.getContentType() : "application/octet-stream";
+        var bytes = Files.readAllBytes(path);
 
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(ct))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + rf.getOriginalName().replace("\"", "") + "\"")
-                .body(fileRes);
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + existing.getOriginalName() + "\"")
+                .contentType(MediaType.parseMediaType(existing.getContentType() == null ? "application/octet-stream" : existing.getContentType()))
+                .body(bytes);
     }
 }

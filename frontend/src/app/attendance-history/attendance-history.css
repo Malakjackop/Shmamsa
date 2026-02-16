@@ -1,0 +1,31 @@
+.about-container {
+  padding: 40px 60px;
+  color: black;
+}
+
+.about-title {
+  font-size: 40px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.about-subtitle {
+  font-size: 16px;
+  margin-bottom: 25px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 12px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(0,0,0,0.15);
+}
+
+.history-table thead th {
+  font-weight: 700;
+}

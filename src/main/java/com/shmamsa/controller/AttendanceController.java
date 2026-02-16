@@ -1,6 +1,6 @@
-
 package com.shmamsa.controller;
 
+import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
@@ -8,14 +8,14 @@ import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.QrTokenService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/attendance")
@@ -25,121 +25,110 @@ public class AttendanceController {
     private final AttendanceRepository attendanceRepo;
     private final UserRepository userRepo;
     private final QrTokenService qrTokenService;
-    public record AttendanceUserRef(Long id, String username) {}
 
-    public static class AttendanceSubmitRequest {
-        public List<Long> userIds;          // backward compatible (old payload)
-        public List<AttendanceUserRef> users; // new payload: [{id, username}]
-        public AttendanceType type;
-    }
+    @PostMapping("/submit")
+    public ResponseEntity<?> submit(@RequestBody Map<String, Object> body, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-public record ScanTokenRequest(String token) {}
-    public record ScanTokenResponse(Long id, String username, String fullName, String deaconFamily) {}
+        User servant = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-
-
-    @GetMapping("/my-stats")
-    public ResponseEntity<?> myStats(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        Object typeObj = body.get("type");
+        Object usersObj = body.get("users");
+        if (typeObj == null || usersObj == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Missing users/type"));
         }
 
-        String username = authentication.getName();
-        User u = userRepo.findByUsername(username).orElse(null);
-        if (u == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
-        }
+        AttendanceType type = AttendanceType.valueOf(typeObj.toString());
 
-        long friday = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
-        long tasbeeha = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
-        long familyMeeting = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FAMILY_MEETING);
-
-        return ResponseEntity.ok(Map.of(
-                "FRIDAY_LITURGY", friday,
-                "TASBEEHA", tasbeeha,
-                "FAMILY_MEETING", familyMeeting
-        ));
-    }
-
-    
-
-    @PostMapping("/scan-token")
-    public ResponseEntity<?> scanToken(@RequestBody ScanTokenRequest req) {
-        if (req == null || req.token() == null || req.token().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "token is required"));
-        }
-
-        Long userId = qrTokenService.verifyAndExtractUserId(req.token());
-        if (userId == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "invalid QR token"));
-        }
-
-        User u = userRepo.findById(userId).orElse(null);
-        if (u == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
-        }
-
-        return ResponseEntity.ok(new ScanTokenResponse(u.getId(), u.getUsername(), u.getFullName(), u.getDeaconFamily()));
-    }
-
-@PostMapping("/submit")
-    public ResponseEntity<?> submit(@RequestBody AttendanceSubmitRequest req) {
-
-        if (req == null || req.type == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "type is required"));
-        }
-
-        // ✅ Accept either old payload {userIds:[...], type:"..."} OR new payload {users:[{id,username}], type:"..."}
-        List<AttendanceUserRef> refs = null;
-        if (req.users != null && !req.users.isEmpty()) {
-            refs = req.users;
-        } else if (req.userIds != null && !req.userIds.isEmpty()) {
-            refs = req.userIds.stream().map(id -> new AttendanceUserRef(id, null)).toList();
-        } else {
-            return ResponseEntity.badRequest().body(Map.of("error", "userIds or users are required"));
-        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> users = (List<Map<String, Object>>) usersObj;
 
         LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
         int created = 0;
-        int skipped = 0;
-        int invalid = 0;
 
-        for (AttendanceUserRef ref : refs) {
-            if (ref == null || ref.id() == null) { skipped++; continue; }
+        for (Map<String, Object> u : users) {
+            Long id = Long.valueOf(u.get("id").toString());
 
-            Long uid = ref.id();
-
-            if (attendanceRepo.existsByUser_IdAndDateAndType(uid, today, req.type)) {
-                skipped++;
+            if (attendanceRepo.existsByUser_IdAndDateAndType(id, today, type)) {
                 continue;
             }
 
-            User u;
-                if (ref.username() != null && !ref.username().isBlank()) {
-                u = userRepo.findByIdAndUsername(uid, ref.username().trim()).orElse(null);
-                if (u == null) { invalid++; continue; }
-            } else {
-                u = userRepo.findById(uid).orElse(null);
-                if (u == null) { invalid++; continue; }
-            }
+            User target = userRepo.findById(id).orElse(null);
+            if (target == null) continue;
 
-            attendanceRepo.save(AttendanceRecord.builder()
-                    .user(u)
-                    .date(today)
-                    .type(req.type)
-                    .createdAt(LocalDateTime.now())
-                    .build());
+            AttendanceRecord r = new AttendanceRecord();
+            r.setUser(target);
+            r.setDate(today);
+            r.setTime(now);
+            r.setType(type);
+
+            r.setTakenBy(servant);
+
+            attendanceRepo.save(r);
             created++;
         }
 
+        return ResponseEntity.ok(Map.of("ok", true, "created", created));
+    }
+
+    @PostMapping("/scan-token")
+    public ResponseEntity<?> scanToken(@RequestBody Map<String, String> body) {
+        String token = body.get("token");
+        Long userId = qrTokenService.verifyAndExtractUserId(token);
+        if (userId == null) return ResponseEntity.badRequest().body(Map.of("error", "Invalid token"));
+
+        User u = userRepo.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
         return ResponseEntity.ok(Map.of(
-                "message", "Attendance saved",
-                "created", created,
-                "skipped", skipped,
-                "invalid", invalid,
-                "date", today.toString(),
-                "type", req.type.name()
+                "id", u.getId(),
+                "username", u.getUsername(),
+                "fullName", u.getFullName(),
+                "deaconFamily", u.getDeaconFamily()
         ));
     }
 
+    @GetMapping("/my-stats")
+    public ResponseEntity<?> myStats(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        long f = attendanceRepo.countByUser_IdAndType(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long t = attendanceRepo.countByUser_IdAndType(me.getId(), AttendanceType.TASBEEHA);
+        long m = attendanceRepo.countByUser_IdAndType(me.getId(), AttendanceType.FAMILY_MEETING);
+
+        return ResponseEntity.ok(Map.of(
+                "FRIDAY_LITURGY", f,
+                "TASBEEHA", t,
+                "FAMILY_MEETING", m
+        ));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<?> history(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+
+        List<AttendanceRecord> list = attendanceRepo.findByUser_IdOrderByCreatedAtDesc(me.getId());
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (AttendanceRecord r : list) {
+            out.add(Map.of(
+                    "id", r.getId(),
+                    "date", r.getDate() == null ? null : r.getDate().toString(),
+                    "time", r.getTime() == null ? null : r.getTime().toString(),
+                    "type", r.getType() == null ? null : r.getType().name(),
+                    "takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName()
+            ));
+        }
+        return ResponseEntity.ok(out);
+    }
 }

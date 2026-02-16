@@ -15,6 +15,5 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     List<AttendanceRecord> findByDateAndType(LocalDate date, AttendanceType type);
     List<AttendanceRecord> findByUser_DeaconFamilyStartingWith(String prefix);
 
-    // ✅ Dashboard stats (total attendance counts for the logged-in user)
     long countByUser_IdAndType(Long userId, AttendanceType type);
 }

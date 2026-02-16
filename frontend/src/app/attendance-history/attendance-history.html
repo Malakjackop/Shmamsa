@@ -1,0 +1,29 @@
+<div class="about-container">
+  <h1 class="about-title">Attendance History</h1>
+
+  <div *ngIf="loading" class="about-subtitle">Loading...</div>
+
+  <div *ngIf="!loading && items.length === 0" class="about-subtitle">
+    لا يوجد سجل حضور حتى الآن.
+  </div>
+
+  <table *ngIf="!loading && items.length > 0" class="history-table">
+    <thead>
+      <tr>
+        <th>التاريخ</th>
+        <th>الوقت</th>
+        <th>النوع</th>
+        <th>الخادم</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let it of items">
+        <td>{{ it.date }}</td>
+        <td>{{ it.time }}</td>
+        <td>{{ labelType(it.type) }}</td>
+        <td>{{ it.takenBy || '-' }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

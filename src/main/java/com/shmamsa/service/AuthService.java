@@ -144,6 +144,24 @@ public class AuthService {
         user.setRole("KHADIM");
 
         user.setPhoneNumber(request.getPhoneNumber());
+        user.setGuardiansPhone(request.getGuardiansPhone());
+        user.setGuardianRelation(request.getGuardianRelation());
+
+
+        if (request.getDateOfBirth() != null && !request.getDateOfBirth().isBlank()) {
+            try { user.setDateOfBirth(java.time.LocalDate.parse(request.getDateOfBirth().trim())); } catch (Exception ignored) {}
+        }
+        if (request.getGender() != null && !request.getGender().isBlank()) {
+            user.setGender(request.getGender().trim());
+        }
+        if (user.getDateOfBirth() == null) {
+            java.time.LocalDate dob = NationalIdUtils.extractBirthDate(nid);
+            if (dob != null) user.setDateOfBirth(dob);
+        }
+        if (user.getGender() == null) {
+            String g = NationalIdUtils.extractGender(nid);
+            if (g != null) user.setGender(g);
+        }
 
         user.setStatus(request.getStatus());
         user.setStudyType(request.getStudyType());
@@ -163,9 +181,7 @@ public class AuthService {
     }
 
 
-// -----------------------------------------------------------
-    // LOGIN
-    // -----------------------------------------------------------
+
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid username or password"));
@@ -177,18 +193,14 @@ public class AuthService {
         return jwtUtils.generateToken(user.getUsername(), user.getRole());
     }
 
-    // -----------------------------------------------------------
-    // GET USER FROM TOKEN
-    // -----------------------------------------------------------
+
     public User getUserFromToken(String token) {
         String username = jwtUtils.extractUsername(token);
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
     }
 
-    // -----------------------------------------------------------
-    // FORGOT PASSWORD (Email)
-    // -----------------------------------------------------------
+
     public Map<String, Object> generateResetTokenByEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "EMAIL_REQUIRED", "Email is required");
@@ -202,9 +214,7 @@ public class AuthService {
         return Map.of("message", "OTP sent successfully to your email");
     }
 
-    // -----------------------------------------------------------
-    // OTP send helper (limits + ttl) - EMAIL
-    // -----------------------------------------------------------
+
     private void sendOtpForUserByEmail(User user) {
         String username = user.getUsername();
         long now = System.currentTimeMillis();
@@ -217,7 +227,6 @@ public class AuthService {
             }
         }
 
-        // Hourly limit (sliding window, best-effort in-memory)
         OtpData.RateWindow window = hourlyRequests.get(username);
         if (window == null || now - window.windowStartMs >= 3600_000) {
             window = new OtpData.RateWindow(0, now);
@@ -230,21 +239,16 @@ public class AuthService {
 
         window.count += 1;
 
-        // Generate OTP
         String code = String.format("%05d", new Random().nextInt(100000));
 
-        // Store OTP with expiry
         otpStore.put(code, new OtpData(username, now + OTP_TTL_MS));
 
         otpTimestamps.put(username, now);
 
-        // Send Email
         emailService.sendOtpEmail(user.getEmail(), user.getFullName(), user.getUsername(), code);
     }
 
-    // -----------------------------------------------------------
-    // RESET PASSWORD (OTP + new pass)
-    // -----------------------------------------------------------
+
     public void resetPassword(String otp, String newPassword) {
         if (otp == null || otp.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "OTP_REQUIRED", "OTP is required");
         if (newPassword == null || newPassword.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_REQUIRED", "New password is required");
@@ -268,20 +272,13 @@ public class AuthService {
         otpStore.remove(otp);
     }
 
-    /**
-     * Best-effort cleanup for in-memory OTP storage.
-     * (Production: move OTP storage to Redis/DB.)
-     */
+
     public void purgeExpiredOtps() {
         long now = System.currentTimeMillis();
 
-        // OTPs
         otpStore.entrySet().removeIf(entry -> entry.getValue() == null || entry.getValue().expiresAt < now);
-
-        // Cooldown timestamps (keep only last 10 minutes)
         otpTimestamps.entrySet().removeIf(e -> e.getValue() == null || now - e.getValue() > 10 * 60_000);
 
-        // Hourly windows (remove windows older than 2 hours - buffer)
         hourlyRequests.entrySet().removeIf(e -> e.getValue() == null || now - e.getValue().windowStartMs > 2 * 3600_000);
     }
 

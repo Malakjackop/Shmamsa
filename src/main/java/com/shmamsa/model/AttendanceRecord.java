@@ -1,22 +1,17 @@
-
 package com.shmamsa.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
-@Table(
-        name = "attendance_records",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "att_date", "att_type"})
-)
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Table(name = "attendance_records")
 public class AttendanceRecord {
 
     @Id
@@ -24,16 +19,22 @@ public class AttendanceRecord {
     private Long id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "att_date", nullable = false)
     private LocalDate date;
+    private LocalTime time;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "att_type", nullable = false, length = 30)
     private AttendanceType type;
 
-    @Column(nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "taken_by_user_id")
+    private User takenBy;
+
     private LocalDateTime createdAt;
+
+    @PrePersist
+    public void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 }

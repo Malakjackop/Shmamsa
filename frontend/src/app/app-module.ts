@@ -21,6 +21,7 @@ import { AboutComponent } from './about/about';
 import { FamilyComponent } from './family/family';
 import { AttendanceComponent } from './attendance/attendance';
 import { ResourcesComponent } from './resources/resources';
+import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -47,12 +48,14 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
     AboutComponent,
     FamilyComponent,
     AttendanceComponent,
-    ResourcesComponent
+    ResourcesComponent,
+    
   ],
   imports: [
     BrowserModule,
     RegisterComponent,
     RegisterServantComponent,
+    AttendanceHistoryComponent,
     AppRoutingModule,
     HttpClientModule,
     ReactiveFormsModule,

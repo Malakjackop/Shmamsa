@@ -36,14 +36,12 @@ public class AuthController {
 
     
 
-// ✅ Register-servant endpoint (special link)
 @PostMapping("/register-servant")
 public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
     authService.registerServant(request);
     return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
 }
 
-// ✅ Login endpoint — sets JWT as HttpOnly cookie
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
 
@@ -61,7 +59,6 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
         return ResponseEntity.ok(Map.of("message", "Login successful"));
     }
 
-    // ✅ Get logged in user data (requires JWT)
     @GetMapping("/user")
     public ResponseEntity<?> getFullUser(Authentication authentication) {
 

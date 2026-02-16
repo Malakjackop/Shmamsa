@@ -7,6 +7,7 @@ import { RegisterServantComponent } from './register-servant/register-servant';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password';
 import { ResetPasswordComponent } from './reset-password/reset-password';
 import { ResourcesComponent } from './resources/resources';
+import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
@@ -37,6 +38,8 @@ const routes: Routes = [
       { path: 'profile', component: ProfileComponent },
       { path: 'about', component: AboutComponent },
       { path: 'resources', component: ResourcesComponent },
+      { path: 'attendance-history', component: AttendanceHistoryComponent },
+
 
       {
         path: 'attendance',

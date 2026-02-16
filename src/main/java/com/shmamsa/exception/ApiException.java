@@ -2,10 +2,7 @@ package com.shmamsa.exception;
 
 import org.springframework.http.HttpStatus;
 
-/**
- * A small, explicit exception for predictable (client-facing) API errors.
- * Use this instead of RuntimeException / jakarta.validation.ValidationException.
- */
+
 public class ApiException extends RuntimeException {
 
     private final HttpStatus status;
