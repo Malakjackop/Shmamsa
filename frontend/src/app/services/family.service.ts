@@ -18,6 +18,13 @@ export class FamilyService {
     return this.http.get<any[]>(`${this.baseUrl}/members`, { params, withCredentials: true });
   }
 
+  search(name: string, family?: string): Observable<any[]> {
+  let params = new HttpParams().set('name', name || '');
+  if (family) params = params.set('family', family);
+  return this.http.get<any[]>(`${this.baseUrl}/search`, { params, withCredentials: true });
+  }
+
+
   memberAttendance(id: number, family?: string): Observable<any[]> {
     let params = new HttpParams();
     if (family) params = params.set('family', family);

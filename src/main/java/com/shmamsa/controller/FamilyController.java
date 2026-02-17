@@ -5,6 +5,7 @@ import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.security.RoleUtil;
 import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,9 +45,11 @@ public class FamilyController {
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        boolean isAminOrDev = "AMIN_KHEDMA".equals(me.getRole()) || "DEVELOPER".equals(me.getRole());
+        // Allow servants (KHADIM+) to choose any family; otherwise default to their own.
+        boolean canChooseFamily = RoleUtil.isAtLeast(me.getRole(), "KHADIM");
 
-        String target = (isAminOrDev && family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+        String target = (canChooseFamily && family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+
         String base = FamilyUtil.mainFamily(target);
 
         List<User> members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, List.of("MAKHDOM"));
@@ -70,6 +73,60 @@ public class FamilyController {
 
         return ResponseEntity.ok(out);
     }
+
+    // Search members by name.
+// - If family is provided: search within that family (A/B included via "startingWith" base family).
+// - If family is NOT provided: search across all families (KHADIM+ only). If not allowed -> restrict to own family.
+    @GetMapping("/search")
+    public ResponseEntity<?> search(@RequestParam String name,
+                                    @RequestParam(required = false) String family,
+                                    Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        String q = name == null ? "" : name.trim();
+        if (q.isBlank()) return ResponseEntity.ok(List.of());
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        boolean canChooseFamily = RoleUtil.isAtLeast(me.getRole(), "KHADIM");
+
+        List<User> users;
+        if (family != null && !family.isBlank()) {
+            // Search inside selected family
+            String base = FamilyUtil.mainFamily(family);
+            users = userRepo.findByRoleAndDeaconFamilyStartingWithAndFullNameContainingIgnoreCase(
+                    "MAKHDOM",
+                    base,
+                    q
+            );
+        } else {
+            // Search across all families (or restrict to own family if not allowed)
+            if (!canChooseFamily) {
+                String base = FamilyUtil.mainFamily(me.getDeaconFamily());
+                users = userRepo.findByRoleAndDeaconFamilyStartingWithAndFullNameContainingIgnoreCase(
+                        "MAKHDOM",
+                        base,
+                        q
+                );
+            } else {
+                users = userRepo.findByRoleAndFullNameContainingIgnoreCase("MAKHDOM", q);
+            }
+        }
+
+        // Minimal payload for attendance selection
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (User u : users) {
+            out.add(Map.of(
+                    "id", u.getId(),
+                    "username", u.getUsername(),
+                    "fullName", u.getFullName(),
+                    "deaconFamily", u.getDeaconFamily()
+            ));
+        }
+        return ResponseEntity.ok(out);
+    }
+
 
     @GetMapping("/members/{id}/attendance")
     public ResponseEntity<?> memberAttendance(@PathVariable Long id, Authentication auth) {

@@ -1,40 +1,111 @@
-
 <p-toast></p-toast>
 
 <div class="page">
   <h1>Attendance</h1>
 
-  <div class="controls">
-    <label>Event</label>
-    <select [(ngModel)]="selectedType">
-      <option value="FRIDAY_LITURGY">قداس الجمعة</option>
-      <option value="TASBEEHA">تسبحة</option>
-      <option value="FAMILY_MEETING">اجتماع الأسرة</option>
-    </select>
+  <div class="layout">
+    <!-- Sidebar: Families display list -->
+    <aside class="sidebar">
+      <div class="side-title">اختار الأسرة</div>
 
-    <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'Stop Scan' : 'Scan QR'"></p-button>
-  </div>
+      <select class="familyDrop" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+       <option value="">كل الأسر</option>
+       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+      </select>
 
-  <div class="scanner" *ngIf="scanning">
-    <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
-    <p class="hint">وجّه الكاميرا للـ QR.</p>
-  </div>
 
-  <h2>Scanned List</h2>
-
-  <div class="list" *ngIf="scanned.length; else empty">
-    <div class="row" *ngFor="let u of scanned">
-      <div>
-        <div class="name">{{u.fullName}}</div>
-        <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
+      <div class="side-hint">
+        لو مختارتش أسرة: البحث هيكون في كل الأسر.
       </div>
-      <p-button type="button" icon="pi pi-times" (onClick)="remove(u.id)"></p-button>
-    </div>
+    </aside>
 
-    <p-button type="button" class="submit" (onClick)="submit()" label="Submit"></p-button>
+    <!-- Main -->
+    <section class="content">
+      <div class="controls">
+        <label>Event</label>
+        <select [(ngModel)]="selectedType">
+          <option value="FRIDAY_LITURGY">قداس الجمعة</option>
+          <option value="TASBEEHA">تسبحة</option>
+          <option value="FAMILY_MEETING">اجتماع الأسرة</option>
+        </select>
+
+        <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'Stop Scan' : 'Scan QR'"></p-button>
+      </div>
+
+      <div class="scanner" *ngIf="scanning">
+        <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
+        <p class="hint">وجّه الكاميرا للـ QR.</p>
+      </div>
+
+      <!-- Search (قبل وبعد اختيار الأسرة) -->
+      <div class="searchWrap">
+        <span class="search">
+          <i class="pi pi-search"></i>
+          <input
+            pInputText
+            [(ngModel)]="searchText"
+            (ngModelChange)="onSearchChange($event)"
+            placeholder="اكتب اسم الولد..."
+            aria-label="Search"
+          />
+        </span>
+
+        <div class="scope">
+          <span *ngIf="selectedFamily; else allScope">البحث داخل: <b>{{ selectedFamily }}</b></span>
+          <ng-template #allScope>
+            البحث في: <b>كل الأسر</b>
+            <span class="loading" *ngIf="searching">(بيبحث...)</span>
+          </ng-template>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <h2 class="listTitle" *ngIf="selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
+      <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim()">نتائج البحث</h2>
+
+      <div class="list" *ngIf="displayedMembers.length; else empty">
+        <div class="row" *ngFor="let u of displayedMembers">
+          <div>
+            <div class="name">{{u.fullName}}</div>
+            <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
+          </div>
+
+          <p-button
+            type="button"
+            [icon]="isSelected(u.id) ? 'pi pi-check' : 'pi pi-plus'"
+            (onClick)="toggleSelect(u)"
+          >➕ </p-button>
+        </div>
+      </div>
+
+      <ng-template #empty>
+        <p class="hint" *ngIf="!selectedFamily && !searchText.trim()">
+          اختار أسرة من القائمة أو اكتب اسم علشان يدور في كل الأسر.
+        </p>
+        <p class="hint" *ngIf="!selectedFamily && searchText.trim() && !displayedMembers.length && !searching">
+          مفيش نتائج للاسم ده.
+        </p>
+        <p class="hint" *ngIf="selectedFamily && !members.length">
+          مفيش حد مسجل في الأسرة دي.
+        </p>
+      </ng-template>
+
+      <!-- Selected + Submit -->
+      <div class="selectedBox" *ngIf="selected.length">
+        <h2>Selected</h2>
+
+        <div class="list">
+          <div class="row" *ngFor="let u of selected">
+            <div>
+              <div class="name">{{u.fullName}}</div>
+              <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
+            </div>
+            <p-button type="button" icon="pi pi-times" (onClick)="remove(u.id)">🗑️</p-button>
+          </div>
+        </div>
+
+        <p-button type="button" class="submit" (onClick)="submit()" label="Submit"></p-button>
+      </div>
+    </section>
   </div>
-
-  <ng-template #empty>
-    <p class="hint">لسه مفيش حد اتعمله Scan.</p>
-  </ng-template>
 </div>

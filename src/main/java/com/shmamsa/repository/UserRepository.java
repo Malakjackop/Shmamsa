@@ -15,6 +15,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     java.util.List<User> findByDeaconFamilyAndRoleIn(String deaconFamily, java.util.List<String> roles);
 
     java.util.List<User> findByDeaconFamilyStartingWithAndRoleIn(String prefix, java.util.List<String> roles);
+
+    // --- Search helpers (used by /api/family/search)
+    java.util.List<User> findByRoleAndFullNameContainingIgnoreCase(String role, String namePart);
+
+    java.util.List<User> findByRoleAndDeaconFamilyStartingWithAndFullNameContainingIgnoreCase(
+            String role,
+            String familyPrefix,
+            String namePart
+    );
 }
 
 

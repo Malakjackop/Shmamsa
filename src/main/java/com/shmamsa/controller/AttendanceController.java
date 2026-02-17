@@ -48,16 +48,22 @@ public class AttendanceController {
         LocalTime now = LocalTime.now();
 
         int created = 0;
+        int skipped = 0;
+
 
         for (Map<String, Object> u : users) {
             Long id = Long.valueOf(u.get("id").toString());
 
             if (attendanceRepo.existsByUser_IdAndDateAndType(id, today, type)) {
+                skipped++;
                 continue;
             }
 
             User target = userRepo.findById(id).orElse(null);
-            if (target == null) continue;
+            if (target == null){
+                skipped++;
+                continue;
+            }
 
             AttendanceRecord r = new AttendanceRecord();
             r.setUser(target);
@@ -71,7 +77,8 @@ public class AttendanceController {
             created++;
         }
 
-        return ResponseEntity.ok(Map.of("ok", true, "created", created));
+        return ResponseEntity.ok(Map.of("ok", true, "created", created, "skipped", skipped));
+
     }
 
     @PostMapping("/scan-token")

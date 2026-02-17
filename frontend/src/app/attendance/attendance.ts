@@ -1,9 +1,11 @@
-
 import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AttendanceService, AttendanceType } from '../services/attendance.service';
 import { AuthService } from '../services/auth.service';
+import { FamilyService } from '../services/family.service';
 import { MessageService } from 'primeng/api';
+
+type PickUser = { id: number; username?: string; fullName: string; deaconFamily?: string };
 
 @Component({
   selector: 'app-attendance',
@@ -15,6 +17,7 @@ import { MessageService } from 'primeng/api';
 export class AttendanceComponent implements OnInit {
   private attendance = inject(AttendanceService);
   private auth = inject(AuthService);
+  private familySvc = inject(FamilyService);
   private message = inject(MessageService);
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
@@ -24,30 +27,150 @@ export class AttendanceComponent implements OnInit {
 
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
 
-  // list of scanned users (unique by id)
-  scanned: { id: number; username: string; fullName: string; deaconFamily?: string }[] = [];
+  // Families (base names, بدون أ/ب)
+  families: string[] = [];
+  selectedFamily = ''; // '' => كل الأسر
+
+  // Members when a family is selected
+  members: PickUser[] = [];
+
+  // Global search results when no family is selected
+  globalResults: PickUser[] = [];
+
+  searchText = '';
+  private searchTimer: any = null;
+  searching = false;
+
+  // Selected users (from list OR QR scan)
+  selected: PickUser[] = [];
 
   ngOnInit() {
-    // ✅ SSR: don't call protected endpoints on the server render
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.auth.getUserData().subscribe((u) => (this.me = u));
+    this.auth.getUserData().subscribe((u) => {
+      this.me = u;
+      this.loadFamilies();
+    });
   }
 
   toggleScan() {
     this.scanning = !this.scanning;
   }
 
+  onFamilyChange() {
+    // reset lists
+    this.members = [];
+    this.globalResults = [];
+
+    if (this.selectedFamily) {
+      this.loadMembersForFamily();
+    } else {
+      // No family => global search mode; if user already typed search, run it
+      const q = this.searchText.trim();
+      if (q) this.runSearch();
+    }
+  }
+
+  onSearchChange(v: string) {
+    this.searchText = v;
+
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.runSearch(), 250);
+  }
+
+  private runSearch() {
+    const q = (this.searchText || '').trim();
+
+    // لو محدد أسرة => البحث يكون local filter (مفيش call للباك)
+    if (this.selectedFamily) return;
+
+    // لو مش محدد أسرة => بحث في كل الأسر من الباك
+    if (!q) {
+      this.globalResults = [];
+      return;
+    }
+
+    this.searching = true;
+    this.familySvc.search(q).subscribe({
+      next: (list) => {
+        this.globalResults = (list as any[])?.map(this.toPickUser) || [];
+        this.searching = false;
+      },
+      error: () => {
+        this.globalResults = [];
+        this.searching = false;
+      }
+    });
+  }
+
+  private loadFamilies() {
+    this.familySvc.families().subscribe({
+      next: (f) => (this.families = f || []),
+      error: () => (this.families = [])
+    });
+  }
+
+  private loadMembersForFamily() {
+    this.familySvc.members(this.selectedFamily).subscribe({
+      next: (m) => (this.members = (m as any[])?.map(this.toPickUser) || []),
+      error: (err) => {
+        this.members = [];
+        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load' });
+      }
+    });
+  }
+
+  private toPickUser = (u: any): PickUser => ({
+    id: Number(u?.id),
+    username: u?.username,
+    fullName: u?.fullName,
+    deaconFamily: u?.deaconFamily
+  });
+
+  // اللي بيتعرض في الليست
+  get displayedMembers(): PickUser[] {
+    const q = (this.searchText || '').trim().toLowerCase();
+
+    if (this.selectedFamily) {
+      // search داخل الأسرة
+      if (!q) return this.members;
+      return this.members.filter((m) => (m.fullName || '').toLowerCase().includes(q));
+    }
+
+    // search في كل الأسر (results جاية من backend)
+    return this.globalResults;
+  }
+
+  // ---------- Selection ----------
+  isSelected(id: number): boolean {
+    return this.selected.some((x) => x.id === id);
+  }
+
+  toggleSelect(u: PickUser) {
+    if (!u?.id) return;
+
+    if (this.isSelected(u.id)) {
+      this.selected = this.selected.filter((x) => x.id !== u.id);
+    } else {
+      this.selected = [...this.selected, u];
+    }
+  }
+
+  remove(id: number) {
+    this.selected = this.selected.filter((x) => x.id !== id);
+  }
+
+  // ---------- QR ----------
   onCodeResult(resultString: string) {
     const token = (resultString || '').trim();
     if (!token) return;
 
-    // ✅ Verify token with backend (trusted source)
     this.attendance.scanToken(token).subscribe({
       next: (u) => {
-        if (!u?.id) return;
-        if (this.scanned.some((x) => x.id === u.id)) return;
-        this.scanned.push({ id: u.id, username: u.username, fullName: u.fullName, deaconFamily: u.deaconFamily });
+        const pu = this.toPickUser(u);
+        if (!pu?.id) return;
+        if (this.isSelected(pu.id)) return;
+        this.selected = [...this.selected, pu];
       },
       error: () => {
         this.message.add({ severity: 'warn', summary: 'Invalid QR', detail: 'This QR is not valid or user not found' });
@@ -55,14 +178,11 @@ export class AttendanceComponent implements OnInit {
     });
   }
 
-  remove(id: number) {
-    this.scanned = this.scanned.filter((x) => x.id !== id);
-  }
-
+  // ---------- Submit ----------
   submit() {
-    const users = this.scanned.map((x) => ({ id: x.id, username: x.username }));
+    const users = this.selected.map((x) => ({ id: x.id, username: x.username }));
     if (users.length === 0) {
-      this.message.add({ severity: 'warn', summary: 'No users', detail: 'Scan at least one QR code' });
+      this.message.add({ severity: 'warn', summary: 'No users', detail: 'اختار اسم واحد على الأقل أو اعمل Scan للـ QR' });
       return;
     }
 
@@ -73,7 +193,7 @@ export class AttendanceComponent implements OnInit {
           summary: 'Saved',
           detail: `Created: ${res.created}, Skipped: ${res.skipped}`
         });
-        this.scanned = [];
+        this.selected = [];
       },
       error: (err) => {
         this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
