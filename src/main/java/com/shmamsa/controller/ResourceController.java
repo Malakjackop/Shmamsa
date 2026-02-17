@@ -39,12 +39,8 @@ public class ResourceController {
         String target = (family != null && !family.isBlank()) ? family : me.getDeaconFamily();
 
         if ("ALL".equalsIgnoreCase(target.trim())) {
-            return ResponseEntity.ok(
-                    resourceRepo.findAll()
-                            .stream()
-                            .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-                            .toList()
-            );
+            // Show everything when "ALL" is selected (admins want to review/edit global + family-specific uploads)
+            return ResponseEntity.ok(resourceRepo.findAllByOrderByCreatedAtDesc());
         }
 
         List<String> families = FamilyUtil.variantsPlusAll(target);

@@ -36,6 +36,8 @@ public class RegisterRequest {
     private String deaconDegree;
 
     private String phoneNumber;
+
+    private String address;
     private String guardiansPhone;
     private String guardianRelation;
 

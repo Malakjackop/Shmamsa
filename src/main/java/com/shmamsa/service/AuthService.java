@@ -81,6 +81,8 @@ public class AuthService {
         user.setDeaconFamily(request.getDeaconFamily());
         user.setDeaconDegree(request.getDeaconDegree());
         user.setPhoneNumber(request.getPhoneNumber());
+        user.setAddress(request.getAddress());
+        user.setAddress(request.getAddress());
         user.setGuardiansPhone(request.getGuardiansPhone());
         user.setGuardianRelation(request.getGuardianRelation());
         user.setStatus(request.getStatus());
@@ -144,6 +146,7 @@ public class AuthService {
         user.setRole("KHADIM");
 
         user.setPhoneNumber(request.getPhoneNumber());
+        user.setAddress(request.getAddress());
         user.setGuardiansPhone(request.getGuardiansPhone());
         user.setGuardianRelation(request.getGuardianRelation());
 

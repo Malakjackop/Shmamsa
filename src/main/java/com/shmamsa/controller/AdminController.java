@@ -69,7 +69,19 @@ public class AdminController {
     }
 
     @GetMapping("/roles")
-    public ResponseEntity<?> roles() {
-        return ResponseEntity.ok(RoleUtil.ORDERED);
+    public ResponseEntity<?> roles(Authentication auth) {
+        String actorRole = authRole(auth);
+        List<String> allowed = RoleUtil.ORDERED.stream()
+                .filter(r -> {
+                    if ("DEVELOPER".equals(actorRole)) return true;
+                    if ("AMIN_KHEDMA".equals(actorRole)) {
+                        if ("DEVELOPER".equals(r)) return false;
+                        if ("AMIN_OSRA".equals(r) || "AMIN_KHEDMA".equals(r)) return false;
+                        return true;
+                    }
+                    return false;
+                })
+                .toList();
+        return ResponseEntity.ok(allowed);
     }
 }

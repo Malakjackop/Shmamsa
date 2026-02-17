@@ -37,6 +37,8 @@ public class RegisterServantRequest {
     private String deaconDegree;
 
     private String phoneNumber;
+
+    private String address;
     private String guardiansPhone;
     private String guardianRelation;
 
@@ -55,6 +57,4 @@ public class RegisterServantRequest {
 
     private Boolean isWorking;
     private String workDetails;
-
-
 }

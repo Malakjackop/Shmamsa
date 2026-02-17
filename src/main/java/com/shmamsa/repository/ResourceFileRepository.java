@@ -10,4 +10,6 @@ public interface ResourceFileRepository extends JpaRepository<ResourceFile, Long
     List<ResourceFile> findByFamilyInOrderByCreatedAtDesc(List<String> families);
 
     List<ResourceFile> findByFamilyOrderByCreatedAtDesc(String family);
+
+    List<ResourceFile> findAllByOrderByCreatedAtDesc();
 }

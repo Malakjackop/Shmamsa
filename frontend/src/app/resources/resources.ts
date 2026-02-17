@@ -78,10 +78,6 @@ export class ResourcesComponent implements OnInit {
   loadResources() {
 
     if (this.isAminKhedmaOrDev()) {
-      if (this.selectedFamily === 'ALL') {
-        this.resources = [];
-        return;
-      }
       this.resService.list(this.selectedFamily).subscribe({
         next: (data) => (this.resources = data || []),
         error: () => (this.resources = [])

@@ -94,7 +94,7 @@ public class AttendanceController {
                 "id", u.getId(),
                 "username", u.getUsername(),
                 "fullName", u.getFullName(),
-                "deaconFamily", u.getDeaconFamily()
+                "deaconFamily", ("DEVELOPER".equalsIgnoreCase(u.getRole()) && "SYSTEM".equalsIgnoreCase(u.getDeaconFamily())) ? null : u.getDeaconFamily()
         ));
     }
 

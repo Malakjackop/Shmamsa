@@ -26,6 +26,7 @@ export class ProfileComponent implements OnInit {
     fullName: [{ value: '', disabled: true }, Validators.required],
     email: [{ value: '', disabled: true }, [Validators.required, Validators.email]],
     phoneNumber: [{ value: '', disabled: true }],
+    address: [{ value: '', disabled: true }],
     guardiansPhone: [{ value: '', disabled: true }],
     guardianRelation: [{ value: '', disabled: true }],
     deaconFamily: [{ value: '', disabled: true }],
@@ -179,6 +180,7 @@ toggleEdit() {
 
 
   this.profileForm.get('phoneNumber')?.enable();
+  this.profileForm.get('address')?.enable();
   this.profileForm.get('workDetails')?.enable();
 
   if (!this.isServant()) {

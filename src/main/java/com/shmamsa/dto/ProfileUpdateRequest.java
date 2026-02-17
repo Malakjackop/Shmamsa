@@ -9,6 +9,8 @@ public class ProfileUpdateRequest {
     private String email;
     private String fullName;
     private String phoneNumber;
+
+    private String address;
     private String guardiansPhone;
     private String guardianRelation;
     private String deaconFamily;

@@ -41,9 +41,16 @@
           <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
 
           <td *ngIf="canEditRoles()">
-            <select [value]="m.role" (change)="changeRole(m, $any($event.target).value)">
-              <option *ngFor="let r of allRoles" [value]="r" [disabled]="r==='DEVELOPER'">{{r}}</option>
-            </select>
+    <select
+      [ngModel]="m.role"
+      (ngModelChange)="changeRole(m, $event)"
+      [ngModelOptions]="{ standalone: true }"
+    >
+      <option *ngFor="let r of allRoles" [value]="r" [disabled]="r === 'DEVELOPER'">
+        {{ r }}
+      </option>
+    </select>
+
           </td>
         </tr>
       </tbody>
@@ -55,7 +62,7 @@
       <div class="modalHead">
         <div>
           <div class="title">{{ detailsFor.fullName }}</div>
-          <div class="sub">{{ detailsFor.role }}</div> 
+          <div class="sub">{{ detailsFor.role }}</div>
         </div>
         <button pButton type="button" icon="pi pi-times" (click)="closeDetails()">➖</button>
       </div>

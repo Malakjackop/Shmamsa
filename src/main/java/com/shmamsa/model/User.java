@@ -46,6 +46,9 @@ public class User {
     @Column(length = 15)
     private String phoneNumber;
 
+    @Column(length = 255)
+    private String address;
+
     @Pattern(regexp = "^$|\\d{11}", message = "Guardian phone must be 11 digits or empty")
     @Column(length = 15)
     private String guardiansPhone;

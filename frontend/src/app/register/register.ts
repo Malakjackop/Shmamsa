@@ -87,6 +87,7 @@ private buildForm() {
     fullName: ['', Validators.required],
     username: ['', Validators.required],
     phoneNumber: [''],
+    address: [''],
     email: ['', [Validators.required, Validators.email]],
 
     nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
@@ -373,6 +374,7 @@ onStatusChange() {
         deaconFamily: 'deaconFamily ',
         deaconDegree: 'deaconDegree ',
         phoneNumber: 'phoneNumber',
+        address: 'address',
         guardiansPhone: 'guardiansPhone',
         guardianRelation: 'guardianRelation',
         status: 'status',
@@ -446,6 +448,8 @@ submit() {
     deaconFamily: formValue.deaconFamily,
 
     phoneNumber: formValue.phoneNumber,
+    // NEW: address
+    address: formValue.address,
     nationalId: formValue.nationalId,
     dateOfBirth: formValue.dateOfBirth,
     gender: formValue.gender,

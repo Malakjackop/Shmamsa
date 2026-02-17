@@ -27,7 +27,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    // ✅ Register endpoint
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
@@ -49,7 +49,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
         ResponseCookie cookie = ResponseCookie.from("jwt", token)
                 .httpOnly(true)
-                .secure(false) // ✅ true in production with HTTPS
+                .secure(false)
                 .path("/")
                 .maxAge(24 * 60 * 60)
                 .sameSite("Lax")
@@ -74,6 +74,12 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
         }
 
         user.setPassword(null);
+
+        // Hide internal/system family label from responses
+        if ("DEVELOPER".equalsIgnoreCase(user.getRole()) && "SYSTEM".equalsIgnoreCase(user.getDeaconFamily())) {
+            user.setDeaconFamily(null);
+        }
+
         return ResponseEntity.ok(user);
     }
 
@@ -121,6 +127,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
             existingUser.setFullName(updated.getFullName());
             existingUser.setPhoneNumber(updated.getPhoneNumber());
+            existingUser.setAddress(updated.getAddress());
             existingUser.setGuardiansPhone(updated.getGuardiansPhone());
             existingUser.setGuardianRelation(updated.getGuardianRelation());
             existingUser.setDeaconDegree(updated.getDeaconDegree());
