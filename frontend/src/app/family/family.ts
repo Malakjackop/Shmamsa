@@ -10,6 +10,9 @@ type Member = {
   fullName: string;
   role: string;
   deaconFamily: string;
+  address?: string;
+  phoneNumber?: string;
+  guardiansPhone?: string;
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
@@ -36,6 +39,10 @@ export class FamilyComponent implements OnInit {
 
   detailsFor: Member | null = null;
   details: any[] = [];
+  detailsType: '' | 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING' = '';
+
+  profileFor: Member | null = null;
+  profile: any = null;
 
   allRoles: string[] = [];
 
@@ -94,9 +101,15 @@ export class FamilyComponent implements OnInit {
 
   openDetails(member: Member) {
     this.detailsFor = member;
+    this.detailsType = '';
+    this.reloadDetails();
+  }
+
+  reloadDetails() {
+    if (!this.detailsFor) return;
     const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
 
-    this.familySvc.memberAttendance(member.id, famParam).subscribe({
+    this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
       next: (d) => (this.details = d || []),
       error: () => (this.details = [])
     });
@@ -105,6 +118,23 @@ export class FamilyComponent implements OnInit {
   closeDetails() {
     this.detailsFor = null;
     this.details = [];
+    this.detailsType = '';
+  }
+
+  openProfile(member: Member) {
+    this.profileFor = member;
+    this.profile = null;
+    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+
+    this.familySvc.memberDetails(member.id, famParam).subscribe({
+      next: (p) => (this.profile = p),
+      error: () => (this.profile = null)
+    });
+  }
+
+  closeProfile() {
+    this.profileFor = null;
+    this.profile = null;
   }
 
   private loadRoles() {
@@ -133,6 +163,9 @@ export class FamilyComponent implements OnInit {
         fullName: m.fullName,
         role: m.role,
         deaconFamily: m.deaconFamily,
+        address: m.address,
+        phoneNumber: m.phoneNumber,
+        guardiansPhone: m.guardiansPhone,
         fridayLiturgy: m.fridayLiturgy,
         tasbeeha: m.tasbeeha,
         familyMeeting: m.familyMeeting
@@ -158,13 +191,16 @@ export class FamilyComponent implements OnInit {
       const body = this.members.map((m) => [
         m.fullName,
         m.role,
+        m.address || '',
+        m.phoneNumber || '',
+        m.guardiansPhone || '',
         String(m.fridayLiturgy),
         String(m.tasbeeha),
         String(m.familyMeeting)
       ]);
 
       autoTable(doc, {
-        head: [['Name', 'Role', 'Friday Liturgy', 'Tasbeeha', 'Family Meeting']],
+        head: [['Name', 'Role', 'Address', 'Phone', "Father's phone", 'Friday Liturgy', 'Tasbeeha', 'Family Meeting']],
         body
       });
 

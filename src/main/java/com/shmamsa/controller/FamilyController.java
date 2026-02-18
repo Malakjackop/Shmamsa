@@ -101,18 +101,79 @@ public class FamilyController {
             long tasbeeha = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
             long meeting = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FAMILY_MEETING);
 
-            out.add(Map.of(
-                    "id", u.getId(),
-                    "fullName", u.getFullName(),
-                    "role", u.getRole(),
-                    "deaconFamily", u.getDeaconFamily(),
-                    "fridayLiturgy", friday,
-                    "tasbeeha", tasbeeha,
-                    "familyMeeting", meeting
-            ));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", u.getId());
+            row.put("fullName", u.getFullName());
+            row.put("role", u.getRole());
+            row.put("deaconFamily", u.getDeaconFamily());
+            row.put("address", u.getAddress());
+            row.put("phoneNumber", u.getPhoneNumber());
+            row.put("guardiansPhone", u.getGuardiansPhone());
+            row.put("fridayLiturgy", friday);
+            row.put("tasbeeha", tasbeeha);
+            row.put("familyMeeting", meeting);
+            out.add(row);
         }
 
         return ResponseEntity.ok(out);
+    }
+
+
+    @GetMapping("/members/{id}")
+    public ResponseEntity<?> member(@PathVariable Long id,
+                                    @RequestParam(required = false) String family,
+                                    Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        User u = userRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
+
+        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(me.getRole()) || "DEVELOPER".equals(me.getRole());
+
+        // permissions:
+        // - AMIN_KHEDMA/DEV can view any member that would appear in the members list for the selected family
+        // - Others can only view members in their own family bucket
+        String target = (isAminKhedmaOrDev && family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+        String base = FamilyUtil.mainFamily(target);
+        String uBase = FamilyUtil.mainFamily(u.getDeaconFamily());
+
+        if (!isAminKhedmaOrDev) {
+            if (base == null || uBase == null || !base.equals(uBase)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
+
+        // DTO: don't return password
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("id", u.getId());
+        dto.put("fullName", u.getFullName());
+        dto.put("username", u.getUsername());
+        dto.put("email", u.getEmail());
+        dto.put("role", u.getRole());
+        dto.put("deaconFamily", u.getDeaconFamily());
+        dto.put("deaconDegree", u.getDeaconDegree());
+        dto.put("nationalId", u.getNationalId());
+        dto.put("phoneNumber", u.getPhoneNumber());
+        dto.put("address", u.getAddress());
+        dto.put("guardiansPhone", u.getGuardiansPhone());
+        dto.put("guardianRelation", u.getGuardianRelation());
+        dto.put("dateOfBirth", u.getDateOfBirth());
+        dto.put("gender", u.getGender());
+        dto.put("status", u.getStatus());
+        dto.put("studyType", u.getStudyType());
+        dto.put("schoolName", u.getSchoolName());
+        dto.put("schoolGrade", u.getSchoolGrade());
+        dto.put("universityName", u.getUniversityName());
+        dto.put("faculty", u.getFaculty());
+        dto.put("universityGrade", u.getUniversityGrade());
+        dto.put("graduatedFrom", u.getGraduatedFrom());
+        dto.put("graduateJob", u.getGraduateJob());
+        dto.put("isWorking", u.getIsWorking());
+        dto.put("workDetails", u.getWorkDetails());
+        return ResponseEntity.ok(dto);
     }
 
 
@@ -189,8 +250,39 @@ public class FamilyController {
     }
 
     @GetMapping("/members/{id}/attendance")
-    public ResponseEntity<?> memberAttendance(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<?> memberAttendance(@PathVariable Long id,
+                                              @RequestParam(required = false) AttendanceType type,
+                                              Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        return ResponseEntity.ok(attendanceRepo.findByUser_IdOrderByCreatedAtDesc(id));
+
+        List<?> records = (type == null)
+                ? attendanceRepo.findByUser_IdOrderByCreatedAtDesc(id)
+                : attendanceRepo.findByUser_IdAndTypeOrderByCreatedAtDesc(id, type);
+
+        // Light DTO: include who took the attendance/absence
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : records) {
+            var r = (com.shmamsa.model.AttendanceRecord) o;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", r.getId());
+            row.put("type", r.getType());
+            row.put("date", r.getDate());
+            row.put("time", r.getTime());
+            row.put("createdAt", r.getCreatedAt());
+
+            if (r.getTakenBy() != null) {
+                Map<String, Object> tb = new LinkedHashMap<>();
+                tb.put("id", r.getTakenBy().getId());
+                tb.put("fullName", r.getTakenBy().getFullName());
+                tb.put("role", r.getTakenBy().getRole());
+                row.put("takenBy", tb);
+            } else {
+                row.put("takenBy", null);
+            }
+
+            out.add(row);
+        }
+
+        return ResponseEntity.ok(out);
     }
 }

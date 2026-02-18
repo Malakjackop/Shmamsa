@@ -10,6 +10,10 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;}
 .modalCard{background:#fff;border-radius:16px;max-width:720px;width:100%;padding:14px;}
 .modalHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.filters label{font-size:12px;color:#666;}
+.profileGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
+.profileGrid div{border:1px solid #eee;border-radius:12px;padding:10px;}
 .title{font-weight:700;font-size:18px;}
 .sub{color:#666;font-size:12px;}
 .detailList{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
@@ -18,4 +22,5 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .dSub{font-size:12px;color:#666;margin-top:4px;}
 @media (max-width:700px){
   .tbl{min-width:700px;}
+  .profileGrid{grid-template-columns:1fr;}
 }

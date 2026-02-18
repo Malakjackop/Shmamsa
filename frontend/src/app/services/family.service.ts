@@ -25,10 +25,17 @@ export class FamilyService {
   }
 
 
-  memberAttendance(id: number, family?: string): Observable<any[]> {
+  memberAttendance(id: number, family?: string, type?: string): Observable<any[]> {
     let params = new HttpParams();
     if (family) params = params.set('family', family);
+    if (type) params = params.set('type', type);
     return this.http.get<any[]>(`${this.baseUrl}/members/${id}/attendance`, { params, withCredentials: true });
+  }
+
+  memberDetails(id: number, family?: string): Observable<any> {
+    let params = new HttpParams();
+    if (family) params = params.set('family', family);
+    return this.http.get<any>(`${this.baseUrl}/members/${id}`, { params, withCredentials: true });
   }
 
 
