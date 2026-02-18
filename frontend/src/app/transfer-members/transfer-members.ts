@@ -35,9 +35,7 @@ export class TransferMembersComponent implements OnInit {
 
   families: string[] = [];
 
-  // ✅ For AMIN_KHEDMA / DEVELOPER: choose which family list to browse
   selectedFamilyView = '';
-  // ✅ Target family to transfer to
   targetFamily = '';
 
   isAminKhedmaOrDev(): boolean {
@@ -59,7 +57,6 @@ export class TransferMembersComponent implements OnInit {
 
     let famParam: string | undefined = undefined;
     if (this.isAminKhedmaOrDev()) {
-      // Special bucket: SERVANTS (Arabic label in UI is "خدام")
       famParam = this.selectedFamilyView === 'SERVANTS' ? 'SERVANTS' : (this.selectedFamilyView || undefined);
     }
 
@@ -80,16 +77,13 @@ export class TransferMembersComponent implements OnInit {
       next: (f) => {
         this.families = (f || []).filter(x => !!x);
 
-        // ✅ AMIN_KHEDMA / DEV: show family chooser (plus "خدام")
         if (this.isAminKhedmaOrDev()) {
           this.selectedFamilyView = this.families[0] || '';
         }
 
-        // default: pick the first family that is NOT my current family (if possible)
         const mine = (this.me?.deaconFamily || '').trim();
         this.targetFamily = this.families.find(x => x !== mine) || (this.families[0] || '');
 
-        // ✅ Load members after we have families (needed for amin_khedma mode)
         this.loadMembers();
       },
       error: () => {}

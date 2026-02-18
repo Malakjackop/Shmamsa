@@ -27,21 +27,16 @@ export class AttendanceComponent implements OnInit {
 
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
 
-  // Families (base names, بدون أ/ب)
   families: string[] = [];
-  selectedFamily = ''; // '' => كل الأسر
+  selectedFamily = ''; 
 
-  // Members when a family is selected
   members: PickUser[] = [];
 
-  // Global search results when no family is selected
   globalResults: PickUser[] = [];
 
   searchText = '';
   private searchTimer: any = null;
   searching = false;
-
-  // Selected users (from list OR QR scan)
   selected: PickUser[] = [];
 
   ngOnInit() {
@@ -58,14 +53,12 @@ export class AttendanceComponent implements OnInit {
   }
 
   onFamilyChange() {
-    // reset lists
     this.members = [];
     this.globalResults = [];
 
     if (this.selectedFamily) {
       this.loadMembersForFamily();
     } else {
-      // No family => global search mode; if user already typed search, run it
       const q = this.searchText.trim();
       if (q) this.runSearch();
     }
@@ -81,10 +74,7 @@ export class AttendanceComponent implements OnInit {
   private runSearch() {
     const q = (this.searchText || '').trim();
 
-    // لو محدد أسرة => البحث يكون local filter (مفيش call للباك)
     if (this.selectedFamily) return;
-
-    // لو مش محدد أسرة => بحث في كل الأسر من الباك
     if (!q) {
       this.globalResults = [];
       return;
@@ -146,21 +136,17 @@ export class AttendanceComponent implements OnInit {
     }
   }
 
-  // اللي بيتعرض في الليست
   get displayedMembers(): PickUser[] {
     const q = (this.searchText || '').trim().toLowerCase();
 
     if (this.selectedFamily) {
-      // search داخل الأسرة
       if (!q) return this.members;
       return this.members.filter((m) => (m.fullName || '').toLowerCase().includes(q));
     }
 
-    // search في كل الأسر (results جاية من backend)
     return this.globalResults;
   }
 
-  // ---------- Selection ----------
   isSelected(id: number): boolean {
     return this.selected.some((x) => x.id === id);
   }
@@ -179,7 +165,6 @@ export class AttendanceComponent implements OnInit {
     this.selected = this.selected.filter((x) => x.id !== id);
   }
 
-  // ---------- QR ----------
   onCodeResult(resultString: string) {
     const token = (resultString || '').trim();
     if (!token) return;
@@ -197,7 +182,6 @@ export class AttendanceComponent implements OnInit {
     });
   }
 
-  // ---------- Submit ----------
   submit() {
     const users = this.selected.map((x) => ({ id: x.id, username: x.username }));
     if (users.length === 0) {
