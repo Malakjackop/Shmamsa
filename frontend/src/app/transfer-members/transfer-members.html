@@ -1,0 +1,58 @@
+<p-toast></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<div class="page">
+  <h1>Transfer members</h1>
+
+  <div class="actions">
+    <button *ngIf="!selecting" pButton type="button" label="Transfer" (click)="startTransfer()"></button>
+
+    <ng-container *ngIf="selecting">
+      <div class="inlinePicker">
+        <label class="lbl">To</label>
+        <select class="select" [(ngModel)]="targetFamily">
+          <option *ngFor="let f of families" [value]="f">{{f}}</option>
+        </select>
+      </div>
+
+      <button pButton type="button" label="Transfer" (click)="doTransfer()"></button>
+      <button pButton type="button" class="p-button-secondary" label="Cancel" (click)="cancelSelecting()"></button>
+      <span class="selHint">Selected: {{selectedIds.size}}</span>
+    </ng-container>
+  </div>
+
+  <!-- ✅ AMIN_KHEDMA / DEVELOPER choose which family list to view -->
+  <div class="familyView" *ngIf="isAminKhedmaOrDev()">
+    <label class="lbl">Show members of</label>
+    <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
+      <option *ngFor="let f of families" [value]="f">{{f}}</option>
+      <option value="SERVANTS">خدام</option>
+    </select>
+  </div>
+
+  <div *ngIf="loading" class="hint">Loading...</div>
+
+  <div class="tableWrap" *ngIf="!loading">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th *ngIf="selecting">Select</th>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Family</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of members">
+          <td *ngIf="selecting" class="checkCell">
+            <input type="checkbox" [checked]="selectedIds.has(m.id)" (change)="toggleMember(m.id, $any($event.target).checked)" />
+          </td>
+          <td>{{m.fullName}}</td>
+          <td>{{m.role}}</td>
+          <td>{{m.deaconFamily}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>

@@ -5,7 +5,7 @@ import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { MessageService } from 'primeng/api';
 
-type PickUser = { id: number; username?: string; fullName: string; deaconFamily?: string };
+type PickUser = { id: number; username?: string; fullName: string; role?: string; deaconFamily?: string };
 
 @Component({
   selector: 'app-attendance',
@@ -124,8 +124,27 @@ export class AttendanceComponent implements OnInit {
     id: Number(u?.id),
     username: u?.username,
     fullName: u?.fullName,
+    role: u?.role,
     deaconFamily: u?.deaconFamily
   });
+
+  prettyRole(role?: string): string {
+    const r = (role || '').toUpperCase();
+    switch (r) {
+      case 'MAKHDOM':
+        return 'مخدوم';
+      case 'KHADIM':
+        return 'خادم';
+      case 'AMIN_OSRA':
+        return 'أمين أسرة';
+      case 'AMIN_KHEDMA':
+        return 'أمين خدمة';
+      case 'DEVELOPER':
+        return 'Developer';
+      default:
+        return role || '';
+    }
+  }
 
   // اللي بيتعرض في الليست
   get displayedMembers(): PickUser[] {

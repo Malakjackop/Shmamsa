@@ -39,6 +39,10 @@ ngOnInit(): void {
     return ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
   }
 
+  isAminOsraOrAbove(): boolean {
+    return ['AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
+  }
+
 logout() {
   this.auth.logout().subscribe({
     next: () => this.router.navigate(['/login']),

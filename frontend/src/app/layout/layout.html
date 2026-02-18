@@ -16,6 +16,7 @@
       <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
         <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> Attendance</li>
         <li routerLink="/family" routerLinkActive="active"><i class="pi pi-users"></i> Members of your family</li>
+        <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> Transfer members</li>
       </ng-container>
 
       <ng-template #makhdomMenu>

@@ -66,7 +66,10 @@
       <div class="list" *ngIf="displayedMembers.length; else empty">
         <div class="row" *ngFor="let u of displayedMembers">
           <div>
-            <div class="name">{{u.fullName}}</div>
+            <div class="name">
+              {{u.fullName}}
+              <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
+            </div>
             <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
           </div>
 
@@ -97,7 +100,10 @@
         <div class="list">
           <div class="row" *ngFor="let u of selected">
             <div>
-              <div class="name">{{u.fullName}}</div>
+              <div class="name">
+                {{u.fullName}}
+                <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
+              </div>
               <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
             </div>
             <p-button type="button" icon="pi pi-times" (onClick)="remove(u.id)">🗑️</p-button>

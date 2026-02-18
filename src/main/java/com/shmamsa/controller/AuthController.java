@@ -125,6 +125,17 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             throw new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
         }
 
+        // ✅ Allow updating email from profile (must be unique)
+        if (updated.getEmail() != null) {
+            String newEmail = updated.getEmail().trim();
+            if (!newEmail.isBlank() && !newEmail.equalsIgnoreCase(existingUser.getEmail())) {
+                if (authService.isEmailTakenByOther(newEmail, existingUser.getId())) {
+                    throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
+                }
+                existingUser.setEmail(newEmail);
+            }
+        }
+
             existingUser.setFullName(updated.getFullName());
             existingUser.setPhoneNumber(updated.getPhoneNumber());
             existingUser.setAddress(updated.getAddress());

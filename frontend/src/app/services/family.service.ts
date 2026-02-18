@@ -30,4 +30,13 @@ export class FamilyService {
     if (family) params = params.set('family', family);
     return this.http.get<any[]>(`${this.baseUrl}/members/${id}/attendance`, { params, withCredentials: true });
   }
+
+
+  transferMembers(memberIds: number[], newFamily: string): Observable<any> {
+    return this.http.post<any>(
+      `${this.baseUrl}/transfer-members`,
+      { memberIds, newFamily },
+      { withCredentials: true }
+    );
+  }
 }

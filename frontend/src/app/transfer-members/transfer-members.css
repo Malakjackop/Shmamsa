@@ -1,0 +1,16 @@
+.page { padding: 16px;color: black; }
+.actions { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+.selHint { opacity: 0.8; }
+.hint { opacity: 0.8; margin-top: 10px; }
+
+.familyView { display: flex; gap: 10px; align-items: center; margin: 8px 0 14px; flex-wrap: wrap; }
+.inlinePicker { display: flex; gap: 8px; align-items: center; }
+.lbl { font-weight: 600; opacity: 0.9; }
+.select { min-width: 220px; }
+
+.tableWrap { overflow: auto; }
+.tbl { width: 100%; border-collapse: collapse; background: #fff; }
+.tbl th, .tbl td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+.checkCell { width: 70px; text-align: center; }
+
+select { padding: 10px; border-radius: 8px; border: 1px solid #ddd; }

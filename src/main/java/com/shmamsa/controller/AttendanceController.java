@@ -33,6 +33,12 @@ public class AttendanceController {
         User servant = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
+        // ✅ Only servants can take attendance
+        Set<String> allowed = Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER");
+        if (servant.getRole() == null || !allowed.contains(servant.getRole())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+        }
+
         Object typeObj = body.get("type");
         Object usersObj = body.get("users");
         if (typeObj == null || usersObj == null) {
@@ -94,6 +100,7 @@ public class AttendanceController {
                 "id", u.getId(),
                 "username", u.getUsername(),
                 "fullName", u.getFullName(),
+                "role", u.getRole(),
                 "deaconFamily", ("DEVELOPER".equalsIgnoreCase(u.getRole()) && "SYSTEM".equalsIgnoreCase(u.getDeaconFamily())) ? null : u.getDeaconFamily()
         ));
     }

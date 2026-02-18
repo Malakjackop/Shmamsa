@@ -22,6 +22,7 @@ import { FamilyComponent } from './family/family';
 import { AttendanceComponent } from './attendance/attendance';
 import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
+import { TransferMembersComponent } from './transfer-members/transfer-members';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -47,6 +48,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
     ProfileComponent,
     AboutComponent,
     FamilyComponent,
+    TransferMembersComponent,
     AttendanceComponent,
     ResourcesComponent,
     

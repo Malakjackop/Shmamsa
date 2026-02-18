@@ -12,13 +12,14 @@ import { AttendanceHistoryComponent } from './attendance-history/attendance-hist
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
 
-import { LayoutComponent } from './layout/layout';   
+import { LayoutComponent } from './layout/layout';
 
 import { DashBoard } from './dash-board/dash-board';
 import { ProfileComponent } from './profile/profile';
 import { AboutComponent } from './about/about';
 import { AttendanceComponent } from './attendance/attendance';
 import { FamilyComponent } from './family/family';
+import { TransferMembersComponent } from './transfer-members/transfer-members';
 
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -40,7 +41,6 @@ const routes: Routes = [
       { path: 'resources', component: ResourcesComponent },
       { path: 'attendance-history', component: AttendanceHistoryComponent },
 
-
       {
         path: 'attendance',
         component: AttendanceComponent,
@@ -52,6 +52,12 @@ const routes: Routes = [
         component: FamilyComponent,
         canActivate: [RoleGuard],
         data: { roles: ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'] }
+      },
+      {
+        path: 'transfer-members',
+        component: TransferMembersComponent,
+        canActivate: [RoleGuard],
+        data: { roles: ['AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'] }
       }
     ]
   },

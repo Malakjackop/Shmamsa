@@ -178,6 +178,9 @@ toggleEdit() {
   this.profileForm.disable();
   this.profileForm.get('status')?.enable();
 
+  // ✅ allow editing email from profile
+  this.profileForm.get('email')?.enable();
+
 
   this.profileForm.get('phoneNumber')?.enable();
   this.profileForm.get('address')?.enable();
