@@ -17,4 +17,8 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     List<AttendanceRecord> findByUser_DeaconFamilyStartingWith(String prefix);
 
     long countByUser_IdAndType(Long userId, AttendanceType type);
+    // Reset attendance (delete full history for user(s))
+    long deleteByUser_Id(Long userId);
+    long deleteByUser_IdIn(List<Long> userIds);
+
 }

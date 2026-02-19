@@ -32,4 +32,8 @@ history(): Observable<any> {
   return this.http.get('/api/attendance/history', { withCredentials: true });
 }
 
+resetAttendance(userIds: number[]): Observable<any> {
+  return this.http.post(`${this.baseUrl}/reset`, { userIds }, { withCredentials: true });
+}
+
 }

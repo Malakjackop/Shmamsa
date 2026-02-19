@@ -23,4 +23,10 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .profileGrid{grid-template-columns:1fr;}
+  .selCol { width: 48px; }
+.selCol input { width: 16px; height: 16px; cursor: pointer; }
+.resetBtn .p-button {
+  background: #d32f2f !important;
+  border-color: #d32f2f !important;
+}
 }

@@ -1,5 +1,6 @@
 
 <p-toast></p-toast>
+<p-confirmDialog></p-confirmDialog>
 
 <div class="page">
   <h1>Members of your family</h1>
@@ -14,8 +15,25 @@
   <div class="actions">
     <button pButton type="button" label="Export Excel" (click)="exportExcel()"></button>
     <button pButton type="button" label="Export PDF" (click)="exportPdf()"></button>
-  </div>
+<button
+  pButton
+  type="button"
+  label="Reset Attendance"
+  class="resetBtn"
+  styleClass="p-button-danger"
+  (click)="onResetButton()"
+></button>
 
+<button
+  *ngIf="resetMode"
+  pButton
+  type="button"
+  label="Cancel"
+  styleClass="p-button-secondary"
+  (click)="cancelResetMode()"
+></button>
+  </div>
+  
   <div *ngIf="loading" class="hint">Loading...</div>
 
   <div class="tableWrap" *ngIf="!loading">
@@ -33,10 +51,12 @@
           <th>Details</th>
           <th>Profile</th>
           <th *ngIf="canEditRoles()">Change role</th>
+          <th *ngIf="resetMode" class="selCol"><input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll($event)" /></th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let m of members">
+          <td class="selCol"><input type="checkbox" [checked]="isSelected(m.id)" (change)="toggleSelectOne(m, $event)" /></td>
           <td>{{m.fullName}}</td>
           <td>{{m.role}}</td>
           <td>{{m.address}}</td>

@@ -241,9 +241,13 @@ public class FamilyController {
                 }
             }
 
-            u.setDeaconFamily(targetBase);
+            u.setDeaconFamily(newFamily.trim());   // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
             userRepo.save(u);
-            updated++;
+
+            // ✅ Reset attendance ONLY for MAKHDOM
+            if ("MAKHDOM".equals(u.getRole())) {
+                attendanceRepo.deleteByUser_Id(u.getId());
+            }
         }
 
         return ResponseEntity.ok(Map.of("updated", updated));

@@ -6,7 +6,9 @@ import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.QrTokenService;
+import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -145,4 +147,72 @@ public class AttendanceController {
         }
         return ResponseEntity.ok(out);
     }
+    // Reset (delete) attendance history for selected users
+    // Used by the Family page "Reset Attendance" button.
+    @PostMapping("/reset")
+    public ResponseEntity<?> reset(@RequestBody Map<String, Object> body, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User actor = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        // Parse IDs safely (accept userIds / memberIds / users[{id}])
+        Object idsObj = body.get("userIds");
+        if (idsObj == null) idsObj = body.get("memberIds");
+        if (idsObj == null) idsObj = body.get("users");
+
+        if (!(idsObj instanceof List<?> list)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "userIds is required");
+        }
+
+        List<Long> ids = new ArrayList<>();
+        for (Object item : list) {
+            if (item == null) continue;
+
+            Object v = item;
+            if (item instanceof Map<?, ?> m && m.get("id") != null) v = m.get("id");
+
+            try { ids.add(Long.valueOf(v.toString())); } catch (Exception ignored) {}
+        }
+
+        if (ids.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No valid userIds");
+
+        String role = actor.getRole();
+        boolean isDev = "DEVELOPER".equals(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equals(role);
+        boolean isAminOsra = "AMIN_OSRA".equals(role);
+        boolean isKhadim = "KHADIM".equals(role);
+
+        if (!(isDev || isAminKhedma || isAminOsra || isKhadim)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        String myBase = FamilyUtil.mainFamily(actor.getDeaconFamily());
+
+        List<Long> allowed = new ArrayList<>();
+        for (Long id : ids) {
+            if (id == null) continue;
+
+            User u = userRepo.findById(id).orElse(null);
+            if (u == null) continue;
+            if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
+
+            if (isDev || isAminKhedma) {
+                allowed.add(id);
+                continue;
+            }
+
+            // KHADIM / AMIN_OSRA: only reset MAKHDOM inside their family
+            String uBase = FamilyUtil.mainFamily(u.getDeaconFamily());
+            if (myBase != null && myBase.equals(uBase) && "MAKHDOM".equals(u.getRole())) {
+                allowed.add(id);
+            }
+        }
+
+        if (allowed.isEmpty()) throw new ApiException(HttpStatus.FORBIDDEN, "No allowed users");
+
+        long deleted = attendanceRepo.deleteByUser_IdIn(allowed);
+        return ResponseEntity.ok(Map.of("ok", true, "users", allowed.size(), "deletedRecords", deleted));
+    }
+
 }

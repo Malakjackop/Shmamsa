@@ -4,6 +4,8 @@ import { FamilyService } from '../services/family.service';
 import { AdminService } from '../services/admin.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
+import { AttendanceService } from '../services/attendance.service';
+import { ConfirmationService } from 'primeng/api';
 
 type Member = {
   id: number;
@@ -23,13 +25,20 @@ type Member = {
   standalone: false,
   templateUrl: './family.html',
   styleUrls: ['./family.css'],
-  providers: [MessageService]
+  providers: [MessageService, ConfirmationService]
 })
 export class FamilyComponent implements OnInit {
   private familySvc = inject(FamilyService);
   private adminSvc = inject(AdminService);
   private auth = inject(AuthService);
   private message = inject(MessageService);
+  private attendanceSvc = inject(AttendanceService);
+  private confirmService = inject(ConfirmationService);
+
+  selectedIds = new Set<number>();
+  resetMode = false;
+
+
 
   me: any;
   members: Member[] = [];
@@ -90,6 +99,8 @@ export class FamilyComponent implements OnInit {
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
         this.members = (m as any) || [];
+        this.resetMode = false;
+        this.selectedIds.clear();
         this.loading = false;
       },
       error: (err) => {
@@ -198,6 +209,7 @@ export class FamilyComponent implements OnInit {
         String(m.tasbeeha),
         String(m.familyMeeting)
       ]);
+      
 
       autoTable(doc, {
         head: [['Name', 'Role', 'Address', 'Phone', "Father's phone", 'Friday Liturgy', 'Tasbeeha', 'Family Meeting']],
@@ -209,4 +221,76 @@ export class FamilyComponent implements OnInit {
       this.message.add({ severity: 'error', summary: 'Export failed', detail: 'PDF export failed' });
     }
   }
+  onResetButton() {
+  // أول ضغطة: فعّل وضع الاختيار واظهر الـ checkboxes
+  if (!this.resetMode) {
+    this.resetMode = true;
+    this.selectedIds.clear();
+    this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختار الناس اللي عايز تصفّر حضورهم' });
+    return;
+  }
+
+  // تاني ضغطة (بعد ما تختار): نفّذ reset
+  this.resetAttendance();
+}
+
+cancelResetMode() {
+  this.resetMode = false;
+  this.selectedIds.clear();
+}
+
+isSelected(id: number): boolean {
+  return this.selectedIds.has(id);
+}
+
+get allSelected(): boolean {
+  return this.members?.length > 0 && this.members.every((m) => this.selectedIds.has(m.id));
+}
+
+toggleSelectAll(ev: any) {
+  if (!this.resetMode) return;
+  const checked = !!ev?.target?.checked;
+
+  this.selectedIds.clear();
+  if (checked) {
+    for (const m of this.members) this.selectedIds.add(m.id);
+  }
+}
+
+toggleSelectOne(member: Member, ev: any) {
+  if (!this.resetMode) return;
+  const checked = !!ev?.target?.checked;
+
+  if (checked) this.selectedIds.add(member.id);
+  else this.selectedIds.delete(member.id);
+}
+
+resetAttendance() {
+  const ids = Array.from(this.selectedIds);
+  if (ids.length === 0) {
+    this.message.add({ severity: 'warn', summary: 'No selection', detail: 'اختار عضو واحد على الأقل' });
+    return;
+  }
+
+  this.confirmService.confirm({
+    header: 'Confirm Reset',
+    icon: 'pi pi-exclamation-triangle',
+    message: `هل أنت متأكد؟ سيتم مسح كل سجل الحضور (قداس/تسبحة/اجتماع) لـ ${ids.length} عضو.`,
+    acceptLabel: 'Confirm',
+    rejectLabel: 'Cancel',
+    accept: () => {
+      this.attendanceSvc.resetAttendance(ids).subscribe({
+        next: () => {
+          this.message.add({ severity: 'success', summary: 'Done', detail: 'Attendance reset successfully' });
+          this.resetMode = false;
+          this.selectedIds.clear();
+          this.loadMembers();
+        },
+        error: (err) => {
+          this.message.add({ severity: 'error', summary: 'Reset failed', detail: err?.error?.error || 'Failed' });
+        }
+      });
+    }
+  });
+}
 }
