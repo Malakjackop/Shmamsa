@@ -211,7 +211,7 @@ public class AttendanceController {
 
         if (allowed.isEmpty()) throw new ApiException(HttpStatus.FORBIDDEN, "No allowed users");
 
-        long deleted = attendanceRepo.deleteByUser_IdIn(allowed);
+        int deleted = attendanceRepo.deleteByUserIds(allowed);
         return ResponseEntity.ok(Map.of("ok", true, "users", allowed.size(), "deletedRecords", deleted));
     }
 

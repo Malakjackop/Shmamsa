@@ -3,7 +3,11 @@ package com.shmamsa.repository;
 
 import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceType;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -17,8 +21,14 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     List<AttendanceRecord> findByUser_DeaconFamilyStartingWith(String prefix);
 
     long countByUser_IdAndType(Long userId, AttendanceType type);
-    // Reset attendance (delete full history for user(s))
-    long deleteByUser_Id(Long userId);
-    long deleteByUser_IdIn(List<Long> userIds);
+    @Modifying
+    @Transactional
+    @Query("delete from AttendanceRecord a where a.user.id = :userId")
+    int deleteByUserId(@Param("userId") Long userId);;
+
+    @Modifying
+    @Transactional
+    @Query("delete from AttendanceRecord a where a.user.id in :userIds")
+    int deleteByUserIds(@Param("userIds") List<Long> userIds);
 
 }

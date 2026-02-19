@@ -101,7 +101,8 @@ export class AttendanceComponent implements OnInit {
   }
 
   private loadMembersForFamily() {
-    this.familySvc.members(this.selectedFamily).subscribe({
+    // In attendance page we want the list to include everyone in the family (including the logged-in servant).
+    this.familySvc.members(this.selectedFamily, true).subscribe({
       next: (m) => (this.members = (m as any[])?.map(this.toPickUser) || []),
       error: (err) => {
         this.members = [];

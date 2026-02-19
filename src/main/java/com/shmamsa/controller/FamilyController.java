@@ -47,7 +47,11 @@ public class FamilyController {
 
 
     @GetMapping("/members")
-    public ResponseEntity<?> members(@RequestParam(required = false) String family, Authentication auth) {
+    public ResponseEntity<?> members(
+            @RequestParam(required = false) String family,
+            @RequestParam(required = false, defaultValue = "false") boolean includeSelf,
+            Authentication auth
+    ) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
         User me = userRepo.findByUsername(auth.getName())
@@ -60,8 +64,17 @@ public class FamilyController {
         // ✅ Special bucket for AMIN_KHEDMA / DEV: "SERVANTS" shows KHADIM + AMIN_OSRA (across all families)
         boolean servantsBucket = isAminKhedmaOrDev && family != null && "SERVANTS".equalsIgnoreCase(family.trim());
 
-        // ✅ Amin khedma/dev can pick a family from the dropdown; others are locked to their own family
-        String target = (isAminKhedmaOrDev && family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+        // ✅ Family selection rules
+        // - AMIN_KHEDMA / DEV: can pick any family from dropdown
+        // - KHADIM (attendance context): can pick any family from dropdown to take attendance for that family
+        //   (Front-end sends 'family' when selecting a family on the attendance page)
+        // - Others: locked to their own family
+        boolean hasFamilySelection = family != null && !family.isBlank();
+        boolean khadimAttendanceContext = isKhadim && hasFamilySelection;
+
+        String target = ((isAminKhedmaOrDev || khadimAttendanceContext) && hasFamilySelection)
+                ? family
+                : me.getDeaconFamily();
         String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
 
         // ✅ Roles visible by permission level
@@ -94,8 +107,9 @@ public class FamilyController {
 
         List<Map<String, Object>> out = new ArrayList<>();
         for (User u : members) {
-            // ✅ Don't show the logged-in account inside the members list
-            if (me.getId() != null && me.getId().equals(u.getId())) continue;
+            // ✅ Default behavior: don't show the logged-in account inside the members list
+            // ✅ Attendance page can opt-in to include the current user via includeSelf=true
+            if (!includeSelf && me.getId() != null && me.getId().equals(u.getId())) continue;
 
             long friday = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
             long tasbeeha = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
@@ -136,7 +150,13 @@ public class FamilyController {
         // permissions:
         // - AMIN_KHEDMA/DEV can view any member that would appear in the members list for the selected family
         // - Others can only view members in their own family bucket
-        String target = (isAminKhedmaOrDev && family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+        boolean hasFamilySelection = family != null && !family.isBlank();
+        boolean isKhadim = "KHADIM".equals(me.getRole());
+        boolean khadimAttendanceContext = isKhadim && hasFamilySelection;
+
+        String target = ((isAminKhedmaOrDev || khadimAttendanceContext) && hasFamilySelection)
+                ? family
+                : me.getDeaconFamily();
         String base = FamilyUtil.mainFamily(target);
         String uBase = FamilyUtil.mainFamily(u.getDeaconFamily());
 
@@ -243,10 +263,11 @@ public class FamilyController {
 
             u.setDeaconFamily(newFamily.trim());   // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
             userRepo.save(u);
+            updated++;
 
-            // ✅ Reset attendance ONLY for MAKHDOM
+            // ✅ Reset attendance for roles below KHADIM (MAKHDOM only)
             if ("MAKHDOM".equals(u.getRole())) {
-                attendanceRepo.deleteByUser_Id(u.getId());
+                attendanceRepo.deleteByUserId(u.getId());
             }
         }
 

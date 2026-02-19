@@ -23,10 +23,19 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .profileGrid{grid-template-columns:1fr;}
-  .selCol { width: 48px; }
+  }
+
+
+/* show checkbox column nicely */
+.selCol { width: 48px; }
 .selCol input { width: 16px; height: 16px; cursor: pointer; }
-.resetBtn .p-button {
+
+/* force Reset Attendance button to be red (PrimeNG) */
+button.resetBtn {
   background: #d32f2f !important;
   border-color: #d32f2f !important;
 }
+button.resetBtn:hover {
+  background: #b71c1c !important;
+  border-color: #b71c1c !important;
 }

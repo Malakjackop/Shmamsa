@@ -40,6 +40,9 @@
     <table class="tbl">
       <thead>
         <tr>
+          <th *ngIf="resetMode" class="selCol">
+            <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll($event)" />
+          </th>
           <th>Name</th>
           <th>Role</th>
           <th>Address</th>
@@ -51,12 +54,11 @@
           <th>Details</th>
           <th>Profile</th>
           <th *ngIf="canEditRoles()">Change role</th>
-          <th *ngIf="resetMode" class="selCol"><input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll($event)" /></th>
-        </tr>
+</tr>
       </thead>
       <tbody>
         <tr *ngFor="let m of members">
-          <td class="selCol"><input type="checkbox" [checked]="isSelected(m.id)" (change)="toggleSelectOne(m, $event)" /></td>
+          <td *ngIf="resetMode" class="selCol"><input type="checkbox" [checked]="isSelected(m.id)" (change)="toggleSelectOne(m, $event)" /></td>
           <td>{{m.fullName}}</td>
           <td>{{m.role}}</td>
           <td>{{m.address}}</td>

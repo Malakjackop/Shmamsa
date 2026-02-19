@@ -287,7 +287,11 @@ resetAttendance() {
           this.loadMembers();
         },
         error: (err) => {
-          this.message.add({ severity: 'error', summary: 'Reset failed', detail: err?.error?.error || 'Failed' });
+          this.message.add({
+            severity: 'error',
+            summary: 'Reset failed',
+            detail: err?.error?.message || err?.error?.error || 'Failed'
+          });
         }
       });
     }
