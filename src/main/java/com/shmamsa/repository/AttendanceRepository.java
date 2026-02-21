@@ -26,6 +26,15 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     @Query("delete from AttendanceRecord a where a.user.id = :userId")
     int deleteByUserId(@Param("userId") Long userId);;
 
+    /**
+     * Delete attendance records where the given user is either the attended user or the taker.
+     * Needed before deleting a user account to avoid FK constraints.
+     */
+    @Modifying
+    @Transactional
+    @Query("delete from AttendanceRecord a where a.user.id = :userId or (a.takenBy is not null and a.takenBy.id = :userId)")
+    int deleteByUserOrTakenBy(@Param("userId") Long userId);
+
     @Modifying
     @Transactional
     @Query("delete from AttendanceRecord a where a.user.id in :userIds")

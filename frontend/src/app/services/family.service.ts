@@ -44,6 +44,10 @@ export class FamilyService {
     return this.http.get<any>(`${this.baseUrl}/members/${id}`, { params, withCredentials: true });
   }
 
+  deleteMember(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.baseUrl}/members/${id}`, { withCredentials: true });
+  }
+
 
   transferMembers(memberIds: number[], newFamily: string, targetRole?: string): Observable<any> {
     return this.http.post<any>(

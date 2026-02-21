@@ -36,4 +36,9 @@ resetAttendance(userIds: number[]): Observable<any> {
   return this.http.post(`${this.baseUrl}/reset`, { userIds }, { withCredentials: true });
 }
 
+// Start a new year: reset attendance for all accounts (servants + served)
+startNewYear(): Observable<any> {
+  return this.http.post(`${this.baseUrl}/start-new-year`, {}, { withCredentials: true });
+}
+
 }

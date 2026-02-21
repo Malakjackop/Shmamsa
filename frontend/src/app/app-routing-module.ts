@@ -19,7 +19,10 @@ import { ProfileComponent } from './profile/profile';
 import { AboutComponent } from './about/about';
 import { AttendanceComponent } from './attendance/attendance';
 import { FamilyComponent } from './family/family';
+import { FamilyAttendanceComponent } from './family-attendance/family-attendance';
+import { FamilyInfoComponent } from './family-info/family-info';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
+import { StartNewYearComponent } from './start-new-year/start-new-year';
 
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -49,7 +52,18 @@ const routes: Routes = [
       },
       {
         path: 'family',
-        component: FamilyComponent,
+        redirectTo: 'family-attendance',
+        pathMatch: 'full'
+      },
+      {
+        path: 'family-attendance',
+        component: FamilyAttendanceComponent,
+        canActivate: [RoleGuard],
+        data: { roles: ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'] }
+      },
+      {
+        path: 'family-info',
+        component: FamilyInfoComponent,
         canActivate: [RoleGuard],
         data: { roles: ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'] }
       },
@@ -58,6 +72,12 @@ const routes: Routes = [
         component: TransferMembersComponent,
         canActivate: [RoleGuard],
         data: { roles: ['AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'] }
+      },
+      {
+        path: 'start-new-year',
+        component: StartNewYearComponent,
+        canActivate: [RoleGuard],
+        data: { roles: ['AMIN_KHEDMA','DEVELOPER'] }
       }
     ]
   },

@@ -23,6 +23,10 @@ public class FamilyController {
     private final UserRepository userRepo;
     private final AttendanceRepository attendanceRepo;
 
+    private String baseFamilyOf(User u) {
+        return u == null ? null : FamilyUtil.mainFamily(u.getDeaconFamily());
+    }
+
     @GetMapping("/families")
     public ResponseEntity<?> families(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -195,6 +199,65 @@ public class FamilyController {
         dto.put("isWorking", u.getIsWorking());
         dto.put("workDetails", u.getWorkDetails());
         return ResponseEntity.ok(dto);
+    }
+
+
+    /**
+     * Delete a member account.
+     * Allowed roles: AMIN_OSRA, AMIN_KHEDMA, DEVELOPER.
+     * Notes:
+     * - Cannot delete self.
+     * - Cannot delete DEVELOPER accounts.
+     * - AMIN_OSRA can delete MAKHDOM only within his own family.
+     */
+    @DeleteMapping("/members/{id}")
+    public ResponseEntity<?> deleteMember(@PathVariable Long id, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String myRole = me.getRole();
+        boolean isDev = "DEVELOPER".equals(myRole);
+        boolean isAminKhedma = "AMIN_KHEDMA".equals(myRole);
+        boolean isAminOsra = "AMIN_OSRA".equals(myRole);
+
+        if (!(isDev || isAminKhedma || isAminOsra)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        User target = userRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
+
+        if (me.getId() != null && me.getId().equals(target.getId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Cannot delete your own account");
+        }
+
+        if ("DEVELOPER".equalsIgnoreCase(target.getRole())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Cannot delete DEVELOPER account");
+        }
+
+        // AMIN_OSRA restrictions: only MAKHDOM inside his own family
+        if (isAminOsra) {
+            String myBase = baseFamilyOf(me);
+            String targetBase = baseFamilyOf(target);
+            if (myBase == null || targetBase == null || !myBase.equals(targetBase)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+            if (!"MAKHDOM".equalsIgnoreCase(target.getRole())) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
+
+        // Delete dependent records first
+        attendanceRepo.deleteByUserOrTakenBy(target.getId());
+
+        userRepo.deleteById(target.getId());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "User deleted",
+                "userId", target.getId()
+        ));
     }
 
 

@@ -19,10 +19,13 @@ import { ProfileComponent } from './profile/profile';
 import { RegisterServantComponent } from './register-servant/register-servant';
 import { AboutComponent } from './about/about';
 import { FamilyComponent } from './family/family';
+import { FamilyAttendanceComponent } from './family-attendance/family-attendance';
+import { FamilyInfoComponent } from './family-info/family-info';
 import { AttendanceComponent } from './attendance/attendance';
 import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
+import { StartNewYearComponent } from './start-new-year/start-new-year';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -48,9 +51,12 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
     ProfileComponent,
     AboutComponent,
     FamilyComponent,
+    FamilyAttendanceComponent,
+    FamilyInfoComponent,
     TransferMembersComponent,
     AttendanceComponent,
     ResourcesComponent,
+    StartNewYearComponent,
     
   ],
   imports: [

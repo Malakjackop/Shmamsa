@@ -6,7 +6,6 @@ import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
-import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.QrTokenService;
 import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
@@ -213,6 +212,45 @@ public class AttendanceController {
 
         int deleted = attendanceRepo.deleteByUserIds(allowed);
         return ResponseEntity.ok(Map.of("ok", true, "users", allowed.size(), "deletedRecords", deleted));
+    }
+
+    // Start new year: reset attendance for ALL accounts (servants + served)
+    // Visible in UI for AMIN_KHEDMA + DEVELOPER only.
+    @PostMapping("/start-new-year")
+    public ResponseEntity<?> startNewYear(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User actor = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String role = actor.getRole();
+        boolean isDev = "DEVELOPER".equals(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equals(role);
+        if (!(isDev || isAminKhedma)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        // All real users (exclude DEVELOPER)
+        List<User> targets = userRepo.findByRoleIn(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+        List<Long> ids = new ArrayList<>();
+        for (User u : targets) {
+            if (u == null || u.getId() == null) continue;
+            ids.add(u.getId());
+        }
+
+        if (ids.isEmpty()) {
+            return ResponseEntity.ok(Map.of("ok", true, "users", 0, "deletedRecords", 0));
+        }
+
+        // Delete in chunks to avoid DB parameter limits
+        int deleted = 0;
+        final int CHUNK = 500;
+        for (int i = 0; i < ids.size(); i += CHUNK) {
+            List<Long> part = ids.subList(i, Math.min(i + CHUNK, ids.size()));
+            deleted += attendanceRepo.deleteByUserIds(part);
+        }
+
+        return ResponseEntity.ok(Map.of("ok", true, "users", ids.size(), "deletedRecords", deleted));
     }
 
 }
