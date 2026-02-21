@@ -14,10 +14,10 @@ html, body {
   display: flex;
   flex-direction: row;
   width: 100%;
-  height: 100%;
+  height: 100vh;
   overflow: hidden;
   background-color: #faf6ef;
-  position: fixed; /* 👈 prevents any vertical overflow */
+  position: fixed;
   top: 0;
   left: 0;
 }
@@ -110,6 +110,9 @@ p-card, p-panel {
 .main {
   flex: 1;
   padding: 2rem;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Header */
@@ -229,10 +232,6 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-.dashboard * {
-  max-height: 100%;
-  overflow: hidden !important;
-}
 
 p-card, p-panel {
   max-width: 100%;

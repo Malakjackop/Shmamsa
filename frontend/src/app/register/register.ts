@@ -32,6 +32,13 @@ export class RegisterComponent implements OnInit {
 
   registerForm!: FormGroup;
 
+  // Tracks explicit user interaction (click/change). Autofill won't trigger these.
+  interacted: Record<string, boolean> = {};
+  // Allows showing validation errors only after user finishes interaction (blur/change)
+  errorGate: Record<string, boolean> = {};
+  submitAttempted = false;
+  serverError: string | null = null;
+
   showPassword = false;
   showConfirmPassword = false;
   showOtherGrade = false;
@@ -168,23 +175,53 @@ private buildForm() {
     };
   }
 
-  onFieldBlur(controlName: string, label?: string) {
+  /**
+   * Inputs: show errors only after user CLICK then BLUR.
+   * We don't set touched on blur unless the user has interacted.
+   */
+  markInteracted(controlName: string) {
+    this.interacted[controlName] = true;
+  }
+
+  markTouched(controlName: string) {
     const c = this.registerForm.get(controlName);
     if (!c) return;
 
+    // Only open the error gate if the user explicitly interacted with the field
+    // (click -> blur). Browser autofill may trigger blur/touched without click.
+    if (this.submitAttempted || this.interacted[controlName]) {
+      this.errorGate[controlName] = true;
+      c.markAsTouched();
+      c.updateValueAndValidity({ emitEvent: false });
+
+      if (controlName === 'confirmPassword' || controlName === 'password') {
+        this.applyPasswordMismatch();
+      }
+    }
+  }
+
+  /** Lists/selects stay reactive: errors can show on change. */
+  markTouchedFromList(controlName: string) {
+    const c = this.registerForm.get(controlName);
+    if (!c) return;
+    this.interacted[controlName] = true;
+    this.errorGate[controlName] = true; // lists are reactive (change triggers error visibility)
     c.markAsTouched();
     c.updateValueAndValidity({ emitEvent: false });
+  }
 
-    if (controlName === 'confirmPassword' || controlName === 'password') {
-      this.applyPasswordMismatch();
-    }
+  shouldShowError(controlName: string): boolean {
+    const c = this.registerForm.get(controlName);
+    if (!c) return false;
 
-    if (c.valid) return;
+    // Show errors only after the field's "error gate" is opened (user click->blur / list change),
+    // OR after a submit attempt.
+    const allowed = this.submitAttempted || !!this.errorGate[controlName];
+    return allowed && c.invalid;
+  }
 
-    const msg = this.getErrorMessage(controlName, label);
-    if (!msg) return;
-
-    this.messageService.add({ severity: 'error', summary: 'wrong', detail: msg });
+  errorText(controlName: string, label?: string): string {
+    return this.getErrorMessage(controlName, label) || '';
   }
 
 
@@ -306,6 +343,9 @@ onStatusChange() {
 
     if (e['mismatch']) return 'password or confirm passwword not match';
 
+    // API/server validation message
+    if (e['api']) return String(e['api']);
+
     return label ? `Value ${label} not correct` : ' Vlaue not correct ';
   }
 
@@ -361,6 +401,7 @@ onStatusChange() {
 
   
   private showApiErrors(err: any) {
+    this.serverError = null;
     const api = err?.error;
 
     if (api && api.errors && typeof api.errors === 'object') {
@@ -392,19 +433,17 @@ onStatusChange() {
       };
 
       const entries = Object.entries(api.errors) as Array<[string, any]>;
-      if (entries.length === 0) {
-        this.messageService.add({ severity: 'error', summary: 'Error', detail: api.message || 'Validation failed' });
-        return;
-      }
-
-      entries.slice(0, 5).forEach(([field, msg]) => {
-        const label = fieldLabels[field] || field;
+      // Put errors under fields instead of toast
+      entries.forEach(([field, msg]) => {
+        const ctrl = this.registerForm.get(field);
+        if (!ctrl) return;
         const detail = msg ? String(msg) : 'value not correct';
-        this.messageService.add({ severity: 'error', summary: label, detail });
+        ctrl.setErrors({ ...(ctrl.errors || {}), api: detail });
+        if (this.submitAttempted) ctrl.markAsTouched();
       });
 
-      if (entries.length > 5) {
-        this.messageService.add({ severity: 'warn', summary: 'ملاحظات', detail: `فيه ${entries.length - 5} أخطاء كمان` });
+      if (entries.length === 0) {
+        this.serverError = api.message || 'Validation failed';
       }
       return;
     }
@@ -413,23 +452,23 @@ onStatusChange() {
       api?.error ||
       'An unexpected error occurred. Please try again.';
 
-    this.messageService.add({
-      severity: 'error',
-      summary: 'Registration Error',
-      detail: msg
-    });
+    this.serverError = msg;
   }
 
 submit() {
+  this.serverError = null;
+  this.submitAttempted = true;
   if (this.registerForm.invalid) {
-    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Please fill all required fields.' });
+    this.registerForm.markAllAsTouched();
+    this.applyPasswordMismatch();
     return;
   }
 
   const formValue = this.registerForm.getRawValue();
 
   if (formValue.password !== formValue.confirmPassword) {
-    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Passwords do not match.' });
+    this.applyPasswordMismatch();
+    this.registerForm.get('confirmPassword')?.markAsTouched();
     return;
   }
 

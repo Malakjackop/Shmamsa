@@ -45,10 +45,10 @@ export class FamilyService {
   }
 
 
-  transferMembers(memberIds: number[], newFamily: string): Observable<any> {
+  transferMembers(memberIds: number[], newFamily: string, targetRole?: string): Observable<any> {
     return this.http.post<any>(
       `${this.baseUrl}/transfer-members`,
-      { memberIds, newFamily },
+      { memberIds, newFamily, targetRole },
       { withCredentials: true }
     );
   }

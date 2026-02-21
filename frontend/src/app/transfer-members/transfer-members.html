@@ -4,14 +4,55 @@
 <div class="page">
   <h1>Transfer members</h1>
 
+  <!-- ✅ AMIN_KHEDMA / DEVELOPER: choose transfer mode -->
+  <div class="familyView" *ngIf="isAminKhedmaOrDev()">
+    <label class="lbl">Transfer type</label>
+    <select class="select" [(ngModel)]="mode" (change)="onModeChange()">
+      <option value="MAKHDOM">مخدومين</option>
+      <option value="SERVANT">خدام</option>
+    </select>
+  </div>
+
+  <!-- ✅ AMIN_KHEDMA / DEVELOPER: when MAKHDOM, choose which family to VIEW (servant registration list) -->
+  <div class="familyView" *ngIf="isAminKhedmaOrDev() && mode === 'MAKHDOM'">
+    <label class="lbl">Show MAKHDOM of</label>
+    <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
+      <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
+    </select>
+  </div>
+
   <div class="actions">
     <button *ngIf="!selecting" pButton type="button" label="Transfer" (click)="startTransfer()"></button>
 
     <ng-container *ngIf="selecting">
+      <!-- ✅ Target family -->
       <div class="inlinePicker">
-        <label class="lbl">To</label>
-        <select class="select" [(ngModel)]="targetFamily">
-          <option *ngFor="let f of families" [value]="f">{{f}}</option>
+        <label class="lbl">To family</label>
+
+        <!-- AMIN_KHEDMA/DEV + MAKHDOM -> makhdom families list (A/B) -->
+        <select class="select" *ngIf="isAminKhedmaOrDev() && mode === 'MAKHDOM'" [(ngModel)]="targetFamily">
+          <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
+        </select>
+
+        <!-- AMIN_KHEDMA/DEV + SERVANT -> servant families list (base) -->
+        <select class="select" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'" [(ngModel)]="targetFamily">
+          <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
+        </select>
+
+        <!-- AMIN_OSRA -> makhdom families list (A/B) -->
+        <select class="select" *ngIf="!isAminKhedmaOrDev()" [(ngModel)]="targetFamily">
+          <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
+        </select>
+      </div>
+
+      <!-- ✅ Target role (only in SERVANT mode for AMIN_KHEDMA/DEV) -->
+      <div class="inlinePicker" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'">
+        <label class="lbl">To role</label>
+        <select class="select" [(ngModel)]="targetRole">
+          <option value="KHADIM">خادم</option>
+          <option value="MAKHDOM">مخدوم</option>
+          <option value="AMIN_OSRA">أمين أسرة</option>
+          <option value="AMIN_KHEDMA">أمين خدمة</option>
         </select>
       </div>
 
@@ -19,15 +60,6 @@
       <button pButton type="button" class="p-button-secondary" label="Cancel" (click)="cancelSelecting()"></button>
       <span class="selHint">Selected: {{selectedIds.size}}</span>
     </ng-container>
-  </div>
-
-  <!-- ✅ AMIN_KHEDMA / DEVELOPER choose which family list to view -->
-  <div class="familyView" *ngIf="isAminKhedmaOrDev()">
-    <label class="lbl">Show members of</label>
-    <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
-      <option *ngFor="let f of families" [value]="f">{{f}}</option>
-      <option value="SERVANTS">خدام</option>
-    </select>
   </div>
 
   <div *ngIf="loading" class="hint">Loading...</div>
@@ -54,5 +86,4 @@
       </tbody>
     </table>
   </div>
-
 </div>

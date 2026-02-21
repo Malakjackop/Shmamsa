@@ -5,6 +5,7 @@ import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.security.RoleUtil;
 import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -100,7 +101,7 @@ public class FamilyController {
 
         List<User> members;
         if (servantsBucket) {
-            members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA"));
+                        members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
         } else {
             members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, rolesToShow);
         }
@@ -215,8 +216,9 @@ public class FamilyController {
 
         Object idsObj = body.get("memberIds");
         String newFamily = body.get("newFamily") == null ? null : body.get("newFamily").toString();
-
-        if (idsObj == null || newFamily == null || newFamily.isBlank()) {
+        String targetRole = body.get("targetRole") == null ? null : body.get("targetRole").toString();
+        String variant = body.get("variant") == null ? null : body.get("variant").toString(); // backward compatible
+if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "memberIds and newFamily are required");
         }
 
@@ -230,12 +232,69 @@ public class FamilyController {
 
         if (ids.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No members selected");
 
-        String targetBase = FamilyUtil.mainFamily(newFamily);
+        // ✅ Optional: change role while transferring (only AMIN_KHEDMA/DEV)
+        String normalizedTargetRole = null;
+        if (targetRole != null && !targetRole.isBlank()) {
+            if (isAminOsra) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+            normalizedTargetRole = targetRole.trim().toUpperCase(Locale.ROOT);
+
+            // validate allowed roles
+            List<String> allowed = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
+            if (!allowed.contains(normalizedTargetRole)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid targetRole");
+            }
+            if (!RoleUtil.canAssign(myRole, normalizedTargetRole)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
+
+
+        
+        // ✅ Registration family variants (special families)
+        // NOTE: Stored family names may include prefixes like "اسره القس ...",
+        // so we detect by keyword containment rather than exact match.
+        List<String> specialKeywords = List.of("الانبا ابرام", "البابا كيرلس", "اسطفانوس");
+        String newFamilyTrim = newFamily.trim();
+        String targetBase = FamilyUtil.mainFamily(newFamilyTrim);
+        boolean isSpecialTarget = (targetBase != null) && specialKeywords.stream().anyMatch(targetBase::contains);
+
+        // ✅ effectiveFamily rules:
+        // - Normal families: use base
+        // - Special families:
+        //    * if client sent full family with " أ"/" ب" -> accept as-is
+        //    * else if client sent base only -> treat as SERVANT group (base)
+        //    * variant is still accepted for backward compatibility
+        String effectiveFamily;
+        if (targetBase == null || targetBase.isBlank()) {
+            effectiveFamily = newFamilyTrim;
+        } else if (!isSpecialTarget) {
+            effectiveFamily = targetBase;
+        } else {
+            // if already specified (A/B) keep it
+            boolean alreadyAB = newFamilyTrim.matches(".*\s[أب]$");
+            if (alreadyAB) {
+                effectiveFamily = newFamilyTrim;
+            } else if (variant != null && !variant.isBlank()) {
+                String v = variant.trim().toUpperCase(Locale.ROOT);
+                if ("A".equals(v)) effectiveFamily = targetBase + " أ";
+                else if ("B".equals(v)) effectiveFamily = targetBase + " ب";
+                else if ("SERVANT".equals(v)) effectiveFamily = targetBase;
+                else throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid variant");
+            } else {
+                // base only => servant group
+                effectiveFamily = targetBase;
+            }
+        }
+
+if (effectiveFamily == null || effectiveFamily.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid target family");
+        }
         if (targetBase == null || targetBase.isBlank() || "SYSTEM".equalsIgnoreCase(targetBase)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid target family");
         }
-
-        String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
+String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
 
         int updated = 0;
         for (Long id : ids) {
@@ -261,7 +320,22 @@ public class FamilyController {
                 }
             }
 
-            u.setDeaconFamily(newFamily.trim());   // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
+            
+            // ✅ Role handling
+            // - If caller provided targetRole (AMIN_KHEDMA/DEV only): set it explicitly
+            // - Else keep old behavior:
+            //    * If moving to special-family SERVANT group OR the account was AMIN_KHEDMA/AMIN_OSRA -> downgrade to KHADIM
+            boolean toServantGroup = (variant != null && "SERVANT".equalsIgnoreCase(variant.trim())) && isSpecialTarget;
+
+            if (normalizedTargetRole != null) {
+                u.setRole(normalizedTargetRole);
+            } else {
+                if (toServantGroup || "AMIN_KHEDMA".equals(u.getRole()) || "AMIN_OSRA".equals(u.getRole())) {
+                    u.setRole("KHADIM");
+                }
+            }
+
+            u.setDeaconFamily(effectiveFamily.trim());   // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
             userRepo.save(u);
             updated++;
 

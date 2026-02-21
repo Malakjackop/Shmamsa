@@ -171,6 +171,15 @@ html {
   padding-left: 15px;
 }
 
+/* Inline field errors under inputs */
+.error-text {
+  display: block;
+  color: #dc3545;
+  font-size: 0.75em;
+  margin-top: 4px;
+  text-align: left;
+}
+
 .success-message {
   color: #28a745;
   font-size: 0.9em;
