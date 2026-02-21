@@ -1,0 +1,26 @@
+
+.page{padding:16px;max-width:1100px;margin:0 auto; color: black;}
+.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+select{padding:8px;border-radius:8px;border:1px solid #ccc;}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
+.tableWrap{overflow:auto;border:1px solid #eee;border-radius:12px;}
+.tbl{width:100%;border-collapse:collapse;min-width:900px;}
+.tbl th,.tbl td{padding:10px;border-bottom:1px solid #eee;text-align:center;}
+.hint{color:#666;margin-top:10px;}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;}
+.modalCard{background:#fff;border-radius:16px;max-width:720px;width:100%;padding:14px;}
+.modalHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.filters label{font-size:12px;color:#666;}
+.profileGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
+.profileGrid div{border:1px solid #eee;border-radius:12px;padding:10px;}
+.title{font-weight:700;font-size:18px;}
+.sub{color:#666;font-size:12px;}
+.detailList{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
+.detailRow{border:1px solid #eee;border-radius:12px;padding:10px;}
+.dTitle{font-weight:600;}
+.dSub{font-size:12px;color:#666;margin-top:4px;}
+@media (max-width:700px){
+  .tbl{min-width:700px;}
+  .profileGrid{grid-template-columns:1fr;}
+  }

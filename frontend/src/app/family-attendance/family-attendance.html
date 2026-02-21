@@ -1,0 +1,117 @@
+<p-toast></p-toast>
+
+<div class="page">
+  <h1>Members attendance</h1>
+
+  <div class="top" *ngIf="isAminKhedmaOrDev()">
+    <label>Family</label>
+    <select [(ngModel)]="selectedFamily" (change)="loadMembers()">
+      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button pButton type="button" label="Export Excel" (click)="exportExcel()"></button>
+    <button pButton type="button" label="Export PDF" (click)="exportPdf()"></button>
+  </div>
+
+  <div *ngIf="loading" class="hint">Loading...</div>
+
+  <div class="tableWrap" *ngIf="!loading">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>قداس الجمعة</th>
+          <th>تسبحة</th>
+          <th>اجتماع الأسرة</th>
+          <th>Details</th>
+          <th>Profile</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of members">
+          <td>{{m.fullName}}</td>
+          <td>{{m.fridayLiturgy}}</td>
+          <td>{{m.tasbeeha}}</td>
+          <td>{{m.familyMeeting}}</td>
+          <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
+          <td><button pButton type="button" icon="pi pi-user" (click)="openProfile(m)">👤</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Attendance details modal -->
+  <div class="modal" *ngIf="detailsFor">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <div class="title">{{ detailsFor.fullName }}</div>
+          <div class="sub">{{ detailsFor.role }}</div>
+        </div>
+        <div class="filters">
+          <label>فلتر</label>
+          <select [(ngModel)]="detailsType" (change)="reloadDetails()">
+            <option value="">الكل</option>
+            <option value="FRIDAY_LITURGY">قداس الجمعة</option>
+            <option value="TASBEEHA">تسبحة</option>
+            <option value="FAMILY_MEETING">اجتماع الأسرة</option>
+          </select>
+        </div>
+        <button pButton type="button" icon="pi pi-times" (click)="closeDetails()">➖</button>
+      </div>
+
+      <div class="detailList" *ngIf="details.length; else noDetails">
+        <div class="detailRow" *ngFor="let d of details">
+          <div class="dTitle">{{d.type}}</div>
+          <div class="dSub">{{d.date}} • {{d.createdAt}}</div>
+          <div class="dSub" *ngIf="d.takenBy">الخادم اللي سجل: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
+        </div>
+      </div>
+
+      <ng-template #noDetails>
+        <div class="hint">No attendance records.</div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Profile modal -->
+  <div class="modal" *ngIf="profileFor">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <div class="title">{{ profileFor.fullName }}</div>
+          <div class="sub">{{ profileFor.role }}</div>
+        </div>
+        <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
+      </div>
+
+      <div *ngIf="profile; else loadingProfile" class="profileGrid">
+        <div><b>Username:</b> {{profile.username}}</div>
+        <div><b>Email:</b> {{profile.email}}</div>
+        <div><b>Family:</b> {{profile.deaconFamily}}</div>
+        <div><b>Degree:</b> {{profile.deaconDegree}}</div>
+        <div><b>National ID:</b> {{profile.nationalId}}</div>
+        <div><b>Phone:</b> {{profile.phoneNumber}}</div>
+        <div><b>Address:</b> {{profile.address}}</div>
+        <div><b>Father phone:</b> {{profile.guardiansPhone}}</div>
+        <div><b>Relation:</b> {{profile.guardianRelation}}</div>
+        <div><b>DOB:</b> {{profile.dateOfBirth}}</div>
+        <div><b>Gender:</b> {{profile.gender}}</div>
+        <div><b>Status:</b> {{profile.status}}</div>
+        <div><b>Study type:</b> {{profile.studyType}}</div>
+        <div><b>School:</b> {{profile.schoolName}} {{profile.schoolGrade}}</div>
+        <div><b>University:</b> {{profile.universityName}} {{profile.faculty}} {{profile.universityGrade}}</div>
+        <div><b>Graduated from:</b> {{profile.graduatedFrom}}</div>
+        <div><b>Job:</b> {{profile.graduateJob}}</div>
+        <div><b>Working:</b> {{profile.isWorking}}</div>
+        <div><b>Work details:</b> {{profile.workDetails}}</div>
+      </div>
+
+      <ng-template #loadingProfile>
+        <div class="hint">Loading...</div>
+      </ng-template>
+    </div>
+  </div>
+</div>

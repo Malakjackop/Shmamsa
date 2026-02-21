@@ -43,7 +43,13 @@
             "outputMode": "server",
             "ssr": {
               "entry": "src/server.ts"
-            }
+            },
+            "allowedCommonJsDependencies": [
+              "xlsx",
+              "file-saver",
+              "jspdf",
+              "jspdf-autotable"
+            ]
           },
           "configurations": {
             "production": {

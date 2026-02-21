@@ -1,0 +1,143 @@
+<p-toast></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<div class="page">
+  <h1>Members info</h1>
+
+  <div class="top" *ngIf="isAminKhedmaOrDev()">
+    <label>Family</label>
+    <select [(ngModel)]="selectedFamily" (change)="loadMembers()">
+      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button
+      pButton
+      type="button"
+      [label]="exportMode && pendingExport === 'excel' ? 'Export Excel (Confirm)' : 'Export Excel'"
+      (click)="exportExcel()"
+    ></button>
+    <button
+      pButton
+      type="button"
+      [label]="exportMode && pendingExport === 'pdf' ? 'Export PDF (Confirm)' : 'Export PDF'"
+      (click)="exportPdf()"
+    ></button>
+    <button
+      *ngIf="exportMode"
+      pButton
+      type="button"
+      class="p-button-secondary"
+      label="Cancel"
+      (click)="cancelExport()"
+    ></button>
+  </div>
+
+  <div *ngIf="loading" class="hint">Loading...</div>
+
+  <div class="tableWrap" *ngIf="!loading">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th class="chk" *ngIf="exportMode">
+            <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" />
+          </th>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Address</th>
+          <th>Phone</th>
+          <th>رقم تليفون الأب</th>
+          <th>السن الدراسي</th>
+          <th>Profile</th>
+          <th *ngIf="canDeleteAccounts()">Delete</th>
+          <th *ngIf="canEditRoles()">Change role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of members">
+          <td class="chk" *ngIf="exportMode">
+            <input type="checkbox" [(ngModel)]="m.selected" (ngModelChange)="onMemberSelectionChange()" [ngModelOptions]="{ standalone: true }" />
+          </td>
+          <td>{{m.fullName}}</td>
+          <td>{{m.role}}</td>
+          <td>{{m.address}}</td>
+          <td>{{m.phoneNumber}}</td>
+          <td>{{m.guardiansPhone}}</td>
+          <td>{{m.schoolGrade}}</td>
+          <td><button pButton type="button" icon="pi pi-user" (click)="openProfile(m)">👤</button></td>
+
+          <td *ngIf="canDeleteAccounts()">
+            <button
+              *ngIf="canDeleteMember(m)"
+              pButton
+              type="button"
+              class="p-button-danger"
+              (click)="deleteMember(m)"
+            >🗑️</button>
+          </td>
+
+          <td *ngIf="canEditRoles()">
+            <select
+              [ngModel]="m.role"
+              (ngModelChange)="changeRole(m, $event)"
+              [ngModelOptions]="{ standalone: true }"
+            >
+              <option *ngFor="let r of allRoles" [value]="r" [disabled]="r === 'DEVELOPER'">
+                {{ r }}
+              </option>
+            </select>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Profile modal -->
+  <div class="modal" *ngIf="profileFor">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <div class="title">{{ profileFor.fullName }}</div>
+          <div class="sub">{{ profileFor.role }}</div>
+        </div>
+        <div class="modalActions">
+          <button
+            *ngIf="canDeleteMember(profileFor)"
+            pButton
+            type="button"
+            class="p-button-danger"
+            (click)="deleteMember(profileFor)"
+          >🗑️</button>
+          <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
+        </div>
+      </div>
+
+      <div *ngIf="profile; else loadingProfile" class="profileGrid">
+        <div><b>Username:</b> {{profile.username}}</div>
+        <div><b>Email:</b> {{profile.email}}</div>
+        <div><b>Family:</b> {{profile.deaconFamily}}</div>
+        <div><b>Degree:</b> {{profile.deaconDegree}}</div>
+        <div><b>National ID:</b> {{profile.nationalId}}</div>
+        <div><b>Phone:</b> {{profile.phoneNumber}}</div>
+        <div><b>Address:</b> {{profile.address}}</div>
+        <div><b>Father phone:</b> {{profile.guardiansPhone}}</div>
+        <div><b>Relation:</b> {{profile.guardianRelation}}</div>
+        <div><b>DOB:</b> {{profile.dateOfBirth}}</div>
+        <div><b>Gender:</b> {{profile.gender}}</div>
+        <div><b>Status:</b> {{profile.status}}</div>
+        <div><b>Study type:</b> {{profile.studyType}}</div>
+        <div><b>School:</b> {{profile.schoolName}} {{profile.schoolGrade}}</div>
+        <div><b>University:</b> {{profile.universityName}} {{profile.faculty}} {{profile.universityGrade}}</div>
+        <div><b>Graduated from:</b> {{profile.graduatedFrom}}</div>
+        <div><b>Job:</b> {{profile.graduateJob}}</div>
+        <div><b>Working:</b> {{profile.isWorking}}</div>
+        <div><b>Work details:</b> {{profile.workDetails}}</div>
+      </div>
+
+      <ng-template #loadingProfile>
+        <div class="hint">Loading...</div>
+      </ng-template>
+    </div>
+  </div>
+</div>
