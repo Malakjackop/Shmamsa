@@ -2,6 +2,7 @@
 package com.shmamsa.repository;
 
 import com.shmamsa.model.AttendanceRecord;
+import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,6 +15,8 @@ import java.util.List;
 
 public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Long> {
     boolean existsByUser_IdAndDateAndType(Long userId, LocalDate date, AttendanceType type);
+
+    AttendanceRecord findFirstByUser_IdAndDateAndType(Long userId, LocalDate date, AttendanceType type);
     List<AttendanceRecord> findByUser_IdOrderByCreatedAtDesc(Long userId);
     List<AttendanceRecord> findByUser_IdAndTypeOrderByCreatedAtDesc(Long userId, AttendanceType type);
     List<AttendanceRecord> findByUser_DeaconFamily(String deaconFamily);
@@ -21,6 +24,10 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     List<AttendanceRecord> findByUser_DeaconFamilyStartingWith(String prefix);
 
     long countByUser_IdAndType(Long userId, AttendanceType type);
+    long countByUser_IdAndTypeAndStatus(Long userId, AttendanceType type, AttendanceStatus status);
+
+    @Query("select count(a) from AttendanceRecord a where a.user.id = :userId and a.type = :type and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
+    long countPresentByUserAndType(@Param("userId") Long userId, @Param("type") AttendanceType type);
     @Modifying
     @Transactional
     @Query("delete from AttendanceRecord a where a.user.id = :userId")

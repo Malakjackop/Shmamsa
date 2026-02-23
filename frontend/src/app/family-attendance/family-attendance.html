@@ -21,6 +21,9 @@
     <table class="tbl">
       <thead>
         <tr>
+          <th class="chk" *ngIf="exportMode">
+            <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" />
+          </th>
           <th>Name</th>
           <th>قداس الجمعة</th>
           <th>تسبحة</th>
@@ -31,10 +34,13 @@
       </thead>
       <tbody>
         <tr *ngFor="let m of members">
+          <td class="chk" *ngIf="exportMode">
+            <input type="checkbox" [(ngModel)]="m.selected" (ngModelChange)="onMemberSelectionChange()" [ngModelOptions]="{ standalone: true }" />
+          </td>
           <td>{{m.fullName}}</td>
-          <td>{{m.fridayLiturgy}}</td>
-          <td>{{m.tasbeeha}}</td>
-          <td>{{m.familyMeeting}}</td>
+          <td>{{ countLabel(m, 'FRIDAY_LITURGY') }}</td>
+          <td>{{ countLabel(m, 'TASBEEHA') }}</td>
+          <td>{{ countLabel(m, 'FAMILY_MEETING') }}</td>
           <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
           <td><button pButton type="button" icon="pi pi-user" (click)="openProfile(m)">👤</button></td>
         </tr>
@@ -62,13 +68,48 @@
         <button pButton type="button" icon="pi pi-times" (click)="closeDetails()">➖</button>
       </div>
 
-      <div class="detailList" *ngIf="details.length; else noDetails">
-        <div class="detailRow" *ngFor="let d of details">
-          <div class="dTitle">{{d.type}}</div>
-          <div class="dSub">{{d.date}} • {{d.createdAt}}</div>
-          <div class="dSub" *ngIf="d.takenBy">الخادم اللي سجل: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
+      <!-- لو الفلتر = الكل: اعرض 3 مربعات -->
+      <ng-container *ngIf="detailsType === ''; else singleType">
+        <div class="cards">
+          <div class="typeCard" *ngFor="let t of allAttendanceTypes">
+            <div class="cardTitle">{{ titleForType(t) }}</div>
+
+            <div class="detailList" *ngIf="filteredDetails(t).length; else noType">
+              <div class="detailRow" *ngFor="let d of filteredDetails(t)">
+                <div class="dTitle">
+                  <span *ngIf="(d.status || 'PRESENT') === 'PRESENT'">حضور</span>
+                  <span *ngIf="(d.status || 'PRESENT') === 'ABSENT'">غياب</span>
+                </div>
+                <div class="dSub">يوم الحضور: {{d.date}}</div>
+                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">
+                  وقت اخد الغياب: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}
+                </div>
+                <div class="dSub" *ngIf="d.takenBy">
+                  الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})
+                </div>
+              </div>
+            </div>
+
+            <ng-template #noType>
+              <div class="hint">لا يوجد سجلات.</div>
+            </ng-template>
+          </div>
         </div>
-      </div>
+      </ng-container>
+
+      <!-- لو نوع محدد -->
+      <ng-template #singleType>
+        <div class="detailList" *ngIf="details.length; else noDetails">
+          <div class="detailRow" *ngFor="let d of details">
+            <div class="dTitle">{{ titleForType(d.type) }} • <span *ngIf="(d.status || 'PRESENT') === 'PRESENT'">حضور</span><span *ngIf="(d.status || 'PRESENT') === 'ABSENT'">غياب</span></div>
+            <div class="dSub">يوم الحضور: {{d.date}}</div>
+                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
+            <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">وقت اخد الغياب: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
+            <div class="dSub" *ngIf="d.takenBy">الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
+          </div>
+        </div>
+      </ng-template>
 
       <ng-template #noDetails>
         <div class="hint">No attendance records.</div>

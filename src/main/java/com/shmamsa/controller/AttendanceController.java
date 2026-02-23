@@ -2,6 +2,7 @@ package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AttendanceRecord;
+import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
@@ -15,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.*;
 
@@ -42,6 +44,7 @@ public class AttendanceController {
 
         Object typeObj = body.get("type");
         Object usersObj = body.get("users");
+        Object dateObj = body.get("date");
         if (typeObj == null || usersObj == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing users/type"));
         }
@@ -52,39 +55,149 @@ public class AttendanceController {
         List<Map<String, Object>> users = (List<Map<String, Object>>) usersObj;
 
         LocalDate today = LocalDate.now();
+        LocalDate selectedDate = today;
+        if (dateObj != null && !dateObj.toString().isBlank()) {
+            try {
+                selectedDate = LocalDate.parse(dateObj.toString());
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid date"));
+            }
+        }
+
+        // ممنوع المستقبل
+        if (selectedDate.isAfter(today)) {
+            return ResponseEntity.status(400).body(Map.of("error", "Cannot take attendance in the future"));
+        }
+
+        // ممنوع أي يوم قبل Monday بتاع الأسبوع الحالي (إلا أمين الخدمة و الـ dev)
+        LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        boolean canEditPastWeeks = "AMIN_KHEDMA".equalsIgnoreCase(servant.getRole()) || "DEVELOPER".equalsIgnoreCase(servant.getRole());
+        if (selectedDate.isBefore(monday) && !canEditPastWeeks) {
+            return ResponseEntity.status(400).body(Map.of("error", "Week is closed (cannot edit previous week)"));
+        }
+
+        // Enforce day-of-week per type
+        DayOfWeek dow = selectedDate.getDayOfWeek();
+        if (type == AttendanceType.FAMILY_MEETING && dow != DayOfWeek.THURSDAY) {
+            return ResponseEntity.status(400).body(Map.of("error", "Family meeting must be on Thursday"));
+        }
+        if (type == AttendanceType.FRIDAY_LITURGY && dow != DayOfWeek.FRIDAY) {
+            return ResponseEntity.status(400).body(Map.of("error", "Friday liturgy must be on Friday"));
+        }
+        if (type == AttendanceType.TASBEEHA && dow != DayOfWeek.SATURDAY) {
+            return ResponseEntity.status(400).body(Map.of("error", "Tasbeeha must be on Saturday"));
+        }
         LocalTime now = LocalTime.now();
 
-        int created = 0;
+        int createdPresent = 0;
+        int updatedToPresent = 0;
+        int createdAbsent = 0;
         int skipped = 0;
 
+        // Present set (exclude DEVELOPER completely)
+        Set<Long> presentIds = new LinkedHashSet<>();
 
         for (Map<String, Object> u : users) {
-            Long id = Long.valueOf(u.get("id").toString());
+            if (u == null || u.get("id") == null) continue;
+            Long id;
+            try { id = Long.valueOf(u.get("id").toString()); } catch (Exception e) { continue; }
+            User target = userRepo.findById(id).orElse(null);
+            if (target == null) continue;
+            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
+            presentIds.add(id);
+        }
 
-            if (attendanceRepo.existsByUser_IdAndDateAndType(id, today, type)) {
-                skipped++;
+        // Determine scope accounts for auto-absence
+        List<User> scope;
+        if (type == AttendanceType.FAMILY_MEETING) {
+            // Thursday: only same family
+            String base = null;
+            if (!presentIds.isEmpty()) {
+                User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
+                base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
+            }
+            if (base == null || base.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
+            }
+            scope = userRepo.findByDeaconFamilyStartingWithAndRoleIn(
+                    base,
+                    List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
+            );
+        } else {
+            // Friday/Sat: whole service (all non-dev accounts)
+            scope = new ArrayList<>();
+            for (User u : userRepo.findAll()) {
+                if (u == null) continue;
+                if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
+                scope.add(u);
+            }
+        }
+
+
+        // 1) Upsert PRESENT for selected
+        for (Long id : presentIds) {
+            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndType(id, selectedDate, type);
+            if (existing != null) {
+                // If it was ABSENT, flip to PRESENT
+                if (existing.getStatus() == AttendanceStatus.ABSENT) {
+                    existing.setStatus(AttendanceStatus.PRESENT);
+                    existing.setTime(now);
+                    existing.setTakenBy(servant);
+                    attendanceRepo.save(existing);
+                    updatedToPresent++;
+                } else {
+                    skipped++;
+                }
                 continue;
             }
 
             User target = userRepo.findById(id).orElse(null);
-            if (target == null){
-                skipped++;
+            if (target == null) { skipped++; continue; }
+            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) { skipped++; continue; }
+
+            AttendanceRecord r = new AttendanceRecord();
+            r.setUser(target);
+            r.setDate(selectedDate);
+            r.setTime(now);
+            r.setType(type);
+            r.setStatus(AttendanceStatus.PRESENT);
+            r.setTakenBy(servant);
+            attendanceRepo.save(r);
+            createdPresent++;
+        }
+
+        // 2) Auto-create ABSENT for scope users not present
+        for (User target : scope) {
+            if (target == null || target.getId() == null) continue;
+            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
+            if (presentIds.contains(target.getId())) continue;
+
+            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndType(target.getId(), selectedDate, type);
+            if (existing != null) {
+                // keep as-is (if present, don't overwrite)
                 continue;
             }
 
             AttendanceRecord r = new AttendanceRecord();
             r.setUser(target);
-            r.setDate(today);
+            r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-
+            r.setStatus(AttendanceStatus.ABSENT);
             r.setTakenBy(servant);
-
             attendanceRepo.save(r);
-            created++;
+            createdAbsent++;
         }
 
-        return ResponseEntity.ok(Map.of("ok", true, "created", created, "skipped", skipped));
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "date", selectedDate.toString(),
+                "type", type.name(),
+                "presentCreated", createdPresent,
+                "presentUpdated", updatedToPresent,
+                "absentCreated", createdAbsent,
+                "skipped", skipped
+        ));
 
     }
 

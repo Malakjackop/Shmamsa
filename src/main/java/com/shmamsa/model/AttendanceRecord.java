@@ -27,6 +27,11 @@ public class AttendanceRecord {
     @Enumerated(EnumType.STRING)
     private AttendanceType type;
 
+    // PRESENT = حضر, ABSENT = غياب
+    @Enumerated(EnumType.STRING)
+    @Column
+    private AttendanceStatus status = AttendanceStatus.PRESENT;
+
     @ManyToOne
     @JoinColumn(name = "taken_by_user_id")
     private User takenBy;

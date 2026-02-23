@@ -20,6 +20,10 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .detailRow{border:1px solid #eee;border-radius:12px;padding:10px;}
 .dTitle{font-weight:600;}
 .dSub{font-size:12px;color:#666;margin-top:4px;}
+
+.cards{display:grid;gap:12px;}
+.typeCard{border:1px solid #eee;border-radius:12px;padding:10px;}
+.cardTitle{font-weight:700;margin-bottom:10px;}
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .profileGrid{grid-template-columns:1fr;}

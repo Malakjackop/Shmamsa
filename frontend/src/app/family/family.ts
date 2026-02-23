@@ -15,9 +15,28 @@ type Member = {
   address?: string;
   phoneNumber?: string;
   guardiansPhone?: string;
+  // backward compatible fields (present count)
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
+
+  // new fields (present/total)
+  fridayLiturgyPresent?: number;
+  fridayLiturgyTotal?: number;
+  tasbeehaPresent?: number;
+  tasbeehaTotal?: number;
+  familyMeetingPresent?: number;
+  familyMeetingTotal?: number;
+};
+
+type AttendanceRow = {
+  id: number;
+  type: 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING';
+  date: string;
+  time?: string;
+  createdAt?: string;
+  status?: 'PRESENT' | 'ABSENT';
+  takenBy?: { id: number; fullName: string; role: string } | null;
 };
 
 @Component({
@@ -28,6 +47,14 @@ type Member = {
   providers: [MessageService, ConfirmationService]
 })
 export class FamilyComponent implements OnInit {
+
+  // Angular templates لا تدعم type-cast زي (t as any)،
+  // فبنحط اللست دي هنا بنوع مضبوط.
+  readonly allAttendanceTypes: AttendanceRow['type'][] = [
+    'TASBEEHA',
+    'FRIDAY_LITURGY',
+    'FAMILY_MEETING'
+  ];
   private familySvc = inject(FamilyService);
   private adminSvc = inject(AdminService);
   private auth = inject(AuthService);
@@ -47,7 +74,7 @@ export class FamilyComponent implements OnInit {
   loading = false;
 
   detailsFor: Member | null = null;
-  details: any[] = [];
+  details: AttendanceRow[] = [];
   detailsType: '' | 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING' = '';
 
   profileFor: Member | null = null;
@@ -121,9 +148,42 @@ export class FamilyComponent implements OnInit {
     const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
-      next: (d) => (this.details = d || []),
+      next: (d) => (this.details = (d as any) || []),
       error: () => (this.details = [])
     });
+  }
+
+  // ===== UI helpers =====
+  countLabel(m: Member, kind: 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING'): string {
+    const fallbackPresent =
+      kind === 'FRIDAY_LITURGY' ? m.fridayLiturgy : kind === 'TASBEEHA' ? m.tasbeeha : m.familyMeeting;
+
+    const present =
+      kind === 'FRIDAY_LITURGY'
+        ? m.fridayLiturgyPresent ?? fallbackPresent
+        : kind === 'TASBEEHA'
+          ? m.tasbeehaPresent ?? fallbackPresent
+          : m.familyMeetingPresent ?? fallbackPresent;
+
+    const total =
+      kind === 'FRIDAY_LITURGY'
+        ? m.fridayLiturgyTotal
+        : kind === 'TASBEEHA'
+          ? m.tasbeehaTotal
+          : m.familyMeetingTotal;
+
+    if (total == null) return String(present ?? 0);
+    return `${present ?? 0}/${total}`;
+  }
+
+  titleForType(t: AttendanceRow['type']): string {
+    if (t === 'TASBEEHA') return 'تسبحة';
+    if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
+    return 'اجتماع الأسرة';
+  }
+
+  filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
+    return (this.details || []).filter((d) => d?.type === t);
   }
 
   closeDetails() {

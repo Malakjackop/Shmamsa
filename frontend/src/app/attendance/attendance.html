@@ -22,11 +22,23 @@
     <!-- Main -->
     <section class="content">
       <div class="controls">
+        <label>Day</label>
+        <p-datepicker
+          [(ngModel)]="selectedDate"
+          (onSelect)="onDateChange()"
+          (onBlur)="onDateChange()"
+          [showIcon]="true"
+          [disabledDays]="disabledDays"
+          [minDate]="minDate"
+          [maxDate]="maxDate"
+          [firstDayOfWeek]="firstDayOfWeek"
+          dateFormat="yy-mm-dd"
+          placeholder="اختار يوم (خميس/جمعة/سبت)"
+        ></p-datepicker>
+
         <label>Event</label>
-        <select [(ngModel)]="selectedType">
-          <option value="FRIDAY_LITURGY">قداس الجمعة</option>
-          <option value="TASBEEHA">تسبحة</option>
-          <option value="FAMILY_MEETING">اجتماع الأسرة</option>
+        <select [(ngModel)]="selectedType" [disabled]="true">
+          <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
         </select>
 
         <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'Stop Scan' : 'Scan QR'"></p-button>
@@ -110,7 +122,7 @@
           </div>
         </div>
 
-        <p-button type="button" class="submit" (onClick)="submit()" label="Submit"></p-button>
+        <p-button type="button" class="submit" (onClick)="submit()" label="Submit" [disabled]="!selectedDate"></p-button>
       </div>
     </section>
   </div>

@@ -116,9 +116,13 @@ public class FamilyController {
             // ✅ Attendance page can opt-in to include the current user via includeSelf=true
             if (!includeSelf && me.getId() != null && me.getId().equals(u.getId())) continue;
 
-            long friday = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
-            long tasbeeha = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
-            long meeting = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FAMILY_MEETING);
+            long fridayTotal = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
+            long tasbeehaTotal = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
+            long meetingTotal = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FAMILY_MEETING);
+
+            long fridayPresent = attendanceRepo.countPresentByUserAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
+            long tasbeehaPresent = attendanceRepo.countPresentByUserAndType(u.getId(), AttendanceType.TASBEEHA);
+            long meetingPresent = attendanceRepo.countPresentByUserAndType(u.getId(), AttendanceType.FAMILY_MEETING);
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", u.getId());
@@ -128,9 +132,18 @@ public class FamilyController {
             row.put("address", u.getAddress());
             row.put("phoneNumber", u.getPhoneNumber());
             row.put("guardiansPhone", u.getGuardiansPhone());
-            row.put("fridayLiturgy", friday);
-            row.put("tasbeeha", tasbeeha);
-            row.put("familyMeeting", meeting);
+            // Backward compatible (old UI): present count only
+            row.put("fridayLiturgy", fridayPresent);
+            row.put("tasbeeha", tasbeehaPresent);
+            row.put("familyMeeting", meetingPresent);
+
+            // New fields: present/total to display like 3/7
+            row.put("fridayLiturgyPresent", fridayPresent);
+            row.put("fridayLiturgyTotal", fridayTotal);
+            row.put("tasbeehaPresent", tasbeehaPresent);
+            row.put("tasbeehaTotal", tasbeehaTotal);
+            row.put("familyMeetingPresent", meetingPresent);
+            row.put("familyMeetingTotal", meetingTotal);
             out.add(row);
         }
 
@@ -431,6 +444,7 @@ String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
             row.put("date", r.getDate());
             row.put("time", r.getTime());
             row.put("createdAt", r.getCreatedAt());
+            row.put("status", r.getStatus() == null ? "PRESENT" : r.getStatus().name());
 
             if (r.getTakenBy() != null) {
                 Map<String, Object> tb = new LinkedHashMap<>();

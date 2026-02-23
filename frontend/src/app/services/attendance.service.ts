@@ -10,8 +10,12 @@ export class AttendanceService {
   private http = inject(HttpClient);
   private baseUrl = '/api/attendance';
 
-  submit(users: { id: number; username?: string }[], type: AttendanceType): Observable<any> {
-    return this.http.post(`${this.baseUrl}/submit`, { users, type }, { withCredentials: true });
+  submit(
+    users: { id: number; username?: string }[],
+    type: AttendanceType,
+    date?: string // yyyy-MM-dd
+  ): Observable<any> {
+    return this.http.post(`${this.baseUrl}/submit`, { users, type, date }, { withCredentials: true });
   }
 
   scanToken(token: string): Observable<{ id: number; username: string; fullName: string; deaconFamily?: string }> {

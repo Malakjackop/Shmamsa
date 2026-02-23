@@ -40,6 +40,8 @@ import { AvatarModule } from 'primeng/avatar';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputIconModule } from 'primeng/inputicon';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+// ✅ PrimeNG v19+ renamed Calendar -> DatePicker (new import path)
+import { DatePickerModule } from 'primeng/datepicker';
 
 @NgModule({
   declarations: [
@@ -81,7 +83,8 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
     AvatarModule,
     InputTextModule,
     InputIconModule,
-    ConfirmDialogModule
+    ConfirmDialogModule,
+    DatePickerModule
   ],
   providers: [
     MessageService,
