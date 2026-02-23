@@ -15,12 +15,6 @@
     <button
       pButton
       type="button"
-      [label]="exportMode && pendingExport === 'excel' ? 'Export Excel (Confirm)' : 'Export Excel'"
-      (click)="exportExcel()"
-    ></button>
-    <button
-      pButton
-      type="button"
       [label]="exportMode && pendingExport === 'pdf' ? 'Export PDF (Confirm)' : 'Export PDF'"
       (click)="exportPdf()"
     ></button>

@@ -45,6 +45,7 @@ public class AttendanceController {
         Object typeObj = body.get("type");
         Object usersObj = body.get("users");
         Object dateObj = body.get("date");
+        Object familyObj = body.get("family");
         if (typeObj == null || usersObj == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing users/type"));
         }
@@ -69,10 +70,15 @@ public class AttendanceController {
             return ResponseEntity.status(400).body(Map.of("error", "Cannot take attendance in the future"));
         }
 
-        // ممنوع أي يوم قبل Monday بتاع الأسبوع الحالي (إلا أمين الخدمة و الـ dev)
+        // ممنوع أي يوم قبل Monday بتاع الأسبوع الحالي
+        // (الأسبوع بيتقفل يوم الاتنين)
+        // لكن: AMIN_OSRA / AMIN_KHEDMA / DEVELOPER يقدروا يسجلوا لأي يوم فات
         LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        boolean canEditPastWeeks = "AMIN_KHEDMA".equalsIgnoreCase(servant.getRole()) || "DEVELOPER".equalsIgnoreCase(servant.getRole());
-        if (selectedDate.isBefore(monday) && !canEditPastWeeks) {
+        boolean canOverrideWeekClose = "AMIN_OSRA".equals(servant.getRole())
+                || "AMIN_KHEDMA".equals(servant.getRole())
+                || "DEVELOPER".equals(servant.getRole());
+
+        if (selectedDate.isBefore(monday) && !canOverrideWeekClose) {
             return ResponseEntity.status(400).body(Map.of("error", "Week is closed (cannot edit previous week)"));
         }
 
@@ -112,10 +118,15 @@ public class AttendanceController {
         if (type == AttendanceType.FAMILY_MEETING) {
             // Thursday: only same family
             String base = null;
-            if (!presentIds.isEmpty()) {
+
+            // لو محددناش أي حاضر (قائمة فاضية) هنحاول ناخد الأسرة من الـ request
+            if (presentIds.isEmpty() && familyObj != null && !familyObj.toString().isBlank()) {
+                base = FamilyUtil.mainFamily(familyObj.toString());
+            } else if (!presentIds.isEmpty()) {
                 User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
                 base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
             }
+
             if (base == null || base.isBlank()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
             }

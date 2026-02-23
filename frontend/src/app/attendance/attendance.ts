@@ -68,9 +68,13 @@ export class AttendanceComponent implements OnInit {
     const monday = new Date(today);
     monday.setDate(today.getDate() - diffToMonday);
 
-    this.minDate = monday;
-    this.maxDate = today;
+    const canOverrideWeekClose =
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes((this.me?.role || '').toUpperCase());
 
+    // لو أمين أسرة/أمين خدمة/Developer: يقدر يسجل لأي يوم فات (بس خميس/جمعة/سبت)
+    // غير كده: من Monday بتاع الأسبوع الحالي لحد النهارده
+    this.minDate = canOverrideWeekClose ? new Date(2020, 0, 1) : monday;
+    this.maxDate = today;
     // Pick default date: today if allowed; otherwise the latest allowed day within this week up to today.
     const allowed = (d: Date) => {
       const dow = d.getDay();
@@ -86,7 +90,8 @@ export class AttendanceComponent implements OnInit {
       for (let i = 0; i < 7; i++) {
         const x = new Date(today);
         x.setDate(today.getDate() - i);
-        if (x < monday) break;
+        if (!canOverrideWeekClose && x < monday) break;
+        if (canOverrideWeekClose && x < this.minDate) break;
         if (allowed(x)) {
           found = x;
           break;
@@ -272,14 +277,24 @@ export class AttendanceComponent implements OnInit {
     }
 
     const users = this.selected.map((x) => ({ id: x.id, username: x.username }));
-    if (users.length === 0) {
+    const canOverrideWeekClose =
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes((this.me?.role || '').toUpperCase());
+
+    // السماح لأمين أسرة/أمين خدمة/Developer بتسجيل الغياب حتى لو مفيش حد حاضر (قائمة فاضية)
+    if (users.length === 0 && !canOverrideWeekClose) {
       this.message.add({ severity: 'warn', summary: 'No users', detail: 'اختار اسم واحد على الأقل أو اعمل Scan للـ QR' });
+      return;
+    }
+
+    // في حالة اجتماع الأسرة (الخميس) لازم تختار الأسرة عشان نعرف مين نطاق التسجيل
+    if (this.selectedType === 'FAMILY_MEETING' && !this.selectedFamily) {
+      this.message.add({ severity: 'warn', summary: 'No family', detail: 'اختار الأسرة قبل التسجيل' });
       return;
     }
 
     const iso = this.toIsoDate(this.selectedDate);
 
-    this.attendance.submit(users, this.selectedType, iso).subscribe({
+    this.attendance.submit(users, this.selectedType, iso, this.selectedFamily || undefined).subscribe({
       next: (res) => {
         const created = res?.presentCreated ?? res?.created ?? 0;
         const updated = res?.presentUpdated ?? res?.updated ?? 0;

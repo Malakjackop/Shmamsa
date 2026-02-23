@@ -45,7 +45,7 @@ export class FamilyInfoComponent implements OnInit {
   /** When true, the page shows selection checkboxes and waits for confirm export. */
   exportMode = false;
   /** Which export action is pending confirmation while in exportMode. */
-  pendingExport: 'excel' | 'pdf' | null = null;
+  pendingExport: 'pdf' | null = null;
 
   // (legacy) profile modal state kept for backward-compat, not used now
   profileFor: Member | null = null;
@@ -236,76 +236,6 @@ export class FamilyInfoComponent implements OnInit {
         });
       }
     });
-  }
-
-  async exportExcel() {
-    // 1st click -> enter selection mode
-    if (!this.exportMode) {
-      this.exportMode = true;
-      this.pendingExport = 'excel';
-      this.message.add({ severity: 'info', summary: 'Select members', detail: 'Choose members then press Export Excel again' });
-      return;
-    }
-
-    // in selection mode but another export is pending
-    if (this.pendingExport && this.pendingExport !== 'excel') {
-      this.pendingExport = 'excel';
-      this.message.add({ severity: 'info', summary: 'Select members', detail: 'Choose members then press Export Excel again' });
-      return;
-    }
-
-    try {
-      const XLSX = await import('xlsx');
-
-      const selected = this.getSelectedMembers();
-      if (!selected.length) {
-        this.message.add({ severity: 'warn', summary: 'Select members', detail: 'Please select at least one member' });
-        return;
-      }
-
-      const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
-      const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
-
-      const rows = selected.map((m, idx) => {
-        const d = detailsArr[idx] || {};
-        return {
-          fullName: m.fullName,
-          role: m.role,
-          deaconFamily: d.deaconFamily ?? m.deaconFamily,
-          username: d.username,
-          email: d.email,
-          deaconDegree: d.deaconDegree,
-          nationalId: d.nationalId,
-          phoneNumber: d.phoneNumber ?? m.phoneNumber,
-          address: d.address ?? m.address,
-          guardiansPhone: d.guardiansPhone ?? m.guardiansPhone,
-          guardianRelation: d.guardianRelation,
-          dateOfBirth: d.dateOfBirth,
-          gender: d.gender,
-          status: d.status,
-          studyType: d.studyType,
-          schoolName: d.schoolName,
-          schoolGrade: d.schoolGrade,
-          universityName: d.universityName,
-          faculty: d.faculty,
-          universityGrade: d.universityGrade,
-          graduatedFrom: d.graduatedFrom,
-          graduateJob: d.graduateJob,
-          isWorking: d.isWorking,
-          workDetails: d.workDetails
-        };
-      });
-
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Members');
-      XLSX.writeFile(wb, `family_${this.selectedFamily || 'my'}_members_info.xlsx`);
-
-      // exit export mode after success
-      this.exitExportMode();
-    } catch {
-      this.message.add({ severity: 'error', summary: 'Export failed', detail: 'Excel export failed' });
-    }
   }
 
   async exportPdf() {

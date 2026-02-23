@@ -63,7 +63,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   // export selection mode
   exportMode = false;
-  pendingExport: 'excel' | 'pdf' | '' = '';
+  pendingExport: 'pdf' | '' = '';
   selectAll = false;
 
   // attendance details modal
@@ -244,92 +244,32 @@ openDetails(member: Member) {
     this.profile = null;
   }
 
-  // ===== Export =====
-  
-async exportExcel() {
-  // 1st click -> enter selection mode
-  if (!this.exportMode) {
-    this.exportMode = true;
-    this.pendingExport = 'excel';
-    this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export Excel مرة أخرى' });
-    return;
-  }
+formatRecordedAt(dateStr?: string): string {
+  if (!dateStr) return '';
 
-  // in selection mode but another export is pending
-  if (this.pendingExport && this.pendingExport !== 'excel') {
-    this.pendingExport = 'excel';
-    this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export Excel مرة أخرى' });
-    return;
-  }
+  let s = String(dateStr).trim();
 
-  try {
-    const XLSX = await import('xlsx');
+  s = s.replace(/(\.\d{3})\d+/, '$1');
 
-    const selected = this.getSelectedMembers();
-    if (!selected.length) {
-      this.message.add({ severity: 'warn', summary: 'Select members', detail: 'اختر على الأقل عضو واحد' });
-      return;
-    }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return dateStr;
 
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
-    const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
-    const attArr = await this.fetchAttendanceForMembers(selected, famParam);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
 
-    // One row per attendance record (present/absent) with full member info.
-    const rows: any[] = [];
-    selected.forEach((m, idx) => {
-      const d = detailsArr[idx] || {};
-      const fam = (d.deaconFamily ?? m.deaconFamily) || '';
-      const phone = d.phoneNumber ?? '';
-      const records = attArr[idx] || [];
+  const minutes = String(d.getMinutes()).padStart(2, '0');
 
-      if (!records.length) {
-        rows.push({
-          Name: m.fullName,
-          Role: m.role,
-          Family: fam,
-          Phone: phone,
-          Type: '',
-          EventDate: '',
-          Status: '',
-          RecordedAt: '',
-          TakenBy: ''
-        });
-        return;
-      }
+const h24 = d.getHours();
+const ampmRaw = h24 >= 12 ? 'PM' : 'AM';
+const LRM = '\u200E'; 
+const ampm = `${LRM}${ampmRaw}${LRM}`;
+const h12 = h24 % 12 || 12;
 
-      records.forEach((r) => {
-        rows.push({
-          Name: m.fullName,
-          Role: m.role,
-          Family: fam,
-          Phone: phone,
-          Type: r.type,
-          EventDate: r.date || '',
-          Status: r.status || '',
-          RecordedAt: r.createdAt || '',
-          TakenBy: r.takenBy?.fullName ? `${r.takenBy.fullName} (${r.takenBy.role || ''})` : ''
-        });
-      });
-    });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Records');
-    XLSX.writeFile(wb, 'members_attendance.xlsx');
-
-    // reset export mode after success
-    this.exportMode = false;
-    this.pendingExport = '';
-    this.selectAll = false;
-    this.members.forEach((m) => (m.selected = false));
-  } catch {
-    this.message.add({ severity: 'error', summary: 'Export failed', detail: 'Excel export failed' });
-  }
+return `${day}/${month}/${year} - ${h12}:${minutes} ${ampm}`;
 }
 
-
-  
+  // ===== Export =====
 async exportPdf() {
   // 1st click -> enter selection mode
   if (!this.exportMode) {
@@ -349,6 +289,32 @@ async exportPdf() {
     const jsPDF = (await import('jspdf')).default;
     const autoTable = (await import('jspdf-autotable')).default;
 
+    // Load Arabic-capable font (DejaVuSans) so Arabic text doesn't become garbled.
+    // Keep direction LTR to avoid "mirrored" text.
+    const ensureDejaVu = async (doc: any) => {
+      try {
+        if (typeof doc.setR2L === 'function') doc.setR2L(false);
+        if (doc.__hasDejaVu) {
+          doc.setFont('DejaVu', 'normal');
+          return;
+        }
+
+        const res = await fetch('assets/fonts/DejaVuSans.ttf');
+        const buf = await res.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
+
+        doc.addFileToVFS('DejaVuSans.ttf', base64);
+        doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
+        doc.__hasDejaVu = true;
+        doc.setFont('DejaVu', 'normal');
+      } catch {
+        // If font loading fails, PDF still generates (Arabic may not render correctly)
+      }
+    };
+
     const selected = this.getSelectedMembers();
     if (!selected.length) {
       this.message.add({ severity: 'warn', summary: 'Select members', detail: 'اختر على الأقل عضو واحد' });
@@ -359,9 +325,8 @@ async exportPdf() {
     const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
     const attArr = await this.fetchAttendanceForMembers(selected, famParam);
 
-    // NOTE: jsPDF default fonts do not render Arabic correctly.
-    // Keep PDF labels in English to avoid garbled output.
     const doc = new jsPDF({ orientation: 'landscape' });
+    await ensureDejaVu(doc);
     doc.setFontSize(14);
     doc.text('Members Attendance (details)', 14, 14);
     doc.setFontSize(10);
@@ -382,20 +347,57 @@ async exportPdf() {
       doc.text(`Phone: ${phone}`, 120, y);
       y += 4;
 
-      const body = (records.length ? records : ([] as AttendanceRow[])).map((r) => [
-        r.type,
-        r.date || '',
-        r.status || '',
-        r.createdAt || '',
-        r.takenBy?.fullName ? `${r.takenBy.fullName}` : ''
-      ]);
+      // Group by Type and merge the Type cell (rowSpan) so each type appears once.
+      const body: any[] = [];
+      if (records.length) {
+        const sorted = [...records].sort((a, b) => {
+          const t = (a.type || '').localeCompare(b.type || '');
+          if (t !== 0) return t;
+          return (a.date || '').localeCompare(b.date || '');
+        });
+
+        const groups = new Map<string, AttendanceRow[]>();
+        sorted.forEach((r) => {
+          const key = r.type || '';
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(r);
+        });
+
+        for (const [type, list] of groups) {
+          list.forEach((r, i) => {
+            // IMPORTANT: With rowSpan, subsequent rows must NOT include a placeholder cell
+            // for the spanned column, otherwise cells shift into wrong columns.
+            if (i === 0) {
+              const typeCell = {
+                content: type,
+                rowSpan: list.length,
+                styles: { valign: 'middle', fontStyle: 'bold' }
+              };
+              body.push([
+                typeCell,
+                r.date || '',
+                r.status || '',
+                this.formatRecordedAt(r.createdAt),
+                r.takenBy?.fullName ? `${r.takenBy.fullName}` : ''
+              ]);
+            } else {
+              body.push([
+                r.date || '',
+                r.status || '',
+                this.formatRecordedAt(r.createdAt),
+                r.takenBy?.fullName ? `${r.takenBy.fullName}` : ''
+              ]);
+            }
+          });
+        }
+      }
 
       autoTable(doc, {
         startY: y,
         head: [['Type', 'Event date', 'Status', 'Recorded at', 'Taken by']],
         body: body.length ? body : [['', '', '', '', '']],
         theme: 'grid',
-        styles: { fontSize: 9 }
+        styles: { fontSize: 9, font: 'DejaVu' }
       });
 
       // @ts-ignore

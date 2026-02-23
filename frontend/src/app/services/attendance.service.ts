@@ -13,9 +13,10 @@ export class AttendanceService {
   submit(
     users: { id: number; username?: string }[],
     type: AttendanceType,
-    date?: string // yyyy-MM-dd
+    date?: string, // yyyy-MM-dd
+    family?: string
   ): Observable<any> {
-    return this.http.post(`${this.baseUrl}/submit`, { users, type, date }, { withCredentials: true });
+    return this.http.post(`${this.baseUrl}/submit`, { users, type, date, family }, { withCredentials: true });
   }
 
   scanToken(token: string): Observable<{ id: number; username: string; fullName: string; deaconFamily?: string }> {

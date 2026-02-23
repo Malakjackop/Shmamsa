@@ -11,7 +11,6 @@
   </div>
 
   <div class="actions">
-    <button pButton type="button" label="Export Excel" (click)="exportExcel()"></button>
     <button pButton type="button" label="Export PDF" (click)="exportPdf()"></button>
   </div>
 
@@ -81,16 +80,11 @@
                   <span *ngIf="(d.status || 'PRESENT') === 'ABSENT'">غياب</span>
                 </div>
                 <div class="dSub">يوم الحضور: {{d.date}}</div>
-                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
-                <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">
-                  وقت اخد الغياب: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}
-                </div>
-                <div class="dSub" *ngIf="d.takenBy">
-                  الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})
-                </div>
+                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
+                <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'"> وقت اخد الغياب: {{ formatRecordedAt(d.createdAt) }}</div>
+                <div class="dSub" *ngIf="d.takenBy"> الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
               </div>
             </div>
-
             <ng-template #noType>
               <div class="hint">لا يوجد سجلات.</div>
             </ng-template>
@@ -104,8 +98,8 @@
           <div class="detailRow" *ngFor="let d of details">
             <div class="dTitle">{{ titleForType(d.type) }} • <span *ngIf="(d.status || 'PRESENT') === 'PRESENT'">حضور</span><span *ngIf="(d.status || 'PRESENT') === 'ABSENT'">غياب</span></div>
             <div class="dSub">يوم الحضور: {{d.date}}</div>
-                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
-            <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">وقت اخد الغياب: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
+            <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
+            <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">وقت اخد الغياب: {{ formatRecordedAt(d.createdAt) }}</div>
             <div class="dSub" *ngIf="d.takenBy">الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
           </div>
         </div>
