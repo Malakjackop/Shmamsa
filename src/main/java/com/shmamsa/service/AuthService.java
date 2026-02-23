@@ -27,6 +27,17 @@ public class AuthService {
 
     private final ServantSecretService servantSecretService;
 
+    // OTP / Rate limit helpers
+    private static class RateWindow {
+        int count;
+        long windowStartMs;
+
+        RateWindow(int count, long windowStartMs) {
+            this.count = count;
+            this.windowStartMs = windowStartMs;
+        }
+    }
+
 
     private static class OtpData {
         String username;
@@ -56,6 +67,35 @@ public class AuthService {
     private static final long COOLDOWN_MS = 45_000;
     private static final int HOURLY_LIMIT = 5;
 
+    // NEW: Khors + Serving Scope
+
+    private static final Set<String> KHORS_VALUES = Set.of("MARMARKOS", "ATHANASIUS", "BOTH", "NONE");
+    private static final Set<String> ATTEND_KHORS_VALUES = Set.of("MARMARKOS", "ATHANASIUS", "NONE");
+
+    private String normalizeKhors(String v, boolean allowBoth) {
+        String x = (v == null) ? "" : v.trim().toUpperCase(Locale.ROOT);
+        if (x.isBlank()) return "NONE";
+        if (!KHORS_VALUES.contains(x)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_KHORS", "Invalid khors value");
+        }
+        if (!allowBoth && "BOTH".equals(x)) return "NONE";
+        return x;
+    }
+
+    private String normalizeServingScope(String v) {
+        String x = (v == null) ? "" : v.trim().toUpperCase(Locale.ROOT);
+        return x.isBlank() ? "" : x;
+    }
+
+    private String normalizeAttendKhors(String v) {
+        String x = (v == null) ? "" : v.trim().toUpperCase(Locale.ROOT);
+        if (x.isBlank()) return "";
+        if (!ATTEND_KHORS_VALUES.contains(x)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ATTEND_KHORS", "Invalid attendKhors value");
+        }
+        return x;
+    }
+
 
     public void register(RegisterRequest request) {
         if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
@@ -80,6 +120,9 @@ public class AuthService {
         user.setNationalId(request.getNationalId());
         user.setDeaconFamily(request.getDeaconFamily());
         user.setDeaconDegree(request.getDeaconDegree());
+        user.setKhors(normalizeKhors(request.getKhors(), false));
+        user.setAttendKhors("NONE");
+        user.setServingScope(null);
         user.setPhoneNumber(request.getPhoneNumber());
         user.setAddress(request.getAddress());
         user.setAddress(request.getAddress());
@@ -135,15 +178,65 @@ public class AuthService {
 
         String nid = request.getNationalId().trim();
 
+        // ✅ NEW: serving scope validation
+        String scope = normalizeServingScope(request.getServingScope());
+        if (!( "FAMILY_ONLY".equals(scope) || "KHORS_ONLY".equals(scope) || "BOTH".equals(scope) )) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCOPE", "Invalid serving scope");
+        }
+
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(nid);
-        user.setDeaconFamily(request.getDeaconFamily());
+        // ✅ NEW: deaconFamily rules based on scope
+        if ("KHORS_ONLY".equals(scope)) {
+            user.setDeaconFamily("SYSTEM");
+        } else {
+            if (request.getDeaconFamily() == null || request.getDeaconFamily().trim().isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "DEACON_FAMILY_REQUIRED", "Deacon family is required");
+            }
+            user.setDeaconFamily(request.getDeaconFamily().trim());
+        }
+
         user.setDeaconDegree(request.getDeaconDegree());
         user.setRole("KHADIM");
+
+
+        // ✅ store scope
+        user.setServingScope(scope);
+
+        // ✅ NEW: serving khors rules
+        if ("FAMILY_ONLY".equals(scope)) {
+            user.setKhors("NONE");
+        } else {
+            String k = normalizeKhors(request.getKhors(), true); // allow BOTH
+            if ("NONE".equals(k)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
+            }
+            user.setKhors(k);
+        }
+
+        // ✅ NEW: attendKhors rules (exactly as you asked)
+        if ("FAMILY_ONLY".equals(scope)) {
+            // user must choose attendKhors (can be NONE)
+            String attend = normalizeAttendKhors(request.getAttendKhors());
+            if (attend.isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ATTEND_KHORS_REQUIRED", "Attend khors is required");
+            }
+            user.setAttendKhors(attend);
+        } else {
+            // KHORS_ONLY or BOTH:
+            // if serving in MARMARKOS -> attend ATHANASIUS by default
+            // if serving in ATHANASIUS or BOTH -> no attend selection
+            if ("MARMARKOS".equalsIgnoreCase(user.getKhors())) {
+                user.setAttendKhors("ATHANASIUS");
+            } else {
+                user.setAttendKhors("NONE");
+            }
+        }
+
 
         user.setPhoneNumber(request.getPhoneNumber());
         user.setAddress(request.getAddress());

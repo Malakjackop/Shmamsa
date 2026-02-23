@@ -35,6 +35,9 @@ public class RegisterRequest {
     @NotBlank(message = "Deacon degree is required")
     private String deaconDegree;
 
+    // Khors (Choir): MARMARKOS / ATHANASIUS / NONE
+    private String khors;
+
     private String phoneNumber;
 
     private String address;

@@ -105,6 +105,17 @@ public class User {
     @Column(length = 50)
     private String deaconDegree; // ✅ new field
 
+    // Khors (Choir): MARMARKOS / ATHANASIUS / BOTH / NONE
+    @Column(length = 30)
+    private String khors;
+
+    // Servant serving scope: FAMILY_ONLY / KHORS_ONLY / BOTH
+    @Column(length = 20)
+    private String servingScope;
+
+    // ✅ NEW: which khors servant attends
+    @Column(length = 30)
+    private String attendKhors; // MARMARKOS / ATHANASIUS / NONE
 
     @NotBlank(message = "Email is required")
     @Column(nullable = false, unique = true, length = 120)

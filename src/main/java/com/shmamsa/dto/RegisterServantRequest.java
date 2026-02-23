@@ -36,6 +36,13 @@ public class RegisterServantRequest {
     @NotBlank(message = "Deacon degree is required")
     private String deaconDegree;
 
+    @NotBlank(message = "Serving scope is required")
+    private String servingScope; // FAMILY_ONLY / KHORS_ONLY / BOTH
+
+    private String khors;       // MARMARKOS / ATHANASIUS / BOTH / NONE
+    private String attendKhors; // MARMARKOS / ATHANASIUS / NONE
+
+
     private String phoneNumber;
 
     private String address;
