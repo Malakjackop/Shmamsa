@@ -1,8 +1,8 @@
 <div class="login-wrapper">
   <div class="login-container">
     <div class="login-header">
-      <img src="assets/images/church-logo.png" alt="Church Logo" class="logo" />
-      <h1>DEACONS FAMILY <br />St Mary Church - Omrania</h1>
+      <img src="assets/images/church-logo.png" alt="شعار الكنيسة" class="logo" />
+      <h1>أسرة الشمامسة <br />كنيسة السيدة العذراء - العمرانية</h1>
     </div>
 
     <p-toast position="top-right"></p-toast>
@@ -11,50 +11,50 @@
       <!-- Row 1 -->
       <div class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="fullName" placeholder="Full Name" required
+          <input type="text" formControlName="fullName" placeholder="الاسم بالكامل" required
                  (click)="markInteracted('fullName')" (blur)="markTouched('fullName')" />
-          <small class="error-text" *ngIf="shouldShowError('fullName')">{{ errorText('fullName','Full Name') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('fullName')">{{ errorText('fullName','الاسم بالكامل') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="username" placeholder="USERNAME" required
+          <input type="text" formControlName="username" placeholder="اسم المستخدم" required
                  (click)="markInteracted('username')" (blur)="markTouched('username')" />
-          <small class="error-text" *ngIf="shouldShowError('username')">{{ errorText('username','Username') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('username')">{{ errorText('username','اسم المستخدم') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="phoneNumber" placeholder="PHONE NUMBER"
+          <input type="text" formControlName="phoneNumber" placeholder="رقم الهاتف"
                  (click)="markInteracted('phoneNumber')" (blur)="markTouched('phoneNumber')" />
-          <small class="error-text" *ngIf="shouldShowError('phoneNumber')">{{ errorText('phoneNumber','Phone Number') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('phoneNumber')">{{ errorText('phoneNumber','رقم الهاتف') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="address" placeholder="ADDRESS"
+          <input type="text" formControlName="address" placeholder="العنوان"
                  (click)="markInteracted('address')" (blur)="markTouched('address')" />
-          <small class="error-text" *ngIf="shouldShowError('address')">{{ errorText('address','Address') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('address')">{{ errorText('address','العنوان') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="nationalId" name="national-id" autocomplete="off" placeholder="NATIONAL ID"
+          <input type="text" formControlName="nationalId" name="national-id" autocomplete="off" placeholder="الرقم القومي"
                  (click)="markInteracted('nationalId')"
                  (blur)="onNationalIdBlur(); markTouched('nationalId')" />
-          <small class="error-text" *ngIf="shouldShowError('nationalId')">{{ errorText('nationalId','National ID') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('nationalId')">{{ errorText('nationalId','الرقم القومي') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="email" formControlName="email" placeholder="EMAIL" required
+          <input type="email" formControlName="email" placeholder="البريد الإلكتروني" required
                  (click)="markInteracted('email')" (blur)="markTouched('email')" />
-          <small class="error-text" *ngIf="shouldShowError('email')">{{ errorText('email','Email') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('email')">{{ errorText('email','البريد الإلكتروني') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" [readonly]="true" autocomplete="off"
+          <input type="date" formControlName="dateOfBirth" placeholder="تاريخ الميلاد" [readonly]="true" autocomplete="off"
                  (keydown)="$event.preventDefault()"
                  (click)="$event.preventDefault()" />
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="gender" placeholder="GENDER" [readonly]="true" autocomplete="off"
+          <input type="text" formControlName="gender" placeholder="النوع" [readonly]="true" autocomplete="off"
                  (keydown)="$event.preventDefault()"
                  (click)="$event.preventDefault()" />
         </div>
@@ -63,7 +63,7 @@
         <div class="input-row">
           <div class="input-group small">
            <select formControlName="deaconDegree" required (change)="markTouchedFromList('deaconDegree')">
-           <option value="" disabled>What's your Deacon Degree?</option>
+           <option value="" disabled>ما هي رتبة الشماس؟</option>
            <option>ابصالتس</option>
            <option>اغنسطس</option>
            <option>ايبودياكون</option>
@@ -71,7 +71,7 @@
            <option>ارشي دياكون</option>
          </select>
          <small class="error-text" *ngIf="shouldShowError('deaconDegree')">
-            {{ errorText('deaconDegree','Deacon Degree') }}
+            {{ errorText('deaconDegree','رتبة الشماس') }}
          </small>
       </div>
     </div>
@@ -89,7 +89,7 @@
             <option value="BOTH">بخدم في اسره و خورس مع بعض</option>
           </select>
           <small class="error-text" *ngIf="shouldShowError('servingScope')">
-            {{ errorText('servingScope','Serving Scope') }}
+            {{ errorText('servingScope','نطاق الخدمة') }}
           </small>
         </div>
       </div>
@@ -98,7 +98,7 @@
       <div class="input-row" *ngIf="!isServant || (servingScope && servingScope !== 'KHORS_ONLY')">
         <div class="input-group small">
           <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
-            <option value="" disabled>What's your Deacon Family?</option>
+            <option value="" disabled>اختار الأسرة</option>
 
             <option value="اسرة السمائين">اسرة السمائين</option>
             <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
@@ -126,7 +126,7 @@
               <option value="اسرة القديس اسطفانوس ب">اسرة القديس اسطفانوس ( ب )</option>
             </ng-template>
           </select>
-          <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','Deacon Family') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','الأسرة') }}</small>
         </div>
       </div>
 
@@ -137,7 +137,7 @@
         <div class="input-group small">
           <select formControlName="khors" (change)="markTouchedFromList('khors')">
             <ng-container *ngIf="!isServant">
-              <option value="" disabled>ElKhors</option>
+              <option value="" disabled>الخورس</option>
               <option value="MARMARKOS">خورس مارمارقس الرسولي</option>
               <option value="ATHANASIUS">خورس البابا اثناسيوس</option>
               <option value="NONE">مش موجود ف أي خورس من دول</option>
@@ -152,7 +152,7 @@
           </select>
 
           <small class="error-text" *ngIf="shouldShowError('khors')">
-            {{ errorText('khors','ElKhors') }}
+            {{ errorText('khors','الخورس') }}
           </small>
         </div>
       </div>
@@ -168,7 +168,7 @@
             <option value="NONE">مش موجود في ولا خورس</option>
           </select>
           <small class="error-text" *ngIf="shouldShowError('attendKhors')">
-            {{ errorText('attendKhors','Attend Khors') }}
+            {{ errorText('attendKhors','خورس الحضور') }}
           </small>
         </div>
       </div>
@@ -186,26 +186,26 @@
       <div class="input-row">
         <div class="input-group small">
           <select formControlName="status" (change)="onStatusChange(); markTouchedFromList('status')">
-            <option value="" disabled>Choose Status</option>
-            <option value="student">Student</option>
-            <option value="graduate">Graduate</option>
+            <option value="" disabled>اختر الحالة</option>
+            <option value="student">طالب</option>
+            <option value="graduate">خريج</option>
           </select>
-          <small class="error-text" *ngIf="shouldShowError('status')">{{ errorText('status','Status') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('status')">{{ errorText('status','الحالة') }}</small>
         </div>
       </div>
 
       <!-- Graduate Section -->
       <div *ngIf="registerForm.get('status')?.value === 'graduate'" class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="graduatedFrom" placeholder="Graduated From (e.g., University Name)"
+          <input type="text" formControlName="graduatedFrom" placeholder="تخرج من (مثال: اسم الجامعة)"
                  (click)="markInteracted('graduatedFrom')" (blur)="markTouched('graduatedFrom')" />
-          <small class="error-text" *ngIf="shouldShowError('graduatedFrom')">{{ errorText('graduatedFrom','Graduated From') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('graduatedFrom')">{{ errorText('graduatedFrom','تخرج من') }}</small>
         </div>
 
         <div class="input-group small">
-          <input type="text" formControlName="graduateJob" placeholder="Current Job"
+          <input type="text" formControlName="graduateJob" placeholder="الوظيفة الحالية"
                  (click)="markInteracted('graduateJob')" (blur)="markTouched('graduateJob')" />
-          <small class="error-text" *ngIf="shouldShowError('graduateJob')">{{ errorText('graduateJob','Current Job') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('graduateJob')">{{ errorText('graduateJob','الوظيفة الحالية') }}</small>
         </div>
       </div>
 
@@ -214,20 +214,20 @@
         <div class="input-row">
           <div class="input-group small">
             <select formControlName="studyType" (change)="onStudyTypeChange(); markTouchedFromList('studyType')">
-              <option value="" disabled>Study In</option>
-              <option value="school">School</option>
-              <option value="university">University</option>
+              <option value="" disabled>الدراسة في</option>
+              <option value="school">مدرسة</option>
+              <option value="university">جامعة</option>
             </select>
-            <small class="error-text" *ngIf="shouldShowError('studyType')">{{ errorText('studyType','Study Type') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('studyType')">{{ errorText('studyType','نوع الدراسة') }}</small>
           </div>
         </div>
 
         <!-- School Section -->
         <div *ngIf="registerForm.get('studyType')?.value === 'school'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="schoolName" placeholder="School Name"
+            <input type="text" formControlName="schoolName" placeholder="اسم المدرسة"
                    (click)="markInteracted('schoolName')" (blur)="markTouched('schoolName')" />
-            <small class="error-text" *ngIf="shouldShowError('schoolName')">{{ errorText('schoolName','School Name') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('schoolName')">{{ errorText('schoolName','اسم المدرسة') }}</small>
           </div>
 
           <div class="input-group small">
@@ -247,7 +247,7 @@
               <option value="grade3_secondary">تالتة ثانوي</option>
               <option value="other">أخر</option>
             </select>
-            <small class="error-text" *ngIf="shouldShowError('schoolGrade')">{{ errorText('schoolGrade','School Grade') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('schoolGrade')">{{ errorText('schoolGrade','الصف الدراسي') }}</small>
           </div>
 
           <div class="input-group small" *ngIf="showOtherGrade">
@@ -255,28 +255,28 @@
                    formControlName="otherGrade"
                    placeholder="اكتب الصف الدراسي"
                    (click)="markInteracted('otherGrade')" (blur)="markTouched('otherGrade')" />
-            <small class="error-text" *ngIf="shouldShowError('otherGrade')">{{ errorText('otherGrade','Other Grade') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('otherGrade')">{{ errorText('otherGrade','الصف') }}</small>
           </div>
         </div>
 
         <!-- University Section -->
         <div *ngIf="registerForm.get('studyType')?.value === 'university'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="universityName" placeholder="University Name"
+            <input type="text" formControlName="universityName" placeholder="اسم الجامعة"
                    (click)="markInteracted('universityName')" (blur)="markTouched('universityName')" />
-            <small class="error-text" *ngIf="shouldShowError('universityName')">{{ errorText('universityName','University Name') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('universityName')">{{ errorText('universityName','اسم الجامعة') }}</small>
           </div>
 
           <div class="input-group small">
-            <input type="text" formControlName="faculty" placeholder="Faculty"
+            <input type="text" formControlName="faculty" placeholder="الكلية"
                    (click)="markInteracted('faculty')" (blur)="markTouched('faculty')" />
-            <small class="error-text" *ngIf="shouldShowError('faculty')">{{ errorText('faculty','Faculty') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('faculty')">{{ errorText('faculty','الكلية') }}</small>
           </div>
 
           <div class="input-group small">
-            <input type="text" formControlName="universityGrade" placeholder="Year/Level"
+            <input type="text" formControlName="universityGrade" placeholder="السنة/الفرقة"
                    (click)="markInteracted('universityGrade')" (blur)="markTouched('universityGrade')" />
-            <small class="error-text" *ngIf="shouldShowError('universityGrade')">{{ errorText('universityGrade','University Grade') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('universityGrade')">{{ errorText('universityGrade','السنة/الفرقة') }}</small>
           </div>
         </div>
 
@@ -284,37 +284,37 @@
         <div class="input-row">
           <div class="input-group small">
             <select formControlName="isWorking" (change)="markTouchedFromList('isWorking')">
-              <option value="" disabled>Do you work?</option>
-              <option [ngValue]="false">No</option>
-              <option [ngValue]="true">Yes</option>
+              <option value="" disabled>هل تعمل؟</option>
+              <option [ngValue]="false">لا</option>
+              <option [ngValue]="true">نعم</option>
             </select>
-            <small class="error-text" *ngIf="shouldShowError('isWorking')">{{ errorText('isWorking','Is Working') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('isWorking')">{{ errorText('isWorking','العمل') }}</small>
           </div>
         </div>
 
         <div *ngIf="registerForm.get('isWorking')?.value === true" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="workDetails" placeholder="What is your job?"
+            <input type="text" formControlName="workDetails" placeholder="ما هي وظيفتك؟"
                    (click)="markInteracted('workDetails')" (blur)="markTouched('workDetails')" />
-            <small class="error-text" *ngIf="shouldShowError('workDetails')">{{ errorText('workDetails','Work Details') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('workDetails')">{{ errorText('workDetails','الوظيفة') }}</small>
           </div>
         </div>
 
         <!-- Guardian (only for students in SCHOOL) -->
         <div *ngIf="registerForm.get('studyType')?.value === 'school'" class="input-row">
           <div class="input-group small">
-            <input type="text" formControlName="guardiansPhone" placeholder="Guardian Phone" required
+            <input type="text" formControlName="guardiansPhone" placeholder="هاتف ولي الأمر" required
                    (click)="markInteracted('guardiansPhone')" (blur)="markTouched('guardiansPhone')" />
-            <small class="error-text" *ngIf="shouldShowError('guardiansPhone')">{{ errorText('guardiansPhone','Guardian Phone') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('guardiansPhone')">{{ errorText('guardiansPhone','هاتف ولي الأمر') }}</small>
           </div>
 
           <div class="input-group small">
             <select formControlName="guardianRelation" (change)="markTouchedFromList('guardianRelation')">
-              <option value="" disabled>Who is the Guardian?</option>
-              <option value="mom">Mom</option>
-              <option value="dad">Dad</option>
+              <option value="" disabled>ولي الأمر</option>
+              <option value="mom">الأم</option>
+              <option value="dad">الأب</option>
             </select>
-            <small class="error-text" *ngIf="shouldShowError('guardianRelation')">{{ errorText('guardianRelation','Guardian Relation') }}</small>
+            <small class="error-text" *ngIf="shouldShowError('guardianRelation')">{{ errorText('guardianRelation','صلة القرابة') }}</small>
           </div>
         </div>
       </div>
@@ -325,37 +325,37 @@
           <input
             [type]="showPassword ? 'text' : 'password'"
             formControlName="password"
-            placeholder="PASSWORD"
+            placeholder="كلمة المرور"
             required (click)="markInteracted('password')" (blur)="markTouched('password')" />
           <span class="password-eye" (click)="togglePassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
-          <small class="error-text" *ngIf="shouldShowError('password')">{{ errorText('password','Password') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('password')">{{ errorText('password','كلمة المرور') }}</small>
         </div>
 
         <div class="input-group small password-group">
           <input
             [type]="showConfirmPassword ? 'text' : 'password'"
             formControlName="confirmPassword"
-            placeholder="CONFIRM PASSWORD"
+            placeholder="تأكيد كلمة المرور"
             required (click)="markInteracted('confirmPassword')" (blur)="markTouched('confirmPassword')" />
           <span class="password-eye" (click)="toggleConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
           </span>
-          <small class="error-text" *ngIf="shouldShowError('confirmPassword')">{{ errorText('confirmPassword','Confirm Password') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('confirmPassword')">{{ errorText('confirmPassword','تأكيد كلمة المرور') }}</small>
         </div>
       </div>
 
       <div class="input-group" *ngIf="isServant">
-        <input id="secret" type="password" formControlName="secret" placeholder="Enter secret"
+        <input id="secret" type="password" formControlName="secret" placeholder="أدخل الكود السري"
                (click)="markInteracted('secret')" (blur)="markTouched('secret')" />
-        <small class="error-text" *ngIf="shouldShowError('secret')">{{ errorText('secret','Secret') }}</small>
+        <small class="error-text" *ngIf="shouldShowError('secret')">{{ errorText('secret','الكود السري') }}</small>
       </div>
 
-      <button type="submit" class="login-btn">REGISTER</button>
+      <button type="submit" class="login-btn">تسجيل</button>
 
       <div class="links">
-        <a routerLink="/login">Already have an account? Login</a>
+        <a routerLink="/login">لديك حساب بالفعل؟ تسجيل الدخول</a>
       </div>
     </form>
   </div>

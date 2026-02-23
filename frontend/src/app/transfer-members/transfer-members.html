@@ -2,11 +2,11 @@
 <p-confirmDialog></p-confirmDialog>
 
 <div class="page">
-  <h1>Transfer members</h1>
+  <h1>نقل الأعضاء</h1>
 
   <!-- ✅ AMIN_KHEDMA / DEVELOPER: choose transfer mode -->
   <div class="familyView" *ngIf="isAminKhedmaOrDev()">
-    <label class="lbl">Transfer type</label>
+    <label class="lbl">نوع النقل</label>
     <select class="select" [(ngModel)]="mode" (change)="onModeChange()">
       <option value="MAKHDOM">مخدومين</option>
       <option value="SERVANT">خدام</option>
@@ -15,19 +15,19 @@
 
   <!-- ✅ AMIN_KHEDMA / DEVELOPER: when MAKHDOM, choose which family to VIEW (servant registration list) -->
   <div class="familyView" *ngIf="isAminKhedmaOrDev() && mode === 'MAKHDOM'">
-    <label class="lbl">Show MAKHDOM of</label>
+    <label class="lbl">عرض مخدومين</label>
     <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
       <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
     </select>
   </div>
 
   <div class="actions">
-    <button *ngIf="!selecting" pButton type="button" label="Transfer" (click)="startTransfer()"></button>
+    <button *ngIf="!selecting" pButton type="button" label="نقل" (click)="startTransfer()"></button>
 
     <ng-container *ngIf="selecting">
       <!-- ✅ Target family -->
       <div class="inlinePicker">
-        <label class="lbl">To family</label>
+        <label class="lbl">إلى أسرة</label>
 
         <!-- AMIN_KHEDMA/DEV + MAKHDOM -> makhdom families list (A/B) -->
         <select class="select" *ngIf="isAminKhedmaOrDev() && mode === 'MAKHDOM'" [(ngModel)]="targetFamily">
@@ -47,7 +47,7 @@
 
       <!-- ✅ Target role (only in SERVANT mode for AMIN_KHEDMA/DEV) -->
       <div class="inlinePicker" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'">
-        <label class="lbl">To role</label>
+        <label class="lbl">إلى دور</label>
         <select class="select" [(ngModel)]="targetRole">
           <option value="KHADIM">خادم</option>
           <option value="MAKHDOM">مخدوم</option>
@@ -56,22 +56,22 @@
         </select>
       </div>
 
-      <button pButton type="button" label="Transfer" (click)="doTransfer()"></button>
-      <button pButton type="button" class="p-button-secondary" label="Cancel" (click)="cancelSelecting()"></button>
-      <span class="selHint">Selected: {{selectedIds.size}}</span>
+      <button pButton type="button" label="نقل" (click)="doTransfer()"></button>
+      <button pButton type="button" class="p-button-secondary" label="إلغاء" (click)="cancelSelecting()"></button>
+      <span class="selHint">المحدد: {{selectedIds.size}}</span>
     </ng-container>
   </div>
 
-  <div *ngIf="loading" class="hint">Loading...</div>
+  <div *ngIf="loading" class="hint">جاري التحميل...</div>
 
   <div class="tableWrap" *ngIf="!loading">
     <table class="tbl">
       <thead>
         <tr>
-          <th *ngIf="selecting">Select</th>
-          <th>Name</th>
-          <th>Role</th>
-          <th>Family</th>
+          <th *ngIf="selecting">اختيار</th>
+          <th>الاسم</th>
+          <th>الدور</th>
+          <th>الأسرة</th>
         </tr>
       </thead>
       <tbody>

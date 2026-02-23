@@ -1,20 +1,20 @@
 <p-toast></p-toast>
 
 <div class="page">
-  <h1>Members attendance</h1>
+  <h1>حضور الأعضاء</h1>
 
   <div class="top" *ngIf="isAminKhedmaOrDev()">
-    <label>Family</label>
+    <label>الأسرة</label>
     <select [(ngModel)]="selectedFamily" (change)="loadMembers()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
     </select>
   </div>
 
   <div class="actions">
-    <button pButton type="button" label="Export PDF" (click)="exportPdf()"></button>
+    <button pButton type="button" label="تحميل الملف pdf " (click)="exportPdf()"></button>
   </div>
 
-  <div *ngIf="loading" class="hint">Loading...</div>
+  <div *ngIf="loading" class="hint">جاري التحميل...</div>
 
   <div class="tableWrap" *ngIf="!loading">
     <table class="tbl">
@@ -23,12 +23,12 @@
           <th class="chk" *ngIf="exportMode">
             <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" />
           </th>
-          <th>Name</th>
+          <th>الاسم</th>
           <th>قداس الجمعة</th>
           <th>تسبحة</th>
           <th>اجتماع الأسرة</th>
-          <th>Details</th>
-          <th>Profile</th>
+          <th>تفاصيل</th>
+          <th>الملف</th>
         </tr>
       </thead>
       <tbody>
@@ -106,7 +106,7 @@
       </ng-template>
 
       <ng-template #noDetails>
-        <div class="hint">No attendance records.</div>
+        <div class="hint">لا توجد سجلات حضور.</div>
       </ng-template>
     </div>
   </div>
@@ -123,29 +123,29 @@
       </div>
 
       <div *ngIf="profile; else loadingProfile" class="profileGrid">
-        <div><b>Username:</b> {{profile.username}}</div>
-        <div><b>Email:</b> {{profile.email}}</div>
-        <div><b>Family:</b> {{profile.deaconFamily}}</div>
-        <div><b>Degree:</b> {{profile.deaconDegree}}</div>
-        <div><b>National ID:</b> {{profile.nationalId}}</div>
-        <div><b>Phone:</b> {{profile.phoneNumber}}</div>
-        <div><b>Address:</b> {{profile.address}}</div>
-        <div><b>Father phone:</b> {{profile.guardiansPhone}}</div>
-        <div><b>Relation:</b> {{profile.guardianRelation}}</div>
-        <div><b>DOB:</b> {{profile.dateOfBirth}}</div>
-        <div><b>Gender:</b> {{profile.gender}}</div>
-        <div><b>Status:</b> {{profile.status}}</div>
-        <div><b>Study type:</b> {{profile.studyType}}</div>
-        <div><b>School:</b> {{profile.schoolName}} {{profile.schoolGrade}}</div>
-        <div><b>University:</b> {{profile.universityName}} {{profile.faculty}} {{profile.universityGrade}}</div>
-        <div><b>Graduated from:</b> {{profile.graduatedFrom}}</div>
-        <div><b>Job:</b> {{profile.graduateJob}}</div>
-        <div><b>Working:</b> {{profile.isWorking}}</div>
-        <div><b>Work details:</b> {{profile.workDetails}}</div>
+        <div><b>اسم المستخدم:</b> {{profile.username}}</div>
+        <div><b>البريد الإلكتروني:</b> {{profile.email}}</div>
+        <div><b>الأسرة:</b> {{profile.deaconFamily}}</div>
+        <div><b>الرتبة:</b> {{profile.deaconDegree}}</div>
+        <div><b>الرقم القومي:</b> {{profile.nationalId}}</div>
+        <div><b>الهاتف:</b> {{profile.phoneNumber}}</div>
+        <div><b>العنوان:</b> {{profile.address}}</div>
+        <div><b>هاتف ولي الأمر:</b> {{profile.guardiansPhone}}</div>
+        <div><b>صلة القرابة:</b> {{profile.guardianRelation}}</div>
+        <div><b>تاريخ الميلاد:</b> {{profile.dateOfBirth}}</div>
+        <div><b>النوع:</b> {{profile.gender}}</div>
+        <div><b>الحالة:</b> {{profile.status}}</div>
+        <div><b>نوع الدراسة:</b> {{profile.studyType}}</div>
+        <div><b>المدرسة:</b> {{profile.schoolName}} {{profile.schoolGrade}}</div>
+        <div><b>الجامعة:</b> {{profile.universityName}} {{profile.faculty}} {{profile.universityGrade}}</div>
+        <div><b>تخرج من:</b> {{profile.graduatedFrom}}</div>
+        <div><b>الوظيفة:</b> {{profile.graduateJob}}</div>
+        <div><b>يعمل:</b> {{profile.isWorking}}</div>
+        <div><b>تفاصيل العمل:</b> {{profile.workDetails}}</div>
       </div>
 
       <ng-template #loadingProfile>
-        <div class="hint">Loading...</div>
+        <div class="hint">جاري التحميل...</div>
       </ng-template>
     </div>
   </div>

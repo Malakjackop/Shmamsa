@@ -2,7 +2,7 @@
 
 <header class="header profile-header">
   <div class="profile-title">
-    <h2>👤 My Profile</h2>
+    <h2>👤 ملفي الشخصي</h2>
   </div>
 
   <div class="qr-section">
@@ -20,119 +20,119 @@
   <form [formGroup]="profileForm" (ngSubmit)="saveChanges()">
     <div class="form-grid">
       <div>
-        <label>Full Name</label>
+        <label>الاسم بالكامل</label>
         <input formControlName="fullName" />
       </div>
 
       <div>
-        <label>Email</label>
+        <label>البريد الإلكتروني</label>
         <input formControlName="email" />
       </div>
 
       <div>
-        <label>Phone Number</label>
+        <label>رقم الهاتف</label>
         <input formControlName="phoneNumber" />
       </div>
 
       <div>
-        <label>Address</label>
+        <label>العنوان</label>
         <input formControlName="address" />
       </div>
 
       <div *ngIf="!isServant()">
-        <label>Guardian’s Phone</label>
+        <label>هاتف ولي الأمر</label>
         <input formControlName="guardiansPhone" />
       </div>
 
       <div *ngIf="!isServant()">
-        <label>Guardian Relation</label>
+        <label>صلة القرابة</label>
         <input formControlName="guardianRelation" />
       </div>
 
 
       <div>
-        <label>Deacon Family</label>
+        <label>الأسرة</label>
         <input formControlName="deaconFamily" />
       </div>
 
       <div>
-        <label>Deacon Degree</label>
+        <label>رتبة الشماس</label>
         <input formControlName="deaconDegree" />
       </div>
 
       <div>
-        <label>Status</label>
+        <label>الحالة</label>
         <select formControlName="status">
-          <option value="" disabled>Choose Status</option>
-          <option value="student">Student</option>
-          <option value="graduate">Graduate</option>
+          <option value="" disabled>اختر الحالة</option>
+          <option value="student">طالب</option>
+          <option value="graduate">خريج</option>
         </select>
       </div>
 
       <div *ngIf="!isGraduate()">
-        <label>Study Type</label>
+        <label>نوع الدراسة</label>
 <select formControlName="studyType">
-  <option value="" disabled>Select Study Type</option>
-  <option *ngIf="!isServant()" value="school">School</option>
-  <option value="university">University</option>
+  <option value="" disabled>اختر نوع الدراسة</option>
+  <option *ngIf="!isServant()" value="school">مدرسة</option>
+  <option value="university">جامعة</option>
 </select>
 
       </div>
 
 <div *ngIf="!isGraduate() && !isServant() && isSchool()">
-  <label>School Name</label>
+  <label>اسم المدرسة</label>
   <input formControlName="schoolName" />
 </div>
 
 <div *ngIf="!isGraduate() && !isServant() && isSchool()">
-  <label>School Grade</label>
+  <label>الصف الدراسي</label>
   <input formControlName="schoolGrade" />
 </div>
 
 
 <div *ngIf="!isGraduate() && isUniversity()">
-  <label>University Name</label>
+  <label>اسم الجامعة</label>
   <input formControlName="universityName" />
 </div>
 
 <div *ngIf="!isGraduate() && isUniversity()">
-  <label>Faculty</label>
+  <label>الكلية</label>
   <input formControlName="faculty" />
 </div>
 
 <div *ngIf="!isGraduate() && isUniversity()">
-  <label>University Grade</label>
+  <label>السنة/الفرقة</label>
   <input formControlName="universityGrade" />
 </div>
 
 <div *ngIf="isGraduate()">
-  <label>Graduated From</label>
+  <label>تخرج من</label>
   <input formControlName="graduatedFrom" />
 </div>
 
 <div *ngIf="isGraduate()">
-  <label>Graduate Job</label>
+  <label>الوظيفة الحالية</label>
   <input formControlName="graduateJob" />
 </div>
 
 
       <div class="wide">
-        <label>Work Details</label>
+        <label>تفاصيل العمل</label>
         <input formControlName="workDetails" />
       </div>
     </div>
 
     <div class="buttons">
       <button type="button" class="edit-btn" (click)="toggleEdit()" *ngIf="!editMode">
-        ✏️ Edit Profile
+        ✏️ تعديل الملف الشخصي
       </button>
 
       <button type="submit" class="save-btn" *ngIf="editMode">
-        💾 Save Changes
+        💾 حفظ التغييرات
       </button>
 
       <button type="button" class="cancel-btn" (click)="toggleEdit()" *ngIf="editMode">
-        ❌ Cancel
+        ❌ إلغاء
       </button>
     </div>
   </form>

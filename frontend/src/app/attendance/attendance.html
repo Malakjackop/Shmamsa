@@ -1,7 +1,7 @@
 <p-toast></p-toast>
 
 <div class="page">
-  <h1>Attendance</h1>
+  <h1>الحضور</h1>
 
   <div class="layout">
     <!-- Sidebar: Families display list -->
@@ -22,7 +22,7 @@
     <!-- Main -->
     <section class="content">
       <div class="controls">
-        <label>Day</label>
+        <label>اليوم</label>
         <p-datepicker
           [(ngModel)]="selectedDate"
           (onSelect)="onDateChange()"
@@ -36,17 +36,17 @@
           placeholder="اختار يوم (خميس/جمعة/سبت)"
         ></p-datepicker>
 
-        <label>Event</label>
+        <label>النوع</label>
         <select [(ngModel)]="selectedType" [disabled]="true">
           <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
         </select>
 
-        <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'Stop Scan' : 'Scan QR'"></p-button>
+        <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'إيقاف المسح' : 'مسح كيو آر'"></p-button>
       </div>
 
       <div class="scanner" *ngIf="scanning">
         <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
-        <p class="hint">وجّه الكاميرا للـ QR.</p>
+        <p class="hint">وجّه الكاميرا للـ كيو آر.</p>
       </div>
 
       <!-- Search (قبل وبعد اختيار الأسرة) -->
@@ -58,7 +58,7 @@
             [(ngModel)]="searchText"
             (ngModelChange)="onSearchChange($event)"
             placeholder="اكتب اسم الولد..."
-            aria-label="Search"
+            aria-label="بحث"
           />
         </span>
 
@@ -107,7 +107,7 @@
 
       <!-- Selected + Submit -->
       <div class="selectedBox" *ngIf="selected.length">
-        <h2>Selected</h2>
+        <h2>المختارون</h2>
 
         <div class="list">
           <div class="row" *ngFor="let u of selected">
@@ -122,7 +122,7 @@
           </div>
         </div>
 
-        <p-button type="button" class="submit" (onClick)="submit()" label="Submit" [disabled]="!selectedDate"></p-button>
+        <p-button type="button" class="submit" (onClick)="submit()" label="تسجيل" [disabled]="!selectedDate"></p-button>
       </div>
     </section>
   </div>

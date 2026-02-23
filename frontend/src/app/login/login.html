@@ -4,37 +4,37 @@
 <div class="login-wrapper">
   <div class="login-container">
     <div class="login-header">
-      <img src="assets/images/church-logo.png" alt="Church Logo" class="logo">
-      <h1>DEACONS FAMILY <br> St Mary Church - Omrania</h1>
+      <img src="assets/images/church-logo.png" alt="شعار الكنيسة" class="logo">
+      <h1>أسرة الشمامسة <br> كنيسة السيدة العذراء - العمرانية</h1>
     </div>
 
     <form [formGroup]="loginForm" class="login-form" (ngSubmit)="onSubmit()">
 
       <!-- Username -->
       <div class="input-group">
-        <input type="text" formControlName="username" placeholder="USERNAME" required>
+        <input type="text" formControlName="username" placeholder="اسم المستخدم" required>
       </div>
       <p class="error-message" *ngIf="loginForm.get('username')?.invalid && loginForm.get('username')?.touched">
-        Username is required.
+        اسم المستخدم مطلوب.
       </p>
 
       <!-- Password with custom eye icon -->
       <div class="input-group password-group">
-        <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="PASSWORD" required>
+        <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="كلمة المرور" required>
         <span class="password-eye" (click)="toggleShowPassword()">
           <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
         </span>
       </div>
       <p class="error-message" *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
-        Password is required.
+        كلمة المرور مطلوبة.
       </p>
 
       <!-- Login button -->
-      <button type="submit" class="login-btn">LOGIN</button>
+      <button type="submit" class="login-btn">تسجيل الدخول</button>
 
       <div class="links">
-        <a routerLink="/forgot-password">Forgot Username/Password?</a><br>
-        <a routerLink="/register">Create Account</a><br>
+        <a routerLink="/forgot-password">نسيت اسم المستخدم/كلمة المرور؟</a><br>
+        <a routerLink="/register">إنشاء حساب</a><br>
       </div>
     </form>
 

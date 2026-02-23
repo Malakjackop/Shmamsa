@@ -3,8 +3,8 @@
       <!-- Header -->
       <header class="header">
         <div>
-          <h1>Welcome back, {{user.fullName }} 👋</h1>
-          <p>We are very happy to have you as part of our <strong>Deacons Family</strong>. </p>
+          <h1>أهلاً بعودتك، {{user.fullName }} 👋</h1>
+          <p>سعداء جداً بوجودك كجزء من <strong>أسرة الشمامسة</strong>. </p>
         </div>
 
       </header>
@@ -12,62 +12,62 @@
       <!-- Stats -->
       <section class="stats">
         <p-card class="stat-card gpa">
-          <h3>Current Family</h3>
+          <h3>الأسرة الحالية</h3>
           <h1>{{ user.deaconFamily }}</h1>
         </p-card>
         <p-card class="stat-card credits">
-          <h3> Meeting Attend </h3>
+          <h3>حضور اجتماع الأسرة</h3>
           <h1>{{ stats.FAMILY_MEETING }}</h1>
         </p-card>
         <p-card class="stat-card assignments">
-          <h3>Odas Attend  </h3>
+          <h3>حضور قداس الجمعة</h3>
           <h1>{{ stats.FRIDAY_LITURGY }}</h1>
         </p-card>
         <p-card class="stat-card classes">
-          <h3>  Rosary Attend</h3>
+          <h3>حضور التسبحة</h3>
           <h1>{{ stats.TASBEEHA }}</h1>
         </p-card>
       </section>
 
       <!-- Panels -->
       <section class="panels">
-        <p-panel header="week's Schedule" class="content-panel">
+        <p-panel header="جدول الأسبوع" class="content-panel">
           <ul class="schedule">
             <li>
               <div>
-                <strong>History 201</strong><br />
-                <small>8:00 AM - 1:30 PM • Dr. Smith</small>
+                <strong>تاريخ ٢٠١</strong><br />
+                <small>8:00 ص - 1:30 م • د. سميث</small>
               </div>
-              <p-button label="Join" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
+              <p-button label="انضم" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
             </li>
             <li>
               <div>
-                <strong>Biology 150</strong><br />
-                <small>11:00 AM - 1:30 PM • Prof. Johnson</small>
+                <strong>أحياء ١٥٠</strong><br />
+                <small>11:00 ص - 1:30 م • أ. جونسون</small>
               </div>
-              <p-button label="Join" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
+              <p-button label="انضم" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
             </li>
             <li>
               <div>
-                <strong>Art 210</strong><br />
-                <small>1:00 PM - 2:30 PM • Mrs. Williams</small>
+                <strong>فن ٢١٠</strong><br />
+                <small>1:00 م - 2:30 م • أ. ويليامز</small>
               </div>
-              <p-button label="Join" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
+              <p-button label="انضم" icon="pi pi-video" styleClass="p-button-success p-button-sm"></p-button>
             </li>
           </ul>
         </p-panel>
 
-        <p-panel header="Recent Activity" class="content-panel">
+        <p-panel header="آخر الأنشطة" class="content-panel">
           <ul class="activity">
-            <li><i class="pi pi-check-circle text-green-600"></i> You submitted Assignment 3 for History 201 <span>(3 days ago)</span></li>
-            <li><i class="pi pi-trophy text-yellow-600"></i> Grade posted for Exam 1 in Biology <span>(Yesterday)</span></li>
-            <li><i class="pi pi-megaphone text-blue-600"></i> New announcement from Mrs. Williams <span>(2 days ago)</span></li>
-            <li><i class="pi pi-file-edit text-red-600"></i> Assignment 2 due for Art 210 <span>(Tomorrow)</span></li>
+            <li><i class="pi pi-check-circle text-green-600"></i> قمت بتسليم الواجب رقم 3 <span>(منذ 3 أيام)</span></li>
+            <li><i class="pi pi-trophy text-yellow-600"></i> تم نشر درجة الاختبار <span>(أمس)</span></li>
+            <li><i class="pi pi-megaphone text-blue-600"></i> إعلان جديد <span>(منذ يومين)</span></li>
+            <li><i class="pi pi-file-edit text-red-600"></i> موعد تسليم واجب <span>(غداً)</span></li>
           </ul>
         </p-panel>
       </section>
 
       <footer class="footer">
-        © 2025 Deacons Family — All Rights Reserved
+        © 2025 أسرة الشمامسة — جميع الحقوق محفوظة
       </footer>
     </main>

@@ -2,20 +2,20 @@
 <p-confirmDialog></p-confirmDialog>
 
 <div class="page">
-  <h1>Start new year</h1>
+  <h1>بدء سنة جديدة</h1>
 
   <div class="card" *ngIf="isAllowed(); else forbidden">
 
     <button
       pButton
       type="button"
-      label="Start new year (Reset attendance for all)"
+      label="بدء سنة جديدة (تصفير الحضور للجميع)"
       styleClass="p-button-danger"
       [disabled]="running"
       (click)="startNewYear()"
     ></button>
 
-    <div *ngIf="running" class="hint">Running...</div>
+    <div *ngIf="running" class="hint">جاري التنفيذ...</div>
   </div>
 
   <ng-template #forbidden>

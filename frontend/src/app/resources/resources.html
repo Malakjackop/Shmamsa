@@ -2,48 +2,48 @@
 <p-confirmDialog></p-confirmDialog>
 
 <div class="page">
-  <h1>Resources</h1>
+  <h1>الموارد</h1>
 
   <div class="top" *ngIf="isAminKhedmaOrDev()">
-    <label>Family</label>
+    <label>الأسرة</label>
     <select [(ngModel)]="selectedFamily" (change)="loadResources()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
     </select>
 
     <small class="hint" *ngIf="selectedFamily === 'ALL'">
-      ALL will not show any list, but uploads will be global for all families.
+      اختيار ALL لن يعرض قائمة، لكن الملفات التي ترفعها ستكون متاحة لكل الأسر.
     </small>
   </div>
 
   <div class="upload" *ngIf="isUploader()">
-    <h3>Upload</h3>
+    <h3>رفع ملفات</h3>
 
     <div class="row">
-      <input type="text" [(ngModel)]="title" placeholder="Title (optional)" />
-      <input type="text" [(ngModel)]="description" placeholder="Description (optional)" />
+      <input type="text" [(ngModel)]="title" placeholder="العنوان (اختياري)" />
+      <input type="text" [(ngModel)]="description" placeholder="الوصف (اختياري)" />
     </div>
 
     <div class="row">
       <input type="file" (change)="onPickFile($event)" />
-      <button pButton type="button" label="Upload" (click)="upload()"></button>
+      <button pButton type="button" label="رفع" (click)="upload()"></button>
     </div>
   </div>
 
   <div class="card">
-    <h3>Files</h3>
+    <h3>الملفات</h3>
 
     <div *ngIf="resources.length === 0" class="empty">
-      No resources.
+      لا توجد ملفات.
     </div>
 
     <table *ngIf="resources.length > 0">
       <thead>
         <tr>
-          <th>Title</th>
-          <th>File</th>
-          <th>Family</th>
-          <th>Uploaded By</th>
-          <th style="width: 280px;">Actions</th>
+          <th>العنوان</th>
+          <th>الملف</th>
+          <th>الأسرة</th>
+          <th>تم الرفع بواسطة</th>
+          <th style="width: 280px;">إجراءات</th>
         </tr>
       </thead>
 
@@ -54,11 +54,11 @@
           <td>{{ r.family }}</td>
           <td>{{ r.uploadedByUsername }}</td>
           <td class="actions">
-            <button pButton type="button" label="Download" (click)="download(r)"></button>
+            <button pButton type="button" label="تحميل" (click)="download(r)"></button>
 
             <ng-container *ngIf="!isMakhdom() && isUploader()">
-              <button pButton type="button" label="Edit" (click)="openEdit(r)"></button>
-              <button pButton type="button" label="Delete" (click)="remove(r)"></button>
+              <button pButton type="button" label="تعديل" (click)="openEdit(r)"></button>
+              <button pButton type="button" label="حذف" (click)="remove(r)"></button>
             </ng-container>
           </td>
         </tr>
@@ -67,15 +67,15 @@
   </div>
 
   <div class="edit" *ngIf="editing">
-    <h3>Edit Resource</h3>
+    <h3>تعديل ملف</h3>
     <div class="row">
-      <input type="text" [(ngModel)]="editTitle" placeholder="Title" />
-      <input type="text" [(ngModel)]="editDescription" placeholder="Description" />
+      <input type="text" [(ngModel)]="editTitle" placeholder="العنوان" />
+      <input type="text" [(ngModel)]="editDescription" placeholder="الوصف" />
     </div>
     <div class="row">
       <input type="file" (change)="onEditFile($event)" />
-      <button pButton type="button" label="Save" (click)="saveEdit()"></button>
-      <button pButton type="button" label="Cancel" (click)="cancelEdit()"></button>
+      <button pButton type="button" label="حفظ" (click)="saveEdit()"></button>
+      <button pButton type="button" label="إلغاء" (click)="cancelEdit()"></button>
     </div>
   </div>
 </div>

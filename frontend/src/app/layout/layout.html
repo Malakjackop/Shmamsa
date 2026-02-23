@@ -4,43 +4,43 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <img src="assets/images/church-logo.png" class="logo" />
-      <h2>Deacons Family</h2>
-      <p>St Mary Church – Omrania</p>
+      <h2>أسرة الشمامسة</h2>
+      <p>كنيسة السيدة العذراء – العمرانية</p>
     </div>
 
     <ul class="menu">
       <li routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">
-        <i class="pi pi-home"></i> Dashboard
+        <i class="pi pi-home"></i> الرئيسية
       </li>
 
       <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
-        <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> Attendance</li>
-        <li routerLink="/family-attendance" routerLinkActive="active"><i class="pi pi-users"></i> Members attendance</li>
-        <li routerLink="/family-info" routerLinkActive="active"><i class="pi pi-id-card"></i> Members info</li>
-        <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> Transfer members</li>
+        <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> الحضور</li>
+        <li routerLink="/family-attendance" routerLinkActive="active"><i class="pi pi-users"></i> حضور الأعضاء</li>
+        <li routerLink="/family-info" routerLinkActive="active"><i class="pi pi-id-card"></i> بيانات الأعضاء</li>
+        <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> نقل الأعضاء</li>
       </ng-container>
 
       <ng-template #makhdomMenu>
-        <li><i class="pi pi-chart-bar"></i> Grades</li>
-        <li><i class="pi pi-pencil"></i> Assignments</li>
+        <li><i class="pi pi-chart-bar"></i> الدرجات</li>
+        <li><i class="pi pi-pencil"></i> الواجبات</li>
       </ng-template>
 
-      <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> Profile</li>
+      <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> الملف الشخصي</li>
       <li routerLink="/resources" routerLinkActive="active">
-      <i class="pi pi-folder"></i> Resources </li>
-      <li routerLink="/attendance-history">My Attendance</li>
-      <li routerLink="/about" routerLinkActive="active"><i class="pi pi-info-circle"></i> About us</li>
+      <i class="pi pi-folder"></i> الموارد </li>
+      <li routerLink="/attendance-history">سجل حضوري</li>
+      <li routerLink="/about" routerLinkActive="active"><i class="pi pi-info-circle"></i> من نحن</li>
 
       <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
-        <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active"><i class="pi pi-calendar"></i> Start new year</li>
+        <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active"><i class="pi pi-calendar"></i> بدء سنة جديدة</li>
       </ng-container>
     </ul>
 
-    <!-- Logout pinned to bottom so it never gets pushed out of view -->
+    <!-- تسجيل الخروج pinned to bottom so it never gets pushed out of view -->
     <div class="logout">
       <button type="button" (click)="logout()">
         <i class="pi pi-sign-out"></i>
-        Logout
+        تسجيل الخروج
       </button>
     </div>
   </aside>
