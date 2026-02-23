@@ -75,8 +75,8 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
         user.setPassword(null);
 
-        // Hide internal/system family label from responses
-        if ("DEVELOPER".equalsIgnoreCase(user.getRole()) && "SYSTEM".equalsIgnoreCase(user.getDeaconFamily())) {
+        // Hide internal/system family label from responses (for all roles)
+        if ("SYSTEM".equalsIgnoreCase(user.getDeaconFamily())) {
             user.setDeaconFamily(null);
         }
 

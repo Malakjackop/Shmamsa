@@ -5,7 +5,6 @@
       <h1>DEACONS FAMILY <br />St Mary Church - Omrania</h1>
     </div>
 
-    <!-- PrimeNG Toast (success only) -->
     <p-toast position="top-right"></p-toast>
 
     <form [formGroup]="registerForm" class="login-form" (ngSubmit)="submit()">
@@ -48,66 +47,138 @@
           <small class="error-text" *ngIf="shouldShowError('email')">{{ errorText('email','Email') }}</small>
         </div>
 
-
         <div class="input-group small">
-          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" [readonly]="true"    autocomplete="off"
+          <input type="date" formControlName="dateOfBirth" placeholder="DATE OF BIRTH" [readonly]="true" autocomplete="off"
                  (keydown)="$event.preventDefault()"
                  (click)="$event.preventDefault()" />
         </div>
 
         <div class="input-group small">
           <input type="text" formControlName="gender" placeholder="GENDER" [readonly]="true" autocomplete="off"
-                  (keydown)="$event.preventDefault()"
+                 (keydown)="$event.preventDefault()"
                  (click)="$event.preventDefault()" />
         </div>
       </div>
-      <!-- ✅ Deacon Family + Degree -->
-      <div class="input-row">
-        <!-- Deacon Family -->
+
+        <div class="input-row">
+          <div class="input-group small">
+           <select formControlName="deaconDegree" required (change)="markTouchedFromList('deaconDegree')">
+           <option value="" disabled>What's your Deacon Degree?</option>
+           <option>ابصالتس</option>
+           <option>اغنسطس</option>
+           <option>ايبودياكون</option>
+           <option>دياكون</option>
+           <option>ارشي دياكون</option>
+         </select>
+         <small class="error-text" *ngIf="shouldShowError('deaconDegree')">
+            {{ errorText('deaconDegree','Deacon Degree') }}
+         </small>
+      </div>
+    </div>
+
+
+       <!-- ✅ NEW (Servant only): Choose where you serve (FIRST THING) -->
+      <div class="input-row" *ngIf="isServant">
         <div class="input-group small">
-          <select formControlName="deaconFamily" required (change)="markTouchedFromList('deaconFamily')">
-  <option value="" disabled>What's your Deacon Family?</option>
-
-  <option value="اسرة السمائين">اسرة السمائين</option>
-  <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
-  <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
-  <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-  <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
-  
-  <ng-container *ngIf="isServant; else makhdomFamilies">
-    <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
-    <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
-  </ng-container>
-  
-  <ng-template #makhdomFamilies>
-    <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
-    <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
-    <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
-    <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
-  </ng-template>
-  <ng-container *ngIf="isServant; else stStephanMakhdom">
-    <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
-  </ng-container>
-  <ng-template #stStephanMakhdom>
-    <option value="اسرة القديس اسطفانوس أ">اسرة القديس اسطفانوس ( أ )</option>
-    <option value="اسرة القديس اسطفانوس ب">اسرة القديس اسطفانوس ( ب )</option>
-  </ng-template>
-</select>
-          <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','Deacon Family') }}</small>
-
-        </div>
-
-        <!-- ✅ Deacon Degree -->
-        <div class="input-group small">
-          <select formControlName="deaconDegree" required (change)="markTouchedFromList('deaconDegree')">
-            <option value="" disabled>What's your Deacon Degree?</option>
-            <option>ابصالتس</option>
-            <option>اغنسطس</option>
-            <option>ايبودياكون</option>
-            <option>دياكون</option>
-            <option>ارشي دياكون</option>
+          <select
+            formControlName="servingScope"
+            (change)="onServingScopeChange(); markTouchedFromList('servingScope')">
+            <option value="" disabled>بخدم فين؟</option>
+            <option value="FAMILY_ONLY">بخدم في اسره بس</option>
+            <option value="KHORS_ONLY">بخدم في خورس بس</option>
+            <option value="BOTH">بخدم في اسره و خورس مع بعض</option>
           </select>
-          <small class="error-text" *ngIf="shouldShowError('deaconDegree')">{{ errorText('deaconDegree','Deacon Degree') }}</small>
+          <small class="error-text" *ngIf="shouldShowError('servingScope')">
+            {{ errorText('servingScope','Serving Scope') }}
+          </small>
+        </div>
+      </div>
+
+         <!-- ✅ Deacon Family: Register always / Servant يظهر حسب scope -->
+      <div class="input-row" *ngIf="!isServant || (servingScope && servingScope !== 'KHORS_ONLY')">
+        <div class="input-group small">
+          <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
+            <option value="" disabled>What's your Deacon Family?</option>
+
+            <option value="اسرة السمائين">اسرة السمائين</option>
+            <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
+            <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
+            <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
+            <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
+
+            <ng-container *ngIf="isServant; else makhdomFamilies">
+              <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
+              <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
+            </ng-container>
+
+            <ng-template #makhdomFamilies>
+              <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
+              <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
+              <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
+              <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
+            </ng-template>
+
+            <ng-container *ngIf="isServant; else stStephanMakhdom">
+              <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
+            </ng-container>
+            <ng-template #stStephanMakhdom>
+              <option value="اسرة القديس اسطفانوس أ">اسرة القديس اسطفانوس ( أ )</option>
+              <option value="اسرة القديس اسطفانوس ب">اسرة القديس اسطفانوس ( ب )</option>
+            </ng-template>
+          </select>
+          <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','Deacon Family') }}</small>
+        </div>
+      </div>
+
+      <!-- ✅ ElKhors -->
+      <!-- Register: always show -->
+      <!-- Servant: show only when KHORS_ONLY or BOTH -->
+      <div class="input-row" *ngIf="!isServant || (servingScope === 'KHORS_ONLY' || servingScope === 'BOTH')">
+        <div class="input-group small">
+          <select formControlName="khors" (change)="markTouchedFromList('khors')">
+            <ng-container *ngIf="!isServant">
+              <option value="" disabled>ElKhors</option>
+              <option value="MARMARKOS">خورس مارمارقس الرسولي</option>
+              <option value="ATHANASIUS">خورس البابا اثناسيوس</option>
+              <option value="NONE">مش موجود ف أي خورس من دول</option>
+            </ng-container>
+
+            <ng-container *ngIf="isServant">
+              <option value="" disabled>بخدم في أنهي خورس؟</option>
+              <option value="MARMARKOS">بخدم في خورس مارمرقس الرسولي</option>
+              <option value="ATHANASIUS">بخدم في خورس البابا اثناسيوس</option>
+              <option value="BOTH">بخدم في الخورسين</option>
+            </ng-container>
+          </select>
+
+          <small class="error-text" *ngIf="shouldShowError('khors')">
+            {{ errorText('khors','ElKhors') }}
+          </small>
+        </div>
+      </div>
+
+         <!-- ✅ NEW: Attend Khors -->
+      <!-- Case 1: FAMILY_ONLY => user chooses -->
+      <div class="input-row" *ngIf="isServant && servingScope === 'FAMILY_ONLY'">
+        <div class="input-group small">
+          <select formControlName="attendKhors" (change)="markTouchedFromList('attendKhors')">
+            <option value="" disabled>بحضر في انهي خورس؟</option>
+            <option value="MARMARKOS">بحضر في خورس مارمارقس الرسولي</option>
+            <option value="ATHANASIUS">بحضر في خورس البابا اثناسيوس الرسولي</option>
+            <option value="NONE">مش موجود في ولا خورس</option>
+          </select>
+          <small class="error-text" *ngIf="shouldShowError('attendKhors')">
+            {{ errorText('attendKhors','Attend Khors') }}
+          </small>
+        </div>
+      </div>
+
+      <!-- Case 2: KHORS_ONLY / BOTH + serving MARMARKOS => show default ATHANASIUS (disabled) -->
+      <div class="input-row" *ngIf="isServant && (servingScope === 'KHORS_ONLY' || servingScope === 'BOTH') && (khorsValue === 'MARMARKOS')">
+        <div class="input-group small">
+          <select formControlName="attendKhors" [disabled]="true">
+            <option value="ATHANASIUS">بحضر خورس البابا اثناسيوس الرسولي</option>
+          </select>
         </div>
       </div>
 
@@ -140,7 +211,6 @@
 
       <!-- Student Section -->
       <div *ngIf="registerForm.get('status')?.value === 'student'">
-        <!-- Study Type -->
         <div class="input-row">
           <div class="input-group small">
             <select formControlName="studyType" (change)="onStudyTypeChange(); markTouchedFromList('studyType')">
@@ -161,34 +231,32 @@
           </div>
 
           <div class="input-group small">
-          <select class="form-select" formControlName="schoolGrade" (change)="markTouchedFromList('schoolGrade')">
-            <option value="" disabled>اختر الصف</option>
-            <option value="grade1_primary">أولى ابتدائي</option>
-            <option value="grade2_primary">تانية ابتدائي</option>
-            <option value="grade3_primary">تالتة ابتدائي</option>
-            <option value="grade4_primary">رابعة ابتدائي</option>
-            <option value="grade5_primary">خامسة ابتدائي</option>
-            <option value="grade6_primary">سادسة ابتدائي</option>
-
-            <option value="grade1_prep">أولى إعدادي</option>
-            <option value="grade2_prep">تانية إعدادي</option>
-            <option value="grade3_prep">تالتة إعدادي</option>
-
-            <option value="grade1_secondary">أولى ثانوي</option>
-            <option value="grade2_secondary">تانية ثانوي</option>
-            <option value="grade3_secondary">تالتة ثانوي</option>
-            <option value="other">أخر</option>
-          </select>
-          <small class="error-text" *ngIf="shouldShowError('schoolGrade')">{{ errorText('schoolGrade','School Grade') }}</small>
+            <select class="form-select" formControlName="schoolGrade" (change)="markTouchedFromList('schoolGrade')">
+              <option value="" disabled>اختر الصف</option>
+              <option value="grade1_primary">أولى ابتدائي</option>
+              <option value="grade2_primary">تانية ابتدائي</option>
+              <option value="grade3_primary">تالتة ابتدائي</option>
+              <option value="grade4_primary">رابعة ابتدائي</option>
+              <option value="grade5_primary">خامسة ابتدائي</option>
+              <option value="grade6_primary">سادسة ابتدائي</option>
+              <option value="grade1_prep">أولى إعدادي</option>
+              <option value="grade2_prep">تانية إعدادي</option>
+              <option value="grade3_prep">تالتة إعدادي</option>
+              <option value="grade1_secondary">أولى ثانوي</option>
+              <option value="grade2_secondary">تانية ثانوي</option>
+              <option value="grade3_secondary">تالتة ثانوي</option>
+              <option value="other">أخر</option>
+            </select>
+            <small class="error-text" *ngIf="shouldShowError('schoolGrade')">{{ errorText('schoolGrade','School Grade') }}</small>
           </div>
-            <div class="input-group small" *ngIf="showOtherGrade">
-              <input type="text"
-                    formControlName="otherGrade"
-                    placeholder="اكتب الصف الدراسي"
-                    (click)="markInteracted('otherGrade')" (blur)="markTouched('otherGrade')" />
-              <small class="error-text" *ngIf="shouldShowError('otherGrade')">{{ errorText('otherGrade','Other Grade') }}</small>
-            </div>
 
+          <div class="input-group small" *ngIf="showOtherGrade">
+            <input type="text"
+                   formControlName="otherGrade"
+                   placeholder="اكتب الصف الدراسي"
+                   (click)="markInteracted('otherGrade')" (blur)="markTouched('otherGrade')" />
+            <small class="error-text" *ngIf="shouldShowError('otherGrade')">{{ errorText('otherGrade','Other Grade') }}</small>
+          </div>
         </div>
 
         <!-- University Section -->
@@ -215,12 +283,12 @@
         <!-- Work Info -->
         <div class="input-row">
           <div class="input-group small">
-          <select formControlName="isWorking" (change)="markTouchedFromList('isWorking')">
-            <option value="" disabled>Do you work?</option>
-            <option [ngValue]="false">No</option>
-            <option [ngValue]="true">Yes</option>
-          </select>
-          <small class="error-text" *ngIf="shouldShowError('isWorking')">{{ errorText('isWorking','Is Working') }}</small>
+            <select formControlName="isWorking" (change)="markTouchedFromList('isWorking')">
+              <option value="" disabled>Do you work?</option>
+              <option [ngValue]="false">No</option>
+              <option [ngValue]="true">Yes</option>
+            </select>
+            <small class="error-text" *ngIf="shouldShowError('isWorking')">{{ errorText('isWorking','Is Working') }}</small>
           </div>
         </div>
 
@@ -277,13 +345,12 @@
           <small class="error-text" *ngIf="shouldShowError('confirmPassword')">{{ errorText('confirmPassword','Confirm Password') }}</small>
         </div>
       </div>
+
       <div class="input-group" *ngIf="isServant">
-        <label for="secret">Secret</label>
         <input id="secret" type="password" formControlName="secret" placeholder="Enter secret"
                (click)="markInteracted('secret')" (blur)="markTouched('secret')" />
         <small class="error-text" *ngIf="shouldShowError('secret')">{{ errorText('secret','Secret') }}</small>
       </div>
-
 
       <button type="submit" class="login-btn">REGISTER</button>
 

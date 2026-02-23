@@ -1,7 +1,7 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
 
@@ -14,7 +14,7 @@ import { InputIconModule } from 'primeng/inputicon';
   selector: 'app-register',
   templateUrl: './register.html',
   styleUrls: ['./register.css'],
-    standalone: true,
+  standalone: true,
   imports: [
     CommonModule,
     RouterModule,
@@ -32,9 +32,7 @@ export class RegisterComponent implements OnInit {
 
   registerForm!: FormGroup;
 
-  // Tracks explicit user interaction (click/change). Autofill won't trigger these.
   interacted: Record<string, boolean> = {};
-  // Allows showing validation errors only after user finishes interaction (blur/change)
   errorGate: Record<string, boolean> = {};
   submitAttempted = false;
   serverError: string | null = null;
@@ -43,20 +41,12 @@ export class RegisterComponent implements OnInit {
   showConfirmPassword = false;
   showOtherGrade = false;
 
-  isStudent = false;
-  isGraduate = false;
-  isSchool = false;
-  isUniversity = false;
-
-
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
     private router: Router,
     private messageService: MessageService
-  ) {
-  }
-
+  ) {}
 
   ngOnInit(): void {
     this.buildForm();
@@ -67,87 +57,193 @@ export class RegisterComponent implements OnInit {
     this.registerForm.get('password')?.valueChanges.subscribe(() => this.applyPasswordMismatch());
     this.registerForm.get('confirmPassword')?.valueChanges.subscribe(() => this.applyPasswordMismatch());
 
+    if (this.isServant) {
+      this.registerForm.get('servingScope')?.valueChanges.subscribe(() => this.onServingScopeChange());
+      this.registerForm.get('khors')?.valueChanges.subscribe(() => this.onKhorsChanged());
+    }
+
     this.onStatusChange();
     this.onStudyTypeChange();
-this.registerForm.get('schoolGrade')?.valueChanges.subscribe(value => {
-  this.showOtherGrade = value === 'other';
 
-  const otherCtrl = this.registerForm.get('otherGrade');
+    this.registerForm.get('schoolGrade')?.valueChanges.subscribe(value => {
+      this.showOtherGrade = value === 'other';
 
-  if (value === 'other') {
-    otherCtrl?.setValidators([Validators.required]);
-  } else {
-    otherCtrl?.setValue('', { emitEvent: false });
-    otherCtrl?.clearValidators();
+      const otherCtrl = this.registerForm.get('otherGrade');
+
+      if (value === 'other') {
+        otherCtrl?.setValidators([Validators.required]);
+      } else {
+        otherCtrl?.setValue('', { emitEvent: false });
+        otherCtrl?.clearValidators();
+      }
+
+      otherCtrl?.updateValueAndValidity({ emitEvent: false });
+    });
   }
 
-  otherCtrl?.updateValueAndValidity({ emitEvent: false });
-});
-
+  get servingScope(): string {
+    return String(this.registerForm?.get('servingScope')?.value || '');
   }
 
-private buildForm() {
-  
+  get khorsValue(): string {
+    return String(this.registerForm?.get('khors')?.value || '');
+  }
+
+  private buildForm() {
     const minAge = this.isServant ? 16 : 6;
 
     this.registerForm = this.fb.group({
-    fullName: ['', Validators.required],
-    username: ['', Validators.required],
-    phoneNumber: [''],
-    address: [''],
-    email: ['', [Validators.required, Validators.email]],
+      fullName: ['', Validators.required],
+      username: ['', Validators.required],
+      phoneNumber: [''],
+      address: [''],
+      email: ['', [Validators.required, Validators.email]],
 
-    nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
-    dateOfBirth: [''],
-    gender: [''],
+      nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
+      dateOfBirth: [''],
+      gender: [''],
 
-    deaconFamily: ['', Validators.required],
-    deaconDegree: ['', Validators.required],
-  
-    status: this.fb.control('', { updateOn: 'change' }),
+      deaconFamily: ['', Validators.required],
+      deaconDegree: ['', Validators.required],
 
-    graduatedFrom: [''],
-    graduateJob: [''],
+      khors: [''], // MARMARKOS / ATHANASIUS / BOTH / NONE
 
-    studyType: this.fb.control('', { updateOn: 'change' }),
+      // ✅ NEW
+      attendKhors: [''], // MARMARKOS / ATHANASIUS / NONE
 
-    schoolName: [''],
-  schoolGrade: this.fb.control('', { updateOn: 'change' }),
-  otherGrade: this.fb.control('', { updateOn: 'change' }),
+      servingScope: this.fb.control(this.isServant ? '' : '', {
+        validators: this.isServant ? [Validators.required] : [],
+        updateOn: 'change'
+      }),
 
-    universityName: [''],
-    faculty: [''],
-    universityGrade: [''],
+      status: this.fb.control('', { updateOn: 'change' }),
 
-    isWorking: [''],
-    workDetails: [''],
+      graduatedFrom: [''],
+      graduateJob: [''],
 
-    guardiansPhone: [''],
-    guardianRelation: [''],
+      studyType: this.fb.control('', { updateOn: 'change' }),
 
-    password: ['', Validators.required],
-    confirmPassword: ['', Validators.required],
+      schoolName: [''],
+      schoolGrade: this.fb.control('', { updateOn: 'change' }),
+      otherGrade: this.fb.control('', { updateOn: 'change' }),
 
-    secret: ['']
-  }, { updateOn: 'blur' });
+      universityName: [''],
+      faculty: [''],
+      universityGrade: [''],
 
-  if (this.isServant) {
-  this.registerForm.get('status')?.setValue('student', { emitEvent: false });
-  this.onStatusChange(); 
-}
+      isWorking: [''],
+      workDetails: [''],
 
+      guardiansPhone: [''],
+      guardianRelation: [''],
 
-  if (this.isServant) {
-    this.registerForm.get('secret')?.setValidators([Validators.required]);
+      password: ['', Validators.required],
+      confirmPassword: ['', Validators.required],
+
+      secret: ['']
+    }, { updateOn: 'blur' });
+
+    if (this.isServant) {
+      this.registerForm.get('status')?.setValue('student', { emitEvent: false });
+      this.onStatusChange();
+
+      this.registerForm.get('secret')?.setValidators([Validators.required]);
+      this.registerForm.get('secret')?.updateValueAndValidity({ emitEvent: false });
+    }
   }
-  this.registerForm.get('secret')?.updateValueAndValidity();
-}
 
+  // ✅ apply rules AFTER user chooses scope
+  onServingScopeChange() {
+    if (!this.isServant) return;
+
+    const scope = String(this.registerForm.get('servingScope')?.value || '').trim();
+    if (!scope) return;
+
+    const famCtrl = this.registerForm.get('deaconFamily');
+    const khorsCtrl = this.registerForm.get('khors');
+    const attendCtrl = this.registerForm.get('attendKhors');
+
+    // Family required only when serving in family
+    if (scope === 'KHORS_ONLY') {
+      famCtrl?.clearValidators();
+      famCtrl?.setValue('SYSTEM', { emitEvent: false });
+    } else {
+      famCtrl?.setValidators([Validators.required]);
+      if (String(famCtrl?.value || '').toUpperCase() === 'SYSTEM') {
+        famCtrl?.setValue('', { emitEvent: false });
+      }
+    }
+    famCtrl?.updateValueAndValidity({ emitEvent: true });
+
+    // Khors required when serving in khors
+    if (scope === 'FAMILY_ONLY') {
+      khorsCtrl?.clearValidators();
+      khorsCtrl?.setValue('NONE', { emitEvent: false });
+    } else {
+      khorsCtrl?.setValidators([Validators.required]);
+      if (String(khorsCtrl?.value || '').toUpperCase() === 'NONE') {
+        khorsCtrl?.setValue('', { emitEvent: false });
+      }
+    }
+    khorsCtrl?.updateValueAndValidity({ emitEvent: true });
+
+    // ✅ Attend Khors rules
+    if (scope === 'FAMILY_ONLY') {
+      // required + user chooses
+      attendCtrl?.enable({ emitEvent: false });
+      attendCtrl?.setValidators([Validators.required]);
+      if (!String(attendCtrl?.value || '').trim()) {
+        attendCtrl?.setValue('', { emitEvent: false });
+      }
+    } else {
+      // not required by default, will be handled by onKhorsChanged()
+      attendCtrl?.clearValidators();
+      attendCtrl?.setValue('NONE', { emitEvent: false });
+      attendCtrl?.enable({ emitEvent: false });
+    }
+    attendCtrl?.updateValueAndValidity({ emitEvent: true });
+
+    this.onKhorsChanged();
+    this.registerForm.updateValueAndValidity({ emitEvent: true });
+  }
+
+  // ✅ when servant chooses serving khors
+  onKhorsChanged() {
+    if (!this.isServant) return;
+
+    const scope = String(this.registerForm.get('servingScope')?.value || '').trim();
+    if (!scope) return;
+
+    const kh = String(this.registerForm.get('khors')?.value || '').toUpperCase();
+    const attendCtrl = this.registerForm.get('attendKhors');
+
+    if (scope === 'FAMILY_ONLY') {
+      // already handled (manual choice)
+      attendCtrl?.enable({ emitEvent: false });
+      return;
+    }
+
+    // scope KHORS_ONLY or BOTH:
+    // if serving MARMARKOS -> attend ATHANASIUS (show + disabled)
+    if (kh === 'MARMARKOS') {
+      attendCtrl?.clearValidators();
+      attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
+      attendCtrl?.disable({ emitEvent: false }); // lock default
+    } else {
+      // serving ATHANASIUS or BOTH -> no attend selection
+      attendCtrl?.clearValidators();
+      attendCtrl?.setValue('NONE', { emitEvent: false });
+      attendCtrl?.enable({ emitEvent: false });
+    }
+
+    attendCtrl?.updateValueAndValidity({ emitEvent: true });
+    this.registerForm.updateValueAndValidity({ emitEvent: true });
+  }
 
   private nationalIdValidator(minAge: number): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
       const nid = String(control.value || '').trim();
-      if (!nid) return null; 
+      if (!nid) return null;
       if (!/^\d{14}$/.test(nid)) return { nationalIdFormat: true };
 
       const centuryCode = nid[0];
@@ -175,10 +271,6 @@ private buildForm() {
     };
   }
 
-  /**
-   * Inputs: show errors only after user CLICK then BLUR.
-   * We don't set touched on blur unless the user has interacted.
-   */
   markInteracted(controlName: string) {
     this.interacted[controlName] = true;
   }
@@ -187,12 +279,10 @@ private buildForm() {
     const c = this.registerForm.get(controlName);
     if (!c) return;
 
-    // Only open the error gate if the user explicitly interacted with the field
-    // (click -> blur). Browser autofill may trigger blur/touched without click.
     if (this.submitAttempted || this.interacted[controlName]) {
       this.errorGate[controlName] = true;
       c.markAsTouched();
-      c.updateValueAndValidity({ emitEvent: false });
+      c.updateValueAndValidity({ emitEvent: true });
 
       if (controlName === 'confirmPassword' || controlName === 'password') {
         this.applyPasswordMismatch();
@@ -200,22 +290,21 @@ private buildForm() {
     }
   }
 
-  /** Lists/selects stay reactive: errors can show on change. */
   markTouchedFromList(controlName: string) {
     const c = this.registerForm.get(controlName);
     if (!c) return;
+
     this.interacted[controlName] = true;
-    this.errorGate[controlName] = true; // lists are reactive (change triggers error visibility)
+    this.errorGate[controlName] = true;
+
     c.markAsTouched();
-    c.updateValueAndValidity({ emitEvent: false });
+    c.updateValueAndValidity({ emitEvent: true });
+    this.registerForm.updateValueAndValidity({ emitEvent: true });
   }
 
   shouldShowError(controlName: string): boolean {
     const c = this.registerForm.get(controlName);
     if (!c) return false;
-
-    // Show errors only after the field's "error gate" is opened (user click->blur / list change),
-    // OR after a submit attempt.
     const allowed = this.submitAttempted || !!this.errorGate[controlName];
     return allowed && c.invalid;
   }
@@ -224,39 +313,36 @@ private buildForm() {
     return this.getErrorMessage(controlName, label) || '';
   }
 
+  onStatusChange() {
+    const status = this.registerForm.get('status')?.value;
 
+    if (status !== 'graduate') {
+      this.registerForm.get('graduatedFrom')?.setValue('', { emitEvent: false });
+      this.registerForm.get('graduateJob')?.setValue('', { emitEvent: false });
+      this.registerForm.get('graduatedFrom')?.clearValidators();
+      this.registerForm.get('graduateJob')?.clearValidators();
+    } else {
+      this.registerForm.get('graduatedFrom')?.setValidators([Validators.required]);
+      this.registerForm.get('graduateJob')?.setValidators([Validators.required]);
+    }
 
-onStatusChange() {
-  const status = this.registerForm.get('status')?.value;
+    this.registerForm.get('graduatedFrom')?.updateValueAndValidity({ emitEvent: false });
+    this.registerForm.get('graduateJob')?.updateValueAndValidity({ emitEvent: false });
 
-  if (status !== 'graduate') {
-    this.registerForm.get('graduatedFrom')?.setValue('', { emitEvent: false });
-    this.registerForm.get('graduateJob')?.setValue('', { emitEvent: false });
-    this.registerForm.get('graduatedFrom')?.clearValidators();
-    this.registerForm.get('graduateJob')?.clearValidators();
-  } else {
-    this.registerForm.get('graduatedFrom')?.setValidators([Validators.required]);
-    this.registerForm.get('graduateJob')?.setValidators([Validators.required]);
-  }
+    const studyTypeCtrl = this.registerForm.get('studyType');
 
-  this.registerForm.get('graduatedFrom')?.updateValueAndValidity({ emitEvent: false });
-  this.registerForm.get('graduateJob')?.updateValueAndValidity({ emitEvent: false });
-
-  const studyTypeCtrl = this.registerForm.get('studyType');
-
-  if (this.isServant && status === 'student') {
-    studyTypeCtrl?.setValue('university', { emitEvent: false });
-    studyTypeCtrl?.disable({ emitEvent: false });     
-    this.onStudyTypeChange();                         
-  } else {
-    studyTypeCtrl?.enable({ emitEvent: false });     
-    if (status !== 'student') {
-      studyTypeCtrl?.setValue('', { emitEvent: false });
+    if (this.isServant && status === 'student') {
+      studyTypeCtrl?.setValue('university', { emitEvent: false });
+      studyTypeCtrl?.disable({ emitEvent: false });
       this.onStudyTypeChange();
+    } else {
+      studyTypeCtrl?.enable({ emitEvent: false });
+      if (status !== 'student') {
+        studyTypeCtrl?.setValue('', { emitEvent: false });
+        this.onStudyTypeChange();
+      }
     }
   }
-}
-
 
   onStudyTypeChange() {
     const studyType = this.registerForm.get('studyType')?.value;
@@ -291,21 +377,6 @@ onStatusChange() {
     this.registerForm.get('universityGrade')?.updateValueAndValidity({ emitEvent: false });
   }
 
-//   onGradeChange() {
-//   const gradeCtrl = this.registerForm.get('schoolGrade');
-//   const otherCtrl = this.registerForm.get('otherGrade');
-
-//   if (gradeCtrl?.value === 'other') {
-//     otherCtrl?.setValidators([Validators.required]);
-//   } else {
-//     otherCtrl?.setValue('', { emitEvent: false });
-//     otherCtrl?.clearValidators();
-//   }
-
-//   otherCtrl?.updateValueAndValidity({ emitEvent: false });
-// }
-
-
   applyPasswordMismatch() {
     const pass = this.registerForm.get('password')?.value;
     const confirmCtrl = this.registerForm.get('confirmPassword');
@@ -334,37 +405,21 @@ onStatusChange() {
     if (!c || !c.errors) return null;
 
     const e: any = c.errors;
-
     if (e['required']) return `${label || 'this field '} required`;
     if (e['email']) return `email not correct`;
-
     if (e['nationalIdFormat']) return 'national id must be 14 chracters ';
     if (e['nationalIdMinAge']) return `age must be  ${e['nationalIdMinAge']?.minAge} or more`;
-
     if (e['mismatch']) return 'password or confirm passwword not match';
-
-    // API/server validation message
     if (e['api']) return String(e['api']);
 
     return label ? `Value ${label} not correct` : ' Vlaue not correct ';
   }
 
-
-  togglePassword() {
-    this.showPassword = !this.showPassword;
-  }
-
-  toggleConfirmPassword() {
-    this.showConfirmPassword = !this.showConfirmPassword;
-  }
-
-  onSubmit() {
-    this.submit();
-  }
+  togglePassword() { this.showPassword = !this.showPassword; }
+  toggleConfirmPassword() { this.showConfirmPassword = !this.showConfirmPassword; }
 
   onNationalIdBlur() {
     const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
-
     if (!/^\d{14}$/.test(nid)) return;
 
     const centuryCode = nid[0];
@@ -378,7 +433,6 @@ onStatusChange() {
     const year = yearBase + Number(yy);
     const month = Number(mm);
     const day = Number(dd);
-
     if (month < 1 || month > 12 || day < 1 || day > 31) return;
 
     const iso = `${year.toString().padStart(4,'0')}-${mm}-${dd}`;
@@ -389,51 +443,12 @@ onStatusChange() {
     this.registerForm.get('gender')?.setValue(gender);
   }
 
-
-  toggleShowPassword() {
-    this.togglePassword();
-  }
-
-  toggleShowConfirmPassword() {
-    this.toggleConfirmPassword();
-  }
-
-
-  
   private showApiErrors(err: any) {
     this.serverError = null;
     const api = err?.error;
 
     if (api && api.errors && typeof api.errors === 'object') {
-      const fieldLabels: Record<string, string> = {
-        fullName: 'fullName',
-        username: 'username ',
-        email: 'email ',
-        password: 'password ',
-        confirmPassword: ' confirmPassword ',
-        nationalId: 'nationalId ',
-        deaconFamily: 'deaconFamily ',
-        deaconDegree: 'deaconDegree ',
-        phoneNumber: 'phoneNumber',
-        address: 'address',
-        guardiansPhone: 'guardiansPhone',
-        guardianRelation: 'guardianRelation',
-        status: 'status',
-        studyType: 'studyType ',
-        schoolName: 'schoolName',
-        schoolGrade: 'schoolGrade',
-        universityName: 'universityName',
-        faculty: 'faculty',
-        universityGrade: 'universityGrade',
-        graduatedFrom: 'graduatedFrom',
-        graduateJob: 'graduateJob',
-        isWorking: 'isWorking ?',
-        workDetails: 'workDetails',
-        secret: 'Secret'
-      };
-
       const entries = Object.entries(api.errors) as Array<[string, any]>;
-      // Put errors under fields instead of toast
       entries.forEach(([field, msg]) => {
         const ctrl = this.registerForm.get(field);
         if (!ctrl) return;
@@ -441,103 +456,110 @@ onStatusChange() {
         ctrl.setErrors({ ...(ctrl.errors || {}), api: detail });
         if (this.submitAttempted) ctrl.markAsTouched();
       });
-
-      if (entries.length === 0) {
-        this.serverError = api.message || 'Validation failed';
-      }
       return;
     }
-    const msg =
-      api?.message ||
-      api?.error ||
-      'An unexpected error occurred. Please try again.';
 
-    this.serverError = msg;
+    this.serverError = api?.message || api?.error || 'An unexpected error occurred. Please try again.';
   }
 
-submit() {
-  this.serverError = null;
-  this.submitAttempted = true;
-  if (this.registerForm.invalid) {
-    this.registerForm.markAllAsTouched();
-    this.applyPasswordMismatch();
-    return;
+  submit() {
+    this.serverError = null;
+    this.submitAttempted = true;
+
+    if (this.registerForm.invalid) {
+      this.registerForm.markAllAsTouched();
+      this.applyPasswordMismatch();
+      return;
+    }
+
+    const formValue = this.registerForm.getRawValue();
+
+    if (formValue.password !== formValue.confirmPassword) {
+      this.applyPasswordMismatch();
+      this.registerForm.get('confirmPassword')?.markAsTouched();
+      return;
+    }
+
+    const schoolGradeToSend =
+      formValue.schoolGrade === 'other'
+        ? String(formValue.otherGrade || '').trim()
+        : formValue.schoolGrade;
+
+    let khorsToSend = String(formValue.khors || '').trim();
+    if (!this.isServant) {
+      if (!khorsToSend) khorsToSend = 'NONE';
+    }
+
+    const payload: any = {
+      fullName: formValue.fullName,
+      username: formValue.username,
+      email: formValue.email,
+      password: formValue.password,
+      confirmPassword: formValue.confirmPassword,
+
+      deaconFamily: formValue.deaconFamily,
+      deaconDegree: formValue.deaconDegree,
+
+      khors: khorsToSend,
+
+      phoneNumber: formValue.phoneNumber,
+      address: formValue.address,
+      nationalId: formValue.nationalId,
+      dateOfBirth: formValue.dateOfBirth,
+      gender: formValue.gender,
+
+      status: formValue.status,
+      graduatedFrom: formValue.graduatedFrom,
+      graduateJob: formValue.graduateJob,
+
+      studyType: formValue.studyType,
+      schoolName: formValue.schoolName,
+      schoolGrade: schoolGradeToSend,
+      universityName: formValue.universityName,
+      faculty: formValue.faculty,
+      universityGrade: formValue.universityGrade,
+
+      isWorking: formValue.isWorking,
+      workDetails: formValue.workDetails,
+
+      guardiansPhone: formValue.guardiansPhone,
+      guardianRelation: formValue.guardianRelation,
+
+      secret: String(formValue.secret || '').trim(),
+    };
+
+    if (this.isServant) {
+      payload.servingScope = String(formValue.servingScope || '').trim();
+      if (!payload.servingScope) {
+        this.messageService.add({ severity: 'warn', summary: 'Missing', detail: 'اختار بخدم فين' });
+        return;
+      }
+
+      // ✅ NEW: send attendKhors
+      payload.attendKhors = String(formValue.attendKhors || '').trim();
+
+      // Apply scope rules
+      if (payload.servingScope === 'KHORS_ONLY') payload.deaconFamily = 'SYSTEM';
+      if (payload.servingScope === 'FAMILY_ONLY') payload.khors = 'NONE';
+
+      this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
+        .subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
+            this.router.navigate(['/login']);
+          },
+          error: (err) => this.showApiErrors(err)
+        });
+
+    } else {
+      this.http.post('/api/auth/register', payload, { withCredentials: true })
+        .subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Registered successfully.' });
+            this.router.navigate(['/login']);
+          },
+          error: (err) => this.showApiErrors(err)
+        });
+    }
   }
-
-  const formValue = this.registerForm.getRawValue();
-
-  if (formValue.password !== formValue.confirmPassword) {
-    this.applyPasswordMismatch();
-    this.registerForm.get('confirmPassword')?.markAsTouched();
-    return;
-  }
-
-  const schoolGradeToSend =
-  formValue.schoolGrade === 'other'
-    ? String(formValue.otherGrade || '').trim()
-    : formValue.schoolGrade;
-
-
-  const payload: any = {
-    fullName: formValue.fullName,
-    username: formValue.username,
-    email: formValue.email,
-    password: formValue.password,
-    confirmPassword: formValue.confirmPassword,
-    deaconFamily: formValue.deaconFamily,
-
-    phoneNumber: formValue.phoneNumber,
-    // NEW: address
-    address: formValue.address,
-    nationalId: formValue.nationalId,
-    dateOfBirth: formValue.dateOfBirth,
-    gender: formValue.gender,
-    deaconDegree: formValue.deaconDegree,
-
-    status: formValue.status,
-    graduatedFrom: formValue.graduatedFrom,
-    graduateJob: formValue.graduateJob,
-
-    studyType: formValue.studyType,
-    schoolName: formValue.schoolName,
-    schoolGrade: schoolGradeToSend,
-    universityName: formValue.universityName,
-    faculty: formValue.faculty,
-    universityGrade: formValue.universityGrade,
-
-    isWorking: formValue.isWorking,
-    workDetails: formValue.workDetails,
-
-    guardiansPhone: formValue.guardiansPhone,
-    guardianRelation: formValue.guardianRelation,
-
-    secret: String(formValue.secret || '').trim(),
-  };
-
-  if (this.isServant) {
-
-    this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
-      .subscribe({
-        next: () => {
-          this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
-          this.router.navigate(['/login']);
-        },
-        error: (err) => {
-          this.showApiErrors(err);
-        }
-      });
-
-  } else {
-    this.http.post('/api/auth/register', payload, { withCredentials: true })
-      .subscribe({
-        next: () => {
-          this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Registered successfully.' });
-          this.router.navigate(['/login']);
-        },
-        error: (err) => {
-          this.showApiErrors(err);
-        }
-      });
-  }
-}
 }
