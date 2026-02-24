@@ -14,7 +14,7 @@
       </li>
 
       <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
-        <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> الحضور</li>
+        <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> تسجيل الحضور</li>
         <li routerLink="/family-attendance" routerLinkActive="active"><i class="pi pi-users"></i> حضور الأعضاء</li>
         <li routerLink="/family-info" routerLinkActive="active"><i class="pi pi-id-card"></i> بيانات الأعضاء</li>
         <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> نقل الأعضاء</li>

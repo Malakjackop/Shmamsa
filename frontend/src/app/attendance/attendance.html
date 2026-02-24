@@ -41,7 +41,7 @@
           <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
         </select>
 
-        <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'إيقاف المسح' : 'مسح كيو آر'"></p-button>
+        <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'Stop' : 'Scan'"></p-button>
       </div>
 
       <div class="scanner" *ngIf="scanning">
