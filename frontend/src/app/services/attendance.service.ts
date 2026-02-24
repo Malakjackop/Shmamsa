@@ -1,4 +1,3 @@
-
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -16,14 +15,18 @@ export class AttendanceService {
     date?: string, // yyyy-MM-dd
     family?: string
   ): Observable<any> {
-    return this.http.post(`${this.baseUrl}/submit`, { users, type, date, family }, { withCredentials: true });
+    return this.http.post(
+      `${this.baseUrl}/submit`,
+      { users, type, date, family },
+      { withCredentials: true }
+    );
   }
 
   scanToken(token: string): Observable<{ id: number; username: string; fullName: string; deaconFamily?: string }> {
     return this.http.post<{ id: number; username: string; fullName: string; deaconFamily?: string }>(
       `${this.baseUrl}/scan-token`,
       { token }
-    );
+    , { withCredentials: true });
   }
 
   getMyStats(): Observable<{ FRIDAY_LITURGY: number; TASBEEHA: number; FAMILY_MEETING: number }> {
@@ -33,17 +36,37 @@ export class AttendanceService {
     );
   }
 
-history(): Observable<any> {
-  return this.http.get('/api/attendance/history', { withCredentials: true });
+  history(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/history`, { withCredentials: true });
+  }
+
+  // (لو زرار reset القديم لسه مستخدمينه في أي مكان)
+  resetAttendance(userIds: number[]): Observable<any> {
+    return this.http.post(`${this.baseUrl}/reset`, { userIds }, { withCredentials: true });
+  }
+
+  // ====== أرشيفات الحضور ======
+  archives(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/archives`, { withCredentials: true });
+  }
+
+  startNewYearArchive(name: string): Observable<any> {
+    return this.http.post<any>(
+      `${this.baseUrl}/start-new-year`,
+      { name },
+      { withCredentials: true }
+    );
+  }
+
+
+  downloadArchivePdf(id: number) {
+  return this.http.get(`${this.baseUrl}/archives/${id}/pdf`, {
+    responseType: 'blob',
+    withCredentials: true
+  });
 }
 
-resetAttendance(userIds: number[]): Observable<any> {
-  return this.http.post(`${this.baseUrl}/reset`, { userIds }, { withCredentials: true });
-}
-
-// Start a new year: reset attendance for all accounts (servants + served)
-startNewYear(): Observable<any> {
-  return this.http.post(`${this.baseUrl}/start-new-year`, {}, { withCredentials: true });
-}
-
+  archivePdfUrl(id: number): string {
+    return `${this.baseUrl}/archives/${id}/pdf`;
+  }
 }

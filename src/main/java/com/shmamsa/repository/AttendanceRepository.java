@@ -47,4 +47,34 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     @Query("delete from AttendanceRecord a where a.user.id in :userIds")
     int deleteByUserIds(@Param("userIds") List<Long> userIds);
 
+
+    // ====== Active (غير مؤرشف) ======
+    boolean existsByUser_IdAndDateAndTypeAndArchivedFalse(Long userId, LocalDate date, AttendanceType type);
+
+    AttendanceRecord findFirstByUser_IdAndDateAndTypeAndArchivedFalse(Long userId, LocalDate date, AttendanceType type);
+
+    List<AttendanceRecord> findByUser_IdAndArchivedFalseOrderByCreatedAtDesc(Long userId);
+
+    List<AttendanceRecord> findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(Long userId, AttendanceType type);
+
+    List<AttendanceRecord> findByUser_DeaconFamilyAndArchivedFalse(String deaconFamily);
+
+    List<AttendanceRecord> findByDateAndTypeAndArchivedFalse(LocalDate date, AttendanceType type);
+
+    List<AttendanceRecord> findByUser_DeaconFamilyStartingWithAndArchivedFalse(String prefix);
+
+    long countByUser_IdAndTypeAndArchivedFalse(Long userId, AttendanceType type);
+
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
+    long countPresentByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
+
+    // أرشفة سجل الحضور (بدل الحذف) وربطه بالأرشيف
+    @Modifying
+    @Transactional
+    @Query("update AttendanceRecord a set a.archived = true, a.archive = :archive where a.archived = false and a.user.id in :userIds")
+    int archiveByUserIds(@Param("userIds") List<Long> userIds, @Param("archive") com.shmamsa.model.AttendanceArchive archive);
+
+    // تحميل السجلات غير المؤرشفة لمجموعة مستخدمين
+    List<AttendanceRecord> findByUser_IdInAndArchivedFalse(List<Long> userIds);
+
 }

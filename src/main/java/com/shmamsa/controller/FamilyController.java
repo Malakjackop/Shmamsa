@@ -116,13 +116,13 @@ public class FamilyController {
             // ✅ Attendance page can opt-in to include the current user via includeSelf=true
             if (!includeSelf && me.getId() != null && me.getId().equals(u.getId())) continue;
 
-            long fridayTotal = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
-            long tasbeehaTotal = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.TASBEEHA);
-            long meetingTotal = attendanceRepo.countByUser_IdAndType(u.getId(), AttendanceType.FAMILY_MEETING);
+            long fridayTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FRIDAY_LITURGY);
+            long tasbeehaTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.TASBEEHA);
+            long meetingTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING);
 
-            long fridayPresent = attendanceRepo.countPresentByUserAndType(u.getId(), AttendanceType.FRIDAY_LITURGY);
-            long tasbeehaPresent = attendanceRepo.countPresentByUserAndType(u.getId(), AttendanceType.TASBEEHA);
-            long meetingPresent = attendanceRepo.countPresentByUserAndType(u.getId(), AttendanceType.FAMILY_MEETING);
+            long fridayPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FRIDAY_LITURGY);
+            long tasbeehaPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.TASBEEHA);
+            long meetingPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FAMILY_MEETING);
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", u.getId());

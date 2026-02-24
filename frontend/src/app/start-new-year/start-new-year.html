@@ -6,21 +6,65 @@
 
   <div class="card" *ngIf="isAllowed(); else forbidden">
 
+    <div class="form-row">
+      <label class="lbl">اسم الأرشيف</label>
+      <input
+        pInputText
+        type="text"
+        [(ngModel)]="archiveName"
+        placeholder="مثلاً: 2025-2026"
+        [disabled]="running"
+      />
+      <small class="hint">⚠️ مهم: اكتب اسم الأرشيف قبل البدء</small>
+    </div>
+
     <button
       pButton
       type="button"
-      label="بدء سنة جديدة (تصفير الحضور للجميع)"
+      label="بدء سنة جديدة (أرشفة الحضور للجميع)"
       styleClass="p-button-danger"
       [disabled]="running"
       (click)="startNewYear()"
     ></button>
 
     <div *ngIf="running" class="hint">جاري التنفيذ...</div>
+
+    <hr class="sep" />
+
+    <h3>الأرشيفات السابقة</h3>
+
+    <div *ngIf="!archivesList?.length" class="hint">لا يوجد أرشيفات حتى الآن.</div>
+
+    <table class="tbl" *ngIf="archivesList?.length">
+      <thead>
+        <tr>
+          <th>الاسم</th>
+          <th>تاريخ الإنشاء</th>
+          <th>أنشأه</th>
+          <th>تحميل</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of archivesList">
+          <td>{{ a?.name }}</td>
+          <td>{{ a?.createdAt }}</td>
+          <td>{{ a?.createdBy }}</td>
+          <td>
+            <a
+              class="link"
+              (click)="$event.preventDefault(); downloadPdf(a)"
+              href="#"
+              >تحميل PDF</a
+            >
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <ng-template #forbidden>
     <div class="card">
-      <p class="hint"></p>
+      <p class="hint">غير مسموح لك بالدخول لهذه الصفحة.</p>
     </div>
   </ng-template>
 </div>

@@ -1,3 +1,25 @@
 .page{padding:16px;color: black;}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:720px;}
 .hint{color:#6b7280;margin:0 0 12px 0;}
+
+
+.form-row{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-bottom:12px;
+  max-width:420px;
+}
+.lbl{font-weight:600;}
+.sep{margin:18px 0;}
+.tbl{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+.tbl th,.tbl td{
+  border:1px solid #ddd;
+  padding:8px;
+  text-align:right;
+}
+.link{ text-decoration: underline; }

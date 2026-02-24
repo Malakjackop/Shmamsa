@@ -1,19 +1,33 @@
 package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
+import com.shmamsa.model.AttendanceArchive;
 import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
+import com.shmamsa.repository.AttendanceArchiveRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.QrTokenService;
 import com.shmamsa.util.FamilyUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.ibm.icu.text.ArabicShaping;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.openhtmltopdf.bidi.support.ICUBidiReorderer;
+import com.openhtmltopdf.bidi.support.ICUBidiSplitter;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import java.time.LocalDate;
 import java.time.DayOfWeek;
@@ -25,9 +39,16 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AttendanceController {
 
+    // OpenHTMLToPDF uses java.util.logging (JUL) internally.
+    // Spring Boot's logging.level.* does NOT reliably control JUL packages unless you bridge JUL -> SLF4J.
+    // We silence noisy INFO/WARN logs for this library here to keep the terminal clean.
+    private static volatile boolean OPENHTMLTOPDF_LOGS_SILENCED = false;
+
     private final AttendanceRepository attendanceRepo;
+    private final AttendanceArchiveRepository archiveRepo;
     private final UserRepository userRepo;
     private final QrTokenService qrTokenService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody Map<String, Object> body, Authentication auth) {
@@ -106,7 +127,11 @@ public class AttendanceController {
         for (Map<String, Object> u : users) {
             if (u == null || u.get("id") == null) continue;
             Long id;
-            try { id = Long.valueOf(u.get("id").toString()); } catch (Exception e) { continue; }
+            try {
+                id = Long.valueOf(u.get("id").toString());
+            } catch (Exception e) {
+                continue;
+            }
             User target = userRepo.findById(id).orElse(null);
             if (target == null) continue;
             if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
@@ -147,7 +172,7 @@ public class AttendanceController {
 
         // 1) Upsert PRESENT for selected
         for (Long id : presentIds) {
-            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndType(id, selectedDate, type);
+            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
             if (existing != null) {
                 // If it was ABSENT, flip to PRESENT
                 if (existing.getStatus() == AttendanceStatus.ABSENT) {
@@ -163,8 +188,14 @@ public class AttendanceController {
             }
 
             User target = userRepo.findById(id).orElse(null);
-            if (target == null) { skipped++; continue; }
-            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) { skipped++; continue; }
+            if (target == null) {
+                skipped++;
+                continue;
+            }
+            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) {
+                skipped++;
+                continue;
+            }
 
             AttendanceRecord r = new AttendanceRecord();
             r.setUser(target);
@@ -183,7 +214,7 @@ public class AttendanceController {
             if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
             if (presentIds.contains(target.getId())) continue;
 
-            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndType(target.getId(), selectedDate, type);
+            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(target.getId(), selectedDate, type);
             if (existing != null) {
                 // keep as-is (if present, don't overwrite)
                 continue;
@@ -237,9 +268,9 @@ public class AttendanceController {
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        long f = attendanceRepo.countByUser_IdAndType(me.getId(), AttendanceType.FRIDAY_LITURGY);
-        long t = attendanceRepo.countByUser_IdAndType(me.getId(), AttendanceType.TASBEEHA);
-        long m = attendanceRepo.countByUser_IdAndType(me.getId(), AttendanceType.FAMILY_MEETING);
+        long f = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long t = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
+        long m = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
 
         return ResponseEntity.ok(Map.of(
                 "FRIDAY_LITURGY", f,
@@ -256,7 +287,7 @@ public class AttendanceController {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
 
-        List<AttendanceRecord> list = attendanceRepo.findByUser_IdOrderByCreatedAtDesc(me.getId());
+        List<AttendanceRecord> list = attendanceRepo.findByUser_IdAndArchivedFalseOrderByCreatedAtDesc(me.getId());
 
         List<Map<String, Object>> out = new ArrayList<>();
         for (AttendanceRecord r : list) {
@@ -270,6 +301,7 @@ public class AttendanceController {
         }
         return ResponseEntity.ok(out);
     }
+
     // Reset (delete) attendance history for selected users
     // Used by the Family page "Reset Attendance" button.
     @PostMapping("/reset")
@@ -295,14 +327,17 @@ public class AttendanceController {
             Object v = item;
             if (item instanceof Map<?, ?> m && m.get("id") != null) v = m.get("id");
 
-            try { ids.add(Long.valueOf(v.toString())); } catch (Exception ignored) {}
+            try {
+                ids.add(Long.valueOf(v.toString()));
+            } catch (Exception ignored) {
+            }
         }
 
         if (ids.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No valid userIds");
 
         String role = actor.getRole();
-        boolean isDev = "DEVELOPER".equals(role);
-        boolean isAminKhedma = "AMIN_KHEDMA".equals(role);
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(role);
         boolean isAminOsra = "AMIN_OSRA".equals(role);
         boolean isKhadim = "KHADIM".equals(role);
 
@@ -338,21 +373,28 @@ public class AttendanceController {
         return ResponseEntity.ok(Map.of("ok", true, "users", allowed.size(), "deletedRecords", deleted));
     }
 
-    // Start new year: reset attendance for ALL accounts (servants + served)
+    // Start new year: ARCHIVE attendance for ALL accounts (servants + served)
     // Visible in UI for AMIN_KHEDMA + DEVELOPER only.
     @PostMapping("/start-new-year")
-    public ResponseEntity<?> startNewYear(Authentication auth) {
+    public ResponseEntity<?> startNewYear(@RequestBody Map<String, Object> body, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
         User actor = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String role = actor.getRole();
-        boolean isDev = "DEVELOPER".equals(role);
-        boolean isAminKhedma = "AMIN_KHEDMA".equals(role);
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(role);
         if (!(isDev || isAminKhedma)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
+
+        String archiveName = body == null ? null : Objects.toString(body.get("name"), null);
+        if (archiveName == null || archiveName.trim().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Archive name is required");
+        }
+        archiveName = archiveName.trim();
+        if (archiveName.length() > 120) archiveName = archiveName.substring(0, 120);
 
         // All real users (exclude DEVELOPER)
         List<User> targets = userRepo.findByRoleIn(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
@@ -362,19 +404,505 @@ public class AttendanceController {
             ids.add(u.getId());
         }
 
-        if (ids.isEmpty()) {
-            return ResponseEntity.ok(Map.of("ok", true, "users", 0, "deletedRecords", 0));
+        // Load all ACTIVE (غير مؤرشف) attendance records for all users
+        List<AttendanceRecord> records = ids.isEmpty() ? List.of() : attendanceRepo.findByUser_IdInAndArchivedFalse(ids);
+
+        // Build snapshots (users + records) as JSON
+        List<Map<String, Object>> usersSnap = new ArrayList<>();
+        for (User u : targets) {
+            if (u == null) continue;
+            usersSnap.add(new LinkedHashMap<>(Map.of(
+                    "id", u.getId(),
+                    "fullName", u.getFullName(),
+                    "username", u.getUsername(),
+                    "role", u.getRole(),
+                    "email", u.getEmail(),
+                    "deaconFamily", u.getDeaconFamily(),
+                    "phoneNumber", u.getPhoneNumber(),
+                    "guardiansPhone", u.getGuardiansPhone(),
+                    "address", u.getAddress()
+            )));
         }
 
-        // Delete in chunks to avoid DB parameter limits
-        int deleted = 0;
-        final int CHUNK = 500;
-        for (int i = 0; i < ids.size(); i += CHUNK) {
-            List<Long> part = ids.subList(i, Math.min(i + CHUNK, ids.size()));
-            deleted += attendanceRepo.deleteByUserIds(part);
+        List<Map<String, Object>> recordsSnap = new ArrayList<>();
+        for (AttendanceRecord r : records) {
+            if (r == null) continue;
+            recordsSnap.add(new LinkedHashMap<>(Map.of(
+                    "id", r.getId(),
+                    "userId", r.getUser() == null ? null : r.getUser().getId(),
+                    "userFullName", r.getUser() == null ? null : r.getUser().getFullName(),
+                    "date", r.getDate() == null ? null : r.getDate().toString(),
+                    "time", r.getTime() == null ? null : r.getTime().toString(),
+                    "type", r.getType() == null ? null : r.getType().name(),
+                    "status", r.getStatus() == null ? null : r.getStatus().name(),
+                    "takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName(),
+                    "createdAt", r.getCreatedAt() == null ? null : r.getCreatedAt().toString()
+            )));
         }
 
-        return ResponseEntity.ok(Map.of("ok", true, "users", ids.size(), "deletedRecords", deleted));
+        String usersJson;
+        String recordsJson;
+        try {
+            usersJson = objectMapper.writeValueAsString(usersSnap);
+            recordsJson = objectMapper.writeValueAsString(recordsSnap);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to build archive json");
+        }
+
+        AttendanceArchive archive = new AttendanceArchive();
+        archive.setName(archiveName);
+        archive.setCreatedByUsername(actor.getUsername());
+        archive.setCreatedByFullName(actor.getFullName());
+        archive.setTotalUsers(ids.size());
+        archive.setTotalRecords(records.size());
+        archive.setUsersJson(usersJson);
+        archive.setRecordsJson(recordsJson);
+
+        archive = archiveRepo.save(archive);
+
+        // Archive (update) all active attendance records instead of deleting
+        int updated = 0;
+        if (!ids.isEmpty()) {
+            final int CHUNK = 500;
+            for (int i = 0; i < ids.size(); i += CHUNK) {
+                List<Long> part = ids.subList(i, Math.min(i + CHUNK, ids.size()));
+                updated += attendanceRepo.archiveByUserIds(part, archive);
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "archiveId", archive.getId(),
+                "archiveName", archive.getName(),
+                "users", ids.size(),
+                "archivedRecords", updated
+        ));
     }
 
+    // List all attendance archives
+    @GetMapping("/archives")
+    public ResponseEntity<?> archives(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User actor = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String role = actor.getRole();
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(role);
+        if (!(isDev || isAminKhedma)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        List<AttendanceArchive> list = archiveRepo.findAll();
+        // أحدث أولاً
+        list.sort((a, b) -> {
+            if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
+            if (a.getCreatedAt() == null) return 1;
+            if (b.getCreatedAt() == null) return -1;
+            return b.getCreatedAt().compareTo(a.getCreatedAt());
+        });
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (AttendanceArchive a : list) {
+            out.add(Map.of(
+                    "id", a.getId(),
+                    "name", a.getName(),
+                    "createdAt", a.getCreatedAt() == null ? null : a.getCreatedAt().toString(),
+                    "createdBy", a.getCreatedByFullName(),
+                    "totalUsers", a.getTotalUsers(),
+                    "totalRecords", a.getTotalRecords()
+            ));
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    // Download archive as PDF
+    @GetMapping("/archives/{id}/pdf")
+    public ResponseEntity<?> archivePdf(@PathVariable Long id, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User actor = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String role = actor.getRole();
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(role);
+        if (!(isDev || isAminKhedma)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        AttendanceArchive archive = archiveRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Archive not found"));
+
+        byte[] pdfBytes;
+        try {
+            pdfBytes = buildArchivePdf(archive);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate pdf");
+        }
+
+        String safeName = archive.getName() == null ? "archive" : archive.getName().trim();
+        if (safeName.isEmpty()) safeName = "archive";
+        safeName = safeName.replaceAll("[\\\\/:*?\"<>|]", "_");
+
+        String contentDisposition = buildContentDisposition(safeName + ".pdf");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
+    }
+
+    private byte[] buildArchivePdf(AttendanceArchive archive) throws Exception {
+
+        silenceOpenHtmlToPdfLogs();
+
+        List<Map<String, Object>> usersSnap = List.of();
+        List<Map<String, Object>> recordsSnap = List.of();
+
+        try {
+            if (archive.getUsersJson() != null && !archive.getUsersJson().isBlank()) {
+                usersSnap = objectMapper.readValue(
+                        archive.getUsersJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                        }
+                );
+            }
+            if (archive.getRecordsJson() != null && !archive.getRecordsJson().isBlank()) {
+                recordsSnap = objectMapper.readValue(
+                        archive.getRecordsJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                        }
+                );
+            }
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse archive json");
+        }
+
+        // Group records by userId
+        Map<Long, List<Map<String, Object>>> recordsByUser = recordsSnap.stream()
+                .filter(r -> r.get("userId") != null)
+                .collect(Collectors.groupingBy(r -> {
+                    Object v = r.get("userId");
+                    if (v instanceof Number n) return n.longValue();
+                    return Long.parseLong(v.toString());
+                }));
+
+        // Build HTML (Arabic RTL)
+        String html = buildArchiveHtmlArabic(archive, usersSnap, recordsByUser);
+        html = html.replace("\uFEFF", "").trim(); // ✅ remove BOM + trim
+        // Render to PDF
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            PdfRendererBuilder builder = new PdfRendererBuilder();
+            builder.withHtmlContent(html, null);
+
+            InputStream test = getClass().getResourceAsStream("/fonts/Amiri-Regular.ttf");
+            if (test == null) {
+                throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Arabic font missing: src/main/resources/fonts/Amiri-Regular.ttf");
+            }
+            try { test.close(); } catch (Exception ignored) {}
+
+            builder.useFont(() -> getClass().getResourceAsStream("/fonts/Amiri-Regular.ttf"), "Amiri");
+
+            builder.toStream(out);
+            builder.useUnicodeBidiSplitter(new ICUBidiSplitter.ICUBidiSplitterFactory());
+            builder.useUnicodeBidiReorderer(new ICUBidiReorderer());
+            builder.defaultTextDirection(PdfRendererBuilder.TextDirection.RTL);
+            builder.run();
+            return out.toByteArray();
+        }
+    }
+
+    private static void silenceOpenHtmlToPdfLogs() {
+        if (OPENHTMLTOPDF_LOGS_SILENCED) return;
+        synchronized (AttendanceController.class) {
+            if (OPENHTMLTOPDF_LOGS_SILENCED) return;
+
+            // Stop INFO spam like: com.openhtmltopdf.load INFO:: ...
+            Logger.getLogger("com.openhtmltopdf").setLevel(Level.SEVERE);
+            Logger.getLogger("com.openhtmltopdf.load").setLevel(Level.SEVERE);
+            Logger.getLogger("com.openhtmltopdf.match").setLevel(Level.SEVERE);
+            Logger.getLogger("com.openhtmltopdf.general").setLevel(Level.SEVERE);
+            Logger.getLogger("com.openhtmltopdf.css-parse").setLevel(Level.SEVERE);
+
+            OPENHTMLTOPDF_LOGS_SILENCED = true;
+        }
+    }
+
+    private String buildArchiveHtmlArabic(
+            AttendanceArchive archive,
+            List<Map<String, Object>> usersSnap,
+            Map<Long, List<Map<String, Object>>> recordsByUser
+    ) {
+        String name = safeStr(archive.getName());
+        String createdAt = archive.getCreatedAt() == null ? "" : archive.getCreatedAt().toString();
+        String createdBy = safeStr(archive.getCreatedByFullName());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
+                <html xmlns="http://www.w3.org/1999/xhtml" lang="ar" dir="rtl">
+                <head>
+                <meta charset="UTF-8" />
+                <style>
+                  @page { size: A4; margin: 18mm 14mm; }
+                  body { font-family: 'Amiri'; direction: rtl; font-size: 14px; }
+                  h1 { margin: 0 0 8px 0; font-size: 22px; }
+                  .meta { margin: 8px 0 14px 0; line-height: 1.8; }
+                  .meta b { display: inline-block; min-width: 120px; }
+                  .summary { margin: 10px 0 18px 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+                  .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin: 12px 0; page-break-inside: avoid; }
+                  .row { display: block; margin: 2px 0; }
+                  .label { color: #333; font-weight: bold; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                  th, td { border: 1px solid #ddd; padding: 7px; vertical-align: top; }
+                  th { background: #f5f5f5; }
+                  .muted { color: #555; }
+                  .counts { margin-top: 6px; }
+                  .counts span { margin-left: 14px; }
+                  .page-break { page-break-after: always; }
+                </style>
+                </head>
+                <body>
+                
+                <h1>أرشيف الحضور</h1>
+                """);
+
+        sb.append("<div class=\"meta\">");
+        sb.append("<div><b>اسم الأرشيف:</b> ").append(esc(name)).append("</div>");
+        sb.append("<div><b>تاريخ الإنشاء:</b> ").append(esc(createdAt)).append("</div>");
+        sb.append("<div><b>تم بواسطة:</b> ").append(esc(createdBy)).append("</div>");
+        sb.append("</div>");
+
+        sb.append("<div class=\"summary\">");
+        sb.append("<div><b>عدد المستخدمين:</b> ").append(archive.getTotalUsers() == null ? 0 : archive.getTotalUsers()).append("</div>");
+        sb.append("<div><b>عدد سجلات الحضور:</b> ").append(archive.getTotalRecords() == null ? 0 : archive.getTotalRecords()).append("</div>");
+        sb.append("</div>");
+
+        // For each user in snapshot, show their data + full attendance history from snapshot records
+        for (int i = 0; i < usersSnap.size(); i++) {
+            Map<String, Object> u = usersSnap.get(i);
+            Long userId = asLong(u.get("id"));
+            String fullName = safeStr(u.get("fullName"));
+            String username = safeStr(u.get("username"));
+            String role = roleAr(safeStr(u.get("role")));
+            String family = safeStr(u.get("deaconFamily"));
+            String phone = safeStr(u.get("phoneNumber"));
+            String gphone = safeStr(u.get("guardiansPhone"));
+            String address = safeStr(u.get("address"));
+            String email = safeStr(u.get("email"));
+
+            List<Map<String, Object>> recs = userId == null ? List.of() : recordsByUser.getOrDefault(userId, List.of());
+
+            // Count by type + status (present/absent)
+            int friP = 0, friA = 0;
+            int tasP = 0, tasA = 0;
+            int famP = 0, famA = 0;
+            int totalP = 0, totalA = 0;
+            for (Map<String, Object> r : recs) {
+                String t = safeStr(r.get("type"));
+                String st = safeStr(r.get("status"));
+
+                boolean present = "PRESENT".equalsIgnoreCase(st);
+                boolean absent = "ABSENT".equalsIgnoreCase(st);
+                if (present) totalP++;
+                else if (absent) totalA++;
+
+                if ("FRIDAY_LITURGY".equals(t)) {
+                    if (present) friP++;
+                    else if (absent) friA++;
+                } else if ("TASBEEHA".equals(t)) {
+                    if (present) tasP++;
+                    else if (absent) tasA++;
+                } else if ("FAMILY_MEETING".equals(t)) {
+                    if (present) famP++;
+                    else if (absent) famA++;
+                }
+            }
+
+            sb.append("<div class=\"card\">");
+            sb.append("<div class=\"row\"><span class=\"label\">الاسم:</span> ").append(esc(fullName)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">اليوزر:</span> ").append(esc(username)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">الدور:</span> ").append(esc(role)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">الأسرة:</span> ").append(esc(family)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">الموبايل:</span> ").append(esc(phone)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">موبايل ولي الأمر:</span> ").append(esc(gphone)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">العنوان:</span> ").append(esc(address)).append("</div>");
+            sb.append("<div class=\"row muted\"><span class=\"label\">البريد:</span> ").append(esc(email)).append("</div>");
+
+            sb.append("<div class=\"counts\">");
+            sb.append("<span><b>قداس الجمعة:</b> ")
+                    .append(friP + friA)
+                    .append(" (حضور ").append(friP).append(" / غياب ").append(friA).append(")</span>");
+            sb.append("<span><b>تسبحة:</b> ")
+                    .append(tasP + tasA)
+                    .append(" (حضور ").append(tasP).append(" / غياب ").append(tasA).append(")</span>");
+            sb.append("<span><b>اجتماع أسرة:</b> ")
+                    .append(famP + famA)
+                    .append(" (حضور ").append(famP).append(" / غياب ").append(famA).append(")</span>");
+            sb.append("<span><b>الإجمالي:</b> ")
+                    .append(recs.size())
+                    .append(" (حضور ").append(totalP).append(" / غياب ").append(totalA).append(")</span>");
+            sb.append("</div>");
+
+            sb.append("<table><thead><tr>");
+            sb.append("<th>التاريخ</th><th>الوقت</th><th>النوع</th><th>الحالة</th><th>تم بواسطة</th>");
+            sb.append("</tr></thead><tbody>");
+
+            if (recs.isEmpty()) {
+                sb.append("<tr><td colspan=\"5\">لا يوجد حضور مسجل</td></tr>");
+            } else {
+                // Group by type, then sort each group by date/time.
+                // Also merge the "type" cell using rowspan so the type name doesn't repeat.
+                List<String> typeOrder = List.of("TASBEEHA", "FRIDAY_LITURGY", "FAMILY_MEETING");
+                Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
+                for (String t : typeOrder) byType.put(t, new ArrayList<>());
+                for (Map<String, Object> r : recs) {
+                    String t = safeStr(r.get("type"));
+                    byType.computeIfAbsent(t, k -> new ArrayList<>()).add(r);
+                }
+
+                for (Map.Entry<String, List<Map<String, Object>>> entry : byType.entrySet()) {
+                    String rawType = entry.getKey();
+                    List<Map<String, Object>> group = entry.getValue();
+                    if (group == null || group.isEmpty()) continue;
+
+                    group.sort((a, b) -> {
+                        String da = safeStr(a.get("date"));
+                        String db = safeStr(b.get("date"));
+                        int c = da.compareTo(db);
+                        if (c != 0) return c;
+                        return safeStr(a.get("time")).compareTo(safeStr(b.get("time")));
+                    });
+
+                    String typeLabel = typeAr(rawType);
+                    int rowspan = group.size();
+
+                    for (int gi = 0; gi < group.size(); gi++) {
+                        Map<String, Object> r = group.get(gi);
+                        String date = safeStr(r.get("date"));
+                        String time = safeStr(r.get("time"));
+                        String status = statusAr(safeStr(r.get("status")));
+                        String takenBy = safeStr(r.get("takenBy"));
+
+                        sb.append("<tr>")
+                                .append("<td>").append(esc(date)).append("</td>")
+                                .append("<td>").append(esc(time)).append("</td>");
+
+                        if (gi == 0) {
+                            sb.append("<td rowspan=\"").append(rowspan).append("\">")
+                                    .append(esc(typeLabel))
+                                    .append("</td>");
+                        }
+
+                        sb.append("<td>").append(esc(status)).append("</td>")
+                                .append("<td>").append(esc(takenBy)).append("</td>")
+                                .append("</tr>");
+                    }
+                }
+            }
+
+            sb.append("</tbody></table>");
+            sb.append("</div>");
+
+            // optional page break every 3 users
+            if ((i + 1) % 3 == 0) {
+                sb.append("<div class=\"page-break\"></div>");
+            }
+        }
+
+        sb.append("</body></html>");
+        return sb.toString();
+    }
+
+    private static Long asLong(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.longValue();
+        try {
+            return Long.parseLong(v.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String safeStr(Object v) {
+        return v == null ? "" : v.toString();
+    }
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    private static boolean hasArabic(String s) {
+        if (s == null || s.isEmpty()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            // Arabic blocks: 0600–06FF, 0750–077F, 08A0–08FF, FB50–FDFF, FE70–FEFF
+            if ((ch >= 0x0600 && ch <= 0x06FF)
+                    || (ch >= 0x0750 && ch <= 0x077F)
+                    || (ch >= 0x08A0 && ch <= 0x08FF)
+                    || (ch >= 0xFB50 && ch <= 0xFDFF)
+                    || (ch >= 0xFE70 && ch <= 0xFEFF)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String arabicVisual(String input) {
+        if (input == null || input.isEmpty()) return "";
+        try {
+            // وصل الحروف فقط، وسيب الترتيب للـHTML + Renderer (dir=rtl)
+            ArabicShaping shaper = new ArabicShaping(
+                    ArabicShaping.LETTERS_SHAPE | ArabicShaping.TEXT_DIRECTION_LOGICAL
+            );
+            return shaper.shape(input);
+        } catch (Exception e) {
+            return input;
+        }
+    }
+
+    private static String typeAr(String t) {
+        return switch (t) {
+            case "FRIDAY_LITURGY" -> "قداس الجمعة";
+            case "TASBEEHA" -> "تسبحة";
+            case "FAMILY_MEETING" -> "اجتماع أسرة";
+            default -> (t == null || t.isBlank()) ? "" : t;
+        };
+    }
+
+    private static String statusAr(String s) {
+        return switch (s) {
+            case "PRESENT" -> "حاضر";
+            case "ABSENT" -> "غائب";
+            default -> (s == null || s.isBlank()) ? "" : s;
+        };
+    }
+
+    private static String roleAr(String r) {
+        return switch (r) {
+            case "MAKHDOM" -> "مخدوم";
+            case "KHADIM" -> "خادم";
+            case "AMIN_OSRA" -> "أمين أسرة";
+            case "AMIN_KHEDMA" -> "أمين خدمة";
+            case "DEVELOPER" -> "مطور";
+            default -> (r == null || r.isBlank()) ? "" : r;
+        };
+    }
+
+    private static String buildContentDisposition(String filename) {
+        if (filename == null || filename.isBlank()) filename = "archive.pdf";
+        // ASCII fallback for legacy filename="..."
+        String fallback = filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (fallback.isBlank()) fallback = "archive.pdf";
+        // RFC 5987 for UTF-8 filenames
+        String utf8 = java.net.URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return "attachment; filename=\"" + fallback + "\"; filename*=UTF-8''" + utf8;
+    }
 }

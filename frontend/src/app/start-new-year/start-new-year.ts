@@ -12,16 +12,23 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 })
 export class StartNewYearComponent implements OnInit {
   private auth = inject(AuthService);
-  private attendanceSvc = inject(AttendanceService);
+  // ✅ لازم يبقى public عشان نستخدمه في الـ HTML
+  attendanceSvc = inject(AttendanceService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
 
   me: any = null;
   running = false;
 
+  archiveName: string = '';
+  archivesList: any[] = [];
+
   ngOnInit(): void {
     this.auth.getUserData().subscribe({
-      next: (u) => (this.me = u),
+      next: (u) => {
+        this.me = u;
+        if (this.isAllowed()) this.loadArchives();
+      },
       error: () => (this.me = null)
     });
   }
@@ -30,37 +37,81 @@ export class StartNewYearComponent implements OnInit {
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
   }
 
+  loadArchives() {
+    this.attendanceSvc.archives().subscribe({
+      next: (list) => (this.archivesList = Array.isArray(list) ? list : []),
+      error: () => (this.archivesList = [])
+    });
+  }
+
+
+  downloadPdf(a: any) {
+  this.attendanceSvc.downloadArchivePdf(a.id).subscribe({
+    next: (blob: Blob) => {
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+
+      const safe = (a?.name || 'archive').toString().replace(/[\\/:*?"<>|]/g, '_');
+      link.download = `${safe}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    },
+    error: () => {
+      // toast فشل التحميل (لو عندك toast)
+      console.error('PDF download failed');
+    }
+  });
+}
+
+
   startNewYear() {
     if (!this.isAllowed()) {
       this.msg.add({ severity: 'error', summary: 'Forbidden', detail: 'غير مسموح' });
       return;
     }
 
+    if (!this.archiveName || !this.archiveName.trim()) {
+      this.msg.add({ severity: 'warn', summary: 'اسم الأرشيف', detail: 'اكتب اسم الأرشيف قبل البدء' });
+      return;
+    }
+
     this.confirm.confirm({
-      header: 'Start New Year',
+      header: 'بدء سنة جديدة',
       icon: 'pi pi-exclamation-triangle',
       message:
-        'هل أنت متأكد؟ سيتم مسح كل سجل الحضور لكل الحسابات (خدام + مخدومين). لا يمكن التراجع.',
-      acceptLabel: 'Confirm',
-      rejectLabel: 'Cancel',
+        'هل أنت متأكد؟ سيتم أرشفة كل سجل الحضور لكل الحسابات (خدام + مخدومين)، ثم يبدأ العد من 0. لا يوجد حذف.',
+      acceptLabel: 'تأكيد',
+      rejectLabel: 'إلغاء',
       accept: () => {
         this.running = true;
-        this.attendanceSvc.startNewYear().subscribe({
+
+        this.attendanceSvc.startNewYearArchive(this.archiveName.trim()).subscribe({
           next: (res) => {
             this.running = false;
+
             const users = res?.users ?? '';
-            const deleted = res?.deletedRecords ?? '';
+            const archived = res?.archivedRecords ?? '';
+
+            this.archiveName = '';
+            this.loadArchives();
+
             this.msg.add({
               severity: 'success',
-              summary: 'Done',
-              detail: `تم تصفير الحضور بنجاح. Users: ${users}  Deleted records: ${deleted}`
+              summary: 'تم',
+              detail: `تم أرشفة سنة كاملة وبدء سنة جديدة. Users: ${users}  Archived records: ${archived}`
             });
           },
           error: (err) => {
             this.running = false;
             this.msg.add({
               severity: 'error',
-              summary: 'Failed',
+              summary: 'فشل',
               detail: err?.error?.message || err?.error?.error || 'Failed'
             });
           }

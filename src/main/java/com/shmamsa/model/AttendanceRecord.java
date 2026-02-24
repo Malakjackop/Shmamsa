@@ -36,6 +36,13 @@ public class AttendanceRecord {
     @JoinColumn(name = "taken_by_user_id")
     private User takenBy;
 
+    // ✅ لما نعمل Start New Year هنأرشف السجل بدل ما نمسحه
+    private boolean archived = false;
+
+    @ManyToOne
+    @JoinColumn(name = "archive_id")
+    private AttendanceArchive archive;
+
     private LocalDateTime createdAt;
 
     @PrePersist
