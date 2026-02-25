@@ -431,8 +431,8 @@ String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
         List<?> records = (type == null)
-                ? attendanceRepo.findByUser_IdOrderByCreatedAtDesc(id)
-                : attendanceRepo.findByUser_IdAndTypeOrderByCreatedAtDesc(id, type);
+                ? attendanceRepo.findByUser_IdAndArchivedFalseOrderByCreatedAtDesc(id)
+                : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(id, type);
 
         // Light DTO: include who took the attendance/absence
         List<Map<String, Object>> out = new ArrayList<>();

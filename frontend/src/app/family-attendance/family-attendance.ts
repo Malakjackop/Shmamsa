@@ -182,9 +182,34 @@ openDetails(member: Member) {
     const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
-      next: (d) => (this.details = (d as any) || []),
+      next: (d) => (this.details = this.filterOutArchivedRows((d as any) || [])),
       error: () => (this.details = [])
     });
+  }
+
+  private filterOutArchivedRows(rows: any[]): AttendanceRow[] {
+    return (Array.isArray(rows) ? rows : []).filter((r) => !this.isArchivedRow(r)) as AttendanceRow[];
+  }
+
+  private isArchivedRow(row: any): boolean {
+    const isTrue = (v: any) => {
+      const s = String(v ?? '').trim().toLowerCase();
+      return v === true || v === 1 || s === 'true' || s === 'yes' || s === 'y';
+    };
+    const hasArchiveRef =
+      row?.archiveId !== null && row?.archiveId !== undefined && row?.archiveId !== 0;
+
+    return (
+      isTrue(row?.archived) ||
+      isTrue(row?.isArchived) ||
+      isTrue(row?.inArchive) ||
+      isTrue(row?.isInArchive) ||
+      !!row?.archive ||
+      !!row?.archiveName ||
+      !!row?.archivedAt ||
+      !!row?.archiveDate ||
+      hasArchiveRef
+    );
   }
 
   // ===== UI helpers =====
