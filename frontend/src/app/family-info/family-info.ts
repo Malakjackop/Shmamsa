@@ -269,12 +269,53 @@ export class FamilyInfoComponent implements OnInit {
 
       // Use landscape layout and avoid a super-wide table (which breaks rendering).
       const doc = new jsPDF({ orientation: 'landscape' });
+
+      // Load Arabic-capable font (DejaVuSans) so Arabic text doesn't become garbled.
+      // IMPORTANT: keep PDF direction LTR to avoid mirrored/reversed Latin text.
+      const ensureDejaVu = async (d: any) => {
+        try {
+          if (typeof d.setR2L === 'function') d.setR2L(false);
+          if (d.__hasDejaVu) {
+            d.setFont('DejaVu', 'normal');
+            return;
+          }
+          const res = await fetch('assets/fonts/DejaVuSans.ttf');
+          const buf = await res.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          const base64 = btoa(binary);
+          d.addFileToVFS('DejaVuSans.ttf', base64);
+          d.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
+          d.__hasDejaVu = true;
+          d.setFont('DejaVu', 'normal');
+        } catch {
+          // If font loading fails, PDF still generates (Arabic may not render correctly)
+        }
+      };
+
+      await ensureDejaVu(doc);
+
+      // Shape Arabic glyphs and isolate direction to keep mixed RTL/LTR text stable in PDF.
+      const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
+      const processArabic =
+        (doc as any).processArabic ||
+        ((jsPDF as any)?.API?.processArabic
+          ? (text: string) => (jsPDF as any).API.processArabic(text)
+          : null);
+      const pdfText = (v: any) => {
+        const s = (v ?? '') + '';
+        if (!s) return '';
+        if (!hasArabic(s)) return s;
+        return typeof processArabic === 'function' ? processArabic(s) : s;
+      };
+      const pageRight = doc.internal.pageSize.getWidth() - 14;
+
       doc.setFontSize(14);
-      doc.text('Members Info', 14, 14);
+      doc.text(pdfText('بيانات الأعضاء'), pageRight, 14, { align: 'right' });
       doc.setFontSize(10);
-      if (this.selectedFamily && /^[\x00-\x7F]+$/.test(this.selectedFamily)) {
-        // jsPDF default fonts don't support Arabic shaping well; only print ASCII safely.
-        doc.text(`Family: ${this.selectedFamily}`, 14, 22);
+      if (this.selectedFamily) {
+        doc.text(pdfText(`الأسرة: ${this.selectedFamily}`), pageRight, 22, { align: 'right' });
       }
 
       let y = 28;
@@ -282,64 +323,55 @@ export class FamilyInfoComponent implements OnInit {
         const d = detailsArr[idx] || {};
 
         doc.setFontSize(12);
-        doc.text(`${m.fullName} (${m.role})`, 14, y);
+        doc.text(pdfText(`${m.fullName} (${this.roleAr(m.role)})`), pageRight, y, { align: 'right' });
         y += 4;
 
-// NOTE: jsPDF default fonts don't support Arabic shaping well.
-// To avoid garbled text, we omit any values that contain non-ASCII characters.
-const safe = (v: any) => {
-  const s = (v ?? '') + '';
-  return /^[\x00-\x7F]*$/.test(s) ? s : '';
-};
+        const toYesNo = (v: any) => {
+          if (v === true) return 'نعم';
+          if (v === false) return 'لا';
+          return (v ?? '') + '';
+        };
 
-const toYesNo = (v: any) => {
-  if (v === true) return 'Yes';
-  if (v === false) return 'No';
-  return safe(v);
-};
+        const show = (v: any) => {
+          const s = String(v ?? '').trim();
+          return s ? s : '-';
+        };
 
-const addUnique = (map: Map<string, string>, key: string, value: any) => {
-  const val = safe(value);
-  if (!val) return;
-  if (!map.has(key)) map.set(key, val);
-};
+        const rows: [string, string][] = [
+          ['رقم الهاتف', d.phoneNumber ?? m.phoneNumber],
+          ['هاتف ولي الأمر', d.guardiansPhone ?? m.guardiansPhone],
+          ['العنوان', d.address ?? m.address],
+          ['الصف الدراسي', d.schoolGrade ?? m.schoolGrade],
+          ['اسم المستخدم', d.username],
+          ['البريد الإلكتروني', d.email],
+          ['الرقم القومي', d.nationalId],
+          ['الرتبة', d.deaconDegree],
+          ['صلة القرابة', this.guardianRelationAr(d.guardianRelation)],
+          ['تاريخ الميلاد', d.dateOfBirth],
+          ['النوع', this.genderAr(d.gender)],
+          ['الحالة', this.statusAr(d.status)],
+          ['نوع الدراسة', this.studyTypeAr(d.studyType)],
+          ['اسم المدرسة', d.schoolName],
+          ['اسم الجامعة', d.universityName],
+          ['الكلية', d.faculty],
+          ['السنة الجامعية', d.universityGrade],
+          ['الوظيفة', d.graduateJob],
+          ['هل يعمل', toYesNo(d.isWorking)],
+          ['تفاصيل العمل', d.workDetails]
+        ];
 
-const kvMap = new Map<string, string>();
-
-addUnique(kvMap, 'Phone', d.phoneNumber ?? m.phoneNumber);
-addUnique(kvMap, "Father's phone", d.guardiansPhone ?? m.guardiansPhone);
-addUnique(kvMap, 'Address', d.address ?? m.address);
-addUnique(kvMap, 'School grade', d.schoolGrade ?? m.schoolGrade);
-
-addUnique(kvMap, 'Username', d.username);
-addUnique(kvMap, 'Email', d.email);
-addUnique(kvMap, 'National ID', d.nationalId);
-addUnique(kvMap, 'Degree', d.deaconDegree);
-addUnique(kvMap, 'Relation', d.guardianRelation);
-addUnique(kvMap, 'DOB', d.dateOfBirth);
-addUnique(kvMap, 'Gender', d.gender);
-addUnique(kvMap, 'Status', d.status);
-addUnique(kvMap, 'Study type', d.studyType);
-addUnique(kvMap, 'School name', d.schoolName);
-addUnique(kvMap, 'University name', d.universityName);
-addUnique(kvMap, 'Faculty', d.faculty);
-addUnique(kvMap, 'University grade', d.universityGrade);
-addUnique(kvMap, 'Job', d.graduateJob);
-addUnique(kvMap, 'Working', toYesNo(d.isWorking));
-addUnique(kvMap, 'Work details', d.workDetails);
-
-// ✅ Tuple safe output (no TS2322)
-const kv: [string, string][] = Array.from(kvMap.entries()) as [string, string][];
+        // Always render every field row so table borders stay consistent.
+        const kv: [string, string][] = rows.map(([k, v]) => [pdfText(show(v)), pdfText(k)]);
 
         autoTable(doc, {
           startY: y,
-          head: [['Field', 'Value']],
+          head: [[pdfText('القيمة'), pdfText('البيان')]],
           body: kv,
           theme: 'grid',
-          styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak' },
+          styles: { font: 'DejaVu', fontSize: 9, cellPadding: 2, overflow: 'linebreak', halign: 'right' },
           columnStyles: {
-            0: { cellWidth: 45 },
-            1: { cellWidth: 220 }
+            0: { cellWidth: 220 },
+            1: { cellWidth: 45 }
           },
           margin: { left: 14, right: 14 }
         });
@@ -385,5 +417,48 @@ const kv: [string, string][] = Array.from(kvMap.entries()) as [string, string][]
         error: () => resolve([])
       });
     });
+  }
+
+  private roleAr(role?: string): string {
+    const r = (role || '').toUpperCase();
+    if (r === 'DEVELOPER') return 'مطوّر';
+    if (r === 'AMIN_KHEDMA') return 'أمين خدمة';
+    if (r === 'AMIN_OSRA') return 'أمين أسرة';
+    if (r === 'KHADIM') return 'خادم';
+    if (r === 'MEMBER') return 'عضو';
+    return role || '';
+  }
+
+  private genderAr(v?: string): string {
+    const x = (v || '').toUpperCase();
+    if (x === 'MALE') return 'ذكر';
+    if (x === 'FEMALE') return 'أنثى';
+    return v || '';
+  }
+
+  private studyTypeAr(v?: string): string {
+    const x = (v || '').toUpperCase();
+    if (x === 'SCHOOL') return 'مدرسي';
+    if (x === 'UNIVERSITY') return 'جامعي';
+    if (x === 'GRADUATE') return 'خريج';
+    return v || '';
+  }
+
+  private statusAr(v?: string): string {
+    const x = (v || '').toUpperCase();
+    if (x === 'ACTIVE') return 'نشط';
+    if (x === 'INACTIVE') return 'غير نشط';
+    if (x === 'SUSPENDED') return 'موقوف';
+    if (x === 'STUDENT') return 'طالب';
+    return v || '';
+  }
+
+  private guardianRelationAr(v?: string): string {
+    const x = (v || '').toUpperCase();
+    if (x === 'MOTHER' || x === 'MOM') return 'الأم';
+    if (x === 'FATHER' || x === 'DAD') return 'الأب';
+    if (x === 'BROTHER') return 'الأخ';
+    if (x === 'SISTER') return 'الأخت';
+    return v || '';
   }
 }

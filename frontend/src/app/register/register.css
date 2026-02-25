@@ -114,12 +114,13 @@ html {
 
 /* Password field */
 .password-group input {
-  padding-right: 35px;
+  padding-left: 35px; /* space for custom eye icon (left) */
+  padding-right: 15px;
 }
 
 .password-eye {
   position: absolute;
-  right: 10px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   cursor: pointer;

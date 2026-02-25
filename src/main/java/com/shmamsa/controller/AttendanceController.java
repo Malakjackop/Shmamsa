@@ -95,9 +95,11 @@ public class AttendanceController {
         // (الأسبوع بيتقفل يوم الاتنين)
         // لكن: AMIN_OSRA / AMIN_KHEDMA / DEVELOPER يقدروا يسجلوا لأي يوم فات
         LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        boolean canOverrideWeekClose = "AMIN_OSRA".equals(servant.getRole())
-                || "AMIN_KHEDMA".equals(servant.getRole())
-                || "DEVELOPER".equals(servant.getRole());
+        String roleNorm = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase().replaceAll("[-\\s]+", "_");
+        boolean canOverrideWeekClose = roleNorm.equals("AMIN_OSRA")
+                || roleNorm.equals("AMIN_KHEDMA")
+                || roleNorm.equals("DEVELOPER")
+                || roleNorm.equals("DEV");
 
         if (selectedDate.isBefore(monday) && !canOverrideWeekClose) {
             return ResponseEntity.status(400).body(Map.of("error", "Week is closed (cannot edit previous week)"));

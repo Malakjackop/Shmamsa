@@ -130,8 +130,7 @@ export class RegisterComponent implements OnInit {
       universityName: [''],
       faculty: [''],
       universityGrade: [''],
-
-      isWorking: [''],
+      isWorking: this.fb.control('', { updateOn: 'change' }),
       workDetails: [''],
 
       guardiansPhone: [''],
@@ -294,10 +293,17 @@ export class RegisterComponent implements OnInit {
     const c = this.registerForm.get(controlName);
     if (!c) return;
 
+    // Treat list/select controls as "interacted" on change,
+    // but don't open the error gate while the value is still empty.
     this.interacted[controlName] = true;
-    this.errorGate[controlName] = true;
 
-    c.markAsTouched();
+    const v = c.value;
+    const hasValue = v !== null && v !== undefined && (v + '').trim() !== '';
+    if (this.submitAttempted || hasValue) {
+      this.errorGate[controlName] = true;
+      c.markAsTouched();
+    }
+
     c.updateValueAndValidity({ emitEvent: true });
     this.registerForm.updateValueAndValidity({ emitEvent: true });
   }

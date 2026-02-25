@@ -68,12 +68,22 @@ export class AttendanceComponent implements OnInit {
     const monday = new Date(today);
     monday.setDate(today.getDate() - diffToMonday);
 
+    // Role can arrive in a few formats depending on DB/imports (English codes or Arabic labels).
+    // Normalize aggressively to avoid mismatches that would incorrectly lock old dates.
+    const rawRole = String(this.me?.role || '').trim();
+    const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
+    const roleArNorm = rawRole
+      .replace(/[\u064B-\u065F\u0670\u0640]/g, '') // remove Arabic diacritics/tatweel
+      .trim()
+      .replace(/\s+/g, ' ');
+
     const canOverrideWeekClose =
-      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes((this.me?.role || '').toUpperCase());
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_OSRA', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm) ||
+      ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسره', 'امين الأسرة'].includes(roleArNorm);
 
     // لو أمين أسرة/أمين خدمة/Developer: يقدر يسجل لأي يوم فات (بس خميس/جمعة/سبت)
     // غير كده: من Monday بتاع الأسبوع الحالي لحد النهارده
-    this.minDate = canOverrideWeekClose ? new Date(2020, 0, 1) : monday;
+    this.minDate = canOverrideWeekClose ? new Date(2000, 0, 1) : monday;
     this.maxDate = today;
     // Pick default date: today if allowed; otherwise the latest allowed day within this week up to today.
     const allowed = (d: Date) => {
@@ -277,8 +287,13 @@ export class AttendanceComponent implements OnInit {
     }
 
     const users = this.selected.map((x) => ({ id: x.id, username: x.username }));
+    const roleNorm = String(this.me?.role || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]+/g, '_');
+
     const canOverrideWeekClose =
-      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes((this.me?.role || '').toUpperCase());
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV'].includes(roleNorm);
 
     // السماح لأمين أسرة/أمين خدمة/Developer بتسجيل الغياب حتى لو مفيش حد حاضر (قائمة فاضية)
     if (users.length === 0 && !canOverrideWeekClose) {

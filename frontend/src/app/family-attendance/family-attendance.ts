@@ -217,6 +217,23 @@ openDetails(member: Member) {
     return 'اجتماع الأسرة';
   }
 
+  private statusAr(v?: AttendanceRow['status'] | string): string {
+    const s = (v || '').toUpperCase();
+    if (s === 'PRESENT') return 'حاضر';
+    if (s === 'ABSENT') return 'غائب';
+    return v || '';
+  }
+
+  private roleAr(role?: string): string {
+    const r = (role || '').toUpperCase();
+    if (r === 'DEVELOPER') return 'مطوّر';
+    if (r === 'AMIN_KHEDMA') return 'أمين خدمة';
+    if (r === 'AMIN_OSRA') return 'أمين أسرة';
+    if (r === 'KHADIM') return 'خادم';
+    if (r === 'MEMBER') return 'عضو';
+    return role || '';
+  }
+
   filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
     return (this.details || []).filter((d) => d?.type === t);
   }
@@ -261,7 +278,7 @@ formatRecordedAt(dateStr?: string): string {
   const minutes = String(d.getMinutes()).padStart(2, '0');
 
 const h24 = d.getHours();
-const ampmRaw = h24 >= 12 ? 'PM' : 'AM';
+const ampmRaw = h24 >= 12 ? 'م' : 'ص';
 const LRM = '\u200E'; 
 const ampm = `${LRM}${ampmRaw}${LRM}`;
 const h12 = h24 % 12 || 12;
@@ -327,8 +344,21 @@ async exportPdf() {
 
     const doc = new jsPDF({ orientation: 'landscape' });
     await ensureDejaVu(doc);
+    const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
+    const processArabic =
+      (doc as any).processArabic ||
+      ((jsPDF as any)?.API?.processArabic
+        ? (text: string) => (jsPDF as any).API.processArabic(text)
+        : null);
+    const pdfText = (v: any) => {
+      const s = (v ?? '') + '';
+      if (!s) return '';
+      if (!hasArabic(s)) return s;
+      return typeof processArabic === 'function' ? processArabic(s) : s;
+    };
+    const pageRight = doc.internal.pageSize.getWidth() - 14;
     doc.setFontSize(14);
-    doc.text('Members Attendance (details)', 14, 14);
+    doc.text(pdfText('تفاصيل حضور الأعضاء'), pageRight, 14, { align: 'right' });
     doc.setFontSize(10);
 
     let y = 20;
@@ -340,11 +370,11 @@ async exportPdf() {
       const records = attArr[idx] || [];
 
       doc.setFontSize(12);
-      doc.text(`${m.fullName} (${m.role})`, 14, y);
+      doc.text(pdfText(`${m.fullName} (${this.roleAr(m.role)})`), pageRight, y, { align: 'right' });
       y += 6;
       doc.setFontSize(10);
-      doc.text(`Family: ${fam}`, 14, y);
-      doc.text(`Phone: ${phone}`, 120, y);
+      doc.text(pdfText(`الأسرة: ${fam}`), pageRight, y, { align: 'right' });
+      doc.text(pdfText(`الهاتف: ${phone}`), pageRight - 110, y, { align: 'right' });
       y += 4;
 
       // Group by Type and merge the Type cell (rowSpan) so each type appears once.
@@ -369,23 +399,23 @@ async exportPdf() {
             // for the spanned column, otherwise cells shift into wrong columns.
             if (i === 0) {
               const typeCell = {
-                content: type,
+                content: pdfText(this.titleForType(type as AttendanceRow['type'])),
                 rowSpan: list.length,
-                styles: { valign: 'middle', fontStyle: 'bold' }
+                styles: { valign: 'middle', fontStyle: 'bold' , font: 'DejaVu', halign: 'right'}
               };
               body.push([
                 typeCell,
-                r.date || '',
-                r.status || '',
-                this.formatRecordedAt(r.createdAt),
-                r.takenBy?.fullName ? `${r.takenBy.fullName}` : ''
+                pdfText(r.date || ''),
+                pdfText(this.statusAr(r.status)),
+                pdfText(this.formatRecordedAt(r.createdAt)),
+                r.takenBy?.fullName ? pdfText(`${r.takenBy.fullName}`) : ''
               ]);
             } else {
               body.push([
-                r.date || '',
-                r.status || '',
-                this.formatRecordedAt(r.createdAt),
-                r.takenBy?.fullName ? `${r.takenBy.fullName}` : ''
+                pdfText(r.date || ''),
+                pdfText(this.statusAr(r.status)),
+                pdfText(this.formatRecordedAt(r.createdAt)),
+                r.takenBy?.fullName ? pdfText(`${r.takenBy.fullName}`) : ''
               ]);
             }
           });
@@ -394,10 +424,36 @@ async exportPdf() {
 
       autoTable(doc, {
         startY: y,
-        head: [['Type', 'Event date', 'Status', 'Recorded at', 'Taken by']],
+        head: [[pdfText('النوع'), pdfText('تاريخ المناسبة'), pdfText('الحالة'), pdfText('وقت التسجيل'), pdfText('المسجّل')]],
         body: body.length ? body : [['', '', '', '', '']],
         theme: 'grid',
-        styles: { fontSize: 9, font: 'DejaVu' }
+        margin: { left: 14, right: 14 },
+        tableWidth: doc.internal.pageSize.getWidth() - 28,
+        tableLineColor: [120, 120, 120],
+        tableLineWidth: 0.25,
+        styles: {
+          fontSize: 9,
+          font: 'DejaVu',
+          halign: 'right',
+          lineColor: [145, 145, 145],
+          lineWidth: 0.2
+        },
+        headStyles: {
+          lineColor: [90, 90, 90],
+          lineWidth: 0.3,
+          textColor: [255, 255, 255]
+        },
+        bodyStyles: {
+          lineColor: [150, 150, 150],
+          lineWidth: 0.2
+        },
+        columnStyles: {
+          0: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.24 },
+          1: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.18 },
+          2: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.12 },
+          3: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.22 },
+          4: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.24 }
+        }
       });
 
       // @ts-ignore
