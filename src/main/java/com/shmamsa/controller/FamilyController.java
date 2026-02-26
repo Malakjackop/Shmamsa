@@ -27,34 +27,72 @@ public class FamilyController {
         return u == null ? null : FamilyUtil.mainFamily(u.getDeaconFamily());
     }
 
+private List<String> servingBasesOf(User u) {
+    if (u == null) return List.of();
+    Set<String> set = new LinkedHashSet<>();
+    String b1 = FamilyUtil.mainFamily(u.getDeaconFamily());
+    if (b1 != null && !b1.isBlank() && !"SYSTEM".equalsIgnoreCase(b1)) set.add(b1);
+    String b2 = FamilyUtil.mainFamily(u.getDeaconFamily2());
+    if (b2 != null && !b2.isBlank() && !"SYSTEM".equalsIgnoreCase(b2)) set.add(b2);
+    String b3 = FamilyUtil.mainFamily(u.getDeaconFamily3());
+    if (b3 != null && !b3.isBlank() && !"SYSTEM".equalsIgnoreCase(b3)) set.add(b3);
+    String b4 = FamilyUtil.mainFamily(u.getDeaconFamily4());
+    if (b4 != null && !b4.isBlank() && !"SYSTEM".equalsIgnoreCase(b4)) set.add(b4);
+    return new ArrayList<>(set);
+}
+
     @GetMapping("/families")
-    public ResponseEntity<?> families(Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+public ResponseEntity<?> families(
+        @RequestParam(required = false) String context,
+        Authentication auth
+) {
+    if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        Set<String> set = new HashSet<>();
-        for (User u : userRepo.findAll()) {
-            if (u.getDeaconFamily() == null) continue;
+    User me = userRepo.findByUsername(auth.getName()).orElse(null);
 
-            if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
+    boolean isAminKhedmaOrDev = me != null && ("AMIN_KHEDMA".equals(me.getRole()) || "DEVELOPER".equals(me.getRole()));
+    boolean isKhadim = me != null && "KHADIM".equals(me.getRole());
 
-            String base = FamilyUtil.mainFamily(u.getDeaconFamily());
-            if (base == null || base.isBlank()) continue;
-
-            if ("SYSTEM".equalsIgnoreCase(base)) continue;
-
-            set.add(base);
-        }
-
-        List<String> out = new ArrayList<>(set);
+    // ✅ If KHADIM:
+    // - default: return only where he serves (1..4 families / choir)
+    // - context=attendance: allow picking any family (ONLY for "تسجيل الحضور" page)
+    boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+    if (isKhadim && !attendanceContext) {
+        List<String> out = servingBasesOf(me);
         out.sort(String::compareTo);
         return ResponseEntity.ok(out);
     }
 
+    // ✅ AMIN_KHEDMA / DEV: return all families in the system
+    // ✅ AMIN_OSRA: also fine to return all for transfer UI
+    Set<String> set = new HashSet<>();
+    for (User u : userRepo.findAll()) {
+        if (u.getDeaconFamily() == null) continue;
+        if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
 
-    @GetMapping("/members")
+        String base = FamilyUtil.mainFamily(u.getDeaconFamily());
+        if (base == null || base.isBlank()) continue;
+        if ("SYSTEM".equalsIgnoreCase(base)) continue;
+
+        set.add(base);
+    }
+
+    // ✅ Always include the 2 choirs as options (even if no users yet)
+    set.add("خورس مارمرقس");
+    set.add("خورس الانبا اثناسيوس");
+
+    List<String> out = new ArrayList<>(set);
+    out.sort(String::compareTo);
+    return ResponseEntity.ok(out);
+}
+
+
+@GetMapping("/members")
+
     public ResponseEntity<?> members(
             @RequestParam(required = false) String family,
             @RequestParam(required = false, defaultValue = "false") boolean includeSelf,
+            @RequestParam(required = false) String context,
             Authentication auth
     ) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -70,17 +108,29 @@ public class FamilyController {
         boolean servantsBucket = isAminKhedmaOrDev && family != null && "SERVANTS".equalsIgnoreCase(family.trim());
 
         // ✅ Family selection rules
-        // - AMIN_KHEDMA / DEV: can pick any family from dropdown
-        // - KHADIM (attendance context): can pick any family from dropdown to take attendance for that family
-        //   (Front-end sends 'family' when selecting a family on the attendance page)
-        // - Others: locked to their own family
-        boolean hasFamilySelection = family != null && !family.isBlank();
-        boolean khadimAttendanceContext = isKhadim && hasFamilySelection;
+// - AMIN_KHEDMA / DEV: can pick any family from dropdown
+// - KHADIM: can only pick from the places he serves in (1 or 2 families / choir)
+// - Others: locked to their own family
+boolean hasFamilySelection = family != null && !family.isBlank();
 
-        String target = ((isAminKhedmaOrDev || khadimAttendanceContext) && hasFamilySelection)
-                ? family
-                : me.getDeaconFamily();
-        String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
+// ✅ "تسجيل الحضور" page can pass context=attendance to allow KHADIM to select ANY family.
+boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+
+// ✅ For KHADIM: allow selecting only if the family is one of his serving families
+if (isKhadim && hasFamilySelection && !attendanceContext) {
+    String selectedBase = FamilyUtil.mainFamily(family);
+    List<String> myBases = servingBasesOf(me);
+    if (selectedBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(selectedBase))) {
+        throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+    }
+}
+
+boolean khadimAttendanceContext = isKhadim && hasFamilySelection;
+
+String target = ((isAminKhedmaOrDev || khadimAttendanceContext) && hasFamilySelection)
+        ? family
+        : me.getDeaconFamily();
+String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
 
         // ✅ Roles visible by permission level
         List<String> rolesToShow;
@@ -94,8 +144,8 @@ public class FamilyController {
             // - In "Members of your family" page (no 'family' param): keep old permissions (don't expose AMIN_KHEDMA)
             // - In attendance context (UI sends 'family' param when selecting a family): allow taking attendance/absence
             //   for all roles inside his family including AMIN_KHEDMA.
-            boolean attendanceContext = family != null && !family.isBlank();
-            rolesToShow = attendanceContext
+            boolean attendanceContext2 = family != null && !family.isBlank();
+            rolesToShow = attendanceContext2
                     ? List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
                     // ✅ In Members page: show served members only
                     : List.of("MAKHDOM");
@@ -104,11 +154,21 @@ public class FamilyController {
         }
 
         List<User> members;
-        if (servantsBucket) {
-                        members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
-        } else {
-            members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, rolesToShow);
+if (servantsBucket) {
+    members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+} else if (isKhadim && !hasFamilySelection) {
+    // ✅ KHADIM "Members" page: show served members in ALL families he serves (primary + optional second)
+    List<String> myBases = servingBasesOf(me);
+    Map<Long, User> uniq = new LinkedHashMap<>();
+    for (String b : myBases) {
+        for (User u : userRepo.findByDeaconFamilyStartingWithAndRoleIn(b, rolesToShow)) {
+            if (u.getId() != null) uniq.put(u.getId(), u);
         }
+    }
+    members = new ArrayList<>(uniq.values());
+} else {
+    members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, rolesToShow);
+}
 
         List<Map<String, Object>> out = new ArrayList<>();
         for (User u : members) {
@@ -129,6 +189,9 @@ public class FamilyController {
             row.put("fullName", u.getFullName());
             row.put("role", u.getRole());
             row.put("deaconFamily", u.getDeaconFamily());
+            row.put("deaconFamily2", u.getDeaconFamily2());
+            row.put("deaconFamily3", u.getDeaconFamily3());
+            row.put("deaconFamily4", u.getDeaconFamily4());
             row.put("address", u.getAddress());
             row.put("phoneNumber", u.getPhoneNumber());
             row.put("guardiansPhone", u.getGuardiansPhone());
@@ -179,10 +242,17 @@ public class FamilyController {
         String uBase = FamilyUtil.mainFamily(u.getDeaconFamily());
 
         if (!isAminKhedmaOrDev) {
-            if (base == null || uBase == null || !base.equals(uBase)) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+    if (isKhadim) {
+        List<String> myBases = servingBasesOf(me);
+        if (uBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(uBase))) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
+    } else {
+        if (base == null || uBase == null || !base.equals(uBase)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+    }
+}
 
         // DTO: don't return password
         Map<String, Object> dto = new LinkedHashMap<>();
@@ -192,6 +262,9 @@ public class FamilyController {
         dto.put("email", u.getEmail());
         dto.put("role", u.getRole());
         dto.put("deaconFamily", u.getDeaconFamily());
+        dto.put("deaconFamily2", u.getDeaconFamily2());
+        dto.put("deaconFamily3", u.getDeaconFamily3());
+        dto.put("deaconFamily4", u.getDeaconFamily4());
         dto.put("deaconDegree", u.getDeaconDegree());
         dto.put("nationalId", u.getNationalId());
         dto.put("phoneNumber", u.getPhoneNumber());
@@ -292,6 +365,8 @@ public class FamilyController {
 
         Object idsObj = body.get("memberIds");
         String newFamily = body.get("newFamily") == null ? null : body.get("newFamily").toString();
+        String secondaryFamily = body.get("secondaryFamily") == null ? null : body.get("secondaryFamily").toString();
+        Object extraFamiliesObj = body.get("extraFamilies");
         String targetRole = body.get("targetRole") == null ? null : body.get("targetRole").toString();
         String variant = body.get("variant") == null ? null : body.get("variant").toString(); // backward compatible
 if (idsObj == null || newFamily == null || newFamily.isBlank()) {
@@ -364,14 +439,73 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             }
         }
 
+
+        // ✅ Optional: extra serving families (future-proof)
+        // Backward compatible:
+        // - if client sends extraFamilies: use it
+        // - else fall back to secondaryFamily
+        List<String> requestedExtras = new ArrayList<>();
+        if (extraFamiliesObj instanceof List<?> list) {
+            for (Object o : list) {
+                if (o == null) continue;
+                String s = o.toString();
+                if (s != null && !s.isBlank()) requestedExtras.add(s);
+            }
+        } else if (secondaryFamily != null && !secondaryFamily.isBlank()) {
+            requestedExtras.add(secondaryFamily);
+        }
+
+        // normalize + cap to 3 extras (2..4)
+        List<String> effectiveExtras = new ArrayList<>();
+        for (String raw : requestedExtras) {
+            if (raw == null || raw.isBlank()) continue;
+            String secTrim = raw.trim();
+            String secBase = FamilyUtil.mainFamily(secTrim);
+            boolean isSpecialSec = (secBase != null) && specialKeywords.stream().anyMatch(secBase::contains);
+
+            String normalized;
+            if (secBase == null || secBase.isBlank()) {
+                normalized = secTrim;
+            } else if (!isSpecialSec) {
+                normalized = secBase;
+            } else {
+                boolean alreadyAB2 = secTrim.matches(".*\\s[أب]$");
+                if (alreadyAB2) normalized = secTrim;
+                else if (variant != null && !variant.isBlank()) {
+                    String v2 = variant.trim().toUpperCase(Locale.ROOT);
+                    if ("A".equals(v2)) normalized = secBase + " أ";
+                    else if ("B".equals(v2)) normalized = secBase + " ب";
+                    else if ("SERVANT".equals(v2)) normalized = secBase;
+                    else throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid variant");
+                } else {
+                    normalized = secBase;
+                }
+            }
+
+            if (normalized != null && !normalized.isBlank()) {
+                effectiveExtras.add(normalized.trim());
+                if (effectiveExtras.size() >= 3) break;
+            }
+        }
+
 if (effectiveFamily == null || effectiveFamily.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid target family");
         }
-        if (targetBase == null || targetBase.isBlank() || "SYSTEM".equalsIgnoreCase(targetBase)) {
+                if (targetBase == null || targetBase.isBlank() || "SYSTEM".equalsIgnoreCase(targetBase)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid target family");
         }
-String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
 
+        // ✅ Validate extra families (if provided)
+        for (String ef : effectiveExtras) {
+            if (ef == null || ef.isBlank()) continue;
+            String secBase = FamilyUtil.mainFamily(ef);
+            if (secBase == null || secBase.isBlank() || "SYSTEM".equalsIgnoreCase(secBase)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid extra family");
+            }
+        }
+
+
+        String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
         int updated = 0;
         for (Long id : ids) {
             if (id == null) continue;
@@ -411,7 +545,34 @@ String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
                 }
             }
 
-            u.setDeaconFamily(effectiveFamily.trim());   // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
+            u.setDeaconFamily(effectiveFamily.trim());
+
+            // ✅ Extra families rules:
+            // - If extras are empty -> clear (2..4)
+            // - If any extra equals primary base -> skip it
+            // - Avoid duplicates between extras
+            // - Store up to 3 extras in (2..4)
+            String primBase = FamilyUtil.mainFamily(effectiveFamily);
+
+            List<String> cleanExtras = new ArrayList<>();
+            Set<String> seenBases = new LinkedHashSet<>();
+            if (primBase != null && !primBase.isBlank()) seenBases.add(primBase);
+
+            for (String ef : effectiveExtras) {
+                if (ef == null || ef.isBlank()) continue;
+                String eb = FamilyUtil.mainFamily(ef);
+                if (eb == null || eb.isBlank()) continue;
+                if (seenBases.stream().anyMatch(x -> x.equalsIgnoreCase(eb))) continue;
+                seenBases.add(eb);
+                cleanExtras.add(ef.trim());
+                if (cleanExtras.size() >= 3) break;
+            }
+
+            u.setDeaconFamily2(cleanExtras.size() >= 1 ? cleanExtras.get(0) : null);
+            u.setDeaconFamily3(cleanExtras.size() >= 2 ? cleanExtras.get(1) : null);
+            u.setDeaconFamily4(cleanExtras.size() >= 3 ? cleanExtras.get(2) : null);
+
+            // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
             userRepo.save(u);
             updated++;
 

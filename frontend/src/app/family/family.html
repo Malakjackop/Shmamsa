@@ -60,7 +60,7 @@
         <tr *ngFor="let m of members">
           <td *ngIf="resetMode" class="selCol"><input type="checkbox" [checked]="isSelected(m.id)" (change)="toggleSelectOne(m, $event)" /></td>
           <td>{{m.fullName}}</td>
-          <td>{{m.role}}</td>
+          <td>{{ m.role | roleLabel }}</td>
           <td>{{m.address}}</td>
           <td>{{m.phoneNumber}}</td>
           <td>{{m.guardiansPhone}}</td>
@@ -76,8 +76,8 @@
       (ngModelChange)="changeRole(m, $event)"
       [ngModelOptions]="{ standalone: true }"
     >
-      <option *ngFor="let r of allRoles" [value]="r" [disabled]="r === 'DEVELOPER'">
-        {{ r }}
+      <option *ngFor="let r of rolesForMember(m)" [value]="r" [disabled]="r === 'DEVELOPER'">
+        {{ r | roleLabel }}
       </option>
     </select>
 
@@ -92,7 +92,7 @@
       <div class="modalHead">
         <div>
           <div class="title">{{ detailsFor.fullName }}</div>
-          <div class="sub">{{ detailsFor.role }}</div>
+          <div class="sub">{{ detailsFor.role | roleLabel }}</div>
         </div>
         <div class="filters">
           <label>فلتر</label>
@@ -123,7 +123,7 @@
                   وقت اخد الغياب: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}
                 </div>
                 <div class="dSub" *ngIf="d.takenBy">
-                  الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})
+                  الخادم: {{d.takenBy.fullName}} ({{ d.takenBy.role | roleLabel }})
                 </div>
               </div>
             </div>
@@ -142,7 +142,7 @@
             <div class="dSub">يوم الحضور: {{d.date}}</div>
                 <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
             <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">وقت اخد الغياب: {{ d.createdAt | date:'yyyy-MM-dd HH:mm' }}</div>
-            <div class="dSub" *ngIf="d.takenBy">الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
+            <div class="dSub" *ngIf="d.takenBy">الخادم: {{d.takenBy.fullName}} ({{ d.takenBy.role | roleLabel }})</div>
           </div>
         </div>
       </ng-template>

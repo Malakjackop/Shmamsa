@@ -9,7 +9,7 @@
       <div class="side-title">اختار الأسرة</div>
 
       <select class="familyDrop" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
-       <option value="">كل الأسر</option>
+       <option value="" *ngIf="!isKhadim()">كل الأسر</option>
        <option *ngFor="let f of families" [value]="f">{{ f }}</option>
       </select>
 

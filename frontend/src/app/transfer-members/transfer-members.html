@@ -55,6 +55,25 @@
         </select>
       </div>
 
+      <!-- ✅ Extra families (hidden by default, shown after pressing +) -->
+      <div class="inlinePicker" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'">
+        <label class="lbl">أسر إضافية</label>
+
+        <div class="extrasWrap">
+          <ng-container *ngFor="let fam of extraFamilies; let i = index">
+            <div class="extraRow">
+              <select class="select" [(ngModel)]="extraFamilies[i]">
+                <option value="">—</option>
+                <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
+              </select>
+              <button type="button" class="miniBtn" (click)="removeExtraFamily(i)" title="حذف">🗑️</button>
+            </div>
+          </ng-container>
+
+          <button type="button" class="miniBtn" (click)="addExtraFamily()" [disabled]="!canAddExtraFamily()" title="إضافة أسرة">➕</button>
+        </div>
+      </div>
+
       <button pButton type="button" label="نقل" (click)="doTransfer()"></button>
       <button pButton type="button" class="p-button-secondary" label="إلغاء" (click)="cancelSelecting()"></button>
       <span class="selHint">المحدد: {{selectedIds.size}}</span>
@@ -71,6 +90,9 @@
           <th>الاسم</th>
           <th>الدور</th>
           <th>الأسرة</th>
+          <ng-container *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT' && extraColIndices().length">
+            <th *ngFor="let i of extraColIndices()">الأسرة {{i + 2}}</th>
+          </ng-container>
         </tr>
       </thead>
       <tbody>
@@ -79,8 +101,11 @@
             <input type="checkbox" [checked]="selectedIds.has(m.id)" (change)="toggleMember(m.id, $any($event.target).checked)" />
           </td>
           <td>{{m.fullName}}</td>
-          <td>{{m.role}}</td>
+          <td>{{getRoleLabel(m.role)}}</td>
           <td>{{m.deaconFamily}}</td>
+          <ng-container *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT' && extraColIndices().length">
+            <td *ngFor="let i of extraColIndices()">{{extraFamilyValue(m, i)}}</td>
+          </ng-container>
         </tr>
       </tbody>
     </table>

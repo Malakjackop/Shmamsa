@@ -102,6 +102,17 @@ public class User {
     @Column(length = 100)
     private String deaconFamily;
 
+    // ✅ NEW: Optional second serving family (to allow serving 2 families)
+    @Column(length = 100)
+    private String deaconFamily2;
+
+    // ✅ Optional third & fourth serving families (future-proof)
+    @Column(length = 100)
+    private String deaconFamily3;
+
+    @Column(length = 100)
+    private String deaconFamily4;
+
     @Column(length = 50)
     private String deaconDegree; // ✅ new field
 

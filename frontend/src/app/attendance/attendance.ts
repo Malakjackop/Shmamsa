@@ -191,15 +191,23 @@ export class AttendanceComponent implements OnInit {
   }
 
   private loadFamilies() {
-    this.familySvc.families().subscribe({
-      next: (f) => (this.families = f || []),
+    // ✅ In "تسجيل الحضور" page: KHADIM is allowed to pick ANY family.
+    this.familySvc.families('attendance').subscribe({
+      next: (f) => {
+        this.families = f || [];
+        // ✅ Default selection for KHADIM (no "كل الأسر" by default)
+        if (!this.selectedFamily && this.families.length) {
+          this.selectedFamily = this.families[0];
+          this.loadMembersForFamily();
+        }
+      },
       error: () => (this.families = [])
     });
   }
 
   private loadMembersForFamily() {
     // In attendance page we want the list to include everyone in the family (including the logged-in servant).
-    this.familySvc.members(this.selectedFamily, true).subscribe({
+    this.familySvc.members(this.selectedFamily, true, 'attendance').subscribe({
       next: (m) => (this.members = (m as any[])?.map(this.toPickUser) || []),
       error: (err) => {
         this.members = [];
@@ -216,6 +224,15 @@ export class AttendanceComponent implements OnInit {
     deaconFamily: u?.deaconFamily
   });
 
+  isKhadim(): boolean {
+    return this.me?.role === 'KHADIM';
+  }
+
+  canSelectFamily(): boolean {
+    // attendance page: allow family switching for AMIN_KHEDMA/DEV and KHADIM
+    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER' || this.isKhadim();
+  }
+
   prettyRole(role?: string): string {
     const r = (role || '').toUpperCase();
     switch (r) {
@@ -224,11 +241,11 @@ export class AttendanceComponent implements OnInit {
       case 'KHADIM':
         return 'خادم';
       case 'AMIN_OSRA':
-        return 'أمين أسرة';
+        return 'امين اسره';
       case 'AMIN_KHEDMA':
-        return 'أمين خدمة';
+        return 'امين خدمة';
       case 'DEVELOPER':
-        return 'Developer';
+        return 'dev';
       default:
         return role || '';
     }

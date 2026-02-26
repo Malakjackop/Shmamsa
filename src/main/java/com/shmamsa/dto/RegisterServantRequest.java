@@ -33,6 +33,10 @@ public class RegisterServantRequest {
     @NotBlank(message = "Deacon family is required")
     private String deaconFamily;
 
+
+    // ✅ NEW: optional second family (serving 2 families)
+    private String deaconFamily2;
+
     @NotBlank(message = "Deacon degree is required")
     private String deaconDegree;
 

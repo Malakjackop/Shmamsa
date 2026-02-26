@@ -239,6 +239,16 @@ export class FamilyComponent implements OnInit {
     this.adminSvc.roles().subscribe({ next: (r) => (this.allRoles = r || []) });
   }
 
+  rolesForMember(member: Member): string[] {
+    const currentRole = String(member?.role || '').toUpperCase();
+    return (this.allRoles || []).filter((role) => {
+      const candidate = String(role || '').toUpperCase();
+      if (candidate === 'DEVELOPER' || candidate === 'DEV' || candidate === 'ROLE_DEVELOPER') return false;
+      if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
+      return true;
+    });
+  }
+
   changeRole(member: Member, newRole: string) {
     if (!this.canEditRoles()) return;
 

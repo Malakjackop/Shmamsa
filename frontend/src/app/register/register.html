@@ -77,112 +77,103 @@
     </div>
 
 
-       <!-- ✅ NEW (Servant only): Choose where you serve (FIRST THING) -->
-      <div class="input-row" *ngIf="isServant">
-        <div class="input-group small">
-          <select
-            formControlName="servingScope"
-            (change)="onServingScopeChange(); markTouchedFromList('servingScope')">
-            <option value="" disabled>بخدم فين؟</option>
-            <option value="FAMILY_ONLY">بخدم في اسره بس</option>
-            <option value="KHORS_ONLY">بخدم في خورس بس</option>
-            <option value="BOTH">بخدم في اسره و خورس مع بعض</option>
-          </select>
-          <small class="error-text" *ngIf="shouldShowError('servingScope')">
-            {{ errorText('servingScope','نطاق الخدمة') }}
-          </small>
-        </div>
-      </div>
+        
+<!-- ✅ Deacon Family (Makhdom only) -->
+<div class="input-row" *ngIf="!isServant">
+  <div class="input-group small">
+    <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
+      <option value="" disabled>اختار الأسرة</option>
 
-         <!-- ✅ Deacon Family: Register always / Servant يظهر حسب scope -->
-      <div class="input-row" *ngIf="!isServant || (servingScope && servingScope !== 'KHORS_ONLY')">
-        <div class="input-group small">
-          <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
-            <option value="" disabled>اختار الأسرة</option>
+      <option value="اسرة السمائين">اسرة السمائين</option>
+      <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
+      <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
+      <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
+      <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
 
-            <option value="اسرة السمائين">اسرة السمائين</option>
-            <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
-            <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
-            <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-            <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
+      <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
+      <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
+      <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
+      <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
 
-            <ng-container *ngIf="isServant; else makhdomFamilies">
-              <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
-              <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
-            </ng-container>
+      <option value="اسرة القديس اسطفانوس أ">اسرة القديس اسطفانوس ( أ )</option>
+      <option value="اسرة القديس اسطفانوس ب">اسرة القديس اسطفانوس ( ب )</option>
+    </select>
+    <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','الأسرة') }}</small>
+  </div>
+</div>
 
-            <ng-template #makhdomFamilies>
-              <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
-              <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
-              <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
-              <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
-            </ng-template>
+<!-- ✅ ElKhors (Makhdom only) -->
+<div class="input-row" *ngIf="!isServant">
+  <div class="input-group small">
+    <select formControlName="khors" (change)="markTouchedFromList('khors')">
+      <option value="" disabled>الخورس</option>
+      <option value="MARMARKOS">خورس مارمارقس الرسولي</option>
+      <option value="ATHANASIUS">خورس البابا اثناسيوس</option>
+      <option value="NONE">مش موجود ف أي خورس من دول</option>
+    </select>
 
-            <ng-container *ngIf="isServant; else stStephanMakhdom">
-              <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
-            </ng-container>
-            <ng-template #stStephanMakhdom>
-              <option value="اسرة القديس اسطفانوس أ">اسرة القديس اسطفانوس ( أ )</option>
-              <option value="اسرة القديس اسطفانوس ب">اسرة القديس اسطفانوس ( ب )</option>
-            </ng-template>
-          </select>
-          <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','الأسرة') }}</small>
-        </div>
-      </div>
+    <small class="error-text" *ngIf="shouldShowError('khors')">
+      {{ errorText('khors','الخورس') }}
+    </small>
+  </div>
+</div>
 
-      <!-- ✅ ElKhors -->
-      <!-- Register: always show -->
-      <!-- Servant: show only when KHORS_ONLY or BOTH -->
-      <div class="input-row" *ngIf="!isServant || (servingScope === 'KHORS_ONLY' || servingScope === 'BOTH')">
-        <div class="input-group small">
-          <select formControlName="khors" (change)="markTouchedFromList('khors')">
-            <ng-container *ngIf="!isServant">
-              <option value="" disabled>الخورس</option>
-              <option value="MARMARKOS">خورس مارمارقس الرسولي</option>
-              <option value="ATHANASIUS">خورس البابا اثناسيوس</option>
-              <option value="NONE">مش موجود ف أي خورس من دول</option>
-            </ng-container>
+<!-- ✅ NEW (Servant only): one list "بتخدم فين" -->
+<div class="input-row" *ngIf="isServant">
+  <div class="input-group small">
+    <select
+      formControlName="servingWhere"
+      (change)="onServingWhereChange(); markTouchedFromList('servingWhere')">
+      <option value="" disabled>بتخدم فين؟</option>
 
-            <ng-container *ngIf="isServant">
-              <option value="" disabled>بخدم في أنهي خورس؟</option>
-              <option value="MARMARKOS">بخدم في خورس مارمرقس الرسولي</option>
-              <option value="ATHANASIUS">بخدم في خورس البابا اثناسيوس</option>
-              <option value="BOTH">بخدم في الخورسين</option>
-            </ng-container>
-          </select>
+      <!-- Families -->
+      <option value="اسرة السمائين">اسرة السمائين</option>
+      <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
+      <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
+      <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
+      <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
+      <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
+      <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
+      <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
 
-          <small class="error-text" *ngIf="shouldShowError('khors')">
-            {{ errorText('khors','الخورس') }}
-          </small>
-        </div>
-      </div>
+      <!-- Choirs (treated like families) -->
+      <option value="خورس مارمرقس">خورس مارمرقس</option>
+      <option value="خورس الانبا اثناسيوس">خورس الانبا اثناسيوس</option>
+    </select>
+    <small class="error-text" *ngIf="shouldShowError('servingWhere')">
+      {{ errorText('servingWhere','بتخدم فين') }}
+    </small>
+  </div>
+</div>
 
-         <!-- ✅ NEW: Attend Khors -->
-      <!-- Case 1: FAMILY_ONLY => user chooses -->
-      <div class="input-row" *ngIf="isServant && servingScope === 'FAMILY_ONLY'">
-        <div class="input-group small">
-          <select formControlName="attendKhors" (change)="markTouchedFromList('attendKhors')">
-            <option value="" disabled>بحضر في انهي خورس؟</option>
-            <option value="MARMARKOS">بحضر في خورس مارمارقس الرسولي</option>
-            <option value="ATHANASIUS">بحضر في خورس البابا اثناسيوس الرسولي</option>
-            <option value="NONE">مش موجود في ولا خورس</option>
-          </select>
-          <small class="error-text" *ngIf="shouldShowError('attendKhors')">
-            {{ errorText('attendKhors','خورس الحضور') }}
-          </small>
-        </div>
-      </div>
+<!-- ✅ Attend Khors rules -->
+<!-- Case 1: serving in FAMILY => user chooses attend -->
+<div class="input-row" *ngIf="isServant && servingWhereValue && servingWhereValue !== 'خورس مارمرقس' && servingWhereValue !== 'خورس الانبا اثناسيوس'">
+  <div class="input-group small">
+    <select formControlName="attendKhors" (change)="markTouchedFromList('attendKhors')">
+      <option value="" disabled>بحضر في انهي خورس؟</option>
+      <option value="MARMARKOS">بحضر في خورس مارمارقس الرسولي</option>
+      <option value="ATHANASIUS">بحضر في خورس البابا اثناسيوس الرسولي</option>
+      <option value="NONE">مش موجود في ولا خورس</option>
+    </select>
+    <small class="error-text" *ngIf="shouldShowError('attendKhors')">
+      {{ errorText('attendKhors','خورس الحضور') }}
+    </small>
+  </div>
+</div>
 
-      <!-- Case 2: KHORS_ONLY / BOTH + serving MARMARKOS => show default ATHANASIUS (disabled) -->
-      <div class="input-row" *ngIf="isServant && (servingScope === 'KHORS_ONLY' || servingScope === 'BOTH') && (khorsValue === 'MARMARKOS')">
-        <div class="input-group small">
-          <select formControlName="attendKhors" [disabled]="true">
-            <option value="ATHANASIUS">بحضر خورس البابا اثناسيوس الرسولي</option>
-          </select>
-        </div>
-      </div>
+<!-- Case 2: serving in خورس مارمرقس => attend ATHANASIUS (locked) -->
+<div class="input-row" *ngIf="isServant && servingWhereValue === 'خورس مارمرقس'">
+  <div class="input-group small">
+    <select formControlName="attendKhors" [disabled]="true">
+      <option value="ATHANASIUS">بحضر خورس البابا اثناسيوس الرسولي</option>
+    </select>
+  </div>
+</div>
 
-      <!-- Status -->
+<!-- For serving in خورس الانبا اثناسيوس: attend list does not show -->
+
+<!-- Status -->
       <div class="input-row">
         <div class="input-group small">
           <select formControlName="status" (change)="onStatusChange(); markTouchedFromList('status')">

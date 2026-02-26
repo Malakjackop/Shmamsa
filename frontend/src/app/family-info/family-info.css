@@ -23,6 +23,31 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .detailRow{border:1px solid #eee;border-radius:12px;padding:10px;}
 .dTitle{font-weight:600;}
 .dSub{font-size:12px;color:#666;margin-top:4px;}
+
+/* ===== Notifications (Khors join requests) ===== */
+.pageHead{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.notifBtn{
+  position:relative;
+  border:none;
+  cursor:pointer;
+  width:44px;
+  height:44px;
+  padding:0;
+  border-radius:12px;
+  background:#1fa84f; /* green box */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.bellEmoji{font-size:22px;line-height:1;}
+.notifBtn:hover{filter:brightness(0.95);}
+.badge{position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#d32f2f;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;}
+.modalCard.wide{max-width:900px;}
+.reqList{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
+.reqRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid rgba(0,0,0,0.08);border-radius:12px;}
+.reqName{font-weight:700;}
+.reqMeta{display:flex;flex-wrap:wrap;gap:10px;opacity:0.9;font-size:13px;}
+.reqActions{display:flex;gap:8px;}
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .profileGrid{grid-template-columns:1fr;}

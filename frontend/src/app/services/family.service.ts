@@ -8,8 +8,10 @@ export class FamilyService {
   private http = inject(HttpClient);
   private baseUrl = '/api/family';
 
-  families(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.baseUrl}/families`, { withCredentials: true });
+  families(context?: string): Observable<string[]> {
+    let params = new HttpParams();
+    if (context) params = params.set('context', context);
+    return this.http.get<string[]>(`${this.baseUrl}/families`, { params, withCredentials: true });
   }
 
   /**
@@ -17,10 +19,11 @@ export class FamilyService {
    * @param family optional family base name
    * @param includeSelf when true, the backend will include the logged-in user in the list
    */
-  members(family?: string, includeSelf: boolean = false): Observable<any[]> {
+  members(family?: string, includeSelf: boolean = false, context?: string): Observable<any[]> {
     let params = new HttpParams();
     if (family) params = params.set('family', family);
     if (includeSelf) params = params.set('includeSelf', 'true');
+    if (context) params = params.set('context', context);
     return this.http.get<any[]>(`${this.baseUrl}/members`, { params, withCredentials: true });
   }
 
@@ -49,10 +52,10 @@ export class FamilyService {
   }
 
 
-  transferMembers(memberIds: number[], newFamily: string, targetRole?: string): Observable<any> {
+  transferMembers(memberIds: number[], newFamily: string, targetRole?: string, extraFamilies?: string[]): Observable<any> {
     return this.http.post<any>(
       `${this.baseUrl}/transfer-members`,
-      { memberIds, newFamily, targetRole },
+      { memberIds, newFamily, targetRole, extraFamilies },
       { withCredentials: true }
     );
   }

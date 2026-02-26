@@ -58,6 +58,7 @@ export class RegisterComponent implements OnInit {
     this.registerForm.get('confirmPassword')?.valueChanges.subscribe(() => this.applyPasswordMismatch());
 
     if (this.isServant) {
+      this.registerForm.get('servingWhere')?.valueChanges.subscribe(() => this.onServingWhereChange());
       this.registerForm.get('servingScope')?.valueChanges.subscribe(() => this.onServingScopeChange());
       this.registerForm.get('khors')?.valueChanges.subscribe(() => this.onKhorsChanged());
     }
@@ -89,6 +90,10 @@ export class RegisterComponent implements OnInit {
     return String(this.registerForm?.get('khors')?.value || '');
   }
 
+
+  get servingWhereValue(): string {
+    return String(this.registerForm?.get('servingWhere')?.value || '');
+  }
   private buildForm() {
     const minAge = this.isServant ? 16 : 6;
 
@@ -103,13 +108,17 @@ export class RegisterComponent implements OnInit {
       dateOfBirth: [''],
       gender: [''],
 
-      deaconFamily: ['', Validators.required],
-      deaconDegree: ['', Validators.required],
+      // ✅ make selects update instantly (no need to click outside)
+      servingWhere: this.fb.control('', { updateOn: 'change' }),
 
-      khors: [''], // MARMARKOS / ATHANASIUS / BOTH / NONE
+      deaconFamily: this.fb.control('', { validators: [Validators.required], updateOn: 'change' }),
+      // NOTE: second family is managed by أمين الخدمة من داخل النظام (not during self registration)
+      deaconDegree: this.fb.control('', { validators: [Validators.required], updateOn: 'change' }),
+
+      khors: this.fb.control('', { updateOn: 'change' }), // MARMARKOS / ATHANASIUS / BOTH / NONE
 
       // ✅ NEW
-      attendKhors: [''], // MARMARKOS / ATHANASIUS / NONE
+      attendKhors: this.fb.control('', { updateOn: 'change' }), // MARMARKOS / ATHANASIUS / NONE
 
       servingScope: this.fb.control(this.isServant ? '' : '', {
         validators: this.isServant ? [Validators.required] : [],
@@ -148,8 +157,60 @@ export class RegisterComponent implements OnInit {
 
       this.registerForm.get('secret')?.setValidators([Validators.required]);
       this.registerForm.get('secret')?.updateValueAndValidity({ emitEvent: false });
+
+      this.registerForm.get('servingWhere')?.setValidators([Validators.required]);
+      this.registerForm.get('servingWhere')?.updateValueAndValidity({ emitEvent: false });
     }
   }
+
+
+// ✅ NEW: one dropdown "بتخدم فين" for servants (family OR choir)
+onServingWhereChange() {
+  if (!this.isServant) return;
+
+  const where = String(this.registerForm.get('servingWhere')?.value || '').trim();
+  if (!where) return;
+
+  const scopeCtrl = this.registerForm.get('servingScope');
+  const famCtrl = this.registerForm.get('deaconFamily');
+  const khorsCtrl = this.registerForm.get('khors');
+  const attendCtrl = this.registerForm.get('attendKhors');
+
+  if (where === 'خورس مارمرقس') {
+    scopeCtrl?.setValue('KHORS_ONLY', { emitEvent: false });
+    famCtrl?.setValue('خورس مارمرقس', { emitEvent: false });
+    khorsCtrl?.setValue('MARMARKOS', { emitEvent: false });
+
+    // attend must be ATHANASIUS (locked)
+    attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
+    attendCtrl?.disable({ emitEvent: false });
+
+  } else if (where === 'خورس الانبا اثناسيوس') {
+    scopeCtrl?.setValue('KHORS_ONLY', { emitEvent: false });
+    famCtrl?.setValue('خورس الانبا اثناسيوس', { emitEvent: false });
+    khorsCtrl?.setValue('ATHANASIUS', { emitEvent: false });
+
+    // no attend selection at all
+    attendCtrl?.setValue('NONE', { emitEvent: false });
+    attendCtrl?.enable({ emitEvent: false });
+
+  } else {
+    // Normal family
+    scopeCtrl?.setValue('FAMILY_ONLY', { emitEvent: false });
+    famCtrl?.setValue(where, { emitEvent: false });
+    khorsCtrl?.setValue('NONE', { emitEvent: false });
+
+    // allow user to choose attend
+    attendCtrl?.enable({ emitEvent: false });
+    if (!String(attendCtrl?.value || '').trim() || String(attendCtrl?.value || '').trim() === 'NONE') {
+      attendCtrl?.setValue('', { emitEvent: false });
+    }
+  }
+
+  // Apply existing validators/rules based on servingScope & khors
+  this.onServingScopeChange();
+  this.onKhorsChanged();
+}
 
   // ✅ apply rules AFTER user chooses scope
   onServingScopeChange() {
@@ -165,12 +226,9 @@ export class RegisterComponent implements OnInit {
     // Family required only when serving in family
     if (scope === 'KHORS_ONLY') {
       famCtrl?.clearValidators();
-      famCtrl?.setValue('SYSTEM', { emitEvent: false });
+      // keep current value (family label or choir label)
     } else {
       famCtrl?.setValidators([Validators.required]);
-      if (String(famCtrl?.value || '').toUpperCase() === 'SYSTEM') {
-        famCtrl?.setValue('', { emitEvent: false });
-      }
     }
     famCtrl?.updateValueAndValidity({ emitEvent: true });
 
@@ -180,7 +238,8 @@ export class RegisterComponent implements OnInit {
       khorsCtrl?.setValue('NONE', { emitEvent: false });
     } else {
       khorsCtrl?.setValidators([Validators.required]);
-      if (String(khorsCtrl?.value || '').toUpperCase() === 'NONE') {
+      const khorsValue = String(khorsCtrl?.value || '').toUpperCase();
+      if (khorsValue === 'NONE' || (scope !== 'KHORS_ONLY' && khorsValue === 'BOTH')) {
         khorsCtrl?.setValue('', { emitEvent: false });
       }
     }
@@ -535,29 +594,27 @@ export class RegisterComponent implements OnInit {
     };
 
     if (this.isServant) {
-      payload.servingScope = String(formValue.servingScope || '').trim();
-      if (!payload.servingScope) {
-        this.messageService.add({ severity: 'warn', summary: 'Missing', detail: 'اختار بخدم فين' });
-        return;
-      }
+  payload.servingWhere = String(formValue.servingWhere || '').trim();
+  payload.servingScope = String(formValue.servingScope || '').trim();
 
-      // ✅ NEW: send attendKhors
-      payload.attendKhors = String(formValue.attendKhors || '').trim();
+  if (!payload.servingWhere || !payload.servingScope) {
+    this.messageService.add({ severity: 'warn', summary: 'Missing', detail: 'اختار بتخدم فين' });
+    return;
+  }
 
-      // Apply scope rules
-      if (payload.servingScope === 'KHORS_ONLY') payload.deaconFamily = 'SYSTEM';
-      if (payload.servingScope === 'FAMILY_ONLY') payload.khors = 'NONE';
+  // ✅ Send attendKhors (may be NONE)
+  payload.attendKhors = String(formValue.attendKhors || '').trim();
 
-      this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
-        .subscribe({
-          next: () => {
-            this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
-            this.router.navigate(['/login']);
-          },
-          error: (err) => this.showApiErrors(err)
-        });
+  this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
+    .subscribe({
+      next: () => {
+        this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
+        this.router.navigate(['/login']);
+      },
+      error: (err) => this.showApiErrors(err)
+    });
 
-    } else {
+} else {
       this.http.post('/api/auth/register', payload, { withCredentials: true })
         .subscribe({
           next: () => {

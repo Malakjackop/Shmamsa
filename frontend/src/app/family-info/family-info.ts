@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AdminService } from '../services/admin.service';
 import { AuthService } from '../services/auth.service';
+import { KhorsRequestsService, KhorsJoinRequestView } from '../services/khors-requests.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -31,6 +32,7 @@ export class FamilyInfoComponent implements OnInit {
   private familySvc = inject(FamilyService);
   private adminSvc = inject(AdminService);
   private auth = inject(AuthService);
+  private khorsReq = inject(KhorsRequestsService);
   private message = inject(MessageService);
   private confirm = inject(ConfirmationService);
 
@@ -53,19 +55,133 @@ export class FamilyInfoComponent implements OnInit {
 
   allRoles: string[] = [];
 
+  // ===== Khors join requests (notifications) =====
+  pendingRequestsCount = 0;
+  requestsOpen = false;
+  requestsLoading = false;
+  requests: KhorsJoinRequestView[] = [];
+
   ngOnInit() {
     this.auth.getUserData().subscribe({
       next: (u) => {
         this.me = u;
         this.loadRoles();
         this.initFamilyMode();
+        this.loadPendingRequestsCount();
       },
       error: () => {}
     });
   }
 
   isAminKhedmaOrDev(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
+    return this.hasRole('AMIN_KHEDMA', 'DEVELOPER', 'DEV');
+  }
+
+  isKhadim(): boolean {
+    return this.hasRole('KHADIM');
+  }
+
+  private isKhadimServingKhors(): boolean {
+    if (!this.isKhadim()) return false;
+    const scope = String(this.me?.servingScope || '').toUpperCase();
+    const khors = String(this.me?.khors || '').toUpperCase();
+    const scopeIncludesKhors = scope === 'KHORS_ONLY' || scope === 'BOTH';
+    const khorsSelectedFromList = !!khors && khors !== 'NONE';
+    return scopeIncludesKhors || khorsSelectedFromList;
+  }
+
+  canSeeKhorsRequests(): boolean {
+    // ✅ Show only in KHORS view for moderators:
+    // AMIN_KHEDMA/DEV and KHADIM.
+    if (!this.isKhorsFamilySelected()) return false;
+    return this.canDecideKhorsRequests();
+  }
+
+  canDecideKhorsRequests(): boolean {
+    return this.isAminKhedmaOrDev() || this.isKhadimServingKhors();
+  }
+
+  private normalizeRole(role: any): string {
+    const raw = String(role || '').trim().toUpperCase();
+    return raw.startsWith('ROLE_') ? raw.slice(5) : raw;
+  }
+
+  private hasRole(...allowed: string[]): boolean {
+    const role = this.normalizeRole(this.me?.role);
+    return allowed.map((x) => this.normalizeRole(x)).includes(role);
+  }
+
+  private loadPendingRequestsCount() {
+    if (!this.canSeeKhorsRequests()) return;
+    this.khorsReq.pending().subscribe({
+      next: (list) => (this.pendingRequestsCount = this.filterRequestsBySelectedKhors(list || []).length),
+      error: () => (this.pendingRequestsCount = 0)
+    });
+  }
+
+  openKhorsRequests() {
+    if (!this.canSeeKhorsRequests()) return;
+    this.requestsOpen = true;
+    this.requestsLoading = true;
+    this.khorsReq.pending().subscribe({
+      next: (list) => {
+        this.requests = this.filterRequestsBySelectedKhors(list || []);
+        this.requestsLoading = false;
+        this.pendingRequestsCount = this.requests.length;
+      },
+      error: (err) => {
+        this.requestsLoading = false;
+        this.requests = [];
+        this.pendingRequestsCount = 0;
+        const isServerError = Number(err?.status) >= 500;
+        this.message.add({
+          severity: isServerError ? 'warn' : 'error',
+          summary: 'خطأ',
+          detail: isServerError
+            ? 'تعذر تحميل طلبات الخورس حاليًا. برجاء المحاولة لاحقًا.'
+            : (err?.error?.error || 'فشل تحميل طلبات الخورس')
+        });
+      }
+    });
+  }
+
+  closeKhorsRequests() {
+    this.requestsOpen = false;
+    this.requestsLoading = false;
+    this.requests = [];
+    this.loadPendingRequestsCount();
+  }
+
+  decideKhorsRequest(req: KhorsJoinRequestView, approved: boolean) {
+    if (!this.canDecideKhorsRequests()) return;
+    if (!req?.requestId) return;
+    this.khorsReq.decide(req.requestId, approved).subscribe({
+      next: () => {
+        // remove from list and update badge
+        this.requests = (this.requests || []).filter((x) => x.requestId !== req.requestId);
+        this.pendingRequestsCount = this.requests.length;
+        // Keep members table in sync immediately after accepting a request.
+        if (approved && this.isKhorsFamilySelected()) {
+          this.loadMembers();
+        }
+        this.message.add({
+          severity: 'success',
+          summary: 'تم',
+          detail: approved ? 'تم قبول الطلب' : 'تم رفض الطلب'
+        });
+      },
+      error: (err) => {
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'فشل تنفيذ القرار'
+        });
+      }
+    });
+  }
+
+  canSelectFamily(): boolean {
+    return this.isAminKhedmaOrDev() || this.isKhadim();
   }
 
   canDeleteAccounts(): boolean {
@@ -86,26 +202,46 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   private initFamilyMode() {
-    if (this.isAminKhedmaOrDev()) {
+    if (this.canSelectFamily()) {
       this.familySvc.families().subscribe({
         next: (f) => {
           this.families = f || [];
           if (this.families.length) {
+            // ✅ default to first family (for KHADIM: one of his served families)
             this.selectedFamily = this.families[0];
             this.loadMembers();
+            this.loadPendingRequestsCount();
           }
         },
-        error: () => {}
+        error: () => {
+          this.families = [];
+          this.selectedFamily = '';
+          this.loadMembers();
+          this.pendingRequestsCount = 0;
+        }
       });
     } else {
       this.selectedFamily = this.me?.deaconFamily;
       this.loadMembers();
+      this.loadPendingRequestsCount();
+    }
+  }
+
+  onFamilyChange() {
+    this.loadMembers();
+    if (this.canSeeKhorsRequests()) {
+      this.loadPendingRequestsCount();
+    } else {
+      this.pendingRequestsCount = 0;
+      this.requestsOpen = false;
+      this.requestsLoading = false;
+      this.requests = [];
     }
   }
 
   loadMembers() {
     this.loading = true;
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
@@ -175,7 +311,7 @@ export class FamilyInfoComponent implements OnInit {
   openProfile(member: Member) {
     this.profileFor = member;
     this.profile = null;
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberDetails(member.id, famParam).subscribe({
       next: (p) => (this.profile = p),
@@ -191,6 +327,16 @@ export class FamilyInfoComponent implements OnInit {
   private loadRoles() {
     if (!this.canEditRoles()) return;
     this.adminSvc.roles().subscribe({ next: (r) => (this.allRoles = r || []) });
+  }
+
+  rolesForMember(member: Member): string[] {
+    const currentRole = String(member?.role || '').toUpperCase();
+    return (this.allRoles || []).filter((role) => {
+      const candidate = String(role || '').toUpperCase();
+      if (candidate === 'DEVELOPER' || candidate === 'DEV' || candidate === 'ROLE_DEVELOPER') return false;
+      if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
+      return true;
+    });
   }
 
   changeRole(member: Member, newRole: string) {
@@ -264,7 +410,7 @@ export class FamilyInfoComponent implements OnInit {
         return;
       }
 
-      const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+      const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
       const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
 
       // Use landscape layout and avoid a super-wide table (which breaks rendering).
@@ -460,5 +606,29 @@ export class FamilyInfoComponent implements OnInit {
     if (x === 'BROTHER') return 'الأخ';
     if (x === 'SISTER') return 'الأخت';
     return v || '';
+  }
+
+  private isKhorsFamilySelected(): boolean {
+    return !!this.getSelectedKhorsCode();
+  }
+
+  private getSelectedKhorsCode(): 'MARMARKOS' | 'ATHANASIUS' | '' {
+    const famRaw = String(this.selectedFamily || '').trim();
+    const fam = famRaw.toUpperCase();
+    if (!fam) return '';
+
+    if (fam === 'MARMARKOS' || fam.includes('مارمر') || fam.includes('MARMARKOS')) return 'MARMARKOS';
+    if (fam === 'ATHANASIUS' || fam.includes('اثناس') || fam.includes('ATHANASIUS')) return 'ATHANASIUS';
+    if (fam.includes('KHORS')) {
+      if (fam.includes('MARMARKOS')) return 'MARMARKOS';
+      if (fam.includes('ATHANASIUS')) return 'ATHANASIUS';
+    }
+    return '';
+  }
+
+  private filterRequestsBySelectedKhors(list: KhorsJoinRequestView[]): KhorsJoinRequestView[] {
+    const selected = this.getSelectedKhorsCode();
+    if (!selected) return [];
+    return (list || []).filter((x) => String(x?.requestedKhors || '').toUpperCase() === selected);
   }
 }

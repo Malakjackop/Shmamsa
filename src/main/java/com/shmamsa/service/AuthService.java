@@ -25,6 +25,8 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
 
+    private final KhorsJoinRequestService khorsJoinRequestService;
+
     private final ServantSecretService servantSecretService;
 
     // OTP / Rate limit helpers
@@ -120,7 +122,10 @@ public class AuthService {
         user.setNationalId(request.getNationalId());
         user.setDeaconFamily(request.getDeaconFamily());
         user.setDeaconDegree(request.getDeaconDegree());
-        user.setKhors(normalizeKhors(request.getKhors(), false));
+        // ✅ IMPORTANT: do NOT enroll the user in the choir directly.
+        // We store "NONE" and create a pending join request if they selected a choir.
+        String requestedKhors = normalizeKhors(request.getKhors(), false);
+        user.setKhors("NONE");
         user.setAttendKhors("NONE");
         user.setServingScope(null);
         user.setPhoneNumber(request.getPhoneNumber());
@@ -153,6 +158,9 @@ public class AuthService {
         user.setRole("MAKHDOM");
 
         userRepository.save(user);
+
+        // Create pending request (if they selected MARMARKOS or ATHANASIUS)
+        khorsJoinRequestService.createForUserIfNeeded(user, requestedKhors);
     }
 
 
@@ -191,14 +199,36 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(nid);
         // ✅ NEW: deaconFamily rules based on scope
-        if ("KHORS_ONLY".equals(scope)) {
-            user.setDeaconFamily("SYSTEM");
-        } else {
-            if (request.getDeaconFamily() == null || request.getDeaconFamily().trim().isBlank()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "DEACON_FAMILY_REQUIRED", "Deacon family is required");
-            }
-            user.setDeaconFamily(request.getDeaconFamily().trim());
+if ("KHORS_ONLY".equals(scope)) {
+    // We treat the two choirs like families for visibility/scope.
+    // Map khors -> a readable "family" label.
+    String kTmp = normalizeKhors(request.getKhors(), true); // allow BOTH
+    if ("NONE".equals(kTmp) || kTmp.isBlank()) {
+        throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
+    }
+    // Store the serving place in deaconFamily (instead of SYSTEM) so "same family" rules work.
+    if ("MARMARKOS".equalsIgnoreCase(kTmp)) {
+        user.setDeaconFamily("خورس مارمرقس");
+    } else if ("ATHANASIUS".equalsIgnoreCase(kTmp)) {
+        user.setDeaconFamily("خورس الانبا اثناسيوس");
+    } else {
+        // BOTH: fallback label
+        user.setDeaconFamily("خورس");
+    }
+} else {
+    if (request.getDeaconFamily() == null || request.getDeaconFamily().trim().isBlank()) {
+        throw new ApiException(HttpStatus.BAD_REQUEST, "DEACON_FAMILY_REQUIRED", "Deacon family is required");
+    }
+    user.setDeaconFamily(request.getDeaconFamily().trim());
+
+    // ✅ Optional: allow serving a second family
+    if (request.getDeaconFamily2() != null && !request.getDeaconFamily2().trim().isBlank()) {
+        String f2 = request.getDeaconFamily2().trim();
+        if (!f2.equalsIgnoreCase(user.getDeaconFamily())) {
+            user.setDeaconFamily2(f2);
         }
+    }
+}
 
         user.setDeaconDegree(request.getDeaconDegree());
         user.setRole("KHADIM");

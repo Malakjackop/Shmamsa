@@ -90,8 +90,16 @@ export class FamilyAttendanceComponent implements OnInit {
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
   }
 
+  isKhadim(): boolean {
+    return this.me?.role === 'KHADIM';
+  }
+
+  canSelectFamily(): boolean {
+    return this.isAminKhedmaOrDev() || this.isKhadim();
+  }
+
   private initFamilyMode() {
-    if (this.isAminKhedmaOrDev()) {
+    if (this.canSelectFamily()) {
       this.familySvc.families().subscribe({
         next: (f) => {
           this.families = f || [];
@@ -100,7 +108,11 @@ export class FamilyAttendanceComponent implements OnInit {
             this.loadMembers();
           }
         },
-        error: () => {}
+        error: () => {
+          this.families = [];
+          this.selectedFamily = '';
+          this.loadMembers();
+        }
       });
     } else {
       this.selectedFamily = this.me?.deaconFamily;
@@ -108,9 +120,13 @@ export class FamilyAttendanceComponent implements OnInit {
     }
   }
 
+  onFamilyChange() {
+    this.loadMembers();
+  }
+
   loadMembers() {
     this.loading = true;
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
@@ -179,7 +195,7 @@ openDetails(member: Member) {
 
   reloadDetails() {
     if (!this.detailsFor) return;
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
       next: (d) => (this.details = this.filterOutArchivedRows((d as any) || [])),
@@ -273,7 +289,7 @@ openDetails(member: Member) {
   openProfile(member: Member) {
     this.profileFor = member;
     this.profile = null;
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberDetails(member.id, famParam).subscribe({
       next: (p) => (this.profile = p),
@@ -363,7 +379,7 @@ async exportPdf() {
       return;
     }
 
-    const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
     const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
     const attArr = await this.fetchAttendanceForMembers(selected, famParam);
 

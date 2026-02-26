@@ -3,9 +3,9 @@
 <div class="page">
   <h1>حضور الأعضاء</h1>
 
-  <div class="top" *ngIf="isAminKhedmaOrDev()">
+  <div class="top" *ngIf="canSelectFamily() && families?.length">
     <label>الأسرة</label>
-    <select [(ngModel)]="selectedFamily" (change)="loadMembers()">
+    <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
     </select>
   </div>
@@ -53,7 +53,7 @@
       <div class="modalHead">
         <div>
           <div class="title">{{ detailsFor.fullName }}</div>
-          <div class="sub">{{ detailsFor.role }}</div>
+          <div class="sub">{{ detailsFor.role | roleLabel }}</div>
         </div>
         <div class="filters">
           <label>فلتر</label>
@@ -82,7 +82,7 @@
                 <div class="dSub">يوم الحضور: {{d.date}}</div>
                 <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
                 <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'"> وقت اخد الغياب: {{ formatRecordedAt(d.createdAt) }}</div>
-                <div class="dSub" *ngIf="d.takenBy"> الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
+                <div class="dSub" *ngIf="d.takenBy"> الخادم: {{d.takenBy.fullName}} ({{ d.takenBy.role | roleLabel }})</div>
               </div>
             </div>
             <ng-template #noType>
@@ -100,7 +100,7 @@
             <div class="dSub">يوم الحضور: {{d.date}}</div>
             <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
             <div class="dSub" *ngIf="(d.status || 'PRESENT') === 'ABSENT'">وقت اخد الغياب: {{ formatRecordedAt(d.createdAt) }}</div>
-            <div class="dSub" *ngIf="d.takenBy">الخادم: {{d.takenBy.fullName}} ({{d.takenBy.role}})</div>
+            <div class="dSub" *ngIf="d.takenBy">الخادم: {{d.takenBy.fullName}} ({{ d.takenBy.role | roleLabel }})</div>
           </div>
         </div>
       </ng-template>
@@ -117,7 +117,7 @@
       <div class="modalHead">
         <div>
           <div class="title">{{ profileFor.fullName }}</div>
-          <div class="sub">{{ profileFor.role }}</div>
+          <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
         <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
       </div>

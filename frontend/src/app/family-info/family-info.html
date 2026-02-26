@@ -2,11 +2,25 @@
 <p-confirmDialog></p-confirmDialog>
 
 <div class="page">
-  <h1>بيانات الأعضاء</h1>
+  <div class="pageHead">
+    <h1>بيانات الأعضاء</h1>
 
-  <div class="top" *ngIf="isAminKhedmaOrDev()">
+    <!-- 🔔 Khors join requests notifications -->
+    <button
+      *ngIf="canSeeKhorsRequests()"
+      type="button"
+      class="notifBtn"
+      (click)="openKhorsRequests()"
+      [title]="'طلبات الانضمام للخورس'"
+    >
+      <span class="bellEmoji">🔔</span>
+      <span class="badge" *ngIf="pendingRequestsCount > 0">{{ pendingRequestsCount }}</span>
+    </button>
+  </div>
+
+  <div class="top" *ngIf="canSelectFamily() && families?.length">
     <label>الأسرة</label>
-    <select [(ngModel)]="selectedFamily" (change)="loadMembers()">
+    <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
     </select>
   </div>
@@ -54,7 +68,7 @@
             <input type="checkbox" [(ngModel)]="m.selected" (ngModelChange)="onMemberSelectionChange()" [ngModelOptions]="{ standalone: true }" />
           </td>
           <td>{{m.fullName}}</td>
-          <td>{{m.role}}</td>
+          <td>{{ m.role | roleLabel }}</td>
           <td>{{m.address}}</td>
           <td>{{m.phoneNumber}}</td>
           <td>{{m.guardiansPhone}}</td>
@@ -77,8 +91,8 @@
               (ngModelChange)="changeRole(m, $event)"
               [ngModelOptions]="{ standalone: true }"
             >
-              <option *ngFor="let r of allRoles" [value]="r" [disabled]="r === 'DEVELOPER'">
-                {{ r }}
+              <option *ngFor="let r of rolesForMember(m)" [value]="r" [disabled]="r === 'DEVELOPER'">
+                {{ r | roleLabel }}
               </option>
             </select>
           </td>
@@ -93,7 +107,7 @@
       <div class="modalHead">
         <div>
           <div class="title">{{ profileFor.fullName }}</div>
-          <div class="sub">{{ profileFor.role }}</div>
+          <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
         <div class="modalActions">
           <button
@@ -132,6 +146,42 @@
       <ng-template #loadingProfile>
         <div class="hint">جاري التحميل...</div>
       </ng-template>
+    </div>
+  </div>
+
+  <!-- Khors requests modal -->
+  <div class="modal" *ngIf="requestsOpen">
+    <div class="modalCard wide">
+      <div class="modalHead">
+        <div>
+          <div class="title">طلبات الانضمام للخورس</div>
+          <div class="sub" *ngIf="pendingRequestsCount > 0">عدد الطلبات: {{ pendingRequestsCount }}</div>
+          <div class="sub" *ngIf="pendingRequestsCount === 0">لا يوجد طلبات حالياً</div>
+        </div>
+        <div class="modalActions">
+          <button pButton type="button" icon="pi pi-times" (click)="closeKhorsRequests()">➖</button>
+        </div>
+      </div>
+
+      <div *ngIf="requestsLoading" class="hint">جاري التحميل...</div>
+
+      <div *ngIf="!requestsLoading && requests?.length" class="reqList">
+        <div class="reqRow" *ngFor="let r of requests">
+          <div class="reqInfo">
+            <div class="reqName">{{ r.fullName }}</div>
+            <div class="reqMeta">
+              <span>الأسرة: {{ r.deaconFamily }}</span>
+              <span>الدور: {{ r.role | roleLabel }}</span>
+              <span>الخورس: {{ r.requestedKhors === 'MARMARKOS' ? 'مارمرقس' : 'الأنبا أثناسيوس' }}</span>
+            </div>
+          </div>
+
+          <div class="reqActions">
+            <button *ngIf="canDecideKhorsRequests()" pButton type="button" class="p-button-success" (click)="decideKhorsRequest(r, true)">✅</button>
+            <button *ngIf="canDecideKhorsRequests()" pButton type="button" class="p-button-danger" (click)="decideKhorsRequest(r, false)">❌</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

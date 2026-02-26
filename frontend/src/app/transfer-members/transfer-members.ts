@@ -8,6 +8,9 @@ type Member = {
   fullName: string;
   role: string;
   deaconFamily: string;
+  deaconFamily2?: string;
+  deaconFamily3?: string;
+  deaconFamily4?: string;
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
@@ -44,7 +47,9 @@ export class TransferMembersComponent implements OnInit {
     'اسرة القديس اسكلابيوس',
     'اسرة القديس البابا كيرلس',
     'اسرة القديس الانبا ابرام',
-    'اسرة القديس اسطفانوس'
+    'اسرة القديس اسطفانوس',
+    'خورس مارمرقس',
+    'خورس الانبا اثناسيوس'
   ];
 
   makhdomFamilies: string[] = [
@@ -67,6 +72,9 @@ export class TransferMembersComponent implements OnInit {
   selectedFamilyView = '';
   // Target family (varies by mode)
   targetFamily = '';
+  // Optional second family for SERVANT mode (AMIN_KHEDMA/DEV only)
+  // ✅ Dynamic extra families (2..4 in backend; UI can show + add/remove)
+  extraFamilies: string[] = [];
   // Target role (only for SERVANT mode)
   targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'KHADIM';
 
@@ -151,6 +159,7 @@ export class TransferMembersComponent implements OnInit {
       this.targetFamily = this.targetFamily || (this.makhdomFamilies[0] || '');
     } else {
       this.targetFamily = this.servantFamilies[0] || '';
+      this.extraFamilies = [];
       this.targetRole = 'KHADIM';
     }
 
@@ -194,11 +203,7 @@ export class TransferMembersComponent implements OnInit {
     }
 
     const ids = Array.from(this.selectedIds);
-    const roleLabel =
-      this.targetRole === 'MAKHDOM' ? 'مخدوم' :
-      this.targetRole === 'KHADIM' ? 'خادم' :
-      this.targetRole === 'AMIN_OSRA' ? 'أمين أسرة' :
-      this.targetRole === 'AMIN_KHEDMA' ? 'أمين خدمة' : this.targetRole;
+    const roleLabel = this.getRoleLabel(this.targetRole);
 
     const msg = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
       ? `Transfer ${ids.length} account(s) to "${this.targetFamily}" as "${roleLabel}"?`
@@ -212,7 +217,10 @@ export class TransferMembersComponent implements OnInit {
       rejectLabel: 'Cancel',
       accept: () => {
         const roleToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') ? this.targetRole : undefined;
-        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend).subscribe({
+        const extrasToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
+          ? this.extraFamilies.map(x => (x || '').trim()).filter(x => !!x)
+          : undefined;
+        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend, extrasToSend).subscribe({
           next: (res) => {
             const updated = res?.updated ?? 0;
             this.message.add({ severity: 'success', summary: 'Done', detail: `Transferred: ${updated}` });
@@ -225,5 +233,49 @@ export class TransferMembersComponent implements OnInit {
         });
       }
     });
+  }
+
+  /** UI helpers for dynamic extra families */
+  canAddExtraFamily(): boolean {
+    // backend currently supports up to 3 extras (2..4)
+    return this.extraFamilies.length < 3;
+  }
+
+  addExtraFamily() {
+    if (!this.canAddExtraFamily()) return;
+    this.extraFamilies.push('');
+  }
+
+  removeExtraFamily(idx: number) {
+    this.extraFamilies.splice(idx, 1);
+  }
+
+  private countExtras(m: Member): number {
+    const arr = [m.deaconFamily2, m.deaconFamily3, m.deaconFamily4].filter(x => !!(x || '').trim());
+    return arr.length;
+  }
+
+  maxExistingExtraCols(): number {
+    if (!this.members?.length) return 0;
+    return this.members.reduce((mx, m) => Math.max(mx, this.countExtras(m)), 0);
+  }
+
+  extraColIndices(): number[] {
+    const n = this.maxExistingExtraCols();
+    return Array.from({ length: n }, (_, i) => i);
+  }
+
+  extraFamilyValue(m: Member, idx: number): string {
+    const vals = [m.deaconFamily2, m.deaconFamily3, m.deaconFamily4];
+    return (vals[idx] || '').trim() || '—';
+  }
+
+  getRoleLabel(role: string): string {
+    if (role === 'MAKHDOM') return 'مخدوم';
+    if (role === 'KHADIM') return 'خادم';
+    if (role === 'AMIN_OSRA') return 'امين اسره';
+    if (role === 'AMIN_KHEDMA') return 'امين خدمة';
+    if (role === 'DEVELOPER' || role === 'DEV' || role.toLowerCase() === 'dev') return 'dev';
+    return role;
   }
 }

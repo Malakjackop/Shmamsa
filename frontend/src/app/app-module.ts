@@ -30,6 +30,7 @@ import { StartNewYearComponent } from './start-new-year/start-new-year';
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
 import { MessageService } from 'primeng/api';
+import { RoleLabelPipe } from './pipes/role-label.pipe';
 
 // ✅ PrimeNG Component Modules
 import { ToastModule } from 'primeng/toast';
@@ -63,6 +64,7 @@ import { DatePickerModule } from 'primeng/datepicker';
   ],
   imports: [
     BrowserModule,
+    RoleLabelPipe,
     RegisterComponent,
     RegisterServantComponent,
     AttendanceHistoryComponent,
