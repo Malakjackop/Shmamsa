@@ -25,6 +25,8 @@
           </th>
           <th>الاسم</th>
           <th>قداس الجمعة</th>
+          <th *ngIf="isChoirSelected()">خورس مارمرقس</th>
+          <th *ngIf="isChoirSelected()">خورس الانبا اثناسيوس</th>
           <th>تسبحة</th>
           <th>اجتماع الأسرة</th>
           <th>تفاصيل</th>
@@ -38,6 +40,8 @@
           </td>
           <td>{{m.fullName}}</td>
           <td>{{ countLabel(m, 'FRIDAY_LITURGY') }}</td>
+          <td *ngIf="isChoirSelected()">{{ countLabel(m, 'MARMARKOS_KHORS') }}</td>
+          <td *ngIf="isChoirSelected()">{{ countLabel(m, 'ATHANASIUS_KHORS') }}</td>
           <td>{{ countLabel(m, 'TASBEEHA') }}</td>
           <td>{{ countLabel(m, 'FAMILY_MEETING') }}</td>
           <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
@@ -60,6 +64,8 @@
           <select [(ngModel)]="detailsType" (change)="reloadDetails()">
             <option value="">الكل</option>
             <option value="FRIDAY_LITURGY">قداس الجمعة</option>
+            <option value="MARMARKOS_KHORS">خورس مارمرقس</option>
+            <option value="ATHANASIUS_KHORS">خورس الانبا اثناسيوس</option>
             <option value="TASBEEHA">تسبحة</option>
             <option value="FAMILY_MEETING">اجتماع الأسرة</option>
           </select>

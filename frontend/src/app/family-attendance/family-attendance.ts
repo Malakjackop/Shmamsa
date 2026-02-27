@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
+import type { AttendanceType } from '../services/attendance.service';
 
 type Member = {
   id: number;
@@ -27,7 +28,8 @@ type Member = {
 
 type AttendanceRow = {
   id: number;
-  type: 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING';
+  // Keep this aligned with backend enum + AttendanceService.AttendanceType
+  type: AttendanceType;
   date: string;
   time?: string;
   createdAt?: string;
@@ -49,6 +51,8 @@ export class FamilyAttendanceComponent implements OnInit {
   readonly allAttendanceTypes: AttendanceRow['type'][] = [
     'TASBEEHA',
     'FRIDAY_LITURGY',
+    'MARMARKOS_KHORS',
+    'ATHANASIUS_KHORS',
     'FAMILY_MEETING'
   ];
   private familySvc = inject(FamilyService);
@@ -69,12 +73,17 @@ export class FamilyAttendanceComponent implements OnInit {
   // attendance details modal
   detailsFor: Member | null = null;
   details: AttendanceRow[] = [];
-  detailsType: '' | 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING' = '';
+  detailsType: '' | AttendanceType = '';
 
   // profile modal
   profileFor: Member | null = null;
   profile: any = null;
 
+
+  isChoirSelected(): boolean {
+    const x = String(this.selectedFamily || '').trim();
+    return x === 'خورس مارمرقس' || x === 'خورس الانبا اثناسيوس';
+  }
 
   ngOnInit() {
     this.auth.getUserData().subscribe({
@@ -229,23 +238,42 @@ openDetails(member: Member) {
   }
 
   // ===== UI helpers =====
-  countLabel(m: Member, kind: 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING'): string {
+  countLabel(
+    m: Member,
+    kind: 'FRIDAY_LITURGY' | 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' | 'TASBEEHA' | 'FAMILY_MEETING'
+  ): string {
     const fallbackPresent =
-      kind === 'FRIDAY_LITURGY' ? m.fridayLiturgy : kind === 'TASBEEHA' ? m.tasbeeha : m.familyMeeting;
+      kind === 'FRIDAY_LITURGY'
+        ? m.fridayLiturgy
+        : kind === 'MARMARKOS_KHORS'
+          ? (m as any).marmarkosKhorsPresent
+          : kind === 'ATHANASIUS_KHORS'
+            ? (m as any).athanasiusKhorsPresent
+            : kind === 'TASBEEHA'
+              ? m.tasbeeha
+              : m.familyMeeting;
 
     const present =
       kind === 'FRIDAY_LITURGY'
         ? m.fridayLiturgyPresent ?? fallbackPresent
-        : kind === 'TASBEEHA'
-          ? m.tasbeehaPresent ?? fallbackPresent
-          : m.familyMeetingPresent ?? fallbackPresent;
+        : kind === 'MARMARKOS_KHORS'
+          ? (m as any).marmarkosKhorsPresent ?? fallbackPresent
+          : kind === 'ATHANASIUS_KHORS'
+            ? (m as any).athanasiusKhorsPresent ?? fallbackPresent
+            : kind === 'TASBEEHA'
+              ? m.tasbeehaPresent ?? fallbackPresent
+              : m.familyMeetingPresent ?? fallbackPresent;
 
     const total =
       kind === 'FRIDAY_LITURGY'
         ? m.fridayLiturgyTotal
-        : kind === 'TASBEEHA'
-          ? m.tasbeehaTotal
-          : m.familyMeetingTotal;
+        : kind === 'MARMARKOS_KHORS'
+          ? (m as any).marmarkosKhorsTotal
+          : kind === 'ATHANASIUS_KHORS'
+            ? (m as any).athanasiusKhorsTotal
+            : kind === 'TASBEEHA'
+              ? m.tasbeehaTotal
+              : m.familyMeetingTotal;
 
     // لو التوتال مش موجود لسه (قبل تحديث الباك), اعرض الرقم القديم بس
     if (total == null) return String(present ?? 0);
@@ -255,6 +283,8 @@ openDetails(member: Member) {
   titleForType(t: AttendanceRow['type']): string {
     if (t === 'TASBEEHA') return 'تسبحة';
     if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
+    if (t === 'MARMARKOS_KHORS') return 'خورس مارمرقس';
+    if (t === 'ATHANASIUS_KHORS') return 'خورس الانبا اثناسيوس';
     return 'اجتماع الأسرة';
   }
 

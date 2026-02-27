@@ -38,7 +38,7 @@
         ></p-datepicker>
 
         <label>النوع</label>
-        <select [(ngModel)]="selectedType" [disabled]="true">
+        <select [(ngModel)]="selectedType" [disabled]="typeOptions.length <= 1" (change)="onTypeChange()">
           <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
         </select>
 

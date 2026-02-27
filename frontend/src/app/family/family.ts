@@ -5,6 +5,7 @@ import { AdminService } from '../services/admin.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { AttendanceService } from '../services/attendance.service';
+import type { AttendanceType } from '../services/attendance.service';
 import { ConfirmationService } from 'primeng/api';
 
 type Member = {
@@ -31,7 +32,8 @@ type Member = {
 
 type AttendanceRow = {
   id: number;
-  type: 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING';
+  // Keep this aligned with backend enum + AttendanceService.AttendanceType
+  type: AttendanceType;
   date: string;
   time?: string;
   createdAt?: string;
@@ -53,6 +55,8 @@ export class FamilyComponent implements OnInit {
   readonly allAttendanceTypes: AttendanceRow['type'][] = [
     'TASBEEHA',
     'FRIDAY_LITURGY',
+    'MARMARKOS_KHORS',
+    'ATHANASIUS_KHORS',
     'FAMILY_MEETING'
   ];
   private familySvc = inject(FamilyService);
@@ -75,7 +79,12 @@ export class FamilyComponent implements OnInit {
 
   detailsFor: Member | null = null;
   details: AttendanceRow[] = [];
-  detailsType: '' | 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING' = '';
+  detailsType: '' | AttendanceType = '';
+
+  isChoirSelected(): boolean {
+    const x = String(this.selectedFamily || '').trim();
+    return x === 'خورس مارمرقس' || x === 'خورس الانبا اثناسيوس';
+  }
 
   profileFor: Member | null = null;
   profile: any = null;
@@ -180,23 +189,42 @@ export class FamilyComponent implements OnInit {
   }
 
   // ===== UI helpers =====
-  countLabel(m: Member, kind: 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING'): string {
+  countLabel(
+    m: Member,
+    kind: 'FRIDAY_LITURGY' | 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' | 'TASBEEHA' | 'FAMILY_MEETING'
+  ): string {
     const fallbackPresent =
-      kind === 'FRIDAY_LITURGY' ? m.fridayLiturgy : kind === 'TASBEEHA' ? m.tasbeeha : m.familyMeeting;
+      kind === 'FRIDAY_LITURGY'
+        ? m.fridayLiturgy
+        : kind === 'MARMARKOS_KHORS'
+          ? (m as any).marmarkosKhorsPresent
+          : kind === 'ATHANASIUS_KHORS'
+            ? (m as any).athanasiusKhorsPresent
+            : kind === 'TASBEEHA'
+              ? m.tasbeeha
+              : m.familyMeeting;
 
     const present =
       kind === 'FRIDAY_LITURGY'
         ? m.fridayLiturgyPresent ?? fallbackPresent
-        : kind === 'TASBEEHA'
-          ? m.tasbeehaPresent ?? fallbackPresent
-          : m.familyMeetingPresent ?? fallbackPresent;
+        : kind === 'MARMARKOS_KHORS'
+          ? (m as any).marmarkosKhorsPresent ?? fallbackPresent
+          : kind === 'ATHANASIUS_KHORS'
+            ? (m as any).athanasiusKhorsPresent ?? fallbackPresent
+            : kind === 'TASBEEHA'
+              ? m.tasbeehaPresent ?? fallbackPresent
+              : m.familyMeetingPresent ?? fallbackPresent;
 
     const total =
       kind === 'FRIDAY_LITURGY'
         ? m.fridayLiturgyTotal
-        : kind === 'TASBEEHA'
-          ? m.tasbeehaTotal
-          : m.familyMeetingTotal;
+        : kind === 'MARMARKOS_KHORS'
+          ? (m as any).marmarkosKhorsTotal
+          : kind === 'ATHANASIUS_KHORS'
+            ? (m as any).athanasiusKhorsTotal
+            : kind === 'TASBEEHA'
+              ? m.tasbeehaTotal
+              : m.familyMeetingTotal;
 
     if (total == null) return String(present ?? 0);
     return `${present ?? 0}/${total}`;
@@ -205,6 +233,8 @@ export class FamilyComponent implements OnInit {
   titleForType(t: AttendanceRow['type']): string {
     if (t === 'TASBEEHA') return 'تسبحة';
     if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
+    if (t === 'MARMARKOS_KHORS') return 'خورس مارمرقس';
+    if (t === 'ATHANASIUS_KHORS') return 'خورس الانبا اثناسيوس';
     return 'اجتماع الأسرة';
   }
 

@@ -2,7 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export type AttendanceType = 'FRIDAY_LITURGY' | 'TASBEEHA' | 'FAMILY_MEETING';
+export type AttendanceType =
+  | 'FRIDAY_LITURGY'
+  | 'MARMARKOS_KHORS'
+  | 'ATHANASIUS_KHORS'
+  | 'TASBEEHA'
+  | 'FAMILY_MEETING';
 
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
@@ -29,8 +34,20 @@ export class AttendanceService {
     , { withCredentials: true });
   }
 
-  getMyStats(): Observable<{ FRIDAY_LITURGY: number; TASBEEHA: number; FAMILY_MEETING: number }> {
-    return this.http.get<{ FRIDAY_LITURGY: number; TASBEEHA: number; FAMILY_MEETING: number }>(
+  getMyStats(): Observable<{
+    FRIDAY_LITURGY: number;
+    MARMARKOS_KHORS?: number;
+    ATHANASIUS_KHORS?: number;
+    TASBEEHA: number;
+    FAMILY_MEETING: number;
+  }> {
+    return this.http.get<{
+      FRIDAY_LITURGY: number;
+      MARMARKOS_KHORS?: number;
+      ATHANASIUS_KHORS?: number;
+      TASBEEHA: number;
+      FAMILY_MEETING: number;
+    }>(
       `${this.baseUrl}/my-stats`,
       { withCredentials: true }
     );

@@ -110,7 +110,10 @@ public class AttendanceController {
         if (type == AttendanceType.FAMILY_MEETING && dow != DayOfWeek.THURSDAY) {
             return ResponseEntity.status(400).body(Map.of("error", "Family meeting must be on Thursday"));
         }
-        if (type == AttendanceType.FRIDAY_LITURGY && dow != DayOfWeek.FRIDAY) {
+        if ((type == AttendanceType.FRIDAY_LITURGY
+                || type == AttendanceType.MARMARKOS_KHORS
+                || type == AttendanceType.ATHANASIUS_KHORS)
+                && dow != DayOfWeek.FRIDAY) {
             return ResponseEntity.status(400).body(Map.of("error", "Friday liturgy must be on Friday"));
         }
         if (type == AttendanceType.TASBEEHA && dow != DayOfWeek.SATURDAY) {
@@ -159,6 +162,32 @@ public class AttendanceController {
             }
             scope = userRepo.findByDeaconFamilyStartingWithAndRoleIn(
                     base,
+                    List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
+            );
+        } else if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
+            // ✅ Choir: only members in that choir
+            // Authorization: only choir servants of that choir (or Amin/Dev)
+            String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
+            boolean isAminOrDev = role.equals("AMIN_KHEDMA") || role.equals("DEVELOPER") || role.equals("DEV");
+            if (!isAminOrDev) {
+                // KHADIM must have servingScope allowing choir, and serve this choir
+                if (!role.equals("KHADIM")) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+                }
+                String scopeStr = servant.getServingScope() == null ? "" : servant.getServingScope().trim().toUpperCase(Locale.ROOT);
+                if (!("KHORS_ONLY".equals(scopeStr) || "BOTH".equals(scopeStr))) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+                }
+                String myKhors = servant.getKhors() == null ? "" : servant.getKhors().trim().toUpperCase(Locale.ROOT);
+                String needed = (type == AttendanceType.MARMARKOS_KHORS) ? "MARMARKOS" : "ATHANASIUS";
+                if (!(myKhors.equals("BOTH") || myKhors.equals(needed))) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+                }
+            }
+
+            String needed = (type == AttendanceType.MARMARKOS_KHORS) ? "MARMARKOS" : "ATHANASIUS";
+            scope = userRepo.findByKhorsAndRoleIn(
+                    needed,
                     List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
             );
         } else {
@@ -271,11 +300,15 @@ public class AttendanceController {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         long f = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long mk = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
+        long ak = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
         long t = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
         long m = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
 
         return ResponseEntity.ok(Map.of(
                 "FRIDAY_LITURGY", f,
+                "MARMARKOS_KHORS", mk,
+                "ATHANASIUS_KHORS", ak,
                 "TASBEEHA", t,
                 "FAMILY_MEETING", m
         ));

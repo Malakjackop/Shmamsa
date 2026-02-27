@@ -38,8 +38,33 @@ private List<String> servingBasesOf(User u) {
     if (b3 != null && !b3.isBlank() && !"SYSTEM".equalsIgnoreCase(b3)) set.add(b3);
     String b4 = FamilyUtil.mainFamily(u.getDeaconFamily4());
     if (b4 != null && !b4.isBlank() && !"SYSTEM".equalsIgnoreCase(b4)) set.add(b4);
+
+    // ✅ If KHADIM serves choir, add the choir bucket(s) to the allowed bases
+    String role = u.getRole() == null ? "" : u.getRole().trim().toUpperCase();
+    if ("KHADIM".equals(role)) {
+        String scope = u.getServingScope() == null ? "" : u.getServingScope().trim().toUpperCase();
+        if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
+            String k = u.getKhors() == null ? "" : u.getKhors().trim().toUpperCase();
+            if ("MARMARKOS".equals(k) || "BOTH".equals(k)) set.add("خورس مارمرقس");
+            if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) set.add("خورس الانبا اثناسيوس");
+        }
+    }
     return new ArrayList<>(set);
 }
+
+    private static boolean isChoirBucket(String base) {
+        if (base == null) return false;
+        String x = base.trim();
+        return x.equalsIgnoreCase("خورس مارمرقس") || x.equalsIgnoreCase("خورس الانبا اثناسيوس");
+    }
+
+    private static String choirCodeFromBucket(String base) {
+        if (base == null) return null;
+        String x = base.trim();
+        if (x.equalsIgnoreCase("خورس مارمرقس")) return "MARMARKOS";
+        if (x.equalsIgnoreCase("خورس الانبا اثناسيوس")) return "ATHANASIUS";
+        return null;
+    }
 
     @GetMapping("/families")
 public ResponseEntity<?> families(
@@ -167,7 +192,13 @@ if (servantsBucket) {
     }
     members = new ArrayList<>(uniq.values());
 } else {
-    members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, rolesToShow);
+    // ✅ Choir bucket: use User.khors membership instead of deaconFamily
+    if (isChoirBucket(base)) {
+        String code = choirCodeFromBucket(base);
+        members = userRepo.findByKhorsAndRoleIn(code, rolesToShow);
+    } else {
+        members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, rolesToShow);
+    }
 }
 
         List<Map<String, Object>> out = new ArrayList<>();
@@ -180,9 +211,16 @@ if (servantsBucket) {
             long tasbeehaTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.TASBEEHA);
             long meetingTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING);
 
+            // ✅ Choir totals (only meaningful for choir members)
+            long marmarkosTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.MARMARKOS_KHORS);
+            long athanasiusTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.ATHANASIUS_KHORS);
+
             long fridayPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FRIDAY_LITURGY);
             long tasbeehaPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.TASBEEHA);
             long meetingPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FAMILY_MEETING);
+
+            long marmarkosPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.MARMARKOS_KHORS);
+            long athanasiusPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.ATHANASIUS_KHORS);
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", u.getId());
@@ -207,6 +245,12 @@ if (servantsBucket) {
             row.put("tasbeehaTotal", tasbeehaTotal);
             row.put("familyMeetingPresent", meetingPresent);
             row.put("familyMeetingTotal", meetingTotal);
+
+            // New: choir attendance
+            row.put("marmarkosKhorsPresent", marmarkosPresent);
+            row.put("marmarkosKhorsTotal", marmarkosTotal);
+            row.put("athanasiusKhorsPresent", athanasiusPresent);
+            row.put("athanasiusKhorsTotal", athanasiusTotal);
             out.add(row);
         }
 

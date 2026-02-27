@@ -76,15 +76,39 @@ export class AttendanceComponent implements OnInit {
       .replace(/[\u064B-\u065F\u0670\u0640]/g, '') // remove Arabic diacritics/tatweel
       .trim()
       .replace(/\s+/g, ' ');
+    const isKhadimRole =
+      ['KHADIM', 'ROLE_KHADIM'].includes(roleNorm) ||
+      ['خادم'].includes(roleArNorm);
 
     const canOverrideWeekClose =
       ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_OSRA', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm) ||
       ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسره', 'امين الأسرة'].includes(roleArNorm);
 
     // لو أمين أسرة/أمين خدمة/Developer: يقدر يسجل لأي يوم فات (بس خميس/جمعة/سبت)
-    // غير كده: من Monday بتاع الأسبوع الحالي لحد النهارده
-    this.minDate = canOverrideWeekClose ? new Date(2000, 0, 1) : monday;
-    this.maxDate = today;
+    // لو KHADIM: الأيام المتاحة خميس/جمعة/سبت فقط، وتفضل مفتوحة لحد الأحد وتتقفل من أول الاثنين.
+    // غير كده: من Monday بتاع الأسبوع الحالي لحد النهارده.
+    if (canOverrideWeekClose) {
+      this.minDate = new Date(2000, 0, 1);
+      this.maxDate = today;
+    } else if (isKhadimRole) {
+      const thursday = new Date(monday);
+      thursday.setDate(monday.getDate() + 3);
+      const saturday = new Date(monday);
+      saturday.setDate(monday.getDate() + 5);
+
+      if (day >= 1 && day <= 3) {
+        // Monday..Wednesday => closed for KHADIM
+        this.minDate = today;
+        this.maxDate = today;
+      } else {
+        // Thursday..Sunday => keep Thu/Fri/Sat open
+        this.minDate = thursday;
+        this.maxDate = day === 0 ? saturday : today;
+      }
+    } else {
+      this.minDate = monday;
+      this.maxDate = today;
+    }
     // Pick default date: today if allowed; otherwise the latest allowed day within this week up to today.
     const allowed = (d: Date) => {
       const dow = d.getDay();
@@ -126,14 +150,64 @@ export class AttendanceComponent implements OnInit {
       this.selectedType = 'FAMILY_MEETING';
       this.typeOptions = [{ value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' }];
     } else if (dow === 5) {
-      this.selectedType = 'FRIDAY_LITURGY';
-      this.typeOptions = [{ value: 'FRIDAY_LITURGY', label: 'قداس الجمعة' }];
+      // Friday: Liturgy + (optional) Choir attendance for choir servants
+      const rawRole = String(this.me?.role || '').trim();
+      const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
+
+      const scopeNorm = String(this.me?.servingScope || '').trim().toUpperCase().replace(/[-\s]+/g, '_');
+      const myKhors = String(this.me?.khors || '').trim().toUpperCase();
+
+      const isDevOrAmin = ['AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm);
+      const isKhadim = ['KHADIM', 'ROLE_KHADIM'].includes(roleNorm);
+      const canChoir = isDevOrAmin || (isKhadim && (scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH'));
+
+      const opts: { value: AttendanceType; label: string }[] = [{ value: 'FRIDAY_LITURGY', label: 'قداس الجمعة' }];
+
+      if (canChoir) {
+        // ✅ KHADIM choir servants: show ONLY their choir + liturgy (2 options)
+        // ✅ AMIN/DEV: show both choirs
+        if (isDevOrAmin || myKhors === 'BOTH') {
+          opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
+          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس الانبا اثناسيوس' });
+        } else if (myKhors === 'MARMARKOS') {
+          opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
+        } else if (myKhors === 'ATHANASIUS') {
+          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس الانبا اثناسيوس' });
+        }
+      }
+
+      this.typeOptions = opts;
+      // Default selection
+      this.selectedType = (opts[0]?.value || 'FRIDAY_LITURGY') as AttendanceType;
     } else if (dow === 6) {
       this.selectedType = 'TASBEEHA';
       this.typeOptions = [{ value: 'TASBEEHA', label: 'تسبحة' }];
     } else {
       // Not allowed day (should be blocked by UI). Keep safe.
       this.typeOptions = [];
+    }
+
+    // If Friday choir type is selected (or becomes available), auto-switch family list to the matching choir
+    // so the members list shows the correct choir members.
+    this.syncFamilyWithType();
+  }
+
+  onTypeChange() {
+    this.syncFamilyWithType();
+  }
+
+  private syncFamilyWithType() {
+    if (!this.selectedDate) return;
+    const d = new Date(this.selectedDate);
+    d.setHours(0, 0, 0, 0);
+    if (d.getDay() !== 5) return; // Friday only
+
+    if (this.selectedType === 'MARMARKOS_KHORS') {
+      this.selectedFamily = 'خورس مارمرقس';
+      this.loadMembersForFamily();
+    } else if (this.selectedType === 'ATHANASIUS_KHORS') {
+      this.selectedFamily = 'خورس الانبا اثناسيوس';
+      this.loadMembersForFamily();
     }
   }
 

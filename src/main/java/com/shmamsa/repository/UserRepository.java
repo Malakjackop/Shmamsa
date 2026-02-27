@@ -26,6 +26,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
             String familyPrefix,
             String namePart
     );
+
+    // ====== Choir helpers (khors membership on User.khors) ======
+    java.util.List<User> findByKhorsAndRoleIn(String khors, java.util.List<String> roles);
+    java.util.List<User> findByKhorsInAndRoleIn(java.util.List<String> khors, java.util.List<String> roles);
 }
 
 
