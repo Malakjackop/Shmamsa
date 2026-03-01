@@ -45,46 +45,117 @@ export class DashBoard implements OnInit {
   ATHANASIUS_KHORS: 0
 };
 
-get showKhorsCard(): boolean {
-  const k = String(this.user?.khors || '').trim().toUpperCase();
-  return k !== '' && k !== 'NONE';
-}
-
-get khorsAttendanceCount(): number {
-  const k = String(this.user?.khors || '').trim().toUpperCase();
-  if (k === 'MARMARKOS') return this.stats.MARMARKOS_KHORS || 0;
-  if (k === 'ATHANASIUS') return this.stats.ATHANASIUS_KHORS || 0;
-  if (k === 'BOTH') return (this.stats.MARMARKOS_KHORS || 0) + (this.stats.ATHANASIUS_KHORS || 0);
-  return 0;
-}
-
-  private arKhorsName(khors: any): string {
+private arKhorsName(khors: any): string {
   const k = String(khors || '').trim().toUpperCase();
   if (k === 'MARMARKOS') return 'خورس مارمرقس';
   if (k === 'ATHANASIUS') return 'خورس الانبا اثناسيوس';
-  if (k === 'BOTH') return 'خورس مارمرقس + خورس الانبا اثناسيوس';
   return '';
 }
 
-get currentFamilyLabel(): string {
+private arYearLabel(year?: number): string {
+  const y = Number(year || 0);
+  if (!y) return '';
+  if (y === 1) return 'سنه اوله';
+  if (y === 2) return 'سنه تانيه';
+  if (y === 3) return 'سنه تالته';
+  if (y === 4) return 'سنه رابعه';
+  if (y === 5) return 'سنه خامسه';
+  return `سنه ${y}`;
+}
+
+private servedKhorsLabel(): string {
+  const k = String(this.user?.khors || '').trim().toUpperCase();
+  const base = this.arKhorsName(k);
+  if (!base) return '';
+  const year = this.arYearLabel(this.user?.khorsYear);
+  return year ? `${base} (${year})` : base;
+}
+
+private attendKhorsLabel(): string {
+  const k = String(this.user?.attendKhors || '').trim().toUpperCase();
+  const base = this.arKhorsName(k);
+  return base || '';
+}
+
+get isKhorsOnlyServant(): boolean {
   const role = String(this.user?.role || '').trim().toUpperCase();
   const scope = String(this.user?.servingScope || '').trim().toUpperCase();
+  const family = String(this.user?.deaconFamily || '').trim().toUpperCase();
+
+  if (role === 'AMIN_KHEDMA') return true;
+  if (scope === 'KHORS_ONLY') return true;
+
+  if (family === 'SYSTEM') return true;
+
+  return false;
+}
+
+get currentFamilyLabel(): string {
   const family = String(this.user?.deaconFamily || '').trim();
-  const khorsLabel = this.arKhorsName(this.user?.khors);
+  const served = this.servedKhorsLabel();
+  const attend = this.attendKhorsLabel();
 
-  if (role === 'AMIN_KHEDMA') {
-    return khorsLabel || 'خورس';
+  const labels: string[] = [];
+
+  if (!this.isKhorsOnlyServant && family && family.toUpperCase() !== 'SYSTEM') {
+    labels.push(family);
   }
 
-  if (scope === 'KHORS_ONLY') {
-    return khorsLabel || 'خورس';
+  if (served) labels.push(served);
+
+  if (attend && !labels.some(x => x.includes(attend))) {
+    labels.push(attend);
   }
 
-  if (family && khorsLabel) {
-    return `${family} + ${khorsLabel}`;
+  return labels.join(' + ');
+}
+
+get showFamilyMeetingCard(): boolean {
+  const fam = String(this.user?.deaconFamily || '').trim();
+  return !!fam && fam.toUpperCase() !== 'SYSTEM';
+}
+
+get khorsCards(): Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number }> {
+  const out: Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number }> = [];
+  const year = this.arYearLabel(this.user?.khorsYear);
+
+  const servedK = String(this.user?.khors || '').trim().toUpperCase();
+  const attendK = String(this.user?.attendKhors || '').trim().toUpperCase();
+
+  const add = (code: 'MARMARKOS' | 'ATHANASIUS', withYear: boolean) => {
+    const name = this.arKhorsName(code);
+    const label = withYear && year ? `${name} (${year})` : name;
+
+    const count =
+      code === 'MARMARKOS'
+        ? (this.stats.MARMARKOS_KHORS || 0)
+        : (this.stats.ATHANASIUS_KHORS || 0);
+
+    if (!out.some(x => x.code === code)) out.push({ code, label, count });
+  };
+
+  if (servedK === 'MARMARKOS') add('MARMARKOS', true);
+  if (servedK === 'ATHANASIUS') add('ATHANASIUS', true);
+  if (servedK === 'BOTH') {
+    add('MARMARKOS', true);
+    add('ATHANASIUS', true);
   }
 
-  return khorsLabel || family || '';
+  if (attendK === 'MARMARKOS') add('MARMARKOS', false);
+  if (attendK === 'ATHANASIUS') add('ATHANASIUS', false);
+
+  return out;
+}
+
+get showAnyKhorsCards(): boolean {
+  return this.khorsCards.length > 0;
+}
+
+get hasRealFamily(): boolean {
+  const family = String(this.user?.deaconFamily || '').trim();
+  if (!family) return false;
+  if (family.toUpperCase() === 'SYSTEM') return false;
+  return true;
 }
 
   ngOnInit(): void {

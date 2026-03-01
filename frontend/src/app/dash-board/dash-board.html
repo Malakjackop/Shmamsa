@@ -13,10 +13,10 @@
           <h3>الأسرة الحالية</h3>
           <h1>{{ currentFamilyLabel }}</h1>
         </p-card>
-        <p-card class="stat-card credits">
-          <h3>حضور اجتماع الأسرة</h3>
-          <h1>{{ stats.FAMILY_MEETING }}</h1>
-        </p-card>
+       <p-card *ngIf="showFamilyMeetingCard" class="stat-card credits">
+        <h3>حضور اجتماع الأسرة</h3>
+        <h1>{{ stats.FAMILY_MEETING }}</h1>
+      </p-card>
         <p-card class="stat-card assignments">
           <h3>حضور قداس الجمعة</h3>
           <h1>{{ stats.FRIDAY_LITURGY }}</h1>
@@ -25,13 +25,15 @@
           <h3>حضور التسبحة</h3>
           <h1>{{ stats.TASBEEHA }}</h1>
         </p-card>
-        <p-card *ngIf="showKhorsCard" class="stat-card credits">
-  <h3>حضور الخورس</h3>
-  <h1>{{ khorsAttendanceCount }}</h1>
-</p-card>
+        <p-card *ngIf="showAnyKhorsCards" class="stat-card credits">
+          <h3>الحضور</h3>
+          <div class="statCard" *ngFor="let c of khorsCards">
+            <div class="statTitle">حضور {{ c.label }}</div>
+            <div class="statValue">{{ c.count }}</div>
+          </div>
+        </p-card>
       </section>
 
-      <!-- Panels -->
       <section class="panels">
         <p-panel header="جدول الشهر" class="content-panel">
           <ul class="schedule">

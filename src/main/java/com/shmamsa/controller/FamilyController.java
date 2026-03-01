@@ -540,13 +540,23 @@ if (servantsBucket) {
                 if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
 
                 if (isKhorsYearMove) {
+                    if (targetKhors == null || targetYear == null) {
+                        throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid khors move");
+                    }
+
+                    if ("ATHANASIUS".equalsIgnoreCase(targetKhors)) {
+                        throw new ApiException(HttpStatus.BAD_REQUEST, "Athanasius khors has no years");
+                    }
+
                     String currentKhors = (u.getKhors() == null) ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
                     if (!currentKhors.equalsIgnoreCase(targetKhors)) {
                         throw new ApiException(HttpStatus.BAD_REQUEST, "User is not in this khors");
                     }
+
                     u.setKhorsYear(targetYear);
                     userRepo.save(u);
                     updated++;
+                    continue;
                 } else {
                     String currentKhors = (u.getKhors() == null) ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
                     if (!currentKhors.equalsIgnoreCase("MARMARKOS")) {
