@@ -63,6 +63,13 @@ public class AdminController {
         }
 
         target.setRole(newRole);
+        if ("AMIN_KHEDMA".equalsIgnoreCase(newRole)) {
+            target.setDeaconFamily("SYSTEM");
+            target.setDeaconFamily2(null);
+            target.setDeaconFamily3(null);
+            target.setDeaconFamily4(null);
+            target.setServingScope("KHORS_ONLY");
+        }
         userRepo.save(target);
 
         return ResponseEntity.ok(Map.of("message", "Role updated", "userId", target.getId(), "role", target.getRole()));

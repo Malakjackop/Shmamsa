@@ -25,11 +25,10 @@ export class AttendanceComponent implements OnInit {
   me: any;
   scanning = false;
 
-  // Calendar (servants can choose which day to submit for)
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
-  disabledDays: number[] = [0, 1, 2, 3]; // Sun..Wed disabled (allow Thu/Fri/Sat)
+  disabledDays: number[] = [0, 1, 2, 3]; 
   firstDayOfWeek = 1; // Monday
 
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
@@ -62,18 +61,17 @@ export class AttendanceComponent implements OnInit {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Week starts Monday
-    const day = today.getDay(); // 0..6
-    const diffToMonday = (day + 6) % 7; // Monday => 0, Sunday => 6
+
+    const day = today.getDay(); 
+    const diffToMonday = (day + 6) % 7; 
     const monday = new Date(today);
     monday.setDate(today.getDate() - diffToMonday);
 
-    // Role can arrive in a few formats depending on DB/imports (English codes or Arabic labels).
-    // Normalize aggressively to avoid mismatches that would incorrectly lock old dates.
+
     const rawRole = String(this.me?.role || '').trim();
     const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
     const roleArNorm = rawRole
-      .replace(/[\u064B-\u065F\u0670\u0640]/g, '') // remove Arabic diacritics/tatweel
+      .replace(/[\u064B-\u065F\u0670\u0640]/g, '') 
       .trim()
       .replace(/\s+/g, ' ');
     const isKhadimRole =
@@ -84,9 +82,7 @@ export class AttendanceComponent implements OnInit {
       ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_OSRA', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm) ||
       ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسره', 'امين الأسرة'].includes(roleArNorm);
 
-    // لو أمين أسرة/أمين خدمة/Developer: يقدر يسجل لأي يوم فات (بس خميس/جمعة/سبت)
-    // لو KHADIM: الأيام المتاحة خميس/جمعة/سبت فقط، وتفضل مفتوحة لحد الأحد وتتقفل من أول الاثنين.
-    // غير كده: من Monday بتاع الأسبوع الحالي لحد النهارده.
+
     if (canOverrideWeekClose) {
       this.minDate = new Date(2000, 0, 1);
       this.maxDate = today;
@@ -97,11 +93,9 @@ export class AttendanceComponent implements OnInit {
       saturday.setDate(monday.getDate() + 5);
 
       if (day >= 1 && day <= 3) {
-        // Monday..Wednesday => closed for KHADIM
         this.minDate = today;
         this.maxDate = today;
       } else {
-        // Thursday..Sunday => keep Thu/Fri/Sat open
         this.minDate = thursday;
         this.maxDate = day === 0 ? saturday : today;
       }
@@ -109,17 +103,15 @@ export class AttendanceComponent implements OnInit {
       this.minDate = monday;
       this.maxDate = today;
     }
-    // Pick default date: today if allowed; otherwise the latest allowed day within this week up to today.
     const allowed = (d: Date) => {
       const dow = d.getDay();
-      return dow === 4 || dow === 5 || dow === 6; // Thu/Fri/Sat
+      return dow === 4 || dow === 5 || dow === 6; 
     };
 
     let d = new Date(today);
     if (allowed(d)) {
       this.selectedDate = d;
     } else {
-      // walk backwards within this week
       let found: Date | null = null;
       for (let i = 0; i < 7; i++) {
         const x = new Date(today);
@@ -136,6 +128,9 @@ export class AttendanceComponent implements OnInit {
 
     this.onDateChange();
   }
+  
+  
+
 
   onDateChange() {
     if (!this.selectedDate) {
@@ -150,7 +145,6 @@ export class AttendanceComponent implements OnInit {
       this.selectedType = 'FAMILY_MEETING';
       this.typeOptions = [{ value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' }];
     } else if (dow === 5) {
-      // Friday: Liturgy + (optional) Choir attendance for choir servants
       const rawRole = String(this.me?.role || '').trim();
       const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
 
@@ -164,8 +158,7 @@ export class AttendanceComponent implements OnInit {
       const opts: { value: AttendanceType; label: string }[] = [{ value: 'FRIDAY_LITURGY', label: 'قداس الجمعة' }];
 
       if (canChoir) {
-        // ✅ KHADIM choir servants: show ONLY their choir + liturgy (2 options)
-        // ✅ AMIN/DEV: show both choirs
+
         if (isDevOrAmin || myKhors === 'BOTH') {
           opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
           opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس الانبا اثناسيوس' });
@@ -177,18 +170,14 @@ export class AttendanceComponent implements OnInit {
       }
 
       this.typeOptions = opts;
-      // Default selection
       this.selectedType = (opts[0]?.value || 'FRIDAY_LITURGY') as AttendanceType;
     } else if (dow === 6) {
       this.selectedType = 'TASBEEHA';
       this.typeOptions = [{ value: 'TASBEEHA', label: 'تسبحة' }];
     } else {
-      // Not allowed day (should be blocked by UI). Keep safe.
       this.typeOptions = [];
     }
 
-    // If Friday choir type is selected (or becomes available), auto-switch family list to the matching choir
-    // so the members list shows the correct choir members.
     this.syncFamilyWithType();
   }
 
@@ -200,7 +189,7 @@ export class AttendanceComponent implements OnInit {
     if (!this.selectedDate) return;
     const d = new Date(this.selectedDate);
     d.setHours(0, 0, 0, 0);
-    if (d.getDay() !== 5) return; // Friday only
+    if (d.getDay() !== 5) return; 
 
     if (this.selectedType === 'MARMARKOS_KHORS') {
       this.selectedFamily = 'خورس مارمرقس';
@@ -212,7 +201,6 @@ export class AttendanceComponent implements OnInit {
   }
 
   private toIsoDate(d: Date): string {
-    // yyyy-MM-dd
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
@@ -265,11 +253,9 @@ export class AttendanceComponent implements OnInit {
   }
 
   private loadFamilies() {
-    // ✅ In "تسجيل الحضور" page: KHADIM is allowed to pick ANY family.
     this.familySvc.families('attendance').subscribe({
       next: (f) => {
         this.families = f || [];
-        // ✅ Default selection for KHADIM (no "كل الأسر" by default)
         if (!this.selectedFamily && this.families.length) {
           this.selectedFamily = this.families[0];
           this.loadMembersForFamily();
@@ -280,7 +266,6 @@ export class AttendanceComponent implements OnInit {
   }
 
   private loadMembersForFamily() {
-    // In attendance page we want the list to include everyone in the family (including the logged-in servant).
     this.familySvc.members(this.selectedFamily, true, 'attendance').subscribe({
       next: (m) => (this.members = (m as any[])?.map(this.toPickUser) || []),
       error: (err) => {

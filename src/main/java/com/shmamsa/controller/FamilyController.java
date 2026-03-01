@@ -6,6 +6,7 @@ import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
+import com.shmamsa.service.KhorsJoinRequestService;
 import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,11 +23,30 @@ public class FamilyController {
 
     private final UserRepository userRepo;
     private final AttendanceRepository attendanceRepo;
+    private final KhorsJoinRequestService khorsReqService;
 
     private String baseFamilyOf(User u) {
         return u == null ? null : FamilyUtil.mainFamily(u.getDeaconFamily());
     }
 
+    private static String normRole(String raw) {
+        if (raw == null) return "";
+        String r = raw.trim();
+
+        r = r.replace("ROLE_", "");
+
+        String upper = r.toUpperCase().replaceAll("[-\\s]+", "_");
+
+        String ar = r.replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "")
+                .trim()
+                .replaceAll("\\s+", " ");
+
+        if (ar.equals("خادم")) return "KHADIM";
+        if (ar.equals("امين اسرة") || ar.equals("أمين أسرة") || ar.equals("امين الاسرة") || ar.equals("أمين الاسره") || ar.equals("امين الأسرة")) return "AMIN_OSRA";
+        if (ar.equals("امين خدمة") || ar.equals("أمين خدمة") || ar.equals("امين الخدمه") || ar.equals("أمين الخدمه")) return "AMIN_KHEDMA";
+
+        return upper;
+    }
 private List<String> servingBasesOf(User u) {
     if (u == null) return List.of();
     Set<String> set = new LinkedHashSet<>();
@@ -75,21 +95,20 @@ public ResponseEntity<?> families(
 
     User me = userRepo.findByUsername(auth.getName()).orElse(null);
 
-    boolean isAminKhedmaOrDev = me != null && ("AMIN_KHEDMA".equals(me.getRole()) || "DEVELOPER".equals(me.getRole()));
-    boolean isKhadim = me != null && "KHADIM".equals(me.getRole());
+        String role = normRole(me == null ? null : me.getRole());
+        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
+        boolean isKhadim = "KHADIM".equals(role);
+        boolean isAminOsra = "AMIN_OSRA".equals(role);
 
-    // ✅ If KHADIM:
-    // - default: return only where he serves (1..4 families / choir)
-    // - context=attendance: allow picking any family (ONLY for "تسجيل الحضور" page)
-    boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+       boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+
     if (isKhadim && !attendanceContext) {
         List<String> out = servingBasesOf(me);
         out.sort(String::compareTo);
         return ResponseEntity.ok(out);
     }
 
-    // ✅ AMIN_KHEDMA / DEV: return all families in the system
-    // ✅ AMIN_OSRA: also fine to return all for transfer UI
+
     Set<String> set = new HashSet<>();
     for (User u : userRepo.findAll()) {
         if (u.getDeaconFamily() == null) continue;
@@ -102,7 +121,6 @@ public ResponseEntity<?> families(
         set.add(base);
     }
 
-    // ✅ Always include the 2 choirs as options (even if no users yet)
     set.add("خورس مارمرقس");
     set.add("خورس الانبا اثناسيوس");
 
@@ -125,23 +143,19 @@ public ResponseEntity<?> families(
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(me.getRole()) || "DEVELOPER".equals(me.getRole());
-        boolean isAminOsra = "AMIN_OSRA".equals(me.getRole());
-        boolean isKhadim = "KHADIM".equals(me.getRole());
+    String role = normRole(me.getRole());
+    boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
+    boolean isAminOsra = "AMIN_OSRA".equals(role);
+    boolean isKhadim = "KHADIM".equals(role);
 
-        // ✅ Special bucket for AMIN_KHEDMA / DEV: "SERVANTS" shows KHADIM + AMIN_OSRA (across all families)
         boolean servantsBucket = isAminKhedmaOrDev && family != null && "SERVANTS".equalsIgnoreCase(family.trim());
 
-        // ✅ Family selection rules
-// - AMIN_KHEDMA / DEV: can pick any family from dropdown
-// - KHADIM: can only pick from the places he serves in (1 or 2 families / choir)
-// - Others: locked to their own family
+
 boolean hasFamilySelection = family != null && !family.isBlank();
 
-// ✅ "تسجيل الحضور" page can pass context=attendance to allow KHADIM to select ANY family.
 boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+boolean aminOsraAttendanceContext = isAminOsra && hasFamilySelection && attendanceContext;
 
-// ✅ For KHADIM: allow selecting only if the family is one of his serving families
 if (isKhadim && hasFamilySelection && !attendanceContext) {
     String selectedBase = FamilyUtil.mainFamily(family);
     List<String> myBases = servingBasesOf(me);
@@ -150,29 +164,25 @@ if (isKhadim && hasFamilySelection && !attendanceContext) {
     }
 }
 
-boolean khadimAttendanceContext = isKhadim && hasFamilySelection;
+    boolean khadimAttendanceContext = isKhadim && hasFamilySelection && attendanceContext;
 
-String target = ((isAminKhedmaOrDev || khadimAttendanceContext) && hasFamilySelection)
-        ? family
-        : me.getDeaconFamily();
-String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
+    String target = ((isAminKhedmaOrDev || khadimAttendanceContext || aminOsraAttendanceContext) && hasFamilySelection)
+            ? family
+            : me.getDeaconFamily();
+    String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
 
-        // ✅ Roles visible by permission level
+    if (base != null) base = base.trim();
         List<String> rolesToShow;
         if (isAminKhedmaOrDev) {
             rolesToShow = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
-        } else if (isAminOsra) {
-            // ✅ Amin Osra can manage/transfer MAKHDOM only (not servants)
-            rolesToShow = List.of("MAKHDOM");
-        } else if (isKhadim) {
-            // ✅ KHADIM:
-            // - In "Members of your family" page (no 'family' param): keep old permissions (don't expose AMIN_KHEDMA)
-            // - In attendance context (UI sends 'family' param when selecting a family): allow taking attendance/absence
-            //   for all roles inside his family including AMIN_KHEDMA.
-            boolean attendanceContext2 = family != null && !family.isBlank();
-            rolesToShow = attendanceContext2
+        }  else if (isAminOsra) {
+        rolesToShow = attendanceContext
+                ? List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
+                : List.of("MAKHDOM", "KHADIM");
+    }else if (isKhadim) {
+
+            rolesToShow = attendanceContext
                     ? List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
-                    // ✅ In Members page: show served members only
                     : List.of("MAKHDOM");
         } else {
             rolesToShow = List.of("MAKHDOM");
@@ -192,7 +202,6 @@ if (servantsBucket) {
     }
     members = new ArrayList<>(uniq.values());
 } else {
-    // ✅ Choir bucket: use User.khors membership instead of deaconFamily
     if (isChoirBucket(base)) {
         String code = choirCodeFromBucket(base);
         members = userRepo.findByKhorsAndRoleIn(code, rolesToShow);
@@ -203,8 +212,7 @@ if (servantsBucket) {
 
         List<Map<String, Object>> out = new ArrayList<>();
         for (User u : members) {
-            // ✅ Default behavior: don't show the logged-in account inside the members list
-            // ✅ Attendance page can opt-in to include the current user via includeSelf=true
+
             if (!includeSelf && me.getId() != null && me.getId().equals(u.getId())) continue;
 
             long fridayTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FRIDAY_LITURGY);
@@ -233,24 +241,21 @@ if (servantsBucket) {
             row.put("address", u.getAddress());
             row.put("phoneNumber", u.getPhoneNumber());
             row.put("guardiansPhone", u.getGuardiansPhone());
-            // Backward compatible (old UI): present count only
             row.put("fridayLiturgy", fridayPresent);
             row.put("tasbeeha", tasbeehaPresent);
             row.put("familyMeeting", meetingPresent);
-
-            // New fields: present/total to display like 3/7
             row.put("fridayLiturgyPresent", fridayPresent);
             row.put("fridayLiturgyTotal", fridayTotal);
             row.put("tasbeehaPresent", tasbeehaPresent);
             row.put("tasbeehaTotal", tasbeehaTotal);
             row.put("familyMeetingPresent", meetingPresent);
             row.put("familyMeetingTotal", meetingTotal);
-
-            // New: choir attendance
             row.put("marmarkosKhorsPresent", marmarkosPresent);
             row.put("marmarkosKhorsTotal", marmarkosTotal);
             row.put("athanasiusKhorsPresent", athanasiusPresent);
             row.put("athanasiusKhorsTotal", athanasiusTotal);
+            row.put("khors", u.getKhors());
+            row.put("khorsYear", u.getKhorsYear());
             out.add(row);
         }
 
@@ -272,9 +277,7 @@ if (servantsBucket) {
 
         boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(me.getRole()) || "DEVELOPER".equals(me.getRole());
 
-        // permissions:
-        // - AMIN_KHEDMA/DEV can view any member that would appear in the members list for the selected family
-        // - Others can only view members in their own family bucket
+
         boolean hasFamilySelection = family != null && !family.isBlank();
         boolean isKhadim = "KHADIM".equals(me.getRole());
         boolean khadimAttendanceContext = isKhadim && hasFamilySelection;
@@ -298,7 +301,6 @@ if (servantsBucket) {
     }
 }
 
-        // DTO: don't return password
         Map<String, Object> dto = new LinkedHashMap<>();
         dto.put("id", u.getId());
         dto.put("fullName", u.getFullName());
@@ -332,14 +334,7 @@ if (servantsBucket) {
     }
 
 
-    /**
-     * Delete a member account.
-     * Allowed roles: AMIN_OSRA, AMIN_KHEDMA, DEVELOPER.
-     * Notes:
-     * - Cannot delete self.
-     * - Cannot delete DEVELOPER accounts.
-     * - AMIN_OSRA can delete MAKHDOM only within his own family.
-     */
+
     @DeleteMapping("/members/{id}")
     public ResponseEntity<?> deleteMember(@PathVariable Long id, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -352,9 +347,13 @@ if (servantsBucket) {
         boolean isAminKhedma = "AMIN_KHEDMA".equals(myRole);
         boolean isAminOsra = "AMIN_OSRA".equals(myRole);
 
-        if (!(isDev || isAminKhedma || isAminOsra)) {
+        boolean isKhadim = "KHADIM".equalsIgnoreCase(me.getRole());
+
+        if (!(isDev || isAminKhedma || isAminOsra || isKhadim)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
+
+
 
         User target = userRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
@@ -379,7 +378,6 @@ if (servantsBucket) {
             }
         }
 
-        // Delete dependent records first
         attendanceRepo.deleteByUserOrTakenBy(target.getId());
 
         userRepo.deleteById(target.getId());
@@ -390,6 +388,54 @@ if (servantsBucket) {
         ));
     }
 
+    private static boolean isKhorsYearToken(String s) {
+        if (s == null) return false;
+        return s.toUpperCase(Locale.ROOT).startsWith("KHORS:");
+    }
+
+    private static boolean isKhorsRequestToken(String s) {
+        if (s == null) return false;
+        return s.toUpperCase(Locale.ROOT).startsWith("KHORS_REQUEST:");
+    }
+
+    private static String parseKhorsFromYearToken(String s) {
+        // KHORS:MARMARKOS:YEAR:2
+        String[] p = s.split(":");
+        return (p.length >= 2) ? p[1].trim().toUpperCase(Locale.ROOT) : null;
+    }
+
+    private static Integer parseYearFromToken(String s) {
+        // KHORS:MARMARKOS:YEAR:2
+        String[] p = s.split(":");
+        if (p.length >= 4) {
+            try { return Integer.valueOf(p[3].trim()); } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private static String parseRequestedKhors(String s) {
+        // KHORS_REQUEST:ATHANASIUS
+        String[] p = s.split(":");
+        return (p.length >= 2) ? p[1].trim().toUpperCase(Locale.ROOT) : null;
+    }
+
+    private boolean canManageKhors(User me, String khorsCode) {
+        if (me == null || khorsCode == null) return false;
+
+        String role = normRole(me.getRole());
+        if ("DEVELOPER".equals(role) || "AMIN_KHEDMA".equals(role)) return true;
+
+        // KHADIM allowed only if he serves that choir
+        if ("KHADIM".equals(role)) {
+            String scope = me.getServingScope() == null ? "" : me.getServingScope().trim().toUpperCase(Locale.ROOT);
+            if (!("KHORS_ONLY".equals(scope) || "BOTH".equals(scope))) return false;
+
+            String k = me.getKhors() == null ? "" : me.getKhors().trim().toUpperCase(Locale.ROOT);
+            return "BOTH".equals(k) || k.equalsIgnoreCase(khorsCode);
+        }
+
+        return false;
+    }
 
     @PostMapping("/transfer-members")
     public ResponseEntity<?> transferMembers(@RequestBody Map<String, Object> body, Authentication auth) {
@@ -399,24 +445,58 @@ if (servantsBucket) {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String myRole = me.getRole();
-        boolean isDev = "DEVELOPER".equals(myRole);
-        boolean isAminKhedma = "AMIN_KHEDMA".equals(myRole);
-        boolean isAminOsra = "AMIN_OSRA".equals(myRole);
-
-        if (!(isDev || isAminKhedma || isAminOsra)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-        }
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(myRole);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(myRole);
+        boolean isAminOsra = "AMIN_OSRA".equalsIgnoreCase(myRole);
+        boolean isKhadim = "KHADIM".equalsIgnoreCase(myRole);
 
         Object idsObj = body.get("memberIds");
         String newFamily = body.get("newFamily") == null ? null : body.get("newFamily").toString();
-        String secondaryFamily = body.get("secondaryFamily") == null ? null : body.get("secondaryFamily").toString();
-        Object extraFamiliesObj = body.get("extraFamilies");
-        String targetRole = body.get("targetRole") == null ? null : body.get("targetRole").toString();
-        String variant = body.get("variant") == null ? null : body.get("variant").toString(); // backward compatible
-if (idsObj == null || newFamily == null || newFamily.isBlank()) {
+
+        if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "memberIds and newFamily are required");
         }
 
+        String newFamilyTrim = newFamily.trim();
+
+        boolean isKhorsYearMove = isKhorsYearToken(newFamilyTrim);
+        boolean isKhorsRequestMove = isKhorsRequestToken(newFamilyTrim);
+
+        String targetKhors = isKhorsYearMove ? parseKhorsFromYearToken(newFamilyTrim) : null;
+        Integer targetYear = isKhorsYearMove ? parseYearFromToken(newFamilyTrim) : null;
+
+        String requestedKhors = isKhorsRequestMove ? parseRequestedKhors(newFamilyTrim) : null;
+
+
+        if (isKhorsYearMove || isKhorsRequestMove) {
+            if (!(isDev || isAminKhedma || isKhadim)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        } else {
+            if (!(isDev || isAminKhedma || isAminOsra)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
+
+        if (isKhorsYearMove) {
+            if (targetKhors == null || targetYear == null || targetYear < 1 || targetYear > 5) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid khors year token");
+            }
+            if (!canManageKhors(me, targetKhors)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
+
+        if (isKhorsRequestMove) {
+            if (requestedKhors == null || !requestedKhors.equals("ATHANASIUS")) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid khors request");
+            }
+            if (!canManageKhors(me, "MARMARKOS")) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
+
+        // parse ids
         List<Long> ids = new ArrayList<>();
         if (idsObj instanceof List<?> list) {
             for (Object o : list) {
@@ -424,18 +504,20 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
                 ids.add(Long.valueOf(o.toString()));
             }
         }
-
         if (ids.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No members selected");
 
-        // ✅ Optional: change role while transferring (only AMIN_KHEDMA/DEV)
+        // ===== Existing fields (families transfer) =====
+        String secondaryFamily = body.get("secondaryFamily") == null ? null : body.get("secondaryFamily").toString();
+        Object extraFamiliesObj = body.get("extraFamilies");
+        String targetRole = body.get("targetRole") == null ? null : body.get("targetRole").toString();
+        String variant = body.get("variant") == null ? null : body.get("variant").toString(); // backward compatible
+
+        // ✅ Optional role change (DEV/AMIN_KHEDMA only)
         String normalizedTargetRole = null;
         if (targetRole != null && !targetRole.isBlank()) {
-            if (isAminOsra) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+            if (isAminOsra) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
             normalizedTargetRole = targetRole.trim().toUpperCase(Locale.ROOT);
 
-            // validate allowed roles
             List<String> allowed = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
             if (!allowed.contains(normalizedTargetRole)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid targetRole");
@@ -445,30 +527,53 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             }
         }
 
+        // If this is khors operation, ignore family logic completely
+        if (isKhorsYearMove || isKhorsRequestMove) {
+            int updated = 0;
 
-        
-        // ✅ Registration family variants (special families)
-        // NOTE: Stored family names may include prefixes like "اسره القس ...",
-        // so we detect by keyword containment rather than exact match.
+            for (Long id : ids) {
+                if (id == null) continue;
+                if (me.getId() != null && me.getId().equals(id)) continue;
+
+                User u = userRepo.findById(id).orElse(null);
+                if (u == null) continue;
+                if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
+
+                if (isKhorsYearMove) {
+                    String currentKhors = (u.getKhors() == null) ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
+                    if (!currentKhors.equalsIgnoreCase(targetKhors)) {
+                        throw new ApiException(HttpStatus.BAD_REQUEST, "User is not in this khors");
+                    }
+                    u.setKhorsYear(targetYear);
+                    userRepo.save(u);
+                    updated++;
+                } else {
+                    String currentKhors = (u.getKhors() == null) ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
+                    if (!currentKhors.equalsIgnoreCase("MARMARKOS")) {
+                        throw new ApiException(HttpStatus.BAD_REQUEST, "User is not in Marmarkos");
+                    }
+                    khorsReqService.createForUserIfNeeded(u, "ATHANASIUS");
+                    updated++;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of("updated", updated));
+        }
+
+        // ===== Normal family transfer logic (your existing code continues) =====
+        // (سيب هنا كود الأسر بتاعك زي ما هو تحت بدون تغيير)
+        // -------------- START: your existing family-transfer block --------------
         List<String> specialKeywords = List.of("الانبا ابرام", "البابا كيرلس", "اسطفانوس");
-        String newFamilyTrim = newFamily.trim();
         String targetBase = FamilyUtil.mainFamily(newFamilyTrim);
         boolean isSpecialTarget = (targetBase != null) && specialKeywords.stream().anyMatch(targetBase::contains);
 
-        // ✅ effectiveFamily rules:
-        // - Normal families: use base
-        // - Special families:
-        //    * if client sent full family with " أ"/" ب" -> accept as-is
-        //    * else if client sent base only -> treat as SERVANT group (base)
-        //    * variant is still accepted for backward compatibility
         String effectiveFamily;
         if (targetBase == null || targetBase.isBlank()) {
             effectiveFamily = newFamilyTrim;
         } else if (!isSpecialTarget) {
             effectiveFamily = targetBase;
         } else {
-            // if already specified (A/B) keep it
-            boolean alreadyAB = newFamilyTrim.matches(".*\s[أب]$");
+            boolean alreadyAB = newFamilyTrim.matches(".*\\s[أب]$");
             if (alreadyAB) {
                 effectiveFamily = newFamilyTrim;
             } else if (variant != null && !variant.isBlank()) {
@@ -478,16 +583,10 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
                 else if ("SERVANT".equals(v)) effectiveFamily = targetBase;
                 else throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid variant");
             } else {
-                // base only => servant group
                 effectiveFamily = targetBase;
             }
         }
 
-
-        // ✅ Optional: extra serving families (future-proof)
-        // Backward compatible:
-        // - if client sends extraFamilies: use it
-        // - else fall back to secondaryFamily
         List<String> requestedExtras = new ArrayList<>();
         if (extraFamiliesObj instanceof List<?> list) {
             for (Object o : list) {
@@ -499,7 +598,6 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             requestedExtras.add(secondaryFamily);
         }
 
-        // normalize + cap to 3 extras (2..4)
         List<String> effectiveExtras = new ArrayList<>();
         for (String raw : requestedExtras) {
             if (raw == null || raw.isBlank()) continue;
@@ -508,22 +606,12 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             boolean isSpecialSec = (secBase != null) && specialKeywords.stream().anyMatch(secBase::contains);
 
             String normalized;
-            if (secBase == null || secBase.isBlank()) {
-                normalized = secTrim;
-            } else if (!isSpecialSec) {
-                normalized = secBase;
-            } else {
+            if (secBase == null || secBase.isBlank()) normalized = secTrim;
+            else if (!isSpecialSec) normalized = secBase;
+            else {
                 boolean alreadyAB2 = secTrim.matches(".*\\s[أب]$");
                 if (alreadyAB2) normalized = secTrim;
-                else if (variant != null && !variant.isBlank()) {
-                    String v2 = variant.trim().toUpperCase(Locale.ROOT);
-                    if ("A".equals(v2)) normalized = secBase + " أ";
-                    else if ("B".equals(v2)) normalized = secBase + " ب";
-                    else if ("SERVANT".equals(v2)) normalized = secBase;
-                    else throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid variant");
-                } else {
-                    normalized = secBase;
-                }
+                else normalized = secBase;
             }
 
             if (normalized != null && !normalized.isBlank()) {
@@ -532,14 +620,13 @@ if (idsObj == null || newFamily == null || newFamily.isBlank()) {
             }
         }
 
-if (effectiveFamily == null || effectiveFamily.isBlank()) {
+        if (effectiveFamily == null || effectiveFamily.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid target family");
         }
-                if (targetBase == null || targetBase.isBlank() || "SYSTEM".equalsIgnoreCase(targetBase)) {
+        if (targetBase == null || targetBase.isBlank() || "SYSTEM".equalsIgnoreCase(targetBase)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid target family");
         }
 
-        // ✅ Validate extra families (if provided)
         for (String ef : effectiveExtras) {
             if (ef == null || ef.isBlank()) continue;
             String secBase = FamilyUtil.mainFamily(ef);
@@ -548,54 +635,38 @@ if (effectiveFamily == null || effectiveFamily.isBlank()) {
             }
         }
 
-
         String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
         int updated = 0;
+
         for (Long id : ids) {
             if (id == null) continue;
-            if (me.getId() != null && me.getId().equals(id)) continue; // never move self
+            if (me.getId() != null && me.getId().equals(id)) continue;
 
             User u = userRepo.findById(id).orElse(null);
             if (u == null) continue;
             if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
 
-            // ✅ AMIN_OSRA can move only accounts in his family
             if (isAminOsra) {
                 String uBase = FamilyUtil.mainFamily(u.getDeaconFamily());
                 if (myBase == null || !myBase.equals(uBase)) continue;
-                // ✅ AMIN_OSRA can transfer only MAKHDOM (not KHADIM)
-                if (!("MAKHDOM".equals(u.getRole()))) continue;
+                if (!("MAKHDOM".equalsIgnoreCase(u.getRole()))) continue;
             }
 
-            // ✅ AMIN_KHEDMA / DEV can move MAKHDOM / KHADIM / AMIN_OSRA / AMIN_KHEDMA
             if (isAminKhedma || isDev) {
-                if (!("MAKHDOM".equals(u.getRole()) || "KHADIM".equals(u.getRole()) || "AMIN_OSRA".equals(u.getRole()) || "AMIN_KHEDMA".equals(u.getRole()))) {
+                if (!( "MAKHDOM".equalsIgnoreCase(u.getRole())
+                        || "KHADIM".equalsIgnoreCase(u.getRole())
+                        || "AMIN_OSRA".equalsIgnoreCase(u.getRole())
+                        || "AMIN_KHEDMA".equalsIgnoreCase(u.getRole()))) {
                     continue;
                 }
             }
 
-            
-            // ✅ Role handling
-            // - If caller provided targetRole (AMIN_KHEDMA/DEV only): set it explicitly
-            // - Else keep old behavior:
-            //    * If moving to special-family SERVANT group OR the account was AMIN_KHEDMA/AMIN_OSRA -> downgrade to KHADIM
-            boolean toServantGroup = (variant != null && "SERVANT".equalsIgnoreCase(variant.trim())) && isSpecialTarget;
-
             if (normalizedTargetRole != null) {
                 u.setRole(normalizedTargetRole);
-            } else {
-                if (toServantGroup || "AMIN_KHEDMA".equals(u.getRole()) || "AMIN_OSRA".equals(u.getRole())) {
-                    u.setRole("KHADIM");
-                }
             }
 
             u.setDeaconFamily(effectiveFamily.trim());
 
-            // ✅ Extra families rules:
-            // - If extras are empty -> clear (2..4)
-            // - If any extra equals primary base -> skip it
-            // - Avoid duplicates between extras
-            // - Store up to 3 extras in (2..4)
             String primBase = FamilyUtil.mainFamily(effectiveFamily);
 
             List<String> cleanExtras = new ArrayList<>();
@@ -616,12 +687,10 @@ if (effectiveFamily == null || effectiveFamily.isBlank()) {
             u.setDeaconFamily3(cleanExtras.size() >= 2 ? cleanExtras.get(1) : null);
             u.setDeaconFamily4(cleanExtras.size() >= 3 ? cleanExtras.get(2) : null);
 
-            // خليه ينقل للأسرة بالـ أ/ب لو موجودة  (u.setDeaconFamily(targetBase);)
             userRepo.save(u);
             updated++;
 
-            // ✅ Reset attendance for roles below KHADIM (MAKHDOM only)
-            if ("MAKHDOM".equals(u.getRole())) {
+            if ("MAKHDOM".equalsIgnoreCase(u.getRole())) {
                 attendanceRepo.deleteByUserId(u.getId());
             }
         }

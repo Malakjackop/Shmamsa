@@ -74,7 +74,6 @@ public class User {
     @Column(length = 20)
     private String schoolGrade;
 
-    // 12️⃣ University Info (only if studyType = university)
     @Column(length = 100)
     private String universityName;
 
@@ -84,29 +83,24 @@ public class User {
     @Column(length = 20)
     private String universityGrade;
 
-    // 13️⃣ Graduate Info
     @Column(length = 100)
     private String graduatedFrom;
 
     @Column(length = 100)
     private String graduateJob;
 
-    // 14️⃣ Work info (for students)
     private Boolean isWorking;
 
     @Column(length = 100)
     private String workDetails;
 
-    // 15️⃣ Deacon Family (new field)
     @NotBlank(message = "Deacon family is required")
     @Column(length = 100)
     private String deaconFamily;
 
-    // ✅ NEW: Optional second serving family (to allow serving 2 families)
     @Column(length = 100)
     private String deaconFamily2;
 
-    // ✅ Optional third & fourth serving families (future-proof)
     @Column(length = 100)
     private String deaconFamily3;
 
@@ -114,17 +108,18 @@ public class User {
     private String deaconFamily4;
 
     @Column(length = 50)
-    private String deaconDegree; // ✅ new field
+    private String deaconDegree;
 
-    // Khors (Choir): MARMARKOS / ATHANASIUS / BOTH / NONE
     @Column(length = 30)
     private String khors;
 
-    // Servant serving scope: FAMILY_ONLY / KHORS_ONLY / BOTH
+    @Column(name = "khors_year")
+    private Integer khorsYear;
+
+
     @Column(length = 20)
     private String servingScope;
 
-    // ✅ NEW: which khors servant attends
     @Column(length = 30)
     private String attendKhors; // MARMARKOS / ATHANASIUS / NONE
 
@@ -132,6 +127,5 @@ public class User {
     @Column(nullable = false, unique = true, length = 120)
     private String email;
 
-    // 16️⃣ Role
     private String role = "MAKHDOM";
 }

@@ -4,7 +4,6 @@
 <div class="page">
   <h1>نقل الأعضاء</h1>
 
-  <!-- ✅ AMIN_KHEDMA / DEVELOPER: choose transfer mode -->
   <div class="familyView" *ngIf="isAminKhedmaOrDev()">
     <label class="lbl">نوع النقل</label>
     <select class="select" [(ngModel)]="mode" (change)="onModeChange()">
@@ -13,8 +12,7 @@
     </select>
   </div>
 
-  <!-- ✅ AMIN_KHEDMA / DEVELOPER: when MAKHDOM, choose which family to VIEW (servant registration list) -->
-  <div class="familyView" *ngIf="isAminKhedmaOrDev() && mode === 'MAKHDOM'">
+  <div class="familyView" *ngIf="(isAminKhedmaOrDev() || isKhadim()) && mode === 'MAKHDOM'">
     <label class="lbl">عرض مخدومين</label>
     <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
       <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
@@ -25,27 +23,31 @@
     <button *ngIf="!selecting" pButton type="button" label="نقل" (click)="startTransfer()"></button>
 
     <ng-container *ngIf="selecting">
-      <!-- ✅ Target family -->
       <div class="inlinePicker">
         <label class="lbl">إلى أسرة</label>
 
-        <!-- AMIN_KHEDMA/DEV + MAKHDOM -> makhdom families list (A/B) -->
-        <select class="select" *ngIf="isAminKhedmaOrDev() && mode === 'MAKHDOM'" [(ngModel)]="targetFamily">
-          <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
-        </select>
+        <select class="select"
+        *ngIf="(isAminKhedmaOrDev() || isKhadim()) && mode === 'MAKHDOM'"
+        [(ngModel)]="targetFamily">
 
-        <!-- AMIN_KHEDMA/DEV + SERVANT -> servant families list (base) -->
+  <ng-container *ngIf="isMarmarkosView(); else normalFamilies">
+    <option *ngFor="let t of marmarkosYearTargets" [value]="t.value">{{ t.label }}</option>
+  </ng-container>
+
+  <ng-template #normalFamilies>
+    <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
+  </ng-template>
+</select>
+
         <select class="select" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'" [(ngModel)]="targetFamily">
           <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
         </select>
 
-        <!-- AMIN_OSRA -> makhdom families list (A/B) -->
         <select class="select" *ngIf="!isAminKhedmaOrDev()" [(ngModel)]="targetFamily">
           <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
         </select>
       </div>
 
-      <!-- ✅ Target role (only in SERVANT mode for AMIN_KHEDMA/DEV) -->
       <div class="inlinePicker" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'">
         <label class="lbl">إلى دور</label>
         <select class="select" [(ngModel)]="targetRole">
@@ -55,7 +57,6 @@
         </select>
       </div>
 
-      <!-- ✅ Extra families (hidden by default, shown after pressing +) -->
       <div class="inlinePicker" *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT'">
         <label class="lbl">أسر إضافية</label>
 
@@ -89,7 +90,7 @@
           <th *ngIf="selecting">اختيار</th>
           <th>الاسم</th>
           <th>الدور</th>
-          <th>الأسرة</th>
+          <th>{{ isMarmarkosView() ? 'الخورس (السنة)' : 'الأسرة' }}</th>
           <ng-container *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT' && extraColIndices().length">
             <th *ngFor="let i of extraColIndices()">الأسرة {{i + 2}}</th>
           </ng-container>
@@ -102,7 +103,7 @@
           </td>
           <td>{{m.fullName}}</td>
           <td>{{getRoleLabel(m.role)}}</td>
-          <td>{{m.deaconFamily}}</td>
+          <td>{{ displayFamily(m) }}</td>
           <ng-container *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT' && extraColIndices().length">
             <td *ngFor="let i of extraColIndices()">{{extraFamilyValue(m, i)}}</td>
           </ng-container>

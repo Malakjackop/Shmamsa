@@ -30,7 +30,6 @@ public class KhorsJoinRequestService {
         return x;
     }
 
-    /** Create a pending request for a newly registered user (only for MARMARKOS / ATHANASIUS). */
     @Transactional
     public void createForUserIfNeeded(User user, String requestedKhors) {
         String k = normKhors(requestedKhors);
@@ -127,8 +126,8 @@ public class KhorsJoinRequestService {
             User target = userRepository.findById(r.getUser().getId())
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
 
-            // ✅ actual membership happens only after approval
             target.setKhors(reqKhors);
+            target.setKhorsYear(1);
             userRepository.save(target);
         } else {
             r.setStatus(KhorsJoinRequestStatus.REJECTED);

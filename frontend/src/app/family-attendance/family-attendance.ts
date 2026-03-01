@@ -46,8 +46,7 @@ type AttendanceRow = {
 })
 export class FamilyAttendanceComponent implements OnInit {
 
-  // Angular templates لا تدعم type-cast زي (t as any)،
-  // فبنحط اللست دي هنا بنوع مضبوط.
+
   readonly allAttendanceTypes: AttendanceRow['type'][] = [
     'TASBEEHA',
     'FRIDAY_LITURGY',
@@ -65,17 +64,14 @@ export class FamilyAttendanceComponent implements OnInit {
   selectedFamily = '';
   loading = false;
 
-  // export selection mode
   exportMode = false;
   pendingExport: 'pdf' | '' = '';
   selectAll = false;
 
-  // attendance details modal
   detailsFor: Member | null = null;
   details: AttendanceRow[] = [];
   detailsType: '' | AttendanceType = '';
 
-  // profile modal
   profileFor: Member | null = null;
   profile: any = null;
 
@@ -94,6 +90,27 @@ export class FamilyAttendanceComponent implements OnInit {
       error: () => {}
     });
   }
+
+  get selectedFamilyName(): string {
+  return String(this.selectedFamily || '').trim();
+}
+
+get isMarmarkosChoir(): boolean {
+  return this.selectedFamilyName === 'خورس مارمرقس';
+}
+
+get isAthanasiusChoir(): boolean {
+  return this.selectedFamilyName === 'خورس الانبا اثناسيوس';
+}
+
+
+get showMarmarkosColumn(): boolean {
+  return this.isMarmarkosChoir;
+}
+
+get showAthanasiusColumn(): boolean {
+  return this.isAthanasiusChoir;
+}
 
   isAminKhedmaOrDev(): boolean {
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
@@ -149,7 +166,6 @@ export class FamilyAttendanceComponent implements OnInit {
     });
   }
 
-  // ===== Attendance details =====
   
 
 toggleSelectAll() {
@@ -196,6 +212,7 @@ private async fetchAttendanceForMembers(members: Member[], famParam?: string): P
   return out;
 }
 
+
 openDetails(member: Member) {
     this.detailsFor = member;
     this.detailsType = '';
@@ -237,7 +254,6 @@ openDetails(member: Member) {
     );
   }
 
-  // ===== UI helpers =====
   countLabel(
     m: Member,
     kind: 'FRIDAY_LITURGY' | 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' | 'TASBEEHA' | 'FAMILY_MEETING'

@@ -14,6 +14,8 @@ type Member = {
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
+  khors?: string;
+  khorsLevel?: number;
 };
 
 type TransferMode = 'MAKHDOM' | 'SERVANT';
@@ -35,47 +37,53 @@ export class TransferMembersComponent implements OnInit {
   members: Member[] = [];
   loading = false;
 
+  khors?: string;
+  khorsLevel?: number;
+
   selecting = false;
   selectedIds = new Set<number>();
 
   /** ✅ Registration lists (same as Register page) */
   servantFamilies: string[] = [
-    'اسرة السمائين',
-    'اسرة القديس ابانوب',
-    'اسرة القديس ديسقورس',
-    'اسرة القديس سيدهم بشاي',
-    'اسرة القديس اسكلابيوس',
-    'اسرة القديس البابا كيرلس',
-    'اسرة القديس الانبا ابرام',
-    'اسرة القديس اسطفانوس',
-    'خورس مارمرقس',
-    'خورس الانبا اثناسيوس'
-  ];
+  'اسره السمائيين',
+  'اسره القديس ابانوب',
+  'اسره القديس ديسقورس',
+  'اسره القديس سيدهم بشاي',
+  'اسره القديس اسكلابيوس',
+  'اسره البابا كيرلس',
+  'اسره الانبا ابرام',
+  'اسره اسطفانوس',
+  'خورس مارمرقس',
+  'خورس الانبا اثناسيوس'
+];
 
   makhdomFamilies: string[] = [
-    'اسرة السمائين',
-    'اسرة القديس ابانوب',
-    'اسرة القديس ديسقورس',
-    'اسرة القديس سيدهم بشاي',
-    'اسرة القديس اسكلابيوس',
-    'اسرة القديس البابا كيرلس أ',
-    'اسرة القديس البابا كيرلس ب',
-    'اسرة القديس الانبا ابرام أ',
-    'اسرة القديس الانبا ابرام ب',
-    'اسرة القديس اسطفانوس أ',
-    'اسرة القديس اسطفانوس ب'
-  ];
+  'اسره السمائيين',
+  'اسره القديس ابانوب',
+  'اسره القديس ديسقورس',
+  'اسره القديس سيدهم بشاي',
+  'اسره القديس اسكلابيوس',
+  'اسره البابا كيرلس أ',
+  'اسره البابا كيرلس ب',
+  'اسره الانبا ابرام أ',
+  'اسره الانبا ابرام ب',
+  'اسره اسطفانوس أ',
+  'اسره اسطفانوس ب'
+];
 
-  /** ✅ For AMIN_KHEDMA+ */
+marmarkosYearTargets: { label: string; value: string }[] = [
+  { label: 'خورس مارمرقس (سنه اوله)', value: 'KHORS:MARMARKOS:YEAR:1' },
+  { label: 'خورس مارمرقس (سنه تانيه)', value: 'KHORS:MARMARKOS:YEAR:2' },
+  { label: 'خورس مارمرقس (سنه تالته)', value: 'KHORS:MARMARKOS:YEAR:3' },
+  { label: 'خورس مارمرقس (سنه رابعه)', value: 'KHORS:MARMARKOS:YEAR:4' },
+  { label: 'خورس مارمرقس (سنه خامسه)', value: 'KHORS:MARMARKOS:YEAR:5' },
+  { label: 'طلب نقل لخورس الانبا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
+];
+
   mode: TransferMode = 'MAKHDOM';
-  // Which family I am currently viewing (only for MAKHDOM mode)
   selectedFamilyView = '';
-  // Target family (varies by mode)
   targetFamily = '';
-  // Optional second family for SERVANT mode (AMIN_KHEDMA/DEV only)
-  // ✅ Dynamic extra families (2..4 in backend; UI can show + add/remove)
   extraFamilies: string[] = [];
-  // Target role (only for SERVANT mode)
   targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'KHADIM';
 
   ngOnInit() {
@@ -89,6 +97,10 @@ export class TransferMembersComponent implements OnInit {
     });
   }
 
+  isKhadim(): boolean {
+  return this.me?.role === 'KHADIM';
+}
+
   isAminKhedmaOrDev(): boolean {
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
   }
@@ -98,9 +110,7 @@ export class TransferMembersComponent implements OnInit {
   }
 
   private bootstrapDefaults() {
-    // ✅ Defaults:
-    // - AMIN_KHEDMA/DEV: start with MAKHDOM mode, view first servant-family, target first makhdom-family
-    // - AMIN_OSRA: can only move MAKHDOM from his own family; choose a default target (first makhdom family different from mine)
+
     const mineBase = (this.me?.deaconFamily || '').trim();
 
     if (this.isAminKhedmaOrDev()) {
@@ -110,36 +120,39 @@ export class TransferMembersComponent implements OnInit {
       this.targetRole = 'KHADIM';
       return;
     }
+    
+    if (this.isKhadim()) {
+  this.mode = 'MAKHDOM';
+  this.selectedFamilyView = this.servantFamilies[0] || '';
+  this.targetFamily = this.makhdomFamilies[0] || '';
+  return;
+}
 
-    // AMIN_OSRA
     this.mode = 'MAKHDOM';
-    this.selectedFamilyView = ''; // locked by backend anyway
+    this.selectedFamilyView = ''; 
     this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
   }
 
-  /** ✅ Load members list depending on role+mode */
   private loadMembers() {
     this.loading = true;
 
     let famParam: string | undefined = undefined;
 
-    if (this.isAminKhedmaOrDev()) {
-      if (this.mode === 'SERVANT') {
-        famParam = 'SERVANTS'; // backend special bucket for servants
-      } else {
-        famParam = this.selectedFamilyView || undefined; // base families
-      }
-    }
+    if (this.isAminKhedmaOrDev() || this.isKhadim()) {
+  if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') {
+    famParam = 'SERVANTS';
+  } else {
+    famParam = this.selectedFamilyView || undefined;
+  }
+}
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
         let list = (m as any) || [];
-        // ✅ Client-side filter by mode
         if (this.isAminKhedmaOrDev()) {
           if (this.mode === 'MAKHDOM') list = list.filter((x: any) => x?.role === 'MAKHDOM');
           if (this.mode === 'SERVANT') list = list.filter((x: any) => x?.role === 'KHADIM' || x?.role === 'AMIN_OSRA' || x?.role === 'AMIN_KHEDMA');
         } else if (this.isAminOsra()) {
-          // backend already returns MAKHDOM only
         }
         this.members = list;
         this.loading = false;
@@ -150,6 +163,36 @@ export class TransferMembersComponent implements OnInit {
       }
     });
   }
+
+  private khorsLabel(k?: string): string {
+  const x = (k || '').toUpperCase();
+  if (x === 'MARMARKOS') return 'خورس مارمرقس';
+  if (x === 'ATHANASIUS') return 'خورس الانبا اثناسيوس';
+  return '';
+}
+
+private levelLabel(n?: number): string {
+  if (!n) return '';
+  if (n === 1) return 'سنه اوله';
+  if (n === 2) return 'سنه تانيه';
+  if (n === 3) return 'سنه تالته';
+  if (n === 4) return 'سنه رابعه';
+  if (n === 5) return 'سنه خامسه';
+  return `سنه ${n}`;
+}
+
+displayFamily(m: Member): string {
+  const kh = this.khorsLabel((m as any).khors);
+  const lvl = this.levelLabel((m as any).khorsYear);
+  if (kh) return lvl ? `${kh} (${lvl})` : kh;
+  return (m.deaconFamily || '').trim();
+}
+
+
+
+isMarmarkosView(): boolean {
+  return (this.selectedFamilyView || '').trim() === 'خورس مارمرقس';
+}
 
   onModeChange() {
     this.cancelSelecting();
@@ -168,10 +211,16 @@ export class TransferMembersComponent implements OnInit {
 
   onFamilyViewChange() {
     this.cancelSelecting();
+    if (this.isMarmarkosView()) {
+  this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+}
     this.loadMembers();
   }
 
   startTransfer() {
+    if (this.isMarmarkosView()) {
+  this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+}
     this.selecting = true;
     this.selectedIds.clear();
   }
@@ -235,9 +284,7 @@ export class TransferMembersComponent implements OnInit {
     });
   }
 
-  /** UI helpers for dynamic extra families */
   canAddExtraFamily(): boolean {
-    // backend currently supports up to 3 extras (2..4)
     return this.extraFamilies.length < 3;
   }
 

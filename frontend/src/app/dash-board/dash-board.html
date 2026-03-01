@@ -1,6 +1,5 @@
 
     <main class="main">
-      <!-- Header -->
       <header class="header">
         <div>
           <h1>أهلاً بعودتك، {{user.fullName }} 👋</h1>
@@ -9,11 +8,10 @@
 
       </header>
 
-      <!-- Stats -->
       <section class="stats">
         <p-card class="stat-card gpa">
           <h3>الأسرة الحالية</h3>
-          <h1>{{ user.deaconFamily }}</h1>
+          <h1>{{ currentFamilyLabel }}</h1>
         </p-card>
         <p-card class="stat-card credits">
           <h3>حضور اجتماع الأسرة</h3>
@@ -27,6 +25,10 @@
           <h3>حضور التسبحة</h3>
           <h1>{{ stats.TASBEEHA }}</h1>
         </p-card>
+        <p-card *ngIf="showKhorsCard" class="stat-card credits">
+  <h3>حضور الخورس</h3>
+  <h1>{{ khorsAttendanceCount }}</h1>
+</p-card>
       </section>
 
       <!-- Panels -->
