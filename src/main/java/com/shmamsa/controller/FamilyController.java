@@ -468,8 +468,12 @@ if (servantsBucket) {
         String requestedKhors = isKhorsRequestMove ? parseRequestedKhors(newFamilyTrim) : null;
 
 
-        if (isKhorsYearMove || isKhorsRequestMove) {
+        if (isKhorsYearMove) {
             if (!(isDev || isAminKhedma || isKhadim)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        } else if (isKhorsRequestMove) {
+            if (!(isDev || isAminKhedma || isAminOsra || isKhadim)) {
                 throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
             }
         } else {
@@ -488,10 +492,11 @@ if (servantsBucket) {
         }
 
         if (isKhorsRequestMove) {
-            if (requestedKhors == null || !requestedKhors.equals("ATHANASIUS")) {
+            if (requestedKhors == null || !(requestedKhors.equals("MARMARKOS") || requestedKhors.equals("ATHANASIUS"))) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid khors request");
             }
-            if (!canManageKhors(me, "MARMARKOS")) {
+            // KHADIM can only create requests for the choir he serves
+            if (isKhadim && !canManageKhors(me, requestedKhors)) {
                 throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
             }
         }
@@ -558,12 +563,45 @@ if (servantsBucket) {
                     updated++;
                     continue;
                 } else {
-                    String currentKhors = (u.getKhors() == null) ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
-                    if (!currentKhors.equalsIgnoreCase("MARMARKOS")) {
-                        throw new ApiException(HttpStatus.BAD_REQUEST, "User is not in Marmarkos");
+                    // ===== Choir join request move (no immediate join) =====
+                    if (requestedKhors == null) {
+                        throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid khors request");
                     }
-                    khorsReqService.createForUserIfNeeded(u, "ATHANASIUS");
-                    updated++;
+
+                    // If AMIN_OSRA: only allowed for members in his base family
+                    if (isAminOsra) {
+                        String myBase = baseFamilyOf(me);
+                        String memberBase = baseFamilyOf(u);
+                        if (myBase == null || memberBase == null || !myBase.equalsIgnoreCase(memberBase)) {
+                            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+                        }
+                    }
+
+                    String currentKhors = (u.getKhors() == null) ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
+                    String req = requestedKhors.trim().toUpperCase(Locale.ROOT);
+
+                    if ("MARMARKOS".equals(req)) {
+                        if ("MARMARKOS".equalsIgnoreCase(currentKhors)) {
+                            throw new ApiException(HttpStatus.BAD_REQUEST, "User is already in Marmarkos");
+                        }
+                        if (currentKhors != null && !currentKhors.isBlank() && !"NONE".equalsIgnoreCase(currentKhors)) {
+                            throw new ApiException(HttpStatus.BAD_REQUEST, "User is already in another khors");
+                        }
+                        khorsReqService.createForUserIfNeeded(u, "MARMARKOS");
+                        updated++;
+                    } else if ("ATHANASIUS".equals(req)) {
+                        if ("ATHANASIUS".equalsIgnoreCase(currentKhors)) {
+                            throw new ApiException(HttpStatus.BAD_REQUEST, "User is already in Athanasius");
+                        }
+                        // Existing behavior: Athanasius request is only for members currently in Marmarkos
+                        if (!"MARMARKOS".equalsIgnoreCase(currentKhors)) {
+                            throw new ApiException(HttpStatus.BAD_REQUEST, "User must be in Marmarkos to request Athanasius");
+                        }
+                        khorsReqService.createForUserIfNeeded(u, "ATHANASIUS");
+                        updated++;
+                    } else {
+                        throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid khors request");
+                    }
                 }
             }
 
