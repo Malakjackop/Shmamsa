@@ -14,6 +14,7 @@ import lombok.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -42,10 +43,8 @@ public class AnnouncementController {
         return FamilyUtil.mainFamily(u == null ? null : u.getDeaconFamily());
     }
 
-    // قواعد التنبيهات:
-    // - KHADIM: يكتب لأسرة واحدة فقط (Base) (بدون ALL)
-    // - AMIN_OSRA: نفس الكلام
-    // - AMIN_KHEDMA/DEVELOPER: يكتب لأي أسرة أو ALL
+    // - KHADIM: family only (no ALL)
+    // - AMIN_KHEDMA/DEVELOPER: any family or ALL
     private void validateTargetFamily(User me, String role, String targetFamily) {
         String tf = (targetFamily == null) ? "" : targetFamily.trim();
         if (tf.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "targetFamily is required");
@@ -82,6 +81,7 @@ public class AnnouncementController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
@@ -91,33 +91,24 @@ public class AnnouncementController {
         List<Announcement> list;
 
         if (isAdmin(role)) {
-            // family = ALL أو null => هات كل التنبيهات
             if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
                 list = announcementRepo.findAllByOrderByCreatedAtDesc();
             } else {
-                // أسرة محددة => ALL + الأسرة دي
-                list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(List.of("ALL", fam));
+                list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(Arrays.asList("ALL", fam));
             }
         } else {
-            // ✅ مستخدم عادي: ALL + أسرته فقط
             String myBase = baseFamily(me);
-
-            // ✅ منع 500: List.of لا تقبل null
             List<String> fams = new ArrayList<>();
             fams.add("ALL");
             if (myBase != null && !myBase.isBlank()) fams.add(myBase);
-
             list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(fams);
         }
 
         List<AnnouncementView> out = new ArrayList<>();
 
         for (Announcement a : list) {
-
-            // ✅ status null-safe (لو قديم في DB)
             EventStatus st = (a.getStatus() == null) ? EventStatus.PENDING : a.getStatus();
 
-            // Scope filter النهائي (لو admin محدد family)
             boolean matchesScope;
             if (isAdmin(role)) {
                 if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
@@ -130,18 +121,18 @@ public class AnnouncementController {
                 matchesScope = "ALL".equalsIgnoreCase(a.getTargetFamily())
                         || (myBase != null && myBase.equals(a.getTargetFamily()));
             }
+
             if (!matchesScope) continue;
 
             boolean can = canManage(me, role, a);
             boolean creator = isCreator(me, a);
 
-            // Published: يظهر للناس
             if (st == EventStatus.PUBLISHED) {
                 out.add(toView(a, st, can, creator));
                 continue;
             }
 
-            // ✅ Pending: يظهر للأمين أو لصاحب التنبيه
+            // ✅ Pending: للـ canManage أو creator
             if (st == EventStatus.PENDING && (can || creator)) {
                 out.add(toView(a, st, can, creator));
             }
@@ -175,6 +166,7 @@ public class AnnouncementController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody AnnouncementUpsertRequest req, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
@@ -182,14 +174,14 @@ public class AnnouncementController {
         Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Announcement not found"));
 
-        EventStatus st = (a.getStatus() == null) ? EventStatus.PENDING : a.getStatus();
-
+        // NOTE:
+        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
+        // Without a transaction, accessing a.getCreatedBy() may throw LazyInitializationException
+        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean can = canManage(me, role, a);
         boolean creator = isCreator(me, a);
 
-        if (!(can || (creator && st == EventStatus.PENDING))) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
-        }
+        if (!(can || creator)) throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
 
         validateTargetFamily(me, role, req.getTargetFamily());
 
@@ -211,9 +203,7 @@ public class AnnouncementController {
 
         if (!canManage(me, role, a)) throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
 
-        EventStatus st = (a.getStatus() == null) ? EventStatus.PENDING : a.getStatus();
-
-        if (st != EventStatus.PUBLISHED) {
+        if (a.getStatus() != EventStatus.PUBLISHED) {
             a.setStatus(EventStatus.PUBLISHED);
             a.setPublishedAt(LocalDateTime.now());
             announcementRepo.save(a);
@@ -223,6 +213,7 @@ public class AnnouncementController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
@@ -230,14 +221,14 @@ public class AnnouncementController {
         Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Announcement not found"));
 
-        EventStatus st = (a.getStatus() == null) ? EventStatus.PENDING : a.getStatus();
-
+        // NOTE:
+        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
+        // Without a transaction, accessing a.getCreatedBy() may throw LazyInitializationException
+        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean can = canManage(me, role, a);
         boolean creator = isCreator(me, a);
 
-        if (!(can || (creator && st == EventStatus.PENDING))) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
-        }
+        if (!(can || creator)) throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
 
         announcementRepo.delete(a);
         return ResponseEntity.ok(Map.of("ok", true));
@@ -246,7 +237,7 @@ public class AnnouncementController {
     private AnnouncementView toView(Announcement a, EventStatus st, boolean canManage, boolean creator) {
         boolean canEdit = canManage || creator;
         boolean canDelete = canManage || creator;
-        boolean canPublish = canManage && st == EventStatus.PENDING; // النشر للأمين فقط
+        boolean canPublish = canManage && st == EventStatus.PENDING;
 
         return AnnouncementView.builder()
                 .id(a.getId())
@@ -269,7 +260,7 @@ public class AnnouncementController {
         private String title;
         private String description;
         private String targetFamily;
-        private String status;
+        private String status; // PENDING/PUBLISHED
         private LocalDateTime publishedAt;
         private LocalDateTime createdAt;
         private String createdByUsername;

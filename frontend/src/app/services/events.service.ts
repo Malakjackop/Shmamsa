@@ -36,3 +36,4 @@ export class EventsService {
     return this.http.delete<any>(`${this.baseUrl}/${id}`, { withCredentials: true });
   }
 }
+

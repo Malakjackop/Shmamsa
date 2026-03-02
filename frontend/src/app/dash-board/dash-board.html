@@ -38,6 +38,7 @@
 
   <section class="panels">
 
+    <!-- تظهر فقط لأمين خدمة/Developer -->
     <div class="boards-scope" *ngIf="isAtLeast('AMIN_KHEDMA')">
       <div class="boards-scope__label"><strong>عرض / نشر على:</strong></div>
 
@@ -59,13 +60,15 @@
 
         <span style="flex:1"></span>
 
-        <p-button
+        <button
           *ngIf="isAtLeast('AMIN_OSRA')"
+          pButton
+          type="button"
           label="إضافة موعد"
           icon="pi pi-plus"
-          (onClick)="openCreateEvent()"
-          styleClass="p-button-sm"
-        ></p-button>
+          class="p-button-sm"
+          (click)="openCreateEvent()"
+        ></button>
       </div>
 
       <ul class="schedule" *ngIf="events.length > 0; else noEvents">
@@ -83,57 +86,68 @@
             </div>
           </div>
 
-          <!-- Buttons (يمين) -->
           <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
             <!-- Join / Unjoin -->
-            <p-button
+            <button
               *ngIf="e.status==='PUBLISHED' && !e.joined"
-              label="انضم"
+              pButton
+              type="button"
+              label="التفاصيل والانضمام"
               icon="pi pi-user-plus"
-              (onClick)="openJoin(e)"
-              styleClass="p-button-success p-button-sm"
-            ></p-button>
+              class="p-button-success p-button-sm"
+              (click)="openJoin(e)"
+            ></button>
 
-            <p-button
+            <button
               *ngIf="e.status==='PUBLISHED' && e.joined"
+              pButton
+              type="button"
               label="إلغاء الانضمام"
               icon="pi pi-times"
-              (onClick)="unjoin(e)"
-              styleClass="p-button-danger p-button-sm"
-            ></p-button>
+              class="p-button-danger p-button-sm"
+              (click)="unjoin(e)"
+            ></button>
 
             <!-- Publish/Edit/Delete/Participants -->
-            <p-button
+            <button
               *ngIf="e.canPublish"
+              pButton
+              type="button"
               label="نشر"
               icon="pi pi-send"
-              (onClick)="publishEvent(e)"
-              styleClass="p-button-help p-button-sm"
-            ></p-button>
+              class="p-button-help p-button-sm"
+              (click)="publishEvent(e)"
+            ></button>
 
-            <p-button
+            <button
               *ngIf="e.canEdit"
+              pButton
+              type="button"
               label="تعديل"
               icon="pi pi-pencil"
-              (onClick)="openEditEvent(e)"
-              styleClass="p-button-secondary p-button-sm"
-            ></p-button>
+              class="p-button-secondary p-button-sm"
+              (click)="openEditEvent(e)"
+            ></button>
 
-            <p-button
+            <button
               *ngIf="e.canDelete"
+              pButton
+              type="button"
               label="مسح"
               icon="pi pi-trash"
-              (onClick)="deleteEvent(e)"
-              styleClass="p-button-danger p-button-sm"
-            ></p-button>
+              class="p-button-danger p-button-sm"
+              (click)="deleteEvent(e)"
+            ></button>
 
-            <p-button
+            <button
               *ngIf="e.canSeeParticipants"
+              pButton
+              type="button"
               label="تفاصيل"
               icon="pi pi-list"
-              (onClick)="openParticipants(e)"
-              styleClass="p-button-info p-button-sm"
-            ></p-button>
+              class="p-button-info p-button-sm"
+              (click)="openParticipants(e)"
+            ></button>
           </div>
         </li>
       </ul>
@@ -143,17 +157,18 @@
       </ng-template>
     </p-panel>
 
-    <!-- ================= التنبيهات ================= -->
     <p-panel header="التنبيهات" class="content-panel">
 
       <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
-        <p-button
+        <button
           *ngIf="isAtLeast('KHADIM')"
+          pButton
+          type="button"
           label="إضافة تنبيه"
           icon="pi pi-plus"
-          (onClick)="openCreateAnnouncement()"
-          styleClass="p-button-sm"
-        ></p-button>
+          class="p-button-sm"
+          (click)="openCreateAnnouncement()"
+        ></button>
       </div>
 
       <ul class="activity" *ngIf="announcements.length > 0; else noAnn">
@@ -168,12 +183,17 @@
           </div>
 
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <p-button label="تفاصيل" icon="pi pi-info-circle" (onClick)="openAnnDetails(a)" styleClass="p-button-info p-button-sm"></p-button>
+            <button pButton type="button" label="تفاصيل" icon="pi pi-info-circle"
+              class="p-button-info p-button-sm" (click)="openAnnDetails(a)"></button>
 
-            <p-button *ngIf="a.canEdit" label="تعديل" icon="pi pi-pencil" (onClick)="openEditAnnouncement(a)" styleClass="p-button-secondary p-button-sm"></p-button>
+            <button *ngIf="a.canEdit" pButton type="button" label="تعديل" icon="pi pi-pencil"
+              class="p-button-secondary p-button-sm" (click)="openEditAnnouncement(a)"></button>
 
-            <p-button *ngIf="a.canDelete" label="مسح" icon="pi pi-trash" (onClick)="deleteAnnouncement(a)" styleClass="p-button-danger p-button-sm"></p-button>
-            <p-button *ngIf="a.canPublish" label="نشر" icon="pi pi-send" (onClick)="publishAnnouncement(a)" styleClass="p-button-help p-button-sm"></p-button>
+            <button *ngIf="a.canDelete" pButton type="button" label="مسح" icon="pi pi-trash"
+              class="p-button-danger p-button-sm" (click)="deleteAnnouncement(a)"></button>
+
+            <button *ngIf="a.canPublish" pButton type="button" label="نشر" icon="pi pi-send"
+              class="p-button-help p-button-sm" (click)="publishAnnouncement(a)"></button>
           </div>
         </li>
       </ul>
@@ -188,14 +208,15 @@
     © 2025 أسرة الشمامسة — جميع الحقوق محفوظة
   </footer>
 
-  <!-- ============== Dialog: Create/Edit Event ============== -->
+  <!-- Dialogs زي ما هم عندك (ما غيرتهمش) -->
+  <!-- Event Dialog -->
   <p-dialog [(visible)]="showEventDialog" [modal]="true" [style]="{width:'520px'}" header="إضافة/تعديل موعد">
     <div style="display:flex; flex-direction:column; gap:10px;">
       <label>العنوان (هيظهر من برّه)</label>
       <input pInputText [(ngModel)]="eventForm.title" />
 
       <label>الوصف (هيظهر قبل تأكيد الانضمام)</label>
-      <textarea pTextarea  [(ngModel)]="eventForm.description" rows="4"></textarea>
+      <textarea pTextarea [(ngModel)]="eventForm.description" rows="4"></textarea>
 
       <label>وقت الإيفنت</label>
       <p-datepicker
@@ -219,20 +240,19 @@
         appendTo="body"
       ></p-datepicker>
 
-      <!-- ✅ DropList واحدة فقط: نعرضه كقراءة فقط -->
       <label>هينزل لمين؟</label>
       <div style="padding:10px; border:1px solid #ddd; border-radius:8px; opacity:.9;">
         {{ eventForm.targetFamily === 'ALL' ? 'كل الأسر (الجميع)' : eventForm.targetFamily }}
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
-        <p-button label="إلغاء" styleClass="p-button-text" (onClick)="showEventDialog=false"></p-button>
+        <button pButton type="button" label="إلغاء" class="p-button-text" (click)="showEventDialog=false"></button>
         <button pButton type="button" label="حفظ" icon="pi pi-save" (click)="saveEvent()"></button>
       </div>
     </div>
   </p-dialog>
 
-  <!-- ============== Dialog: Join ============== -->
+  <!-- Join Dialog -->
   <p-dialog [(visible)]="showJoinDialog" [modal]="true" [style]="{width:'520px'}" header="تفاصيل الموعد">
     <div *ngIf="selectedJoinEvent">
       <h3 style="margin-top:0;">{{ selectedJoinEvent.title }}</h3>
@@ -247,13 +267,13 @@
       </ng-template>
 
       <div style="display:flex; justify-content:flex-end; gap:10px;">
-        <p-button label="إلغاء" styleClass="p-button-text" (onClick)="showJoinDialog=false"></p-button>
-        <p-button label="انضم" icon="pi pi-check" styleClass="p-button-success" (onClick)="confirmJoin()"></p-button>
+        <button pButton type="button" label="إلغاء" class="p-button-text" (click)="showJoinDialog=false"></button>
+        <button pButton type="button" label="انضم" icon="pi pi-check" class="p-button-success" (click)="confirmJoin()"></button>
       </div>
     </div>
   </p-dialog>
 
-  <!-- ============== Dialog: Participants ============== -->
+  <!-- Participants Dialog -->
   <p-dialog [(visible)]="showParticipantsDialog" [modal]="true" [style]="{width:'650px'}" header="تفاصيل المنضمين">
     <p-table [value]="participantsGroups" *ngIf="participantsGroups.length > 0; else noParts">
       <ng-template pTemplate="header">
@@ -280,29 +300,28 @@
     </ng-template>
   </p-dialog>
 
-  <!-- ============== Dialog: Create/Edit Announcement ============== -->
+  <!-- Announcement Dialog -->
   <p-dialog [(visible)]="showAnnDialog" [modal]="true" [style]="{width:'520px'}" header="إضافة/تعديل تنبيه">
     <div style="display:flex; flex-direction:column; gap:10px;">
       <label>العنوان (هيظهر من برّه)</label>
       <input pInputText [(ngModel)]="annForm.title" />
 
       <label>الوصف (هيظهر في تفاصيل)</label>
-      <textarea pInputTextarea [(ngModel)]="annForm.description" rows="4"></textarea>
+      <textarea pTextarea [(ngModel)]="annForm.description" rows="4"></textarea>
 
-      <!-- ✅ DropList واحدة فقط: نعرضه كقراءة فقط -->
       <label>هينزل لمين؟</label>
       <div style="padding:10px; border:1px solid #ddd; border-radius:8px; opacity:.9;">
         {{ annForm.targetFamily === 'ALL' ? 'كل الأسر (الجميع)' : annForm.targetFamily }}
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
-        <p-button label="إلغاء" styleClass="p-button-text" (onClick)="showAnnDialog=false"></p-button>
+        <button pButton type="button" label="إلغاء" class="p-button-text" (click)="showAnnDialog=false"></button>
         <button pButton type="button" label="حفظ" icon="pi pi-save" (click)="saveAnnouncement()"></button>
       </div>
     </div>
   </p-dialog>
 
-  <!-- ============== Dialog: Announcement Details ============== -->
+  <!-- Announcement Details -->
   <p-dialog [(visible)]="showAnnDetailsDialog" [modal]="true" [style]="{width:'520px'}" header="تفاصيل التنبيه">
     <div *ngIf="selectedAnn">
       <h3 style="margin-top:0;">{{ selectedAnn.title }}</h3>

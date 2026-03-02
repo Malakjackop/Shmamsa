@@ -42,6 +42,7 @@ public class EventController {
         return FamilyUtil.mainFamily(u == null ? null : u.getDeaconFamily());
     }
 
+    // ✅ Developer محسوب أعلى من AMIN_KHEDMA في RoleUtil
     private boolean isAdmin(String role) {
         return RoleUtil.isAtLeast(role, "AMIN_KHEDMA");
     }
@@ -91,23 +92,11 @@ public class EventController {
         User me = requireUser(auth);
         String role = me.getRole();
 
-        YearMonth ym;
-        if (month == null || month.isBlank()) {
-            ym = YearMonth.now();
-        } else {
-            String m = month.trim();
-            m = m.replace('_', '-');
-            if (m.length() >= 7) m = m.substring(0, 7);
-
-            try {
-                ym = YearMonth.parse(m);
-            } catch (Exception ex) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid month. Expected YYYY-MM");
-            }
-        }
+        YearMonth ym = (month == null || month.isBlank()) ? YearMonth.now() : YearMonth.parse(month.trim());
         LocalDate start = ym.atDay(1);
         LocalDate end = ym.plusMonths(1).atDay(1);
 
+        // ✅ ده اللي موجود عندك في EventRepository
         List<Event> inMonth = eventRepo.findByEventAtGreaterThanEqualAndEventAtLessThan(start, end);
 
         String fam = (family == null) ? null : family.trim();
@@ -115,46 +104,37 @@ public class EventController {
         List<EventView> out = new ArrayList<>();
 
         for (Event e : inMonth) {
-
-            // ✅ status null-safe (لو قديم في DB)
             EventStatus st = (e.getStatus() == null) ? EventStatus.PENDING : e.getStatus();
 
             boolean admin = isAdmin(role);
 
             boolean matchesFamily;
             if (admin) {
-                // family=ALL أو null => اعرض الكل
                 if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
                     matchesFamily = true;
                 } else {
-                    // أسرة محددة => اعرض (ALL + الأسرة)
                     matchesFamily = fam.equals(e.getTargetFamily()) || "ALL".equalsIgnoreCase(e.getTargetFamily());
                 }
             } else {
-                // مستخدم عادي: ALL + أسرته
                 String myBase = baseFamily(me);
                 matchesFamily = "ALL".equalsIgnoreCase(e.getTargetFamily())
                         || (myBase != null && myBase.equals(e.getTargetFamily()));
             }
 
-            boolean canManage = canManage(me, role, e);
+            boolean canM = canManage(me, role, e);
             boolean creator = isCreator(me, e);
 
             boolean publishedVisible = st == EventStatus.PUBLISHED && matchesFamily;
-
-            // ✅ Pending يظهر للأمين أو لصاحب الإيفنت
-            boolean pendingVisible = st == EventStatus.PENDING
-                    && matchesFamily
-                    && (canManage || creator);
+            boolean pendingVisible = st == EventStatus.PENDING && matchesFamily && (canM || creator);
 
             if (!publishedVisible && !pendingVisible) continue;
 
             boolean joined = participantRepo.existsByEvent_IdAndUser_Id(e.getId(), me.getId());
             long joinCount = participantRepo.countByEvent_Id(e.getId());
 
-            boolean canEdit = canManage || creator;
-            boolean canDelete = canManage || creator;
-            boolean canPublish = canManage && st == EventStatus.PENDING; // النشر للأمين فقط
+            boolean canEdit = canM || creator;
+            boolean canDelete = canM || creator;
+            boolean canPublish = canM && st == EventStatus.PENDING;
 
             out.add(EventView.builder()
                     .id(e.getId())
@@ -171,7 +151,7 @@ public class EventController {
                     .canEdit(canEdit)
                     .canDelete(canDelete)
                     .canPublish(canPublish)
-                    .canSeeParticipants(canManage)
+                    .canSeeParticipants(canM)
                     .build());
         }
 
@@ -209,6 +189,7 @@ public class EventController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody EventUpsertRequest req, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
@@ -216,12 +197,15 @@ public class EventController {
         Event e = eventRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
 
-        EventStatus st = (e.getStatus() == null) ? EventStatus.PENDING : e.getStatus();
-
-        boolean canManage = canManage(me, role, e);
+        // NOTE:
+        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
+        // Without a transaction, accessing e.getCreatedBy() may throw LazyInitializationException
+        // which becomes a generic 500. Keep this method transactional so creator checks work.
+        boolean canM = canManage(me, role, e);
         boolean creator = isCreator(me, e);
 
-        if (!(canManage || (creator && st == EventStatus.PENDING))) {
+        // ✅ خلي التعديل يشتغل للـ creator كمان
+        if (!(canM || creator)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
@@ -263,7 +247,9 @@ public class EventController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
+    // ✅ مسح الإيفنت: لازم نمسح المشاركين الأول
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
@@ -271,16 +257,16 @@ public class EventController {
         Event e = eventRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
 
-        EventStatus st = (e.getStatus() == null) ? EventStatus.PENDING : e.getStatus();
-
-        boolean canManage = canManage(me, role, e);
+        boolean canM = canManage(me, role, e);
         boolean creator = isCreator(me, e);
 
-        if (!(canManage || (creator && st == EventStatus.PENDING))) {
+        if (!(canM || creator)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
+        participantRepo.deleteByEvent_Id(e.getId());
         eventRepo.delete(e);
+
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
@@ -303,7 +289,9 @@ public class EventController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
+    // ✅ إلغاء الانضمام: Transaction + delete
     @DeleteMapping("/{id}/join")
+    @Transactional
     public ResponseEntity<?> unjoin(@PathVariable Long id, Authentication auth) {
         User me = requireUser(auth);
         participantRepo.deleteByEvent_IdAndUser_Id(id, me.getId());

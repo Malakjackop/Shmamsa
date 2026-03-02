@@ -12,48 +12,35 @@ public class RoleUtil {
             "DEVELOPER"
     );
 
-    private static String normalize(String role) {
-        if (role == null) return "";
-        String r = role.trim().toUpperCase();
-
-        // normalize separators
-        r = r.replace(" ", "_");
-
-        // accept common variants
-        if (r.contains("DEVELOPER")) return "DEVELOPER";
-        if (r.contains("AMIN_KHEDMA")) return "AMIN_KHEDMA";
-        if (r.contains("AMIN_OSRA")) return "AMIN_OSRA";
-        if (r.contains("KHADIM")) return "KHADIM";
-        if (r.contains("MAKHDOM")) return "MAKHDOM";
-
-        return r;
-    }
-
+    // ✅ Normalize role (حل مشكلة developer / Developer / developer)
     public static int level(String role) {
-        String r = normalize(role);
+        if (role == null) return 0;
+        String r = role.trim().toUpperCase();
         int idx = ORDERED.indexOf(r);
         return idx >= 0 ? idx : 0;
     }
 
     public static boolean isAtLeast(String role, String required) {
-        return level(role) >= level(required);
+        if (required == null) return true;
+        String req = required.trim().toUpperCase();
+        return level(role) >= level(req);
     }
 
     public static boolean isDeveloper(String role) {
-        return normalize(role).equals("DEVELOPER");
+        return "DEVELOPER".equals(String.valueOf(role).trim().toUpperCase());
     }
 
     public static boolean canChangeRoles(String actorRole) {
-        String r = normalize(actorRole);
+        String r = String.valueOf(actorRole).trim().toUpperCase();
         return "AMIN_KHEDMA".equals(r) || "DEVELOPER".equals(r);
     }
 
     public static boolean canAssign(String actorRole, String targetRole) {
-        String ar = normalize(actorRole);
-        String tr = normalize(targetRole);
+        String a = String.valueOf(actorRole).trim().toUpperCase();
+        String t = String.valueOf(targetRole).trim().toUpperCase();
 
-        if ("DEVELOPER".equals(ar)) return true;
-        if ("AMIN_KHEDMA".equals(ar)) return !"DEVELOPER".equals(tr);
+        if ("DEVELOPER".equals(a)) return true;
+        if ("AMIN_KHEDMA".equals(a)) return !"DEVELOPER".equals(t);
         return false;
     }
 }
