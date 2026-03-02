@@ -9,6 +9,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     Optional<User> findByIdAndUsername(Long id, String username);
+    Optional<User> findByNationalId(String nationalId);
 
     java.util.List<User> findByDeaconFamily(String deaconFamily);
     java.util.List<User> findByRoleAndDeaconFamily(String role, String deaconFamily);
@@ -18,7 +19,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     java.util.List<User> findByRoleIn(java.util.List<String> roles);
 
-    // --- Search helpers (used by /api/family/search)
     java.util.List<User> findByRoleAndFullNameContainingIgnoreCase(String role, String namePart);
 
     java.util.List<User> findByRoleAndDeaconFamilyStartingWithAndFullNameContainingIgnoreCase(
@@ -27,7 +27,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
             String namePart
     );
 
-    // ====== Choir helpers (khors membership on User.khors) ======
     java.util.List<User> findByAttendKhorsAndRoleIn(String attendKhors, java.util.List<String> roles);
 
     java.util.List<User> findByKhorsAndRoleIn(String khors, java.util.List<String> roles);

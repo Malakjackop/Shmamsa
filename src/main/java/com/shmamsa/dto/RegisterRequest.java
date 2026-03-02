@@ -3,6 +3,7 @@ import com.shmamsa.validation.customAnnotation.ValidNationalId;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import jakarta.validation.constraints.Pattern;
 
 @Data
 public class RegisterRequest {
@@ -35,12 +36,13 @@ public class RegisterRequest {
     @NotBlank(message = "Deacon degree is required")
     private String deaconDegree;
 
-    // Khors (Choir): MARMARKOS / ATHANASIUS / NONE
     private String khors;
 
+    @Pattern(regexp = "^$|^\\d{11}$", message = "رقم الهاتف يجب أن يكون 11 رقم")
     private String phoneNumber;
 
     private String address;
+    @Pattern(regexp = "^$|^\\d{11}$", message = "رقم ولي الأمر يجب أن يكون 11 رقم")
     private String guardiansPhone;
     private String guardianRelation;
 

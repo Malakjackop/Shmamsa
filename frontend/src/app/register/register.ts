@@ -100,7 +100,7 @@ export class RegisterComponent implements OnInit {
     this.registerForm = this.fb.group({
       fullName: ['', Validators.required],
       username: ['', Validators.required],
-      phoneNumber: [''],
+      phoneNumber: ['', [this.optionalPhone11()]],
       address: [''],
       email: ['', [Validators.required, Validators.email]],
 
@@ -108,17 +108,13 @@ export class RegisterComponent implements OnInit {
       dateOfBirth: [''],
       gender: [''],
 
-      // ✅ make selects update instantly (no need to click outside)
       servingWhere: this.fb.control('', { updateOn: 'change' }),
 
       deaconFamily: this.fb.control('', { validators: [Validators.required], updateOn: 'change' }),
-      // NOTE: second family is managed by أمين الخدمة من داخل النظام (not during self registration)
       deaconDegree: this.fb.control('', { validators: [Validators.required], updateOn: 'change' }),
 
-      khors: this.fb.control('', { updateOn: 'change' }), // MARMARKOS / ATHANASIUS / BOTH / NONE
-
-      // ✅ NEW
-      attendKhors: this.fb.control('', { updateOn: 'change' }), // MARMARKOS / ATHANASIUS / NONE
+      khors: this.fb.control('', { updateOn: 'change' }), 
+      attendKhors: this.fb.control('', { updateOn: 'change' }), 
 
       servingScope: this.fb.control(this.isServant ? '' : '', {
         validators: this.isServant ? [Validators.required] : [],
@@ -142,14 +138,18 @@ export class RegisterComponent implements OnInit {
       isWorking: this.fb.control('', { updateOn: 'change' }),
       workDetails: [''],
 
-      guardiansPhone: [''],
+      guardiansPhone: ['', [this.optionalPhone11()]],
       guardianRelation: [''],
 
       password: ['', Validators.required],
       confirmPassword: ['', Validators.required],
 
       secret: ['']
-    }, { updateOn: 'blur' });
+    }, {
+  validators: [this.guardianNotSameAsPhone()],
+  updateOn: 'blur'
+});
+    
 
     if (this.isServant) {
       this.registerForm.get('status')?.setValue('student', { emitEvent: false });
@@ -163,8 +163,14 @@ export class RegisterComponent implements OnInit {
     }
   }
 
+  private optionalPhone11(): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const v = String(control.value ?? '').trim();
+    if (!v) return null; 
+    return /^\d{11}$/.test(v) ? null : { phone11: true };
+  };
+}
 
-// ✅ NEW: one dropdown "بتخدم فين" for servants (family OR choir)
 onServingWhereChange() {
   if (!this.isServant) return;
 
@@ -181,7 +187,6 @@ onServingWhereChange() {
     famCtrl?.setValue('خورس مارمرقس', { emitEvent: false });
     khorsCtrl?.setValue('MARMARKOS', { emitEvent: false });
 
-    // attend must be ATHANASIUS (locked)
     attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
     attendCtrl?.disable({ emitEvent: false });
 
@@ -190,29 +195,24 @@ onServingWhereChange() {
     famCtrl?.setValue('خورس الانبا اثناسيوس', { emitEvent: false });
     khorsCtrl?.setValue('ATHANASIUS', { emitEvent: false });
 
-    // no attend selection at all
     attendCtrl?.setValue('NONE', { emitEvent: false });
     attendCtrl?.enable({ emitEvent: false });
 
   } else {
-    // Normal family
     scopeCtrl?.setValue('FAMILY_ONLY', { emitEvent: false });
     famCtrl?.setValue(where, { emitEvent: false });
     khorsCtrl?.setValue('NONE', { emitEvent: false });
 
-    // allow user to choose attend
     attendCtrl?.enable({ emitEvent: false });
     if (!String(attendCtrl?.value || '').trim() || String(attendCtrl?.value || '').trim() === 'NONE') {
       attendCtrl?.setValue('', { emitEvent: false });
     }
   }
 
-  // Apply existing validators/rules based on servingScope & khors
   this.onServingScopeChange();
   this.onKhorsChanged();
 }
 
-  // ✅ apply rules AFTER user chooses scope
   onServingScopeChange() {
     if (!this.isServant) return;
 
@@ -223,16 +223,13 @@ onServingWhereChange() {
     const khorsCtrl = this.registerForm.get('khors');
     const attendCtrl = this.registerForm.get('attendKhors');
 
-    // Family required only when serving in family
     if (scope === 'KHORS_ONLY') {
       famCtrl?.clearValidators();
-      // keep current value (family label or choir label)
     } else {
       famCtrl?.setValidators([Validators.required]);
     }
     famCtrl?.updateValueAndValidity({ emitEvent: true });
 
-    // Khors required when serving in khors
     if (scope === 'FAMILY_ONLY') {
       khorsCtrl?.clearValidators();
       khorsCtrl?.setValue('NONE', { emitEvent: false });
@@ -245,16 +242,13 @@ onServingWhereChange() {
     }
     khorsCtrl?.updateValueAndValidity({ emitEvent: true });
 
-    // ✅ Attend Khors rules
     if (scope === 'FAMILY_ONLY') {
-      // required + user chooses
       attendCtrl?.enable({ emitEvent: false });
       attendCtrl?.setValidators([Validators.required]);
       if (!String(attendCtrl?.value || '').trim()) {
         attendCtrl?.setValue('', { emitEvent: false });
       }
     } else {
-      // not required by default, will be handled by onKhorsChanged()
       attendCtrl?.clearValidators();
       attendCtrl?.setValue('NONE', { emitEvent: false });
       attendCtrl?.enable({ emitEvent: false });
@@ -265,7 +259,6 @@ onServingWhereChange() {
     this.registerForm.updateValueAndValidity({ emitEvent: true });
   }
 
-  // ✅ when servant chooses serving khors
   onKhorsChanged() {
     if (!this.isServant) return;
 
@@ -276,19 +269,15 @@ onServingWhereChange() {
     const attendCtrl = this.registerForm.get('attendKhors');
 
     if (scope === 'FAMILY_ONLY') {
-      // already handled (manual choice)
       attendCtrl?.enable({ emitEvent: false });
       return;
     }
 
-    // scope KHORS_ONLY or BOTH:
-    // if serving MARMARKOS -> attend ATHANASIUS (show + disabled)
     if (kh === 'MARMARKOS') {
       attendCtrl?.clearValidators();
       attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
-      attendCtrl?.disable({ emitEvent: false }); // lock default
+      attendCtrl?.disable({ emitEvent: false }); 
     } else {
-      // serving ATHANASIUS or BOTH -> no attend selection
       attendCtrl?.clearValidators();
       attendCtrl?.setValue('NONE', { emitEvent: false });
       attendCtrl?.enable({ emitEvent: false });
@@ -352,8 +341,6 @@ onServingWhereChange() {
     const c = this.registerForm.get(controlName);
     if (!c) return;
 
-    // Treat list/select controls as "interacted" on change,
-    // but don't open the error gate while the value is still empty.
     this.interacted[controlName] = true;
 
     const v = c.value;
@@ -468,15 +455,16 @@ onServingWhereChange() {
   getErrorMessage(controlName: string, label?: string): string | null {
     const c = this.registerForm.get(controlName);
     if (!c || !c.errors) return null;
-
+    
     const e: any = c.errors;
     if (e['required']) return `${label || 'this field '} required`;
     if (e['email']) return `email not correct`;
     if (e['nationalIdFormat']) return 'national id must be 14 chracters ';
     if (e['nationalIdMinAge']) return `age must be  ${e['nationalIdMinAge']?.minAge} or more`;
     if (e['mismatch']) return 'password or confirm passwword not match';
+    if (e['phone11']) return 'رقم الهاتف يجب أن يكون 11 رقم';
+    if (e['guardianSameAsPhone']) return 'ممنوع تكرار نفس رقم ولي الأمر بالرقم الشخصي';
     if (e['api']) return String(e['api']);
-
     return label ? `Value ${label} not correct` : ' Vlaue not correct ';
   }
 
@@ -512,20 +500,53 @@ onServingWhereChange() {
     this.serverError = null;
     const api = err?.error;
 
-    if (api && api.errors && typeof api.errors === 'object') {
-      const entries = Object.entries(api.errors) as Array<[string, any]>;
-      entries.forEach(([field, msg]) => {
-        const ctrl = this.registerForm.get(field);
-        if (!ctrl) return;
-        const detail = msg ? String(msg) : 'value not correct';
-        ctrl.setErrors({ ...(ctrl.errors || {}), api: detail });
-        if (this.submitAttempted) ctrl.markAsTouched();
-      });
-      return;
-    }
+    const fieldBag = (api?.errors && typeof api.errors === 'object')
+  ? api.errors
+  : (api?.fields && typeof api.fields === 'object')
+    ? api.fields
+    : null;
+
+if (fieldBag) {
+  const entries = Object.entries(fieldBag) as Array<[string, any]>;
+  entries.forEach(([field, msg]) => {
+    const ctrl = this.registerForm.get(field);
+    if (!ctrl) return;
+    const detail = msg ? String(msg) : 'value not correct';
+    ctrl.setErrors({ ...(ctrl.errors || {}), api: detail });
+    if (this.submitAttempted) ctrl.markAsTouched();
+  });
+  return;
+}
 
     this.serverError = api?.message || api?.error || 'An unexpected error occurred. Please try again.';
   }
+
+private guardianNotSameAsPhone(): ValidatorFn {
+  return (group: AbstractControl): ValidationErrors | null => {
+    const phoneCtrl = group.get('phoneNumber');
+    const guardianCtrl = group.get('guardiansPhone');
+
+    if (!phoneCtrl || !guardianCtrl) return null;
+
+    const phone = String(phoneCtrl.value ?? '').trim();
+    const guardian = String(guardianCtrl.value ?? '').trim();
+
+    const gErrors = { ...(guardianCtrl.errors || {}) };
+    if (gErrors['guardianSameAsPhone']) {
+      delete gErrors['guardianSameAsPhone'];
+      guardianCtrl.setErrors(Object.keys(gErrors).length ? gErrors : null);
+    }
+
+    if (!phone || !guardian) return null;
+
+    if (phone === guardian) {
+      guardianCtrl.setErrors({ ...(guardianCtrl.errors || {}), guardianSameAsPhone: true });
+      return { guardianSameAsPhone: true }; 
+    }
+
+    return null;
+  };
+}
 
   submit() {
     this.serverError = null;

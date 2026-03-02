@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
                 ex.getStatus().value(),
                 ex.getMessage(),
                 ex.getCode(),
-                null
+                ex.getFields()
         );
         return ResponseEntity.status(ex.getStatus()).body(body);
     }

@@ -29,7 +29,6 @@ public class AuthService {
 
     private final ServantSecretService servantSecretService;
 
-    // OTP / Rate limit helpers
     private static class RateWindow {
         int count;
         long windowStartMs;
@@ -43,7 +42,7 @@ public class AuthService {
 
     private static class OtpData {
         String username;
-        long expiresAt; // ms
+        long expiresAt;
 
         OtpData(String username, long expiresAt) {
             this.username = username;
@@ -69,7 +68,6 @@ public class AuthService {
     private static final long COOLDOWN_MS = 45_000;
     private static final int HOURLY_LIMIT = 5;
 
-    // NEW: Khors + Serving Scope
 
     private static final Set<String> KHORS_VALUES = Set.of("MARMARKOS", "ATHANASIUS", "BOTH", "NONE");
     private static final Set<String> ATTEND_KHORS_VALUES = Set.of("MARMARKOS", "ATHANASIUS", "NONE");
@@ -113,6 +111,17 @@ public class AuthService {
                 .ifPresent(existing -> {
                     throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
                 });
+        String phone = request.getPhoneNumber() == null ? "" : request.getPhoneNumber().trim();
+        String guardian = request.getGuardiansPhone() == null ? "" : request.getGuardiansPhone().trim();
+
+        if (!phone.isEmpty() && !guardian.isEmpty() && phone.equals(guardian)) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "GUARDIAN_SAME_AS_PHONE",
+                    "Guardian phone must be different",
+                    java.util.Map.of("guardiansPhone", "ممنوع تكرار نفس رقم ولي الأمر بالرقم الشخصي")
+            );
+        }
 
         User user = new User();
         user.setFullName(request.getFullName());
@@ -122,8 +131,7 @@ public class AuthService {
         user.setNationalId(request.getNationalId());
         user.setDeaconFamily(request.getDeaconFamily());
         user.setDeaconDegree(request.getDeaconDegree());
-        // ✅ IMPORTANT: do NOT enroll the user in the choir directly.
-        // We store "NONE" and create a pending join request if they selected a choir.
+
         String requestedKhors = normalizeKhors(request.getKhors(), false);
         user.setKhors("NONE");
         user.setAttendKhors("NONE");
@@ -157,9 +165,18 @@ public class AuthService {
 
         user.setRole("MAKHDOM");
 
+        String nid = request.getNationalId() == null ? "" : request.getNationalId().trim();
+        userRepository.findByNationalId(nid).ifPresent(existing -> {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "NATIONAL_ID_TAKEN",
+                    "National ID already in use",
+                    java.util.Map.of("nationalId", "الرقم القومي مسجل بالفعل")
+            );
+        });
+
         userRepository.save(user);
 
-        // Create pending request (if they selected MARMARKOS or ATHANASIUS)
         khorsJoinRequestService.createForUserIfNeeded(user, requestedKhors);
     }
 
@@ -185,8 +202,15 @@ public class AuthService {
                 });
 
         String nid = request.getNationalId().trim();
+        userRepository.findByNationalId(nid).ifPresent(existing -> {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "NATIONAL_ID_TAKEN",
+                    "National ID already in use",
+                    java.util.Map.of("nationalId", "الرقم القومي مسجل بالفعل")
+            );
+        });
 
-        // ✅ NEW: serving scope validation
         String scope = normalizeServingScope(request.getServingScope());
         if (!( "FAMILY_ONLY".equals(scope) || "KHORS_ONLY".equals(scope) || "BOTH".equals(scope) )) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCOPE", "Invalid serving scope");
@@ -198,21 +222,17 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(nid);
-        // ✅ NEW: deaconFamily rules based on scope
-if ("KHORS_ONLY".equals(scope)) {
-    // We treat the two choirs like families for visibility/scope.
-    // Map khors -> a readable "family" label.
+
+        if ("KHORS_ONLY".equals(scope)) {
     String kTmp = normalizeKhors(request.getKhors(), true); // allow BOTH
     if ("NONE".equals(kTmp) || kTmp.isBlank()) {
         throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
     }
-    // Store the serving place in deaconFamily (instead of SYSTEM) so "same family" rules work.
     if ("MARMARKOS".equalsIgnoreCase(kTmp)) {
         user.setDeaconFamily("خورس مارمرقس");
     } else if ("ATHANASIUS".equalsIgnoreCase(kTmp)) {
         user.setDeaconFamily("خورس البابا اثناسيوس");
     } else {
-        // BOTH: fallback label
         user.setDeaconFamily("خورس");
     }
 } else {
@@ -221,7 +241,6 @@ if ("KHORS_ONLY".equals(scope)) {
     }
     user.setDeaconFamily(request.getDeaconFamily().trim());
 
-    // ✅ Optional: allow serving a second family
     if (request.getDeaconFamily2() != null && !request.getDeaconFamily2().trim().isBlank()) {
         String f2 = request.getDeaconFamily2().trim();
         if (!f2.equalsIgnoreCase(user.getDeaconFamily())) {
@@ -233,11 +252,8 @@ if ("KHORS_ONLY".equals(scope)) {
         user.setDeaconDegree(request.getDeaconDegree());
         user.setRole("KHADIM");
 
-
-        // ✅ store scope
         user.setServingScope(scope);
 
-        // ✅ NEW: serving khors rules
         if ("FAMILY_ONLY".equals(scope)) {
             user.setKhors("NONE");
         } else {
@@ -248,13 +264,9 @@ if ("KHORS_ONLY".equals(scope)) {
             user.setKhors(k);
         }
 
-        // ✅ NEW: attendKhors rules (exactly as you asked)
-        // NOTE: if the servant is NOT serving in a choir (FAMILY_ONLY) and chooses to attend a choir,
-        // we do NOT enroll مباشرة. We create a pending join request (same flow as makhdom).
-        String requestedAttendKhors = "NONE";
+                String requestedAttendKhors = "NONE";
 
         if ("FAMILY_ONLY".equals(scope)) {
-            // user must choose attendKhors (can be NONE)
             String attend = normalizeAttendKhors(request.getAttendKhors());
             if (attend.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ATTEND_KHORS_REQUIRED", "Attend khors is required");
@@ -263,9 +275,7 @@ if ("KHORS_ONLY".equals(scope)) {
             requestedAttendKhors = attend;
             user.setAttendKhors("NONE"); // pending until approved
         } else {
-            // KHORS_ONLY or BOTH:
-            // if serving in MARMARKOS -> attend ATHANASIUS by default
-            // if serving in ATHANASIUS or BOTH -> no attend selection
+
             if ("MARMARKOS".equalsIgnoreCase(user.getKhors())) {
                 user.setAttendKhors("ATHANASIUS");
             } else {
@@ -311,7 +321,6 @@ if ("KHORS_ONLY".equals(scope)) {
 
         userRepository.save(user);
 
-        // Create pending request if they selected attendKhors (MARMARKOS / ATHANASIUS)
         khorsJoinRequestService.createForUserIfNeeded(user, requestedAttendKhors);
 
     }
@@ -355,7 +364,6 @@ if ("KHORS_ONLY".equals(scope)) {
         String username = user.getUsername();
         long now = System.currentTimeMillis();
 
-        // Cooldown
         if (otpTimestamps.containsKey(username)) {
             long lastSent = otpTimestamps.get(username);
             if (now - lastSent < COOLDOWN_MS) {
