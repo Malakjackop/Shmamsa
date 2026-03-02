@@ -13,8 +13,10 @@ import lombok.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.*;
@@ -80,6 +82,7 @@ public class EventController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<?> list(
             @RequestParam(required = false) String month,
             @RequestParam(required = false) String family,
@@ -88,11 +91,24 @@ public class EventController {
         User me = requireUser(auth);
         String role = me.getRole();
 
-        YearMonth ym = (month == null || month.isBlank()) ? YearMonth.now() : YearMonth.parse(month.trim());
-        LocalDateTime start = ym.atDay(1).atStartOfDay();
-        LocalDateTime end = ym.plusMonths(1).atDay(1).atStartOfDay();
+        YearMonth ym;
+        if (month == null || month.isBlank()) {
+            ym = YearMonth.now();
+        } else {
+            String m = month.trim();
+            m = m.replace('_', '-');
+            if (m.length() >= 7) m = m.substring(0, 7);
 
-        List<Event> inMonth = eventRepo.findByEventAtBetween(start, end);
+            try {
+                ym = YearMonth.parse(m);
+            } catch (Exception ex) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid month. Expected YYYY-MM");
+            }
+        }
+        LocalDate start = ym.atDay(1);
+        LocalDate end = ym.plusMonths(1).atDay(1);
+
+        List<Event> inMonth = eventRepo.findByEventAtGreaterThanEqualAndEventAtLessThan(start, end);
 
         String fam = (family == null) ? null : family.trim();
 
@@ -295,6 +311,7 @@ public class EventController {
     }
 
     @GetMapping("/{id}/participants")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> participants(@PathVariable Long id, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
@@ -342,10 +359,10 @@ public class EventController {
         private Long id;
         private String title;
         private String description;
-        private LocalDateTime eventAt;
+        private LocalDate eventAt;
         private String targetFamily;
         private String status;
-        private LocalDateTime publishAt;
+        private LocalDate publishAt;
         private LocalDateTime publishedAt;
         private String createdByUsername;
 

@@ -136,7 +136,12 @@ public class KhorsJoinRequestService {
             } else {
                 // default: join as choir member
                 target.setKhors(reqKhors);
-                target.setKhorsYear(1);
+                // Marmarkos has levels/years; Athanasius should NOT store a year.
+                if ("MARMARKOS".equals(reqKhors)) {
+                    target.setKhorsYear(1);
+                } else {
+                    target.setKhorsYear(null);
+                }
             }
 
             userRepository.save(target);

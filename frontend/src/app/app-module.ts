@@ -1,4 +1,4 @@
-import { NgModule } from '@angular/core';
+import { NgModule ,  LOCALE_ID } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
@@ -50,6 +50,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { TagModule } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
 
+
 @NgModule({
   declarations: [
     App,
@@ -100,6 +101,7 @@ import { TableModule } from 'primeng/table';
     TableModule
   ],
   providers: [
+    { provide: LOCALE_ID, useValue: 'ar-EG' },
     MessageService,
     providePrimeNG({
       theme: {

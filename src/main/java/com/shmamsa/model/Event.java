@@ -3,6 +3,7 @@ package com.shmamsa.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -26,7 +27,7 @@ public class Event {
 
     // Date/time of the event (what users see)
     @Column(nullable = false)
-    private LocalDateTime eventAt;
+    private LocalDate eventAt;
 
     // Target family: "ALL" OR "اسم الأسرة" OR "اسم الأسرة أ" OR "اسم الأسرة ب"
     @Column(nullable = false, length = 120)
@@ -37,7 +38,7 @@ public class Event {
     private EventStatus status;
 
     // Optional: auto publish date/time
-    private LocalDateTime publishAt;
+    private LocalDate publishAt;
 
     private LocalDateTime publishedAt;
 

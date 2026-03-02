@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,6 +22,7 @@ public class EventPublishScheduler {
     public void autoPublish() {
 
         LocalDateTime now = LocalDateTime.now();
+        LocalDate today = now.toLocalDate();
         List<Event> pending = eventRepo.findByStatus(EventStatus.PENDING);
 
         for (Event e : pending) {
@@ -29,14 +31,14 @@ public class EventPublishScheduler {
             boolean shouldPublish = false;
 
             // 1) لو publishAt محدد واتعدّى => publish
-            if (e.getPublishAt() != null && !e.getPublishAt().isAfter(now)) {
+            if (e.getPublishAt() != null && !e.getPublishAt().isAfter(today)) {
                 shouldPublish = true;
             }
 
             // 2) لو مفيش publishAt => قبل الإيفنت بـ 4 أيام publish تلقائي
             if (e.getPublishAt() == null) {
-                // eventAt <= now + 4days  <=> "فاضل 4 أيام أو أقل"
-                if (!e.getEventAt().isAfter(now.plusDays(4))) {
+                // eventAt <= today + 4 days
+                if (!e.getEventAt().isAfter(today.plusDays(4))) {
                     shouldPublish = true;
                 }
             }

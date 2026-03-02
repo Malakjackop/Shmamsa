@@ -2,31 +2,28 @@ import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
-import { FamilyService } from '../services/family.service';
-import { EventsService, EventItem, ParticipantsGroup } from '../services/events.service';
-import { AnnouncementsService, AnnouncementItem } from '../services/announcements.service';
 import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
+import { FamilyService } from '../services/family.service';
+import { EventsService } from '../services/events.service';
 
 @Component({
   selector: 'app-dash-board',
   standalone: false,
   templateUrl: './dash-board.html',
-  styleUrls: ['./dash-board.css']
+  styleUrls: ['./dash-board.css'],
+  providers: [MessageService]
 })
 export class DashBoard implements OnInit {
-
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
   private familyService = inject(FamilyService);
   private eventsService = inject(EventsService);
-  private announcementsService = inject(AnnouncementsService);
   private router = inject(Router);
   private messageService = inject(MessageService);
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
-  // ====== Existing user/stats (كما هو عندك) ======
   user: any = {
     fullName: '',
     username: '',
@@ -38,155 +35,182 @@ export class DashBoard implements OnInit {
     dateOfBirth: ''
   };
 
-  stats: {
-    FRIDAY_LITURGY: number;
-    TASBEEHA: number;
-    FAMILY_MEETING: number;
-    MARMARKOS_KHORS: number;
-    ATHANASIUS_KHORS: number;
-  } = {
-    FRIDAY_LITURGY: 0,
-    TASBEEHA: 0,
-    FAMILY_MEETING: 0,
-    MARMARKOS_KHORS: 0,
-    ATHANASIUS_KHORS: 0
+  private roleRank: Record<string, number> = {
+    KHADIM: 1,
+    AMIN_OSRA: 2,
+    AMIN_KHEDMA: 3,
+    ADMIN: 4
   };
 
-  private arKhorsName(khors: any): string {
-    const k = String(khors || '').trim().toUpperCase();
-    if (k === 'MARMARKOS') return 'خورس مارمرقس';
-    if (k === 'ATHANASIUS') return 'خورس الانبا اثناسيوس';
-    return '';
-  }
+  familyDropdown: Array<{ label: string; value: string }> = [];
+  scopeFamily: string = 'ALL';
 
-  private arYearLabel(year?: number): string {
-    const y = Number(year || 0);
-    if (!y) return '';
-    if (y === 1) return 'سنه اوله';
-    if (y === 2) return 'سنه تانيه';
-    if (y === 3) return 'سنه تالته';
-    if (y === 4) return 'سنه رابعه';
-    if (y === 5) return 'سنه خامسه';
-    return `سنه ${y}`;
-  }
-
-  // ====== Helpers for roles ======
-  private roleLevel(role: string): number {
-    const order = ['MAKHDOM', 'KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'];
-    const idx = order.indexOf(String(role || '').toUpperCase());
-    return idx >= 0 ? idx : 0;
-  }
-  isAtLeast(required: string): boolean {
-    return this.roleLevel(this.user?.role) >= this.roleLevel(required);
-  }
-
-  private mainFamily(family: string): string {
-    const f = String(family || '').trim();
-    if (f.endsWith(' أ')) return f.slice(0, -2).trim();
-    if (f.endsWith(' ب')) return f.slice(0, -2).trim();
-    return f;
-  }
-
-  // ====== Dashboard computed labels you already show ======
-  get currentFamilyLabel(): string {
-    const fam = String(this.user?.deaconFamily || '').trim();
-    if (!fam || fam.toUpperCase() === 'SYSTEM') return '—';
-    return fam;
-  }
-
-  get showFamilyMeetingCard(): boolean {
-    return true;
-  }
-
-  get khorsCards(): { label: string; count: number }[] {
-    const out: { label: string; count: number }[] = [];
-    if (this.stats.MARMARKOS_KHORS > 0) out.push({ label: 'مارمرقس', count: this.stats.MARMARKOS_KHORS });
-    if (this.stats.ATHANASIUS_KHORS > 0) out.push({ label: 'اثناسيوس', count: this.stats.ATHANASIUS_KHORS });
-    return out;
-  }
-
-  get showAnyKhorsCards(): boolean {
-    return this.khorsCards.length > 0;
-  }
-
-  get hasRealFamily(): boolean {
-    const family = String(this.user?.deaconFamily || '').trim();
-    if (!family) return false;
-    if (family.toUpperCase() === 'SYSTEM') return false;
-    return true;
-  }
-
-  // ====== Events + Announcements state ======
   monthCursor: Date = new Date();
-  families: string[] = [];
-  familyDropdown: { label: string; value: string }[] = [];
+  events: any[] = [];
+  announcements: any[] = [];
 
-  // ✅ NEW: scope واحد فوق الجدولين
-  scopeFamily: string = '';
-  scopeLocked: boolean = true;
-
-  events: EventItem[] = [];
-  announcements: AnnouncementItem[] = [];
-
-  // dialogs
   showEventDialog = false;
   showJoinDialog = false;
   showParticipantsDialog = false;
-
   showAnnDialog = false;
   showAnnDetailsDialog = false;
 
-  // forms
+  selectedJoinEvent: any = null;
+  selectedAnn: any = null;
+  participantsGroups: Array<{ family: string; members: any[] }> = [];
+
   eventForm: any = {
-    id: null,
     title: '',
     description: '',
-    eventAt: null as Date | null,
-    publishAt: null as Date | null,
-    targetFamily: ''
+    eventAt: null,
+    publishAt: null,
+    targetFamily: 'ALL'
   };
 
   annForm: any = {
-    id: null,
     title: '',
     description: '',
-    targetFamily: ''
+    targetFamily: 'ALL'
   };
 
-  selectedJoinEvent: EventItem | null = null;
-  participantsGroups: ParticipantsGroup[] = [];
+  stats: {
+  FRIDAY_LITURGY: number;
+  TASBEEHA: number;
+  FAMILY_MEETING: number;
+  MARMARKOS_KHORS: number;
+  ATHANASIUS_KHORS: number;
+} = {
+  FRIDAY_LITURGY: 0,
+  TASBEEHA: 0,
+  FAMILY_MEETING: 0,
+  MARMARKOS_KHORS: 0,
+  ATHANASIUS_KHORS: 0
+};
 
-  selectedAnn: AnnouncementItem | null = null;
+private arKhorsName(khors: any): string {
+  const k = String(khors || '').trim().toUpperCase();
+  if (k === 'MARMARKOS') return 'خورس مارمرقس';
+  if (k === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
+  return '';
+}
 
-  // ====== Date helpers ======
-  private pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
+private arYearLabel(year?: number): string {
+  const y = Number(year || 0);
+  if (!y) return '';
+  if (y === 1) return 'سنه اوله';
+  if (y === 2) return 'سنه تانيه';
+  if (y === 3) return 'سنه تالته';
+  if (y === 4) return 'سنه رابعه';
+  if (y === 5) return 'سنه خامسه';
+  return `سنه ${y}`;
+}
 
-  private toLocalIso(dt: Date): string {
-    const y = dt.getFullYear();
-    const m = this.pad(dt.getMonth() + 1);
-    const d = this.pad(dt.getDate());
-    const hh = this.pad(dt.getHours());
-    const mm = this.pad(dt.getMinutes());
-    const ss = this.pad(dt.getSeconds());
-    return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
+private servedKhorsLabel(): string {
+  const k = String(this.user?.khors || '').trim().toUpperCase();
+  const base = this.arKhorsName(k);
+  if (!base) return '';
+
+  if (k === 'ATHANASIUS') return base; 
+
+  const year = this.arYearLabel(this.user?.khorsYear);
+  return year ? `${base} (${year})` : base;
+}
+
+private attendKhorsLabel(): string {
+  const k = String(this.user?.attendKhors || '').trim().toUpperCase();
+  const base = this.arKhorsName(k);
+  return base || '';
+}
+
+get isKhorsOnlyServant(): boolean {
+  const role = String(this.user?.role || '').trim().toUpperCase();
+  const scope = String(this.user?.servingScope || '').trim().toUpperCase();
+  const family = String(this.user?.deaconFamily || '').trim().toUpperCase();
+
+  if (role === 'AMIN_KHEDMA') return true;
+  if (scope === 'KHORS_ONLY') return true;
+
+  if (family === 'SYSTEM') return true;
+
+  return false;
+}
+
+get currentFamilyLabel(): string {
+  const family = String(this.user?.deaconFamily || '').trim();
+  const served = this.servedKhorsLabel();
+  const attend = this.attendKhorsLabel();
+
+  const labels: string[] = [];
+
+  if (!this.isKhorsOnlyServant && family && family.toUpperCase() !== 'SYSTEM') {
+    labels.push(family);
   }
 
-  private monthKey(d: Date): string {
-    const y = d.getFullYear();
-    const m = this.pad(d.getMonth() + 1);
-    return `${y}-${m}`;
+  if (served) labels.push(served);
+
+  if (attend && !labels.some(x => x.includes(attend))) {
+    labels.push(attend);
   }
 
-  private daysBetween(from: Date, to: Date): number {
-    const ms = to.getTime() - from.getTime();
-    return Math.floor(ms / (1000 * 60 * 60 * 24));
+  return labels.join(' + ');
+}
+
+get showFamilyMeetingCard(): boolean {
+  const fam = String(this.user?.deaconFamily || '').trim();
+  return !!fam && fam.toUpperCase() !== 'SYSTEM';
+}
+
+get khorsCards(): Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number }> {
+  const out: Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number }> = [];
+  const year = this.arYearLabel(this.user?.khorsYear);
+
+  const servedK = String(this.user?.khors || '').trim().toUpperCase();
+  const attendK = String(this.user?.attendKhors || '').trim().toUpperCase();
+
+  const add = (code: 'MARMARKOS' | 'ATHANASIUS', withYear: boolean) => {
+    const name = this.arKhorsName(code);
+    const label =
+  withYear && year && code !== 'ATHANASIUS'
+    ? `${name} (${year})`
+    : name;
+
+    const count =
+      code === 'MARMARKOS'
+        ? (this.stats.MARMARKOS_KHORS || 0)
+        : (this.stats.ATHANASIUS_KHORS || 0);
+
+    if (!out.some(x => x.code === code)) out.push({ code, label, count });
+  };
+
+  if (servedK === 'MARMARKOS') add('MARMARKOS', true);
+  if (servedK === 'ATHANASIUS') add('ATHANASIUS', true);
+  if (servedK === 'BOTH') {
+    add('MARMARKOS', true);
+    add('ATHANASIUS', true);
   }
 
-  // ====== Init ======
+  if (attendK === 'MARMARKOS') add('MARMARKOS', false);
+  if (attendK === 'ATHANASIUS') add('ATHANASIUS', false);
+
+  return out;
+}
+
+get showAnyKhorsCards(): boolean {
+  return this.khorsCards.length > 0;
+}
+
+get hasRealFamily(): boolean {
+  const family = String(this.user?.deaconFamily || '').trim();
+  if (!family) return false;
+  if (family.toUpperCase() === 'SYSTEM') return false;
+  return true;
+}
+
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     this.loadUserData();
     this.loadMyStats();
+    this.loadFamilyDropdown();
   }
 
   loadUserData(): void {
@@ -197,365 +221,304 @@ export class DashBoard implements OnInit {
           return;
         }
         this.user = data;
+        this.syncScopeTarget();
 
-        // بعد ما المستخدم يتحمّل: حمّل الأسر + events + announcements
-        this.initBoards();
+        // بعد ما نعرف المستخدم والأسرة، نحمّل جدول الشهر
+        this.loadMonthBoards();
       },
       error: () => this.router.navigate(['/login'])
     });
+  }
+
+  
+  private toYmd(d: any): string | null {
+    if (!d) return null;
+    const dt = (d instanceof Date) ? d : new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+private monthParam(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`; 
+}
+
+  private loadMonthBoards(): void {
+    const month = this.monthParam(this.monthCursor);
+    const family = this.scopeFamily && this.scopeFamily !== 'ALL' ? this.scopeFamily : '';
+
+    this.eventsService.list(month, family).subscribe({
+      next: (rows) => (this.events = rows || []),
+      error: () => {
+        this.eventsService.list('', '').subscribe({
+          next: (rows) => {
+            const monthPrefix = `${month}-`;
+            const scoped = (rows || []).filter((e: any) => {
+              const evDate = String(e?.eventAt || '');
+              const inMonth = evDate.startsWith(monthPrefix) || evDate.startsWith(month);
+              const inFamily =
+                this.scopeFamily === 'ALL' ||
+                String(e?.targetFamily || '').toUpperCase() === 'ALL' ||
+                String(e?.targetFamily || '').trim() === String(this.scopeFamily || '').trim();
+              return inMonth && inFamily;
+            });
+            this.events = scoped;
+          },
+          error: () => {
+            this.events = [];
+            this.messageService.add({
+              severity: 'error',
+              summary: 'خطأ',
+              detail: 'حصل خطأ أثناء تحميل جدول الشهر.'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  private loadFamilyDropdown(): void {
+    this.familyService.families().subscribe({
+      next: (families) => {
+        const opts = (families || [])
+          .filter(x => !!x)
+          .map(x => ({ label: x, value: x }));
+        this.familyDropdown = [{ label: 'كل الأسر (الجميع)', value: 'ALL' }, ...opts];
+      },
+      error: () => {
+        this.familyDropdown = [{ label: 'كل الأسر (الجميع)', value: 'ALL' }];
+      }
+    });
+  }
+
+  private syncScopeTarget(): void {
+    if (this.scopeFamily !== 'ALL') return;
+    const family = String(this.user?.deaconFamily || '').trim();
+    const defaultFamily = family && family.toUpperCase() !== 'SYSTEM' ? family : 'ALL';
+    this.eventForm.targetFamily = defaultFamily;
+    this.annForm.targetFamily = defaultFamily;
   }
 
   loadMyStats(): void {
     this.attendanceService.getMyStats().subscribe({
       next: (data) => {
         this.stats = {
-          ...this.stats,
-          FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
-          TASBEEHA: data?.TASBEEHA ?? 0,
-          FAMILY_MEETING: data?.FAMILY_MEETING ?? 0,
-          MARMARKOS_KHORS: data?.MARMARKOS_KHORS ?? 0,
-          ATHANASIUS_KHORS: data?.ATHANASIUS_KHORS ?? 0
-        };
-      },
-      error: () => {}
-    });
-  }
-
-  // ====== Load families + content ======
-  initBoards(): void {
-    // ✅ اسمح لـ AMIN_KHEDMA/DEVELOPER يشتغلوا حتى لو deaconFamily مخفية/فاضية
-    if (!this.hasRealFamily && !this.isAtLeast('AMIN_KHEDMA')) return;
-
-    this.familyService.families().subscribe({
-      next: (list) => {
-        this.families = list || [];
-
-        const myBase = this.mainFamily(this.user?.deaconFamily || '');
-
-        // ✅ أمين خدمة/ديفيلوبر: يقدر يختار ALL أو أسرة
-        if (this.isAtLeast('AMIN_KHEDMA')) {
-          this.scopeLocked = false;
-          this.familyDropdown = [
-            { label: 'كل الأسر', value: 'ALL' },
-            ...this.families.map(f => ({ label: f, value: f }))
-          ];
-          this.scopeFamily = 'ALL';
-        } else {
-          // ✅ باقي الأدوار: scope ثابت على أسرته فقط
-          this.scopeLocked = true;
-          this.familyDropdown = myBase ? [{ label: myBase, value: myBase }] : [];
-          this.scopeFamily = myBase || '';
-        }
-
-        // default target family in forms (هيبقى نفس scope)
-        this.eventForm.targetFamily = this.scopeFamily || '';
-        this.annForm.targetFamily = this.scopeFamily || '';
-
-        this.reloadEvents();
-        this.reloadAnnouncements();
+  ...this.stats,
+  FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
+  TASBEEHA: data?.TASBEEHA ?? 0,
+  FAMILY_MEETING: data?.FAMILY_MEETING ?? 0,
+  MARMARKOS_KHORS: data?.MARMARKOS_KHORS ?? 0,
+  ATHANASIUS_KHORS: data?.ATHANASIUS_KHORS ?? 0
+};
       },
       error: () => {
-        this.reloadEvents();
-        this.reloadAnnouncements();
       }
     });
   }
 
-  // ✅ scope change (dropdown اللي فوق الجدولين)
+  isAtLeast(role: 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'ADMIN'): boolean {
+    const current = String(this.user?.role || '').trim().toUpperCase();
+    const currentRank = this.roleRank[current] ?? 0;
+    return currentRank >= (this.roleRank[role] ?? 0);
+  }
+
   onScopeChange(): void {
-    // خلي الفورم دايمًا على نفس scope (DropList واحدة)
-    this.eventForm.targetFamily = this.scopeFamily || '';
-    this.annForm.targetFamily = this.scopeFamily || '';
+    const target = this.scopeFamily || 'ALL';
+    this.eventForm.targetFamily = target;
+    this.annForm.targetFamily = target;
 
-    this.reloadEvents();
-    this.reloadAnnouncements();
+    this.loadMonthBoards();
   }
 
-  onMonthChange(dir: number): void {
-    const d = new Date(this.monthCursor);
-    d.setMonth(d.getMonth() + dir);
-    this.monthCursor = d;
-    this.reloadEvents();
+  onMonthChange(offset: number): void {
+    const next = new Date(this.monthCursor);
+    next.setMonth(next.getMonth() + Number(offset || 0));
+    this.monthCursor = next;
+
+    this.loadMonthBoards();
   }
 
-  reloadEvents(): void {
-    const month = this.monthKey(this.monthCursor);
-
-    // ✅ فلترة الشهر: للأدوار العالية نفلتر بالـ scope، لغير كده نخليها undefined والباك يفلتر حسب صلاحياته
-    const family = this.isAtLeast('AMIN_KHEDMA') ? (this.scopeFamily || undefined) : undefined;
-
-    this.eventsService.list(month, family).subscribe({
-      next: (list) => {
-        this.events = list || [];
-        this.firePendingAlarms();
-      },
-      error: () => {
-        this.events = [];
-      }
-    });
-  }
-
-  private firePendingAlarms(): void {
-    const now = new Date();
-    const pending = this.events.filter(e => e.status === 'PENDING' && e.canPublish);
-
-    for (const e of pending) {
-      const ev = new Date(e.eventAt);
-      const days = this.daysBetween(now, ev);
-
-      if (days <= 7 && days > 4) {
-        this.messageService.add({
-          severity: 'warn',
-          summary: 'تنبيه نشر',
-          detail: `الإيفنت "${e.title}" فاضله ${days} أيام. لو ما اتنشرش قبل 4 أيام هيتم نشره تلقائي.`,
-          life: 5000
-        });
-      }
-    }
-  }
-
-  reloadAnnouncements(): void {
-    const family = this.isAtLeast('AMIN_KHEDMA') ? (this.scopeFamily || undefined) : undefined;
-
-    this.announcementsService.list(family).subscribe({
-      next: (list) => this.announcements = list || [],
-      error: () => this.announcements = []
-    });
-  }
-
-  // ====== Events CRUD ======
   openCreateEvent(): void {
     this.eventForm = {
-      id: null,
       title: '',
       description: '',
       eventAt: null,
       publishAt: null,
-      // ✅ DropList واحدة: targetFamily = scopeFamily
-      targetFamily: this.scopeFamily || ''
+      targetFamily: this.scopeFamily || this.eventForm.targetFamily || 'ALL'
     };
     this.showEventDialog = true;
   }
 
-  openEditEvent(e: EventItem): void {
+  openEditEvent(e: any): void {
     this.eventForm = {
-      id: e.id,
-      title: e.title,
-      description: e.description || '',
-      eventAt: e.eventAt ? new Date(e.eventAt) : null,
-      publishAt: e.publishAt ? new Date(e.publishAt) : null,
-      // readonly في الـ UI
-      targetFamily: e.targetFamily
+      id: e?.id,
+      title: e?.title || '',
+      description: e?.description || '',
+      eventAt: e?.eventAt ? new Date(e.eventAt) : null,
+      publishAt: e?.publishAt ? new Date(e.publishAt) : null,
+      targetFamily: e?.targetFamily || this.scopeFamily || 'ALL'
     };
     this.showEventDialog = true;
   }
 
   saveEvent(): void {
-    // ✅ تأكد targetFamily موجود (جاية من scope أو من event نفسه في edit)
-    if (!this.eventForm.targetFamily) {
-      this.eventForm.targetFamily = this.scopeFamily || '';
-    }
+    const payload = {
+      title: String(this.eventForm?.title || '').trim(),
+      description: this.eventForm?.description || null,
+      eventAt: this.toYmd(this.eventForm?.eventAt),
+      publishAt: this.toYmd(this.eventForm?.publishAt),
+      targetFamily: String(this.eventForm?.targetFamily || this.scopeFamily || 'ALL').trim()
+    };
 
-    if (!this.eventForm.title || !this.eventForm.eventAt || !this.eventForm.targetFamily) {
-      this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'لازم عنوان + وقت الإيفنت + الأسرة', life: 3000 });
+    if (!payload.title) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'اكتب عنوان الموعد.' });
+      return;
+    }
+    if (!payload.eventAt) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار تاريخ الموعد.' });
       return;
     }
 
-    const payload = {
-      title: this.eventForm.title,
-      description: this.eventForm.description,
-      eventAt: this.toLocalIso(this.eventForm.eventAt),
-      targetFamily: this.eventForm.targetFamily,
-      publishAt: this.eventForm.publishAt ? this.toLocalIso(this.eventForm.publishAt) : null
-    };
+    const id = this.eventForm?.id;
+    const req$ = id ? this.eventsService.update(id, payload) : this.eventsService.create(payload);
 
-    const obs = this.eventForm.id
-      ? this.eventsService.update(this.eventForm.id, payload)
-      : this.eventsService.create(payload);
-
-    obs.subscribe({
+    req$.subscribe({
       next: () => {
         this.showEventDialog = false;
-
-        // ✅ اقفز لشهر الموعد اللي اتعمل (عشان يظهر فورًا)
-        if (this.eventForm?.eventAt) {
-          this.monthCursor = new Date(this.eventForm.eventAt);
-        }
-
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ', life: 2000 });
-
-        // ✅ reload
-        this.reloadEvents();
+        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'اتحفظ الموعد.' });
+        this.loadMonthBoards();
       },
       error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل الحفظ', life: 4000 });
+        this.showEventDialog = false;
+        const msg = err?.error?.message || 'حصل خطأ أثناء الحفظ.';
+        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: msg });
       }
     });
   }
 
-  publishEvent(e: EventItem): void {
-    this.eventsService.publish(e.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم النشر', life: 2000 });
-        this.reloadEvents();
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل النشر', life: 3000 })
+  formatDateTime(value: any): string {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('ar-EG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   }
 
-  deleteEvent(e: EventItem): void {
-    this.eventsService.delete(e.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم المسح', life: 2000 });
-        this.reloadEvents();
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل المسح', life: 3000 })
-    });
-  }
-
-  // ====== Join/Unjoin ======
-  openJoin(e: EventItem): void {
+  openJoin(e: any): void {
     this.selectedJoinEvent = e;
     this.showJoinDialog = true;
   }
 
   confirmJoin(): void {
-    if (!this.selectedJoinEvent) return;
-
-    this.eventsService.join(this.selectedJoinEvent.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الانضمام', life: 2000 });
-        this.showJoinDialog = false;
-        this.reloadEvents();
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل الانضمام', life: 3000 })
+    this.showJoinDialog = false;
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Join action is not connected yet.'
     });
   }
 
-  unjoin(e: EventItem): void {
-    this.eventsService.unjoin(e.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'info', summary: 'تم', detail: 'تم إلغاء الانضمام', life: 2000 });
-        this.reloadEvents();
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل إلغاء الانضمام', life: 3000 })
+  unjoin(_: any): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Unjoin action is not connected yet.'
     });
   }
 
-  // ====== Participants ======
-  openParticipants(e: EventItem): void {
-    this.eventsService.participants(e.id).subscribe({
-      next: (groups) => {
-        this.participantsGroups = groups || [];
-        this.showParticipantsDialog = true;
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل التفاصيل', life: 3000 })
+  publishEvent(_: any): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Publish event action is not connected yet.'
     });
   }
 
-  // ====== Announcements CRUD ======
+  deleteEvent(_: any): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Delete event action is not connected yet.'
+    });
+  }
+
+  openParticipants(_: any): void {
+    this.participantsGroups = [];
+    this.showParticipantsDialog = true;
+  }
+
   openCreateAnnouncement(): void {
     this.annForm = {
-      id: null,
       title: '',
       description: '',
-      // ✅ DropList واحدة: targetFamily = scopeFamily
-      targetFamily: this.scopeFamily || ''
+      targetFamily: this.scopeFamily || this.annForm.targetFamily || 'ALL'
     };
     this.showAnnDialog = true;
   }
 
-  openEditAnnouncement(a: AnnouncementItem): void {
+  openEditAnnouncement(a: any): void {
     this.annForm = {
-      id: a.id,
-      title: a.title,
-      description: a.description || '',
-      // readonly في الـ UI
-      targetFamily: a.targetFamily
+      id: a?.id,
+      title: a?.title || '',
+      description: a?.description || '',
+      targetFamily: a?.targetFamily || this.scopeFamily || 'ALL'
     };
     this.showAnnDialog = true;
   }
 
   saveAnnouncement(): void {
-    if (!this.annForm.targetFamily) {
-      this.annForm.targetFamily = this.scopeFamily || '';
-    }
-
-    if (!this.annForm.title || !this.annForm.targetFamily) {
-      this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'لازم عنوان + الأسرة', life: 3000 });
-      return;
-    }
-
-    const payload = {
-      title: this.annForm.title,
-      description: this.annForm.description,
-      targetFamily: this.annForm.targetFamily
-    };
-
-    const obs = this.annForm.id
-      ? this.announcementsService.update(this.annForm.id, payload)
-      : this.announcementsService.create(payload);
-
-    obs.subscribe({
-      next: () => {
-        this.showAnnDialog = false;
-
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ', life: 2000 });
-
-        this.reloadAnnouncements();
-      },
-      error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل الحفظ', life: 4000 });
-      }
+    this.showAnnDialog = false;
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Announcement save wiring is not connected yet.'
     });
   }
 
-  deleteAnnouncement(a: AnnouncementItem): void {
-    this.announcementsService.delete(a.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم المسح', life: 2000 });
-        this.reloadAnnouncements();
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل المسح', life: 3000 })
-    });
-  }
-
-  publishAnnouncement(a: AnnouncementItem): void {
-    this.announcementsService.publish(a.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم النشر', life: 2000 });
-        this.reloadAnnouncements();
-      },
-      error: () => this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل النشر', life: 3000 })
-    });
-  }
-
-  openAnnDetails(a: AnnouncementItem): void {
+  openAnnDetails(a: any): void {
     this.selectedAnn = a;
     this.showAnnDetailsDialog = true;
   }
 
-  // ====== UI helpers ======
-  formatDateTime(s: string): string {
-    const d = new Date(s);
-    return d.toLocaleString('ar-EG');
+  publishAnnouncement(_: any): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Publish announcement action is not connected yet.'
+    });
   }
 
-  daysAgo(dateStr: string): string {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const days = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    if (days <= 0) return 'اليوم';
-    if (days === 1) return 'منذ يوم';
-    return `منذ ${days} أيام`;
+  deleteAnnouncement(_: any): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Soon',
+      detail: 'Delete announcement action is not connected yet.'
+    });
   }
 
-  annDaysLabel(a: AnnouncementItem): string {
-    const ref = a.publishedAt || a.createdAt;
-    return this.daysAgo(ref);
+  daysAgo(value: any): string {
+    const created = new Date(value);
+    if (Number.isNaN(created.getTime())) return '';
+    const diff = Math.floor((Date.now() - created.getTime()) / 86400000);
+    if (diff <= 0) return 'اليوم';
+    if (diff === 1) return 'منذ يوم';
+    if (diff === 2) return 'منذ يومين';
+    if (diff < 11) return `منذ ${diff} أيام`;
+    return `منذ ${diff} يوم`;
   }
 
-  // ====== Logout (كما هو عندك) ======
+  annDaysLabel(a: any): string {
+    return this.daysAgo(a?.createdAt);
+  }
+
+
   logout(): void {
     this.authService.logout().subscribe({
       next: () => {
@@ -570,7 +533,8 @@ export class DashBoard implements OnInit {
           this.router.navigate(['/login']);
         }, 2000);
       },
-      error: () => {
+      error: (err) => {
+        console.error('Logout failed:', err);
         this.messageService.add({
           severity: 'error',
           summary: 'Logout Failed',

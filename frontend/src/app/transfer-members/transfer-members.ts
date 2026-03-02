@@ -120,7 +120,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
       this.targetRole = 'KHADIM';
       return;
     }
-    
+
     if (this.isKhadim()) {
   this.mode = 'MAKHDOM';
   this.selectedFamilyView = this.servantFamilies[0] || '';
@@ -129,7 +129,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
 }
 
     this.mode = 'MAKHDOM';
-    this.selectedFamilyView = ''; 
+    this.selectedFamilyView = '';
     this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
   }
 
@@ -182,7 +182,12 @@ private levelLabel(n?: number): string {
 }
 
 displayFamily(m: Member): string {
-  const kh = this.khorsLabel((m as any).khors);
+  const khCode = String((m as any).khors || '').toUpperCase();
+  const kh = this.khorsLabel(khCode);
+
+  // Athanasius choir has no "year" label.
+  if (khCode === 'ATHANASIUS' && kh) return kh;
+
   const lvl = this.levelLabel((m as any).khorsYear);
   if (kh) return lvl ? `${kh} (${lvl})` : kh;
   return (m.deaconFamily || '').trim();

@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -19,12 +19,12 @@ public class EventUpsertRequest {
     private String description;
 
     @NotNull
-    private LocalDateTime eventAt;
+    private LocalDate eventAt;
 
     // "ALL" OR family variants
     @NotBlank
     private String targetFamily;
 
     // optional
-    private LocalDateTime publishAt;
+    private LocalDate publishAt;
 }

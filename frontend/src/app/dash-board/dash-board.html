@@ -38,7 +38,6 @@
 
   <section class="panels">
 
-    <!-- ✅ تظهر فقط لأمين الخدمة/الديفيلوبر -->
     <div class="boards-scope" *ngIf="isAtLeast('AMIN_KHEDMA')">
       <div class="boards-scope__label"><strong>عرض / نشر على:</strong></div>
 
@@ -51,17 +50,12 @@
         (onChange)="onScopeChange()"
         class="boards-scope__select"
       ></p-select>
-
-      <!-- ✅ شيلنا الكلام اللي جنبها نهائيًا -->
     </div>
 
-    <!-- ================= جدول الشهر ================= -->
     <p-panel header="جدول الشهر" class="content-panel">
 
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
-        <p-button icon="pi pi-angle-right" (onClick)="onMonthChange(-1)" styleClass="p-button-text"></p-button>
-        <strong>{{ monthCursor | date:'MMMM yyyy':'':'ar-EG' }}</strong>
-        <p-button icon="pi pi-angle-left" (onClick)="onMonthChange(1)" styleClass="p-button-text"></p-button>
+        <strong>{{ monthCursor | date:'MMMM yyyy' }}</strong>
 
         <span style="flex:1"></span>
 
@@ -207,10 +201,9 @@
       <p-datepicker
         [(ngModel)]="eventForm.eventAt"
         [showIcon]="true"
-        [showTime]="true"
-        hourFormat="24"
+        [showTime]="false"
         dateFormat="yy-mm-dd"
-        placeholder="اختار اليوم والوقت"
+        placeholder="اختار اليوم"
         [showButtonBar]="true"
         appendTo="body"
       ></p-datepicker>
@@ -219,10 +212,9 @@
       <p-datepicker
         [(ngModel)]="eventForm.publishAt"
         [showIcon]="true"
-        [showTime]="true"
-        hourFormat="24"
+        [showTime]="false"
         dateFormat="yy-mm-dd"
-        placeholder="اختياري: انشر تلقائي"
+        placeholder="اختياري: تاريخ نشر تلقائي"
         [showButtonBar]="true"
         appendTo="body"
       ></p-datepicker>
