@@ -66,7 +66,7 @@ private List<String> servingBasesOf(User u) {
         if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
             String k = u.getKhors() == null ? "" : u.getKhors().trim().toUpperCase();
             if ("MARMARKOS".equals(k) || "BOTH".equals(k)) set.add("خورس مارمرقس");
-            if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) set.add("خورس الانبا اثناسيوس");
+            if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) set.add("خورس البابا اثناسيوس");
         }
     }
     return new ArrayList<>(set);
@@ -75,14 +75,14 @@ private List<String> servingBasesOf(User u) {
     private static boolean isChoirBucket(String base) {
         if (base == null) return false;
         String x = base.trim();
-        return x.equalsIgnoreCase("خورس مارمرقس") || x.equalsIgnoreCase("خورس الانبا اثناسيوس");
+        return x.equalsIgnoreCase("خورس مارمرقس") || x.equalsIgnoreCase("خورس البابا اثناسيوس") || x.equalsIgnoreCase("خورس الانبا اثناسيوس");
     }
 
     private static String choirCodeFromBucket(String base) {
         if (base == null) return null;
         String x = base.trim();
         if (x.equalsIgnoreCase("خورس مارمرقس")) return "MARMARKOS";
-        if (x.equalsIgnoreCase("خورس الانبا اثناسيوس")) return "ATHANASIUS";
+        if (x.equalsIgnoreCase("خورس البابا اثناسيوس")) return "ATHANASIUS";
         return null;
     }
 
@@ -122,7 +122,7 @@ public ResponseEntity<?> families(
     }
 
     set.add("خورس مارمرقس");
-    set.add("خورس الانبا اثناسيوس");
+    set.add("خورس البابا اثناسيوس");
 
     List<String> out = new ArrayList<>(set);
     out.sort(String::compareTo);

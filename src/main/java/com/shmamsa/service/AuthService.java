@@ -210,7 +210,7 @@ if ("KHORS_ONLY".equals(scope)) {
     if ("MARMARKOS".equalsIgnoreCase(kTmp)) {
         user.setDeaconFamily("خورس مارمرقس");
     } else if ("ATHANASIUS".equalsIgnoreCase(kTmp)) {
-        user.setDeaconFamily("خورس الانبا اثناسيوس");
+        user.setDeaconFamily("خورس البابا اثناسيوس");
     } else {
         // BOTH: fallback label
         user.setDeaconFamily("خورس");
@@ -249,13 +249,19 @@ if ("KHORS_ONLY".equals(scope)) {
         }
 
         // ✅ NEW: attendKhors rules (exactly as you asked)
+        // NOTE: if the servant is NOT serving in a choir (FAMILY_ONLY) and chooses to attend a choir,
+        // we do NOT enroll مباشرة. We create a pending join request (same flow as makhdom).
+        String requestedAttendKhors = "NONE";
+
         if ("FAMILY_ONLY".equals(scope)) {
             // user must choose attendKhors (can be NONE)
             String attend = normalizeAttendKhors(request.getAttendKhors());
             if (attend.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ATTEND_KHORS_REQUIRED", "Attend khors is required");
             }
-            user.setAttendKhors(attend);
+
+            requestedAttendKhors = attend;
+            user.setAttendKhors("NONE"); // pending until approved
         } else {
             // KHORS_ONLY or BOTH:
             // if serving in MARMARKOS -> attend ATHANASIUS by default
@@ -304,6 +310,10 @@ if ("KHORS_ONLY".equals(scope)) {
 
 
         userRepository.save(user);
+
+        // Create pending request if they selected attendKhors (MARMARKOS / ATHANASIUS)
+        khorsJoinRequestService.createForUserIfNeeded(user, requestedAttendKhors);
+
     }
 
 

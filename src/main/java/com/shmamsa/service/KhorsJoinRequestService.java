@@ -126,8 +126,19 @@ public class KhorsJoinRequestService {
             User target = userRepository.findById(r.getUser().getId())
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
 
-            target.setKhors(reqKhors);
-            target.setKhorsYear(1);
+            // If the user is a servant (KHADIM) serving families فقط and asked to "attend" a choir,
+            // we approve by setting attendKhors.
+            String targetRole = String.valueOf(target.getRole()).toUpperCase(Locale.ROOT);
+            String scope = (target.getServingScope() == null) ? "" : target.getServingScope().trim().toUpperCase(Locale.ROOT);
+
+            if ("KHADIM".equals(targetRole) && "FAMILY_ONLY".equals(scope)) {
+                target.setAttendKhors(reqKhors);
+            } else {
+                // default: join as choir member
+                target.setKhors(reqKhors);
+                target.setKhorsYear(1);
+            }
+
             userRepository.save(target);
         } else {
             r.setStatus(KhorsJoinRequestStatus.REJECTED);

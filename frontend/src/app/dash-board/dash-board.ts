@@ -48,7 +48,7 @@ export class DashBoard implements OnInit {
 private arKhorsName(khors: any): string {
   const k = String(khors || '').trim().toUpperCase();
   if (k === 'MARMARKOS') return 'خورس مارمرقس';
-  if (k === 'ATHANASIUS') return 'خورس الانبا اثناسيوس';
+  if (k === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
   return '';
 }
 

@@ -78,7 +78,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   isChoirSelected(): boolean {
     const x = String(this.selectedFamily || '').trim();
-    return x === 'خورس مارمرقس' || x === 'خورس الانبا اثناسيوس';
+    return x === 'خورس مارمرقس' || x === 'خورس البابا اثناسيوس';
   }
 
   ngOnInit() {
@@ -100,7 +100,7 @@ get isMarmarkosChoir(): boolean {
 }
 
 get isAthanasiusChoir(): boolean {
-  return this.selectedFamilyName === 'خورس الانبا اثناسيوس';
+  return this.selectedFamilyName === 'خورس البابا اثناسيوس';
 }
 
 
@@ -300,7 +300,7 @@ openDetails(member: Member) {
     if (t === 'TASBEEHA') return 'تسبحة';
     if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
     if (t === 'MARMARKOS_KHORS') return 'خورس مارمرقس';
-    if (t === 'ATHANASIUS_KHORS') return 'خورس الانبا اثناسيوس';
+    if (t === 'ATHANASIUS_KHORS') return 'خورس البابا اثناسيوس';
     return 'اجتماع الأسرة';
   }
 
