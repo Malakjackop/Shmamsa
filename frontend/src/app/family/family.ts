@@ -83,7 +83,7 @@ export class FamilyComponent implements OnInit {
 
   isChoirSelected(): boolean {
     const x = String(this.selectedFamily || '').trim();
-    return x === 'خورس مارمرقس' || x === 'خورس البابا اثناسيوس';
+    return x === 'خورس مارمرقس' || x === 'خورس الانبا اثناسيوس';
   }
 
   profileFor: Member | null = null;
@@ -234,7 +234,7 @@ export class FamilyComponent implements OnInit {
     if (t === 'TASBEEHA') return 'تسبحة';
     if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
     if (t === 'MARMARKOS_KHORS') return 'خورس مارمرقس';
-    if (t === 'ATHANASIUS_KHORS') return 'خورس البابا اثناسيوس';
+    if (t === 'ATHANASIUS_KHORS') return 'خورس الانبا اثناسيوس';
     return 'اجتماع الأسرة';
   }
 

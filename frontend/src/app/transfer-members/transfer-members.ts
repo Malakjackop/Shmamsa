@@ -16,7 +16,6 @@ type Member = {
   familyMeeting: number;
   khors?: string;
   khorsLevel?: number;
-  attendKhors?: string;
 };
 
 type TransferMode = 'MAKHDOM' | 'SERVANT';
@@ -40,7 +39,6 @@ export class TransferMembersComponent implements OnInit {
 
   khors?: string;
   khorsLevel?: number;
-  attendKhors?: string;
 
   selecting = false;
   selectedIds = new Set<number>();
@@ -56,7 +54,7 @@ export class TransferMembersComponent implements OnInit {
   'اسره الانبا ابرام',
   'اسره اسطفانوس',
   'خورس مارمرقس',
-  'خورس البابا اثناسيوس'
+  'خورس الانبا اثناسيوس'
 ];
 
   makhdomFamilies: string[] = [
@@ -73,28 +71,13 @@ export class TransferMembersComponent implements OnInit {
   'اسره اسطفانوس ب'
 ];
 
-makhdomTransferTargets: { label: string; value: string }[] = [
-  { label: 'اسره السمائيين', value: 'اسره السمائيين' },
-  { label: 'اسره القديس ابانوب', value: 'اسره القديس ابانوب' },
-  { label: 'اسره القديس ديسقورس', value: 'اسره القديس ديسقورس' },
-  { label: 'اسره القديس سيدهم بشاي', value: 'اسره القديس سيدهم بشاي' },
-  { label: 'اسره القديس اسكلابيوس', value: 'اسره القديس اسكلابيوس' },
-  { label: 'اسره البابا كيرلس أ', value: 'اسره البابا كيرلس أ' },
-  { label: 'اسره البابا كيرلس ب', value: 'اسره البابا كيرلس ب' },
-  { label: 'اسره الانبا ابرام أ', value: 'اسره الانبا ابرام أ' },
-  { label: 'اسره الانبا ابرام ب', value: 'اسره الانبا ابرام ب' },
-  { label: 'اسره اسطفانوس أ', value: 'اسره اسطفانوس أ' },
-  { label: 'اسره اسطفانوس ب', value: 'اسره اسطفانوس ب' },
-  { label: 'طلب نقل لخورس مارمرقس', value: 'KHORS_REQUEST:MARMARKOS' }
-];
-
 marmarkosYearTargets: { label: string; value: string }[] = [
   { label: 'خورس مارمرقس (سنه اوله)', value: 'KHORS:MARMARKOS:YEAR:1' },
   { label: 'خورس مارمرقس (سنه تانيه)', value: 'KHORS:MARMARKOS:YEAR:2' },
   { label: 'خورس مارمرقس (سنه تالته)', value: 'KHORS:MARMARKOS:YEAR:3' },
   { label: 'خورس مارمرقس (سنه رابعه)', value: 'KHORS:MARMARKOS:YEAR:4' },
   { label: 'خورس مارمرقس (سنه خامسه)', value: 'KHORS:MARMARKOS:YEAR:5' },
-  { label: 'طلب نقل لخورس البابا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
+  { label: 'طلب نقل لخورس الانبا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
 ];
 
   mode: TransferMode = 'MAKHDOM';
@@ -163,22 +146,6 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   }
 }
 
-    // If a choir bucket is selected, show ALL members in that choir (servant + makhdom) and allow removal
-    if (this.isKhorsView()) {
-      const code = this.selectedKhorsCode();
-      this.familySvc.khorsMembers(code).subscribe({
-        next: (m) => {
-          this.members = (m as any) || [];
-          this.loading = false;
-        },
-        error: (err) => {
-          this.loading = false;
-          this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load members' });
-        }
-      });
-      return;
-    }
-
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
         let list = (m as any) || [];
@@ -200,7 +167,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   private khorsLabel(k?: string): string {
   const x = (k || '').toUpperCase();
   if (x === 'MARMARKOS') return 'خورس مارمرقس';
-  if (x === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
+  if (x === 'ATHANASIUS') return 'خورس الانبا اثناسيوس';
   return '';
 }
 
@@ -227,63 +194,12 @@ isMarmarkosView(): boolean {
   return (this.selectedFamilyView || '').trim() === 'خورس مارمرقس';
 }
 
-isAthanasiusView(): boolean {
-  return (this.selectedFamilyView || '').trim() === 'خورس البابا اثناسيوس';
-}
-
-
-isKhorsView(): boolean {
-  const x = (this.selectedFamilyView || '').trim();
-  return x === 'خورس مارمرقس' || x === 'خورس البابا اثناسيوس';
-}
-
-selectedKhorsCode(): string {
-  const x = (this.selectedFamilyView || '').trim();
-  if (x === 'خورس مارمرقس') return 'MARMARKOS';
-  if (x === 'خورس البابا اثناسيوس') return 'ATHANASIUS';
-  return '';
-}
-
-canDeleteFromKhors(): boolean {
-  return this.isAminKhedmaOrDev() && this.isKhorsView();
-}
-
-removeFromKhors(m: Member) {
-  const code = this.selectedKhorsCode();
-  if (!code) return;
-
-  this.confirm.confirm({
-    message: `تأكيد إزالة ${m.fullName} من الخورس؟`,
-    header: 'تأكيد',
-    icon: 'pi pi-exclamation-triangle',
-    accept: () => {
-      this.familySvc.removeFromKhors(m.id, code).subscribe({
-        next: () => {
-          this.message.add({ severity: 'success', summary: 'Done', detail: 'تمت الإزالة' });
-          this.loadMembers();
-        },
-        error: (err) => {
-          this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
-        }
-      });
-    }
-  });
-}
-
-
   onModeChange() {
     this.cancelSelecting();
 
     if (this.mode === 'MAKHDOM') {
       this.selectedFamilyView = this.selectedFamilyView || (this.servantFamilies[0] || '');
-      if (this.isMarmarkosView()) {
-        this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
-      } else {
-        const allowed = this.makhdomTransferTargets.map((x) => x.value);
-        if (!allowed.includes(this.targetFamily)) {
-          this.targetFamily = this.makhdomTransferTargets[0]?.value || '';
-        }
-      }
+      this.targetFamily = this.targetFamily || (this.makhdomFamilies[0] || '');
     } else {
       this.targetFamily = this.servantFamilies[0] || '';
       this.extraFamilies = [];
@@ -297,21 +213,11 @@ removeFromKhors(m: Member) {
     this.cancelSelecting();
     if (this.isMarmarkosView()) {
   this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
-} else {
-  const allowed = this.makhdomTransferTargets.map((x) => x.value);
-  if (!allowed.includes(this.targetFamily)) {
-    this.targetFamily = this.makhdomTransferTargets[0]?.value || '';
-  }
 }
     this.loadMembers();
   }
 
   startTransfer() {
-    if (this.isAthanasiusView()) {
-      this.message.add({ severity: 'info', summary: 'غير متاح', detail: 'لا يوجد نقل بعد خورس البابا اثناسيوس.' });
-      return;
-    }
-
     if (this.isMarmarkosView()) {
   this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
 }
@@ -330,11 +236,6 @@ removeFromKhors(m: Member) {
   }
 
   doTransfer() {
-    if (this.isAthanasiusView()) {
-      this.message.add({ severity: 'info', summary: 'غير متاح', detail: 'لا يوجد نقل بعد خورس البابا اثناسيوس.' });
-      return;
-    }
-
     if (!this.targetFamily) {
       this.message.add({ severity: 'warn', summary: 'Choose family', detail: 'Please choose the target family.' });
       return;
@@ -352,14 +253,10 @@ removeFromKhors(m: Member) {
 
     const ids = Array.from(this.selectedIds);
     const roleLabel = this.getRoleLabel(this.targetRole);
-    const isKhorsRequest = (this.targetFamily || '').startsWith('KHORS_REQUEST:');
-    const targetLabel = this.targetLabel(this.targetFamily);
 
-    const msg = isKhorsRequest
-      ? `إنشاء طلب نقل لعدد ${ids.length} عضو إلى "${targetLabel}"؟`
-      : (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
-      ? `Transfer ${ids.length} account(s) to "${targetLabel}" as "${roleLabel}"?`
-      : `Transfer ${ids.length} account(s) to "${targetLabel}"?`;
+    const msg = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
+      ? `Transfer ${ids.length} account(s) to "${this.targetFamily}" as "${roleLabel}"?`
+      : `Transfer ${ids.length} account(s) to "${this.targetFamily}"?`;
 
     this.confirm.confirm({
       header: 'Confirm transfer',
@@ -427,12 +324,5 @@ removeFromKhors(m: Member) {
     if (role === 'AMIN_KHEDMA') return 'امين خدمة';
     if (role === 'DEVELOPER' || role === 'DEV' || role.toLowerCase() === 'dev') return 'dev';
     return role;
-  }
-
-  targetLabel(v: string): string {
-    const x = String(v || '').trim();
-    if (x === 'KHORS_REQUEST:MARMARKOS') return 'خورس مارمرقس';
-    if (x === 'KHORS_REQUEST:ATHANASIUS') return 'خورس البابا اثناسيوس';
-    return x;
   }
 }

@@ -219,3 +219,27 @@ p-card, p-panel {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* خلي عنصر الفلترة صف كامل فوق الجريد */
+.boards-scope{
+  grid-column: 1 / -1;    /* دي أهم سطر */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.boards-scope__select{
+  min-width: 240px;
+}
+
+/* لو الشاشات صغيرة خليه ينزل تحت بعض */
+@media (max-width: 900px){
+  .boards-scope{
+    flex-wrap: wrap;
+  }
+  .boards-scope__select{
+    width: 100%;
+    min-width: unset;
+  }
+}

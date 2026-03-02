@@ -44,6 +44,12 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 // ✅ PrimeNG v19+ renamed Calendar -> DatePicker (new import path)
 import { DatePickerModule } from 'primeng/datepicker';
 
+import { DialogModule } from 'primeng/dialog';
+import { SelectModule } from 'primeng/select';
+import { TextareaModule } from 'primeng/textarea';
+import { TagModule } from 'primeng/tag';
+import { TableModule } from 'primeng/table';
+
 @NgModule({
   declarations: [
     App,
@@ -86,7 +92,12 @@ import { DatePickerModule } from 'primeng/datepicker';
     InputTextModule,
     InputIconModule,
     ConfirmDialogModule,
-    DatePickerModule
+    DatePickerModule,
+    DialogModule,
+    SelectModule,
+    TextareaModule,
+    TagModule,
+    TableModule
   ],
   providers: [
     MessageService,

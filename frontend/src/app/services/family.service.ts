@@ -59,16 +59,4 @@ export class FamilyService {
       { withCredentials: true }
     );
   }
-
-  // ===== Choir management =====
-  khorsMembers(khors: string): Observable<any[]> {
-    let params = new HttpParams().set('khors', khors || '');
-    return this.http.get<any[]>(`/api/khors/members`, { params, withCredentials: true });
-  }
-
-  removeFromKhors(id: number, khors: string): Observable<any> {
-    let params = new HttpParams().set('khors', khors || '');
-    return this.http.delete<any>(`/api/khors/members/${id}`, { params, withCredentials: true });
-  }
-
 }
