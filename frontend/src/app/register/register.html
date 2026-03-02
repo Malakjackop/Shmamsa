@@ -63,13 +63,14 @@
         <div class="input-row">
           <div class="input-group small">
            <select formControlName="deaconDegree" required (change)="markTouchedFromList('deaconDegree')">
-           <option value="" disabled>ما هي رتبة الشماس؟</option>
-           <option>ابصالتس</option>
-           <option>اغنسطس</option>
-           <option>ايبودياكون</option>
-           <option>دياكون</option>
-           <option>ارشي دياكون</option>
-         </select>
+  <option value="" disabled>ما هي رتبة الشماس؟</option>
+  <option *ngIf="!isServant">مش مرشوم</option>
+  <option *ngIf="!isServant">ابصالتس</option>
+  <option>اغنسطس</option>
+  <option>ايبودياكون</option>
+  <option>دياكون</option>
+  <option>ارشي دياكون</option>
+</select>
          <small class="error-text" *ngIf="shouldShowError('deaconDegree')">
             {{ errorText('deaconDegree','رتبة الشماس') }}
          </small>
@@ -78,7 +79,6 @@
 
 
         
-<!-- ✅ Deacon Family (Makhdom only) -->
 <div class="input-row" *ngIf="!isServant">
   <div class="input-group small">
     <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
