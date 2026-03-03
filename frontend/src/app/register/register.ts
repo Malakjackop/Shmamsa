@@ -190,9 +190,9 @@ onServingWhereChange() {
     attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
     attendCtrl?.disable({ emitEvent: false });
 
-  } else if (where === 'خورس الانبا اثناسيوس') {
+  } else if (where === 'خورس البابا اثناسيوس') {
     scopeCtrl?.setValue('KHORS_ONLY', { emitEvent: false });
-    famCtrl?.setValue('خورس الانبا اثناسيوس', { emitEvent: false });
+    famCtrl?.setValue('خورس البابا اثناسيوس', { emitEvent: false });
     khorsCtrl?.setValue('ATHANASIUS', { emitEvent: false });
 
     attendCtrl?.setValue('NONE', { emitEvent: false });

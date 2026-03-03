@@ -57,10 +57,6 @@ public class AdminController {
             return ResponseEntity.status(403).body(Map.of("error", "Not allowed to assign this role"));
         }
 
-        // Developer-only for AMIN roles
-        if (!"DEVELOPER".equals(actorRole) && ( "AMIN_OSRA".equals(newRole) || "AMIN_KHEDMA".equals(newRole) )) {
-            return ResponseEntity.status(403).body(Map.of("error", "Only DEVELOPER can assign this role"));
-        }
 
         target.setRole(newRole);
         if ("AMIN_KHEDMA".equalsIgnoreCase(newRole)) {
@@ -81,11 +77,7 @@ public class AdminController {
         List<String> allowed = RoleUtil.ORDERED.stream()
                 .filter(r -> {
                     if ("DEVELOPER".equals(actorRole)) return true;
-                    if ("AMIN_KHEDMA".equals(actorRole)) {
-                        if ("DEVELOPER".equals(r)) return false;
-                        if ("AMIN_OSRA".equals(r) || "AMIN_KHEDMA".equals(r)) return false;
-                        return true;
-                    }
+                    if ("AMIN_KHEDMA".equals(actorRole)) return !"DEVELOPER".equals(r);
                     return false;
                 })
                 .toList();

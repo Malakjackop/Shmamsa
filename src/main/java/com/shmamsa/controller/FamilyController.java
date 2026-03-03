@@ -47,6 +47,34 @@ public class FamilyController {
 
         return upper;
     }
+
+    private static List<String> expandRoles(List<String> canonical) {
+        Set<String> out = new LinkedHashSet<>();
+        for (String r : canonical) {
+            if (r == null) continue;
+            String x = r.trim();
+            out.add(x);
+            out.add("ROLE_" + x);
+
+            if ("MAKHDOM".equals(x)) out.add("مخدوم");
+            if ("KHADIM".equals(x)) out.add("خادم");
+
+            if ("AMIN_OSRA".equals(x)) {
+                out.add("امين اسرة");
+                out.add("أمين أسرة");
+                out.add("امين الاسرة");
+                out.add("امين الأسرة");
+            }
+
+            if ("AMIN_KHEDMA".equals(x)) {
+                out.add("امين خدمة");
+                out.add("أمين خدمة");
+                out.add("امين الخدمه");
+                out.add("أمين الخدمه");
+            }
+        }
+        return new ArrayList<>(out);
+    }
 private List<String> servingBasesOf(User u) {
     if (u == null) return List.of();
     Set<String> set = new LinkedHashSet<>();
@@ -66,7 +94,10 @@ private List<String> servingBasesOf(User u) {
         if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
             String k = u.getKhors() == null ? "" : u.getKhors().trim().toUpperCase();
             if ("MARMARKOS".equals(k) || "BOTH".equals(k)) set.add("خورس مارمرقس");
-            if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) set.add("خورس البابا اثناسيوس");
+            if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) {
+                // ✅ keep both labels (some UIs show "الانبا" وبعضها "البابا")
+                set.add("خورس البابا اثناسيوس");
+                            }
         }
     }
     return new ArrayList<>(set);
@@ -75,14 +106,14 @@ private List<String> servingBasesOf(User u) {
     private static boolean isChoirBucket(String base) {
         if (base == null) return false;
         String x = base.trim();
-        return x.equalsIgnoreCase("خورس مارمرقس") || x.equalsIgnoreCase("خورس البابا اثناسيوس") || x.equalsIgnoreCase("خورس الانبا اثناسيوس");
+        return x.equalsIgnoreCase("خورس مارمرقس") || x.equalsIgnoreCase("خورس البابا اثناسيوس") ;
     }
 
     private static String choirCodeFromBucket(String base) {
         if (base == null) return null;
         String x = base.trim();
         if (x.equalsIgnoreCase("خورس مارمرقس")) return "MARMARKOS";
-        if (x.equalsIgnoreCase("خورس البابا اثناسيوس")) return "ATHANASIUS";
+        if (x.equalsIgnoreCase("خورس البابا اثناسيوس") ) return "ATHANASIUS";
         return null;
     }
 
@@ -122,8 +153,9 @@ public ResponseEntity<?> families(
     }
 
     set.add("خورس مارمرقس");
+    // ✅ keep both labels (some UIs show "الانبا" وبعضها "البابا")
     set.add("خورس البابا اثناسيوس");
-
+    
     List<String> out = new ArrayList<>(set);
     out.sort(String::compareTo);
     return ResponseEntity.ok(out);
@@ -172,27 +204,31 @@ if (isKhadim && hasFamilySelection && !attendanceContext) {
     String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
 
     if (base != null) base = base.trim();
-        List<String> rolesToShow;
-        if (isAminKhedmaOrDev) {
-            rolesToShow = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
-        }  else if (isAminOsra) {
+    List<String> rolesToShow;
+    if (isAminKhedmaOrDev) {
+        rolesToShow = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+    } else if (isAminOsra) {
         rolesToShow = attendanceContext
-                ? List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
-                : List.of("MAKHDOM", "KHADIM");
-    }else if (isKhadim) {
+                ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
+                : expandRoles(List.of("MAKHDOM", "KHADIM"));
+    } else if (isKhadim) {
+        rolesToShow = attendanceContext
+                ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
+                : expandRoles(List.of("MAKHDOM"));
+    } else {
+        rolesToShow = expandRoles(List.of("MAKHDOM"));
+    }
 
-            rolesToShow = attendanceContext
-                    ? List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
-                    : List.of("MAKHDOM");
-        } else {
-            rolesToShow = List.of("MAKHDOM");
-        }
+    // ✅ If viewing a choir bucket explicitly (Mar Markos / Baba Athanasius), show ALL account roles
+    //    (KHADIM + MAKHDOM + AMIN_OSRA + AMIN_KHEDMA) regardless of viewer role/mode.
+    if (!servantsBucket && hasFamilySelection && isChoirBucket(base)) {
+        rolesToShow = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+    }
 
         List<User> members;
 if (servantsBucket) {
     members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
 } else if (isKhadim && !hasFamilySelection) {
-    // ✅ KHADIM "Members" page: show served members in ALL families he serves (primary + optional second)
     List<String> myBases = servingBasesOf(me);
     Map<Long, User> uniq = new LinkedHashMap<>();
     for (String b : myBases) {
@@ -204,11 +240,26 @@ if (servantsBucket) {
 } else {
     if (isChoirBucket(base)) {
         String code = choirCodeFromBucket(base);
-        members = userRepo.findByKhorsAndRoleIn(code, rolesToShow);
+
+        List<User> a = userRepo.findByKhorsAndRoleIn(code, rolesToShow);
+        List<User> b = userRepo.findByAttendKhorsAndRoleIn(code, rolesToShow);
+
+        Map<Long, User> map = new LinkedHashMap<>();
+        for (User u : a) map.put(u.getId(), u);
+        for (User u : b) map.put(u.getId(), u);
+
+        members = new ArrayList<>(map.values());
     } else {
         members = userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, rolesToShow);
     }
 }
+
+        // ✅ عند اختيار خورس اثناسيوس (البابا/الانبا): استبعد زوار النقل (علشان العدد كبير)
+        if (!servantsBucket && hasFamilySelection && base != null &&
+                base.trim().equals("خورس البابا اثناسيوس")) {
+            members = members.stream().filter(u -> !isTransferVisitorUser(u))
+                    .collect(java.util.stream.Collectors.toList());
+        }
 
         List<Map<String, Object>> out = new ArrayList<>();
         for (User u : members) {
@@ -256,6 +307,7 @@ if (servantsBucket) {
             row.put("athanasiusKhorsTotal", athanasiusTotal);
             row.put("khors", u.getKhors());
             row.put("khorsYear", u.getKhorsYear());
+            row.put("servingScope", u.getServingScope());
             out.add(row);
         }
 
@@ -782,5 +834,21 @@ if (servantsBucket) {
         }
 
         return ResponseEntity.ok(out);
+    }
+
+    // زوار النقل: غالبًا بيكون مكتوب "زوار" داخل واحدة من حقول الأسرة
+    private boolean isTransferVisitorUser(User u) {
+        if (u == null) return false;
+        String[] arr = new String[]{u.getDeaconFamily(), u.getDeaconFamily2(), u.getDeaconFamily3(), u.getDeaconFamily4()};
+        for (String f : arr) {
+            if (f == null) continue;
+            String s = f.trim();
+            if (s.contains("زوار") || s.contains("زائر")) {
+                return true;
+            }
+        }
+        // احتياط: لو فيه role مخصوص
+        String r = (u.getRole() == null) ? "" : u.getRole().trim().toUpperCase();
+        return r.equals("ZAYER") || r.equals("VISITOR") || r.equals("TRANSFER_VISITOR");
     }
 }

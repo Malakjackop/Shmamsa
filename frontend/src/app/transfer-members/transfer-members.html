@@ -20,7 +20,8 @@
   </div>
 
   <div class="actions">
-    <button *ngIf="!selecting" pButton type="button" label="نقل" (click)="startTransfer()"></button>
+    <!-- إخفاء زرار النقل عند اختيار خورس البابا اثناسيوس -->
+    <button *ngIf="!selecting && !isPapaAthanasiusView()" pButton type="button" label="نقل" (click)="startTransfer()"></button>
 
     <ng-container *ngIf="selecting">
       <div class="inlinePicker">
@@ -75,7 +76,7 @@
         </div>
       </div>
 
-      <button pButton type="button" label="نقل" (click)="doTransfer()"></button>
+      <button *ngIf="!isPapaAthanasiusView()" pButton type="button" label="نقل" (click)="doTransfer()"></button>
       <button pButton type="button" class="p-button-secondary" label="إلغاء" (click)="cancelSelecting()"></button>
       <span class="selHint">المحدد: {{selectedIds.size}}</span>
     </ng-container>
@@ -90,7 +91,8 @@
           <th *ngIf="selecting">اختيار</th>
           <th>الاسم</th>
           <th>الدور</th>
-          <th>{{ isMarmarkosView() ? 'الخورس (السنة)' : 'الأسرة' }}</th>
+          <th>{{ (mode === 'MAKHDOM' && isMarmarkosView()) ? 'الخورس (السنة)' : 'الأسرة' }}</th>
+          <th *ngIf="!selecting && isChoirSelection() && mode === 'MAKHDOM'">حذف</th>
           <ng-container *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT' && extraColIndices().length">
             <th *ngFor="let i of extraColIndices()">الأسرة {{i + 2}}</th>
           </ng-container>
@@ -104,6 +106,9 @@
           <td>{{m.fullName}}</td>
           <td>{{getRoleLabel(m.role)}}</td>
           <td>{{ displayFamily(m) }}</td>
+          <td *ngIf="!selecting && isChoirSelection() && mode === 'MAKHDOM'" class="delCell">
+            <button type="button" class="miniBtn" (click)="removeFromChoir(m)" title="إخراج من الخورس">🗑️</button>
+          </td>
           <ng-container *ngIf="isAminKhedmaOrDev() && mode === 'SERVANT' && extraColIndices().length">
             <td *ngFor="let i of extraColIndices()">{{extraFamilyValue(m, i)}}</td>
           </ng-container>

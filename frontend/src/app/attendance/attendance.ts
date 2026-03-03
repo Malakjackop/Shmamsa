@@ -161,11 +161,11 @@ export class AttendanceComponent implements OnInit {
 
         if (isDevOrAmin || myKhors === 'BOTH') {
           opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
-          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس الانبا اثناسيوس' });
+          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
         } else if (myKhors === 'MARMARKOS') {
           opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
         } else if (myKhors === 'ATHANASIUS') {
-          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس الانبا اثناسيوس' });
+          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
         }
       }
 
@@ -195,7 +195,7 @@ export class AttendanceComponent implements OnInit {
       this.selectedFamily = 'خورس مارمرقس';
       this.loadMembersForFamily();
     } else if (this.selectedType === 'ATHANASIUS_KHORS') {
-      this.selectedFamily = 'خورس الانبا اثناسيوس';
+      this.selectedFamily = 'خورس البابا اثناسيوس';
       this.loadMembersForFamily();
     }
   }

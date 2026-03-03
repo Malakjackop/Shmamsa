@@ -7,6 +7,7 @@ import { Observable } from 'rxjs';
 export class FamilyService {
   private http = inject(HttpClient);
   private baseUrl = '/api/family';
+  private khorsUrl = '/api/khors';
 
   families(context?: string): Observable<string[]> {
     let params = new HttpParams();
@@ -58,5 +59,11 @@ export class FamilyService {
       { memberIds, newFamily, targetRole, extraFamilies },
       { withCredentials: true }
     );
+  }
+
+  /** Remove a member from a choir (Marmarkos / Athanasius). */
+  removeFromKhors(memberId: number, khorsLabel: string): Observable<any> {
+    let params = new HttpParams().set('khors', khorsLabel);
+    return this.http.delete<any>(`${this.khorsUrl}/members/${memberId}`, { params, withCredentials: true });
   }
 }

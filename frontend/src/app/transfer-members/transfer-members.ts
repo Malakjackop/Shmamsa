@@ -15,7 +15,8 @@ type Member = {
   tasbeeha: number;
   familyMeeting: number;
   khors?: string;
-  khorsLevel?: number;
+  khorsYear?: number;
+  servingScope?: string;
 };
 
 type TransferMode = 'MAKHDOM' | 'SERVANT';
@@ -38,7 +39,8 @@ export class TransferMembersComponent implements OnInit {
   loading = false;
 
   khors?: string;
-  khorsLevel?: number;
+  khorsYear?: number;
+  servingScope?: string;
 
   selecting = false;
   selectedIds = new Set<number>();
@@ -54,7 +56,7 @@ export class TransferMembersComponent implements OnInit {
   'اسره الانبا ابرام',
   'اسره اسطفانوس',
   'خورس مارمرقس',
-  'خورس الانبا اثناسيوس'
+  'خورس البابا اثناسيوس'
 ];
 
   makhdomFamilies: string[] = [
@@ -77,7 +79,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   { label: 'خورس مارمرقس (سنه تالته)', value: 'KHORS:MARMARKOS:YEAR:3' },
   { label: 'خورس مارمرقس (سنه رابعه)', value: 'KHORS:MARMARKOS:YEAR:4' },
   { label: 'خورس مارمرقس (سنه خامسه)', value: 'KHORS:MARMARKOS:YEAR:5' },
-  { label: 'طلب نقل لخورس الانبا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
+  { label: 'طلب نقل لخورس البابا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
 ];
 
   mode: TransferMode = 'MAKHDOM';
@@ -91,6 +93,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
       next: (u) => {
         this.me = u;
         this.bootstrapDefaults();
+        this.loadFamilyLists();
         this.loadMembers();
       },
       error: () => {}
@@ -115,7 +118,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
 
     if (this.isAminKhedmaOrDev()) {
       this.mode = 'MAKHDOM';
-      this.selectedFamilyView = this.servantFamilies[0] || '';
+      this.selectedFamilyView = '';
       this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
       this.targetRole = 'KHADIM';
       return;
@@ -123,7 +126,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
 
     if (this.isKhadim()) {
   this.mode = 'MAKHDOM';
-  this.selectedFamilyView = this.servantFamilies[0] || '';
+  this.selectedFamilyView = '';
   this.targetFamily = this.makhdomFamilies[0] || '';
   return;
 }
@@ -133,25 +136,58 @@ marmarkosYearTargets: { label: string; value: string }[] = [
     this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
   }
 
+
+  private loadFamilyLists() {
+    // ✅ Use backend to return the right families for the logged-in user (especially KHADIM)
+    this.familySvc.families().subscribe({
+      next: (list) => {
+        if (Array.isArray(list) && list.length) {
+          this.servantFamilies = list as any;
+          // keep selection valid
+          if (!this.selectedFamilyView || !this.servantFamilies.some(x => (x || '').trim() === (this.selectedFamilyView || '').trim())) {
+            this.selectedFamilyView = '';
+          }
+          // if Marmarkos view, ensure target is set
+          if (this.isMarmarkosView()) {
+            this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+          }
+        }
+      },
+      error: () => {}
+    });
+  }
+
   private loadMembers() {
     this.loading = true;
 
     let famParam: string | undefined = undefined;
 
     if (this.isAminKhedmaOrDev() || this.isKhadim()) {
-  if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') {
-    famParam = 'SERVANTS';
-  } else {
-    famParam = this.selectedFamilyView || undefined;
-  }
-}
+      if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') {
+        famParam = 'SERVANTS';
+      } else {
+        famParam = this.selectedFamilyView ? this.selectedFamilyView : undefined;
+      }
+    }
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
         let list = (m as any) || [];
+        if (this.mode === 'MAKHDOM' && this.isPapaAthanasiusView()) {
+          list = list.filter((x: any) => !this.isTransferVisitor(x));
+        }
+
         if (this.isAminKhedmaOrDev()) {
-          if (this.mode === 'MAKHDOM') list = list.filter((x: any) => x?.role === 'MAKHDOM');
-          if (this.mode === 'SERVANT') list = list.filter((x: any) => x?.role === 'KHADIM' || x?.role === 'AMIN_OSRA' || x?.role === 'AMIN_KHEDMA');
+  if (this.mode === 'MAKHDOM') {
+
+    if (!this.isChoirSelection()) {
+      list = list.filter((x: any) => String(x?.role || '').trim().toUpperCase() === 'MAKHDOM');
+    }
+  }
+  if (this.mode === 'SERVANT') {
+    const ok = new Set(['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA']);
+    list = list.filter((x: any) => ok.has(String(x?.role || '').trim().toUpperCase()));
+  }
         } else if (this.isAminOsra()) {
         }
         this.members = list;
@@ -167,7 +203,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   private khorsLabel(k?: string): string {
   const x = (k || '').toUpperCase();
   if (x === 'MARMARKOS') return 'خورس مارمرقس';
-  if (x === 'ATHANASIUS') return 'خورس الانبا اثناسيوس';
+  if (x === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
   return '';
 }
 
@@ -182,22 +218,103 @@ private levelLabel(n?: number): string {
 }
 
 displayFamily(m: Member): string {
-  const khCode = String((m as any).khors || '').toUpperCase();
+  // ✅ Choir year column is only for MAKHDOM view
+  if (this.mode === 'MAKHDOM' && this.isMarmarkosView()) {
+    const yr = (m as any).khorsYear || 1;
+    return this.levelLabel(yr);
+  }
+
+  const role = String(m.role || '').trim().toUpperCase();
+  const isServantRole = role === 'KHADIM' || role === 'AMIN_OSRA' || role === 'AMIN_KHEDMA';
+
+  const baseFamily = (m.deaconFamily || '').trim();
+  const khCode = String((m as any).khors || '').trim().toUpperCase();
   const kh = this.khorsLabel(khCode);
+  const scope = String((m as any).servingScope || '').trim().toUpperCase();
 
-  // Athanasius choir has no "year" label.
+  // ✅ For servants: show الأسرة if he's serving family (BOTH), show الخورس only if KHORS_ONLY
+  if (isServantRole) {
+    if (scope === 'KHORS_ONLY' || this.isChoirBucket(baseFamily)) {
+      if (khCode === 'ATHANASIUS' && kh) return kh;
+      const lvl = this.levelLabel((m as any).khorsYear);
+      return kh ? (lvl ? `${kh} (${lvl})` : kh) : baseFamily;
+    }
+    return baseFamily;
+  }
+
+  // ✅ For مخدومين: keep old behavior (show choir if exists, else family)
   if (khCode === 'ATHANASIUS' && kh) return kh;
-
   const lvl = this.levelLabel((m as any).khorsYear);
   if (kh) return lvl ? `${kh} (${lvl})` : kh;
-  return (m.deaconFamily || '').trim();
+  return baseFamily;
 }
 
+private isChoirBucket(base: string): boolean {
+  const x = (base || '').trim();
+  return x === 'خورس مارمرقس' || x === 'خورس البابا اثناسيوس';
+}
 
+// NOTE: not private because it's used in the template
+isPapaAthanasiusView(): boolean {
+  const x = (this.selectedFamilyView || '').trim();
+  return x === 'خورس البابا اثناسيوس';
+}
+
+// زوار النقل: غالبًا بيتسجلوا كـ "زوار" داخل واحدة من حقول الأسرة
+private isTransferVisitor(m: any): boolean {
+  const fields = [m?.deaconFamily, m?.deaconFamily2, m?.deaconFamily3, m?.deaconFamily4]
+    .map((x: any) => String(x || '').trim());
+
+  const joined = fields.join(' | ');
+  // استبعاد واسع لتغطية اختلافات الكتابة
+  if (joined.includes('زوار') || joined.includes('زائر')) {
+    // لو في كلمة "نقل" يبقى أكيد زوار النقل
+    if (joined.includes('نقل')) return true;
+    // أو لو مكتوبة صراحة
+    if (joined.includes('زوار النقل')) return true;
+  }
+
+  // احتياط: لو فيه role مخصوص
+  const role = String(m?.role || '').trim().toUpperCase();
+  if (role === 'ZAYER' || role === 'VISITOR' || role === 'TRANSFER_VISITOR') return true;
+
+  return false;
+}
 
 isMarmarkosView(): boolean {
   return (this.selectedFamilyView || '').trim() === 'خورس مارمرقس';
 }
+
+
+isChoirSelection(): boolean {
+  const x = (this.selectedFamilyView || '').trim();
+  return this.isChoirBucket(x);
+}
+
+removeFromChoir(m: Member) {
+  const kh = (this.selectedFamilyView || '').trim();
+  if (!kh || !this.isChoirSelection()) return;
+
+  this.confirm.confirm({
+    header: 'تأكيد الحذف',
+    message: `إخراج "${m.fullName}" من ${kh} ؟`,
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'حذف',
+    rejectLabel: 'إلغاء',
+    accept: () => {
+      this.familySvc.removeFromKhors(m.id, kh).subscribe({
+        next: () => {
+          this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إخراج العضو من الخورس' });
+          this.loadMembers();
+        },
+        error: (err) => {
+          this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Delete failed' });
+        }
+      });
+    }
+  });
+}
+
 
   onModeChange() {
     this.cancelSelecting();

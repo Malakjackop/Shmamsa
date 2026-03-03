@@ -36,7 +36,7 @@ public class KhorsController {
         if (k == null) return null;
         String x = k.trim().toUpperCase();
         if (x.equals("خورس مارمرقس")) return "MARMARKOS";
-        if (x.equals("خورس البابا اثناسيوس") || x.equals("خورس الانبا اثناسيوس")) return "ATHANASIUS";
+        if (x.equals("خورس البابا اثناسيوس")) return "ATHANASIUS";
         return x;
     }
 
