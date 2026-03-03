@@ -232,7 +232,6 @@ export class DashBoard implements OnInit {
     return this.khorsCards.length > 0;
   }
 
-  // ===== Lifecycle =====
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     this.loadUserData();
@@ -249,7 +248,6 @@ export class DashBoard implements OnInit {
         }
         this.user = data;
 
-        // ✅ Developer زي أمين خدمة => scope مفتوح
         this.scopeLocked = !this.isAtLeast('AMIN_KHEDMA');
 
         if (this.scopeLocked) {
@@ -297,7 +295,6 @@ export class DashBoard implements OnInit {
     });
   }
 
-  // ===== API Load =====
   private loadMonthBoards(): void {
     const month = this.monthParam(this.monthCursor);
     const family = (this.scopeFamily && this.scopeFamily !== 'ALL') ? this.scopeFamily : '';
@@ -327,7 +324,6 @@ export class DashBoard implements OnInit {
     });
   }
 
-  // ===== UI actions =====
   onScopeChange(): void {
     const target = this.scopeFamily || 'ALL';
     this.eventForm.targetFamily = target;
@@ -344,7 +340,6 @@ export class DashBoard implements OnInit {
     this.loadMonthBoards();
   }
 
-  // ===== Events =====
   openCreateEvent(): void {
     this.eventForm = {
       id: null,
@@ -475,7 +470,6 @@ export class DashBoard implements OnInit {
     });
   }
 
-  // ===== Announcements =====
   openCreateAnnouncement(): void {
     this.annForm = { id: null, title: '', description: '', targetFamily: this.scopeFamily || 'ALL' };
     this.showAnnDialog = true;
@@ -546,7 +540,6 @@ export class DashBoard implements OnInit {
     this.showAnnDetailsDialog = true;
   }
 
-  // ===== UI helpers =====
   formatDateTime(value: any): string {
     if (!value) return '';
     const date = value instanceof Date ? value : new Date(value);
@@ -568,31 +561,5 @@ export class DashBoard implements OnInit {
   annDaysLabel(a: any): string {
     const ref = a?.publishedAt || a?.createdAt;
     return this.daysAgo(ref);
-  }
-
-  logout(): void {
-    this.authService.logout().subscribe({
-      next: () => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Logged out',
-          detail: 'You have been logged out successfully.',
-          life: 2000
-        });
-
-        setTimeout(() => {
-          this.router.navigate(['/login']);
-        }, 2000);
-      },
-      error: (err: any) => {
-        console.error('Logout failed:', err);
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Logout Failed',
-          detail: 'Something went wrong while logging out.',
-          life: 3000
-        });
-      }
-    });
   }
 }

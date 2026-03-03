@@ -107,10 +107,6 @@ public class AuthService {
                     throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
                 });
 
-        userRepository.findByEmail(request.getEmail())
-                .ifPresent(existing -> {
-                    throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
-                });
         String phone = request.getPhoneNumber() == null ? "" : request.getPhoneNumber().trim();
         String guardian = request.getGuardiansPhone() == null ? "" : request.getGuardiansPhone().trim();
 
@@ -122,11 +118,21 @@ public class AuthService {
                     java.util.Map.of("guardiansPhone", "ممنوع تكرار نفس رقم ولي الأمر بالرقم الشخصي")
             );
         }
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+
+        userRepository.findByEmail(email).ifPresent(u -> {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "EMAIL_TAKEN",
+                    "Email already in use",
+                    java.util.Map.of("email", "الإيميل مسجل بالفعل")
+            );
+        });
 
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(request.getNationalId());
         user.setDeaconFamily(request.getDeaconFamily());
@@ -183,7 +189,12 @@ public class AuthService {
 
     public void registerServant(RegisterServantRequest request) {
         if (!servantSecretService.validateSecret(request.getSecret())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "INVALID_SECRET", "Invalid registration secret");
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "INVALID_SECRET",
+                    "Invalid registration secret",
+                    java.util.Map.of("secret", "كود التأكيد غير صحيح")
+            );
         }
 
 
@@ -194,11 +205,6 @@ public class AuthService {
         userRepository.findByUsername(request.getUsername())
                 .ifPresent(existing -> {
                     throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
-                });
-
-        userRepository.findByEmail(request.getEmail())
-                .ifPresent(existing -> {
-                    throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email already in use");
                 });
 
         String nid = request.getNationalId().trim();
@@ -216,10 +222,20 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCOPE", "Invalid serving scope");
         }
 
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+
+        userRepository.findByEmail(email).ifPresent(u -> {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "EMAIL_TAKEN",
+                    "Email already in use",
+                    java.util.Map.of("email", "الإيميل مسجل بالفعل")
+            );
+        });
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(nid);
 

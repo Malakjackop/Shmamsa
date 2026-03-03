@@ -13,17 +13,14 @@
         <i class="pi pi-home"></i> الرئيسية
       </li>
 
-      <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
+      <ng-container *ngIf="isServantOrAbove();  ">
         <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> تسجيل الحضور</li>
         <li routerLink="/family-attendance" routerLinkActive="active"><i class="pi pi-users"></i> حضور الأعضاء</li>
         <li routerLink="/family-info" routerLinkActive="active"><i class="pi pi-id-card"></i> بيانات الأعضاء</li>
         <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> نقل الأعضاء</li>
       </ng-container>
 
-      <ng-template #makhdomMenu>
         <li><i class="pi pi-chart-bar"></i> الدرجات</li>
-        <li><i class="pi pi-pencil"></i> الواجبات</li>
-      </ng-template>
 
       <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> الملف الشخصي</li>
       <li routerLink="/resources" routerLinkActive="active">
@@ -31,12 +28,11 @@
       <li routerLink="/attendance-history">سجل حضوري</li>
       <li routerLink="/about" routerLinkActive="active"><i class="pi pi-info-circle"></i> من نحن</li>
 
-      <ng-container *ngIf="isServantOrAbove(); else makhdomMenu">
+      <ng-container *ngIf="isServantOrAbove(); ">
         <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active"><i class="pi pi-calendar"></i> بدء سنة جديدة</li>
       </ng-container>
     </ul>
 
-    <!-- تسجيل الخروج pinned to bottom so it never gets pushed out of view -->
     <div class="logout">
       <button type="button" (click)="logout()">
         <i class="pi pi-sign-out"></i>

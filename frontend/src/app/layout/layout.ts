@@ -30,11 +30,6 @@ ngOnInit(): void {
 }
 
 
-
-  isMakhdom(): boolean {
-    return this.user?.role === 'MAKHDOM';
-  }
-
   isServantOrAbove(): boolean {
     return ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
   }

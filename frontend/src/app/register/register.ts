@@ -101,7 +101,7 @@ export class RegisterComponent implements OnInit {
       fullName: ['', Validators.required],
       username: ['', Validators.required],
       phoneNumber: ['', [this.optionalPhone11()]],
-      address: [''],
+      address: ['',Validators.required],
       email: ['', [Validators.required, Validators.email]],
 
       nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
@@ -457,15 +457,15 @@ onServingWhereChange() {
     if (!c || !c.errors) return null;
     
     const e: any = c.errors;
-    if (e['required']) return `${label || 'this field '} required`;
-    if (e['email']) return `email not correct`;
-    if (e['nationalIdFormat']) return 'national id must be 14 chracters ';
-    if (e['nationalIdMinAge']) return `age must be  ${e['nationalIdMinAge']?.minAge} or more`;
-    if (e['mismatch']) return 'password or confirm passwword not match';
+    if (e['required']) return `${label || 'هذا الحقل '} يلزم`;
+    if (e['email']) return `الايميل غير صحيح`;
+    if (e['nationalIdFormat']) return 'الرقم القومي لازم يكون 14 رقم ';
+    if (e['nationalIdMinAge']) return `السن لازم يكون   ${e['nationalIdMinAge']?.minAge} سنين او اكثر`;
+    if (e['mismatch']) return 'كلية السر او تاكيد كلمة السر غير مطابقين';
     if (e['phone11']) return 'رقم الهاتف يجب أن يكون 11 رقم';
     if (e['guardianSameAsPhone']) return 'ممنوع تكرار نفس رقم ولي الأمر بالرقم الشخصي';
     if (e['api']) return String(e['api']);
-    return label ? `Value ${label} not correct` : ' Vlaue not correct ';
+    return label ? `القيمه ${label} غير صحيحه` : ' القيمة غير صحيحه ';
   }
 
   togglePassword() { this.showPassword = !this.showPassword; }
@@ -498,27 +498,28 @@ onServingWhereChange() {
 
   private showApiErrors(err: any) {
     this.serverError = null;
-    const api = err?.error;
+    const api = err?.error ?? err;
 
-    const fieldBag = (api?.errors && typeof api.errors === 'object')
-  ? api.errors
-  : (api?.fields && typeof api.fields === 'object')
-    ? api.fields
-    : null;
+      const fieldBag =
+    (api?.errors && typeof api.errors === 'object') ? api.errors :
+    (api?.fields && typeof api.fields === 'object') ? api.fields :
+    null;
 
-if (fieldBag) {
-  const entries = Object.entries(fieldBag) as Array<[string, any]>;
-  entries.forEach(([field, msg]) => {
-    const ctrl = this.registerForm.get(field);
-    if (!ctrl) return;
-    const detail = msg ? String(msg) : 'value not correct';
-    ctrl.setErrors({ ...(ctrl.errors || {}), api: detail });
-    if (this.submitAttempted) ctrl.markAsTouched();
-  });
-  return;
-}
+ if (fieldBag) {
+    Object.entries(fieldBag).forEach(([field, msg]) => {
+      const ctrl = this.registerForm.get(field);
+      if (!ctrl) return;
 
-    this.serverError = api?.message || api?.error || 'An unexpected error occurred. Please try again.';
+      const detail = msg ? String(msg) : 'قيمة غير صحيحة';
+      ctrl.setErrors({ ...(ctrl.errors || {}), api: detail });
+      ctrl.markAsTouched();
+    });
+    return;
+  }
+
+    const msg = api?.message || api?.error || 'حدث خطأ غير متوقع';
+    this.serverError = msg;
+this.messageService.add({ severity: 'error', summary: 'خطأ', detail: msg });
   }
 
 private guardianNotSameAsPhone(): ValidatorFn {
@@ -623,7 +624,6 @@ private guardianNotSameAsPhone(): ValidatorFn {
     return;
   }
 
-  // ✅ Send attendKhors (may be NONE)
   payload.attendKhors = String(formValue.attendKhors || '').trim();
 
   this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
@@ -632,7 +632,10 @@ private guardianNotSameAsPhone(): ValidatorFn {
         this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Servant registered successfully.' });
         this.router.navigate(['/login']);
       },
-      error: (err) => this.showApiErrors(err)
+      error: (err) => {
+  this.registerForm.markAllAsTouched();
+  this.showApiErrors(err);
+}
     });
 
 } else {
