@@ -2,6 +2,7 @@ package com.shmamsa.repository;
 
 import com.shmamsa.model.EventParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -14,11 +15,13 @@ public interface EventParticipantRepository extends JpaRepository<EventParticipa
 
     List<EventParticipant> findByEvent_Id(Long eventId);
 
-    // ✅ عشان إلغاء الانضمام يشتغل ويعمل commit
+    // ✅ إلغاء الانضمام
+    @Modifying
     @Transactional
     void deleteByEvent_IdAndUser_Id(Long eventId, Long userId);
 
-    // ✅ عشان مسح الإيفنت يشتغل حتى لو فيه منضمين
+    // ✅ مسح كل المنضمين قبل حذف الإيفنت (FK)
+    @Modifying
     @Transactional
     void deleteByEvent_Id(Long eventId);
 }

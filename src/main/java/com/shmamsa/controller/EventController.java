@@ -27,6 +27,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class EventController {
 
+    // ===== Choir buckets (match /api/family/families output) =====
+    private static final String KHORS_MARMARKOS = "خورس مارمرقس";
+    private static final String KHORS_ATHANASIUS = "خورس البابا اثناسيوس";
+
     private final EventRepository eventRepo;
     private final EventParticipantRepository participantRepo;
     private final UserRepository userRepo;
@@ -47,6 +51,75 @@ public class EventController {
         return RoleUtil.isAtLeast(role, "AMIN_KHEDMA");
     }
 
+    private static String normalizeTarget(String raw) {
+        if (raw == null) return null;
+        String x = raw.trim().replaceAll("\\s+", " ");
+
+        // Normalize choir labels (support slight variations)
+        if (x.startsWith("خورس")) {
+            String plain = x.replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", ""); // remove tashkeel/tatweel
+            if (plain.contains("اثناس")) return KHORS_ATHANASIUS;
+            if (plain.contains("مرقس")) return KHORS_MARMARKOS;
+        }
+
+        if (x.equalsIgnoreCase("خورس الانبا اثناسيوس") || x.equalsIgnoreCase("خورس الأنبا اثناسيوس")) {
+            return KHORS_ATHANASIUS;
+        }
+
+        return x;
+    }
+
+    private static boolean isChoirBucket(String base) {
+        if (base == null) return false;
+        String x = normalizeTarget(base);
+        return KHORS_MARMARKOS.equalsIgnoreCase(x) || KHORS_ATHANASIUS.equalsIgnoreCase(x);
+    }
+
+    private static void addKhorsBuckets(Set<String> set, String code) {
+        if (set == null) return;
+        String c = String.valueOf(code == null ? "" : code).trim().toUpperCase();
+        if (c.isBlank() || "NONE".equals(c)) return;
+
+        boolean both = c.contains("BOTH");
+        // handle values like MARMARKOS_KHORS
+        if (both || c.contains("MARMARKOS")) set.add(KHORS_MARMARKOS);
+        if (both || c.contains("ATHANASIUS")) set.add(KHORS_ATHANASIUS);
+    }
+
+    /**
+     * Bases that the user should SEE (family + choir attendance + choir field).
+     * We include both attendKhors and khors to avoid missing users where one of them is filled.
+     */
+    private Set<String> audienceBasesOf(User u) {
+        Set<String> set = new LinkedHashSet<>();
+        if (u == null) return set;
+
+        String fam = FamilyUtil.mainFamily(u.getDeaconFamily());
+        if (fam != null && !fam.isBlank() && !"SYSTEM".equalsIgnoreCase(fam)) set.add(fam);
+
+        // Choir membership
+        addKhorsBuckets(set, u.getAttendKhors());
+        addKhorsBuckets(set, u.getKhors());
+
+        return set;
+    }
+
+    /** Bases that the user can MANAGE (family + served choir if servingScope indicates). */
+    private Set<String> manageBasesOf(User u) {
+        Set<String> set = new LinkedHashSet<>();
+        if (u == null) return set;
+
+        String fam = FamilyUtil.mainFamily(u.getDeaconFamily());
+        if (fam != null && !fam.isBlank() && !"SYSTEM".equalsIgnoreCase(fam)) set.add(fam);
+
+        String scope = String.valueOf(u.getServingScope() == null ? "" : u.getServingScope()).trim().toUpperCase();
+        if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
+            addKhorsBuckets(set, u.getKhors());
+        }
+
+        return set;
+    }
+
     private void validateTargetFamily(User me, String role, String targetFamily) {
         String tf = (targetFamily == null) ? "" : targetFamily.trim();
         if (tf.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "targetFamily is required");
@@ -57,20 +130,24 @@ public class EventController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        String myBase = baseFamily(me);
-        if (myBase == null || myBase.isBlank()) throw new ApiException(HttpStatus.FORBIDDEN, "No family");
+        String tfBase = FamilyUtil.mainFamily(normalizeTarget(tf));
+        if (tfBase == null || tfBase.isBlank()) throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
+        if ("ALL".equalsIgnoreCase(tfBase)) throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
 
-        if ("ALL".equalsIgnoreCase(tf) || !tf.equals(myBase)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
-        }
+        Set<String> allowed = manageBasesOf(me);
+        boolean ok = allowed.stream().anyMatch(x -> x.equalsIgnoreCase(tfBase));
+        if (!ok) throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
     }
 
     private boolean canManage(User me, String role, Event e) {
         if (isAdmin(role)) return true;
 
         if (RoleUtil.isAtLeast(role, "AMIN_OSRA")) {
-            String myBase = baseFamily(me);
-            return myBase != null && myBase.equals(e.getTargetFamily());
+            String evBase = FamilyUtil.mainFamily(normalizeTarget(e.getTargetFamily()));
+            if (evBase == null || evBase.isBlank() || "ALL".equalsIgnoreCase(evBase)) return false;
+
+            Set<String> allowed = manageBasesOf(me);
+            return allowed.stream().anyMatch(x -> x.equalsIgnoreCase(evBase));
         }
         return false;
     }
@@ -96,36 +173,38 @@ public class EventController {
         LocalDate start = ym.atDay(1);
         LocalDate end = ym.plusMonths(1).atDay(1);
 
-        // ✅ ده اللي موجود عندك في EventRepository
         List<Event> inMonth = eventRepo.findByEventAtGreaterThanEqualAndEventAtLessThan(start, end);
 
-        String fam = (family == null) ? null : family.trim();
+        String fam = normalizeTarget(family);
+        Set<String> myAudience = audienceBasesOf(me);
 
         List<EventView> out = new ArrayList<>();
 
         for (Event e : inMonth) {
             EventStatus st = (e.getStatus() == null) ? EventStatus.PENDING : e.getStatus();
-
             boolean admin = isAdmin(role);
 
-            boolean matchesFamily;
+            boolean matchesScope;
             if (admin) {
                 if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
-                    matchesFamily = true;
+                    matchesScope = true;
                 } else {
-                    matchesFamily = fam.equals(e.getTargetFamily()) || "ALL".equalsIgnoreCase(e.getTargetFamily());
+                    String et = normalizeTarget(e.getTargetFamily());
+                    matchesScope = fam.equalsIgnoreCase(et) || "ALL".equalsIgnoreCase(et);
                 }
             } else {
-                String myBase = baseFamily(me);
-                matchesFamily = "ALL".equalsIgnoreCase(e.getTargetFamily())
-                        || (myBase != null && myBase.equals(e.getTargetFamily()));
+                String etBase = FamilyUtil.mainFamily(normalizeTarget(e.getTargetFamily()));
+                // ✅ Allow ALL + family + choir buckets
+                matchesScope = "ALL".equalsIgnoreCase(etBase)
+                        || (etBase != null && myAudience.stream().anyMatch(x -> x.equalsIgnoreCase(etBase)));
             }
 
             boolean canM = canManage(me, role, e);
             boolean creator = isCreator(me, e);
 
-            boolean publishedVisible = st == EventStatus.PUBLISHED && matchesFamily;
-            boolean pendingVisible = st == EventStatus.PENDING && matchesFamily && (canM || creator);
+            boolean publishedVisible = st == EventStatus.PUBLISHED && matchesScope;
+            // ✅ pending يظهر لصاحب الإيفنت حتى لو خارج السكوب
+            boolean pendingVisible = st == EventStatus.PENDING && (creator || (matchesScope && canM));
 
             if (!publishedVisible && !pendingVisible) continue;
 
@@ -197,14 +276,9 @@ public class EventController {
         Event e = eventRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
 
-        // NOTE:
-        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
-        // Without a transaction, accessing e.getCreatedBy() may throw LazyInitializationException
-        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean canM = canManage(me, role, e);
         boolean creator = isCreator(me, e);
 
-        // ✅ خلي التعديل يشتغل للـ creator كمان
         if (!(canM || creator)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
@@ -247,7 +321,6 @@ public class EventController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
-    // ✅ مسح الإيفنت: لازم نمسح المشاركين الأول
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
@@ -289,7 +362,6 @@ public class EventController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
-    // ✅ إلغاء الانضمام: Transaction + delete
     @DeleteMapping("/{id}/join")
     @Transactional
     public ResponseEntity<?> unjoin(@PathVariable Long id, Authentication auth) {
