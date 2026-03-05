@@ -2,6 +2,12 @@
 .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
+
+/* ===== Buttons (PDF + Daily) ===== */
+.pdfBtn, .todayAttendanceBtn{border-radius:10px;}
+
+/* ===== Table file button ===== */
+.fileBtn{width:44px;height:38px;display:inline-flex;align-items:center;justify-content:center;}
 .tableWrap{overflow:auto;border:1px solid #eee;border-radius:12px;}
 .tbl{width:100%;border-collapse:collapse;min-width:900px;}
 .tbl th,.tbl td{padding:10px;border-bottom:1px solid #eee;text-align:center;}
@@ -102,11 +108,32 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .cancelBtn2{background:#777;color:#fff;border:none;border-radius:10px;padding:8px 14px;cursor:pointer;}
 .dangerBtn:disabled,.cancelBtn2:disabled{opacity:.6;cursor:not-allowed;}
 
+/* ===== Daily attendance modal ===== */
+.dailyControls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;}
+.dailyField{display:flex;flex-direction:column;gap:6px;}
+.dailyField label{font-size:12px;color:#666;}
+.dailyField input{padding:10px;border:1px solid #ddd;border-radius:10px;}
+
+.dailyStats{display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:10px;margin-top:6px;}
+.stat{border:1px solid #eee;border-radius:12px;padding:10px;text-align:center;background:#fafafa;}
+.statNum{font-weight:800;font-size:20px;}
+.statLbl{font-size:12px;color:#666;margin-top:4px;}
+.dailySummaryLine{margin:10px 0;font-weight:800;text-align:center;}
+
+.dailyBoxes{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:12px;}
+.dailyBox{border:1px solid #eee;border-radius:14px;padding:12px;background:#fff;max-height:48vh;overflow:auto;}
+.boxTitle{font-weight:800;margin-bottom:10px;text-align:right;}
+.boxList{display:flex;flex-direction:column;gap:8px;}
+.boxRow{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #eee;border-radius:12px;padding:8px 10px;background:#fafafa;}
+.boxName{font-weight:700;}
+.minusBtn{width:44px;height:36px;display:inline-flex;align-items:center;justify-content:center;}
+
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .iftekadForm{grid-template-columns:1fr;}
   .editGrid{grid-template-columns:1fr;}
   .cards{grid-template-columns: 1fr;}
+  .dailyBoxes{grid-template-columns:1fr;}
 }
 .cards{
   display: grid;

@@ -11,7 +11,16 @@
   </div>
 
   <div class="actions">
-    <button pButton type="button" label="تحميل الملف pdf " (click)="exportPdf()"></button>
+    <button pButton type="button" icon="pi pi-file-pdf" label="تحميل PDF" (click)="exportPdf()" class="pdfBtn"></button>
+    <button
+      pButton
+      type="button"
+      icon="pi pi-calendar"
+      label="حضور اليوم"
+      (click)="openDailyAttendance()"
+      class="todayAttendanceBtn"
+      *ngIf="canEditDailyAttendance()"
+    ></button>
   </div>
 
   <div *ngIf="loading" class="hint">جاري التحميل...</div>
@@ -59,10 +68,112 @@
             </span>
           </td>
 
-          <td><button pButton type="button" icon="pi pi-user" (click)="openProfile(m)">👤</button></td>
+          <td><button pButton type="button" icon="pi pi-file" class="fileBtn" (click)="openProfile(m)"></button></td>
         </tr>
       </tbody>
     </table>
+  </div>
+
+
+  <!-- Daily attendance modal (حضور اليوم) -->
+  <div class="modal" *ngIf="showDaily">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <div class="title">حضور اليوم</div>
+          <div class="sub" *ngIf="dailyType">النوع: {{ dailyTypeLabel(dailyType) }}</div>
+        </div>
+        <button pButton type="button" icon="pi pi-times" (click)="closeDailyAttendance()">➖</button>
+      </div>
+
+      <div class="dailyControls">
+        <div class="dailyField">
+          <label>اليوم</label>
+          <input
+            type="date"
+            [(ngModel)]="dailyDate"
+            (change)="onDailyDateChange()"
+            [ngModelOptions]="{ standalone: true }"
+          />
+        </div>
+        <button pButton type="button" class="todayBtn" label="اليوم" (click)="setDailyToday(); onDailyDateChange()"></button>
+      </div>
+
+      <div *ngIf="dailyLoading" class="hint">جاري التحميل...</div>
+
+      <ng-container *ngIf="!dailyLoading && dailyType">
+        <div class="dailyStats">
+          <div class="stat">
+            <div class="statNum">{{ dailyPresentCount }}</div>
+            <div class="statLbl">حضور</div>
+          </div>
+          <div class="stat">
+            <div class="statNum">{{ dailyAbsentCount }}</div>
+            <div class="statLbl">غياب</div>
+          </div>
+          <div class="stat">
+            <div class="statNum">{{ dailyTotal }}</div>
+            <div class="statLbl">المجموع</div>
+          </div>
+        </div>
+
+        <div class="dailySummaryLine" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
+
+        <div class="dailyBoxes">
+          <div class="dailyBox">
+            <div class="boxTitle">الحضور</div>
+
+            <div class="boxList" *ngIf="dailyPresent?.length; else noPresent">
+              <div class="boxRow" *ngFor="let p of dailyPresent">
+                <span class="boxName">{{ p.fullName }}</span>
+                <button
+                  *ngIf="canEditDailyAttendance()"
+                  pButton
+                  type="button"
+                  icon="pi pi-minus"
+                  class="minusBtn"
+                  (click)="askDailyMarkAbsent(p)"
+                ></button>
+              </div>
+            </div>
+
+            <ng-template #noPresent>
+              <div class="hint">لا يوجد حضور</div>
+            </ng-template>
+          </div>
+
+          <div class="dailyBox">
+            <div class="boxTitle">الغياب</div>
+
+            <div class="boxList" *ngIf="dailyAbsent?.length; else noAbsent">
+              <div class="boxRow" *ngFor="let a of dailyAbsent">
+                <span class="boxName">{{ a.fullName }}</span>
+              </div>
+            </div>
+
+            <ng-template #noAbsent>
+              <div class="hint">لا يوجد غياب</div>
+            </ng-template>
+          </div>
+        </div>
+
+        <div class="hint" *ngIf="dailyRecordsCount === 0">ملحوظة: لم يتم تسجيل حضور/غياب لهذا اليوم بعد.</div>
+      </ng-container>
+
+      <!-- confirm: mark present -> absent -->
+      <div class="confirmOverlay" *ngIf="showDailyRemoveConfirm && dailyRemoveTarget">
+        <div class="confirmBox">
+          <div class="confirmTitle">تأكيد</div>
+          <div class="confirmText">
+            هل تريد إلغاء حضور <b>{{ dailyRemoveTarget.fullName }}</b> يوم <b>{{ dailyDate }}</b> ؟
+          </div>
+          <div class="confirmActions">
+            <button type="button" class="dangerBtn" [disabled]="dailyRemoveSaving" (click)="confirmDailyRemove()">تأكيد</button>
+            <button type="button" class="cancelBtn2" [disabled]="dailyRemoveSaving" (click)="cancelDailyRemove()">إلغاء</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Attendance details modal -->

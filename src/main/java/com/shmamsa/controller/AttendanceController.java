@@ -159,32 +159,32 @@ public class AttendanceController {
 
         // Determine scope accounts for auto-absence
         List<User> scope;
-        
-if (type == AttendanceType.FAMILY_MEETING) {
-    // Thursday: only selected family, but support users serving in multiple families.
-    String base = null;
 
-    // Prefer the explicit family parameter (required for correct multi-family separation)
-    if (familyObj != null && !familyObj.toString().isBlank()) {
-        base = FamilyUtil.mainFamily(familyObj.toString());
-    }
+        if (type == AttendanceType.FAMILY_MEETING) {
+            // Thursday: only selected family, but support users serving in multiple families.
+            String base = null;
 
-    // Backward compatibility: if family is missing, infer from the first selected member
-    if ((base == null || base.isBlank()) && !presentIds.isEmpty()) {
-        User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
-        base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
-    }
+            // Prefer the explicit family parameter (required for correct multi-family separation)
+            if (familyObj != null && !familyObj.toString().isBlank()) {
+                base = FamilyUtil.mainFamily(familyObj.toString());
+            }
 
-    if (base == null || base.isBlank()) {
-        return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
-    }
+            // Backward compatibility: if family is missing, infer from the first selected member
+            if ((base == null || base.isBlank()) && !presentIds.isEmpty()) {
+                User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
+                base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
+            }
 
-    // Scope: anyone who belongs to this family in ANY family slot
-    scope = userRepo.findByAnyFamilyStartingWithAndRoleIn(
-            base,
-            List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
-    );
-} else if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
+            if (base == null || base.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
+            }
+
+            // Scope: anyone who belongs to this family in ANY family slot
+            scope = userRepo.findByAnyFamilyStartingWithAndRoleIn(
+                    base,
+                    List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
+            );
+        } else if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
             // ✅ Choir: only members in that choir
             // Authorization: only choir servants of that choir (or Amin/Dev)
             String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
@@ -224,11 +224,11 @@ if (type == AttendanceType.FAMILY_MEETING) {
         // 1) Upsert PRESENT for selected
         for (Long id : presentIds) {
             AttendanceRecord existing;
-if (type == AttendanceType.FAMILY_MEETING) {
-    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(id, selectedDate, type, meetingBase);
-} else {
-    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
-}
+            if (type == AttendanceType.FAMILY_MEETING) {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(id, selectedDate, type, meetingBase);
+            } else {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
+            }
             if (existing != null) {
                 // If it was ABSENT, flip to PRESENT
                 if (existing.getStatus() == AttendanceStatus.ABSENT) {
@@ -258,10 +258,10 @@ if (type == AttendanceType.FAMILY_MEETING) {
             r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-if (type == AttendanceType.FAMILY_MEETING) {
-    r.setFamilyBase(meetingBase);
-}
-r.setStatus(AttendanceStatus.PRESENT);
+            if (type == AttendanceType.FAMILY_MEETING) {
+                r.setFamilyBase(meetingBase);
+            }
+            r.setStatus(AttendanceStatus.PRESENT);
             r.setTakenBy(servant);
             attendanceRepo.save(r);
             createdPresent++;
@@ -274,11 +274,11 @@ r.setStatus(AttendanceStatus.PRESENT);
             if (presentIds.contains(target.getId())) continue;
 
             AttendanceRecord existing;
-if (type == AttendanceType.FAMILY_MEETING) {
-    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(target.getId(), selectedDate, type, meetingBase);
-} else {
-    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(target.getId(), selectedDate, type);
-}
+            if (type == AttendanceType.FAMILY_MEETING) {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(target.getId(), selectedDate, type, meetingBase);
+            } else {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(target.getId(), selectedDate, type);
+            }
             if (existing != null) {
                 // keep as-is (if present, don't overwrite)
                 continue;
@@ -289,10 +289,10 @@ if (type == AttendanceType.FAMILY_MEETING) {
             r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-if (type == AttendanceType.FAMILY_MEETING) {
-    r.setFamilyBase(meetingBase);
-}
-r.setStatus(AttendanceStatus.ABSENT);
+            if (type == AttendanceType.FAMILY_MEETING) {
+                r.setFamilyBase(meetingBase);
+            }
+            r.setStatus(AttendanceStatus.ABSENT);
             r.setTakenBy(servant);
             attendanceRepo.save(r);
             createdAbsent++;
@@ -351,38 +351,38 @@ r.setStatus(AttendanceStatus.ABSENT);
     }
 
 
-@GetMapping("/my-stats-v2")
-public ResponseEntity<?> myStatsV2(Authentication auth) {
-    if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+    @GetMapping("/my-stats-v2")
+    public ResponseEntity<?> myStatsV2(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-    User me = userRepo.findByUsername(auth.getName())
-            .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-    long f = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
-    long mk = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
-    long ak = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
-    long t = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
-    long mTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
+        long f = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long mk = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
+        long ak = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
+        long t = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
+        long mTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
 
-    // FAMILY_MEETING broken down by familyBase (multi-family)
-    Map<String, Long> familyMeetingByFamily = new LinkedHashMap<>();
-    for (AttendanceRecord r : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), AttendanceType.FAMILY_MEETING)) {
-        String fb = r.getFamilyBase() == null ? "" : r.getFamilyBase().trim();
-        if (fb.isBlank()) continue;
-        // count only PRESENT (or null treated as present for legacy)
-        if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
-        familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
+        // FAMILY_MEETING broken down by familyBase (multi-family)
+        Map<String, Long> familyMeetingByFamily = new LinkedHashMap<>();
+        for (AttendanceRecord r : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), AttendanceType.FAMILY_MEETING)) {
+            String fb = r.getFamilyBase() == null ? "" : r.getFamilyBase().trim();
+            if (fb.isBlank()) continue;
+            // count only PRESENT (or null treated as present for legacy)
+            if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
+            familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "FRIDAY_LITURGY", f,
+                "MARMARKOS_KHORS", mk,
+                "ATHANASIUS_KHORS", ak,
+                "TASBEEHA", t,
+                "FAMILY_MEETING", mTotal,
+                "FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily
+        ));
     }
-
-    return ResponseEntity.ok(Map.of(
-            "FRIDAY_LITURGY", f,
-            "MARMARKOS_KHORS", mk,
-            "ATHANASIUS_KHORS", ak,
-            "TASBEEHA", t,
-            "FAMILY_MEETING", mTotal,
-            "FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily
-    ));
-}
 
 
     @GetMapping("/history")
@@ -407,6 +407,329 @@ public ResponseEntity<?> myStatsV2(Authentication auth) {
             ));
         }
         return ResponseEntity.ok(out);
+    }
+
+
+    // =========================
+    // Daily review (حضور اليوم)
+    // =========================
+
+    @GetMapping("/daily")
+    public ResponseEntity<?> daily(@RequestParam(required = false) String date,
+                                   @RequestParam AttendanceType type,
+                                   @RequestParam(required = false) String family,
+                                   Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User servant = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        assertServantCanEditAttendance(servant);
+
+        LocalDate today = LocalDate.now();
+        LocalDate selectedDate = today;
+        if (date != null && !date.isBlank()) {
+            try {
+                selectedDate = LocalDate.parse(date.trim());
+            } catch (Exception e) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
+            }
+        }
+
+        if (selectedDate.isAfter(today)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot view attendance in the future");
+        }
+
+        enforceWeekClose(servant, selectedDate);
+        enforceDayOfWeek(type, selectedDate);
+
+        // Scope = selected family / choir (or all)
+        ScopeResult scope = resolveScopeUsers(servant, type, family);
+
+        List<Long> ids = scope.users.stream()
+                .filter(u -> u != null && u.getId() != null)
+                .map(User::getId)
+                .collect(Collectors.toList());
+
+        List<AttendanceRecord> records;
+        if (type == AttendanceType.FAMILY_MEETING) {
+            records = ids.isEmpty()
+                    ? List.of()
+                    : attendanceRepo.findByDateAndTypeAndFamilyBaseAndArchivedFalseAndUser_IdIn(selectedDate, type, scope.familyBase, ids);
+        } else {
+            records = ids.isEmpty()
+                    ? List.of()
+                    : attendanceRepo.findByDateAndTypeAndArchivedFalseAndUser_IdIn(selectedDate, type, ids);
+        }
+
+        Map<Long, AttendanceRecord> byUser = new HashMap<>();
+        for (AttendanceRecord r : records) {
+            if (r == null || r.getUser() == null || r.getUser().getId() == null) continue;
+            byUser.put(r.getUser().getId(), r);
+        }
+
+        List<Map<String, Object>> present = new ArrayList<>();
+        List<Map<String, Object>> absent = new ArrayList<>();
+
+        for (User u : scope.users) {
+            if (u == null || u.getId() == null) continue;
+            AttendanceRecord r = byUser.get(u.getId());
+            AttendanceStatus st = (r == null || r.getStatus() == null) ? AttendanceStatus.ABSENT : r.getStatus();
+            // Legacy: null treated as present in old DB, but current model defaults to PRESENT.
+            if (r != null && r.getStatus() == null) st = AttendanceStatus.PRESENT;
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", u.getId());
+            row.put("fullName", u.getFullName());
+            row.put("role", u.getRole());
+            row.put("deaconFamily", u.getDeaconFamily());
+            row.put("status", st.name());
+            if (st == AttendanceStatus.PRESENT) present.add(row);
+            else absent.add(row);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("date", selectedDate.toString());
+        out.put("type", type.name());
+        out.put("family", family);
+        out.put("familyBase", scope.familyBase);
+        out.put("total", scope.users.size());
+        out.put("presentCount", present.size());
+        out.put("absentCount", absent.size());
+        out.put("recordsCount", records.size());
+        out.put("present", present);
+        out.put("absent", absent);
+        return ResponseEntity.ok(out);
+    }
+
+
+    @PostMapping("/mark-absent")
+    public ResponseEntity<?> markAbsent(@RequestBody Map<String, Object> body, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User servant = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        assertServantCanEditAttendance(servant);
+
+        if (body == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Missing body");
+
+        Object userIdObj = body.get("userId");
+        Object dateObj = body.get("date");
+        Object typeObj = body.get("type");
+        Object familyObj = body.get("family");
+
+        if (userIdObj == null || typeObj == null || dateObj == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "userId/date/type are required");
+        }
+
+        Long userId;
+        try {
+            userId = Long.valueOf(userIdObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid userId");
+        }
+
+        AttendanceType type;
+        try {
+            type = AttendanceType.valueOf(typeObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
+        }
+
+        LocalDate selectedDate;
+        try {
+            selectedDate = LocalDate.parse(dateObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
+        }
+
+        LocalDate today = LocalDate.now();
+        if (selectedDate.isAfter(today)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot edit attendance in the future");
+        }
+
+        enforceWeekClose(servant, selectedDate);
+        enforceDayOfWeek(type, selectedDate);
+
+        String family = familyObj == null ? null : familyObj.toString();
+        ScopeResult scope = resolveScopeUsers(servant, type, family);
+
+        boolean inScope = scope.users.stream().anyMatch(u -> u != null && u.getId() != null && u.getId().equals(userId));
+        if (!inScope) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "User not in scope");
+        }
+
+        AttendanceRecord existing;
+        if (type == AttendanceType.FAMILY_MEETING) {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(userId, selectedDate, type, scope.familyBase);
+        } else {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(userId, selectedDate, type);
+        }
+
+        LocalTime now = LocalTime.now();
+        if (existing != null) {
+            existing.setStatus(AttendanceStatus.ABSENT);
+            existing.setTime(now);
+            existing.setTakenBy(servant);
+            attendanceRepo.save(existing);
+            return ResponseEntity.ok(Map.of(
+                    "ok", true,
+                    "id", existing.getId(),
+                    "userId", userId,
+                    "date", selectedDate.toString(),
+                    "type", type.name(),
+                    "status", "ABSENT"
+            ));
+        }
+
+        User target = userRepo.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        AttendanceRecord r = new AttendanceRecord();
+        r.setUser(target);
+        r.setDate(selectedDate);
+        r.setTime(now);
+        r.setType(type);
+        if (type == AttendanceType.FAMILY_MEETING) {
+            r.setFamilyBase(scope.familyBase);
+        }
+        r.setStatus(AttendanceStatus.ABSENT);
+        r.setTakenBy(servant);
+        attendanceRepo.save(r);
+
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "id", r.getId(),
+                "userId", userId,
+                "date", selectedDate.toString(),
+                "type", type.name(),
+                "status", "ABSENT"
+        ));
+    }
+
+
+    // ===== helpers =====
+
+    private void assertServantCanEditAttendance(User servant) {
+        if (servant == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        Set<String> allowed = Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER", "DEV");
+        String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(role)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+        }
+    }
+
+    private void enforceWeekClose(User servant, LocalDate selectedDate) {
+        if (selectedDate == null) return;
+
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        String roleNorm = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT).replaceAll("[-\\s]+", "_");
+        boolean canOverrideWeekClose = roleNorm.equals("AMIN_OSRA")
+                || roleNorm.equals("AMIN_KHEDMA")
+                || roleNorm.equals("DEVELOPER")
+                || roleNorm.equals("DEV");
+
+        if (selectedDate.isBefore(monday) && !canOverrideWeekClose) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Week is closed (cannot edit previous week)");
+        }
+    }
+
+    private void enforceDayOfWeek(AttendanceType type, LocalDate selectedDate) {
+        if (type == null || selectedDate == null) return;
+        DayOfWeek dow = selectedDate.getDayOfWeek();
+        if (type == AttendanceType.FAMILY_MEETING && dow != DayOfWeek.THURSDAY) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting must be on Thursday");
+        }
+        if ((type == AttendanceType.FRIDAY_LITURGY
+                || type == AttendanceType.MARMARKOS_KHORS
+                || type == AttendanceType.ATHANASIUS_KHORS)
+                && dow != DayOfWeek.FRIDAY) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "This type must be on Friday");
+        }
+        if (type == AttendanceType.TASBEEHA && dow != DayOfWeek.SATURDAY) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Tasbeeha must be on Saturday");
+        }
+    }
+
+    private boolean isChoirLabel(String family) {
+        if (family == null) return false;
+        String x = family.trim();
+        return x.equals("خورس مارمرقس") || x.equals("خورس البابا اثناسيوس");
+    }
+
+    private String choirKeyFromLabel(String family) {
+        String x = family == null ? "" : family.trim();
+        if (x.equals("خورس مارمرقس")) return "MARMARKOS";
+        if (x.equals("خورس البابا اثناسيوس")) return "ATHANASIUS";
+        return "";
+    }
+
+    private void assertChoirAuthorization(User servant, AttendanceType type) {
+        String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
+        boolean isAminOrDev = role.equals("AMIN_KHEDMA") || role.equals("DEVELOPER") || role.equals("DEV");
+        if (isAminOrDev) return;
+
+        if (!role.equals("KHADIM")) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+        }
+
+        String scopeStr = servant.getServingScope() == null ? "" : servant.getServingScope().trim().toUpperCase(Locale.ROOT);
+        if (!("KHORS_ONLY".equals(scopeStr) || "BOTH".equals(scopeStr))) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+        }
+
+        String myKhors = servant.getKhors() == null ? "" : servant.getKhors().trim().toUpperCase(Locale.ROOT);
+        String needed = (type == AttendanceType.MARMARKOS_KHORS) ? "MARMARKOS" : "ATHANASIUS";
+        if (!(myKhors.equals("BOTH") || myKhors.equals(needed))) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
+        }
+    }
+
+    private static class ScopeResult {
+        final List<User> users;
+        final String familyBase;
+
+        ScopeResult(List<User> users, String familyBase) {
+            this.users = users == null ? List.of() : users;
+            this.familyBase = familyBase;
+        }
+    }
+
+    private ScopeResult resolveScopeUsers(User servant, AttendanceType type, String family) {
+        List<String> roles = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
+
+        if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
+            assertChoirAuthorization(servant, type);
+            String needed = (type == AttendanceType.MARMARKOS_KHORS) ? "MARMARKOS" : "ATHANASIUS";
+            return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), null);
+        }
+
+        if (type == AttendanceType.FAMILY_MEETING) {
+            String base = (family == null || family.isBlank()) ? null : FamilyUtil.mainFamily(family);
+            if (base == null || base.isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting needs a selected family");
+            }
+            return new ScopeResult(userRepo.findByAnyFamilyStartingWithAndRoleIn(base, roles), base);
+        }
+
+        // Friday / Saturday types: allow filtering by selected family or choir label
+        if (family != null && !family.trim().isBlank()) {
+            if (isChoirLabel(family)) {
+                String needed = choirKeyFromLabel(family);
+                return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), null);
+            }
+            String base = FamilyUtil.mainFamily(family);
+            if (base != null && !base.isBlank()) {
+                return new ScopeResult(userRepo.findByAnyFamilyStartingWithAndRoleIn(base, roles), base);
+            }
+        }
+
+        // All service
+        return new ScopeResult(userRepo.findByRoleIn(roles), null);
     }
 
     // Reset (delete) attendance history for selected users

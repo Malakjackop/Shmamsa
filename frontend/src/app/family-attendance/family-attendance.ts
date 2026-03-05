@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
-import type { AttendanceType } from '../services/attendance.service';
+import { AttendanceService, type AttendanceType } from '../services/attendance.service';
 import { IftekadService } from '../services/iftekad.service';
 
 type Member = {
@@ -84,6 +84,7 @@ export class FamilyAttendanceComponent implements OnInit {
   private auth = inject(AuthService);
   private message = inject(MessageService);
   private iftekadSvc = inject(IftekadService);
+  private attendanceSvc = inject(AttendanceService);
 
   me: any;
   members: Member[] = [];
@@ -101,6 +102,23 @@ export class FamilyAttendanceComponent implements OnInit {
 
   profileFor: Member | null = null;
   profile: any = null;
+
+  // ===== Daily attendance (حضور اليوم) =====
+  showDaily = false;
+  dailyDate = '';
+  dailyType: AttendanceType | null = null;
+  dailyLoading = false;
+  dailyTotal = 0;
+  dailyPresentCount = 0;
+  dailyAbsentCount = 0;
+  dailyRecordsCount = 0;
+  dailyPresent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string }> = [];
+  dailyAbsent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string }> = [];
+
+  // confirm remove (mark absent)
+  showDailyRemoveConfirm = false;
+  dailyRemoveTarget: { id: number; fullName: string } | null = null;
+  dailyRemoveSaving = false;
 
   // ===== Iftekad (visitation) =====
   iftekadFor: Member | null = null;
@@ -441,6 +459,162 @@ export class FamilyAttendanceComponent implements OnInit {
   closeProfile() {
     this.profileFor = null;
     this.profile = null;
+  }
+
+  // ===== Daily attendance (حضور اليوم) =====
+
+  canEditDailyAttendance(): boolean {
+    const r = String(this.me?.role || '').trim().toUpperCase();
+    return r === 'KHADIM' || r === 'AMIN_OSRA' || r === 'AMIN_KHEDMA' || r === 'DEVELOPER' || r === 'DEV';
+  }
+
+  openDailyAttendance() {
+    this.showDaily = true;
+    this.setDailyToday();
+    this.reloadDaily();
+  }
+
+  closeDailyAttendance() {
+    this.showDaily = false;
+    this.dailyLoading = false;
+    this.dailyDate = '';
+    this.dailyType = null;
+    this.dailyTotal = 0;
+    this.dailyPresentCount = 0;
+    this.dailyAbsentCount = 0;
+    this.dailyRecordsCount = 0;
+    this.dailyPresent = [];
+    this.dailyAbsent = [];
+    this.showDailyRemoveConfirm = false;
+    this.dailyRemoveTarget = null;
+    this.dailyRemoveSaving = false;
+  }
+
+  setDailyToday() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    this.dailyDate = `${yyyy}-${mm}-${dd}`;
+  }
+
+  private dailyFamilyParam(): string | undefined {
+    if (this.canSelectFamily()) return this.selectedFamily;
+    return this.me?.deaconFamily;
+  }
+
+  private inferDailyType(dateIso: string): AttendanceType | null {
+    if (!dateIso) return null;
+    const d = new Date(`${dateIso}T00:00:00`);
+    if (isNaN(d.getTime())) return null;
+    const dow = d.getDay(); // 0 Sun .. 6 Sat
+
+    // Thu / Fri / Sat only
+    if (dow === 4) return 'FAMILY_MEETING';
+    if (dow === 5) {
+      if (this.isMarmarkosChoir) return 'MARMARKOS_KHORS';
+      if (this.isAthanasiusChoir) return 'ATHANASIUS_KHORS';
+      return 'FRIDAY_LITURGY';
+    }
+    if (dow === 6) return 'TASBEEHA';
+
+    return null;
+  }
+
+  dailyTypeLabel(t: AttendanceType | null): string {
+    if (!t) return '';
+    if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
+    if (t === 'MARMARKOS_KHORS') return 'خورس مارمرقس';
+    if (t === 'ATHANASIUS_KHORS') return 'خورس البابا اثناسيوس';
+    if (t === 'TASBEEHA') return 'تسبحة';
+    if (t === 'FAMILY_MEETING') return 'اجتماع الأسرة';
+    return t;
+  }
+
+  onDailyDateChange() {
+    this.reloadDaily();
+  }
+
+  reloadDaily() {
+    if (!this.showDaily) return;
+    if (!this.dailyDate) {
+      this.dailyType = null;
+      this.dailyPresent = [];
+      this.dailyAbsent = [];
+      this.dailyTotal = 0;
+      this.dailyPresentCount = 0;
+      this.dailyAbsentCount = 0;
+      return;
+    }
+
+    const t = this.inferDailyType(this.dailyDate);
+    this.dailyType = t;
+
+    if (!t) {
+      this.dailyPresent = [];
+      this.dailyAbsent = [];
+      this.dailyTotal = 0;
+      this.dailyPresentCount = 0;
+      this.dailyAbsentCount = 0;
+      this.dailyRecordsCount = 0;
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار يوم خميس / جمعة / سبت' });
+      return;
+    }
+
+    this.dailyLoading = true;
+    const fam = this.dailyFamilyParam();
+    this.attendanceSvc.daily(this.dailyDate, t, fam).subscribe({
+      next: (res: any) => {
+        this.dailyTotal = Number(res?.total || 0);
+        this.dailyPresentCount = Number(res?.presentCount || 0);
+        this.dailyAbsentCount = Number(res?.absentCount || 0);
+        this.dailyRecordsCount = Number(res?.recordsCount || 0);
+        this.dailyPresent = (res?.present || []) as any;
+        this.dailyAbsent = (res?.absent || []) as any;
+        this.dailyLoading = false;
+      },
+      error: (err: any) => {
+        this.dailyLoading = false;
+        this.dailyPresent = [];
+        this.dailyAbsent = [];
+        this.dailyTotal = 0;
+        this.dailyPresentCount = 0;
+        this.dailyAbsentCount = 0;
+        this.dailyRecordsCount = 0;
+        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load' });
+      }
+    });
+  }
+
+  askDailyMarkAbsent(p: { id: number; fullName: string }) {
+    if (!this.dailyType || !this.dailyDate) return;
+    if (!this.canEditDailyAttendance()) return;
+    this.dailyRemoveTarget = { id: p.id, fullName: p.fullName };
+    this.showDailyRemoveConfirm = true;
+  }
+
+  cancelDailyRemove() {
+    this.showDailyRemoveConfirm = false;
+    this.dailyRemoveTarget = null;
+    this.dailyRemoveSaving = false;
+  }
+
+  confirmDailyRemove() {
+    if (!this.dailyType || !this.dailyDate || !this.dailyRemoveTarget) return;
+    const fam = this.dailyFamilyParam();
+    this.dailyRemoveSaving = true;
+    this.attendanceSvc.markAbsent(this.dailyRemoveTarget.id, this.dailyDate, this.dailyType, fam).subscribe({
+      next: () => {
+        this.dailyRemoveSaving = false;
+        this.cancelDailyRemove();
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء الحضور وتسجيله غياب' });
+        this.reloadDaily();
+      },
+      error: (err: any) => {
+        this.dailyRemoveSaving = false;
+        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
+      }
+    });
   }
 
   // ===== Iftekad =====

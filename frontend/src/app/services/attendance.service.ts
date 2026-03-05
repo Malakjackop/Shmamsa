@@ -14,6 +14,36 @@ export class AttendanceService {
   private http = inject(HttpClient);
   private baseUrl = '/api/attendance';
 
+  daily(
+    date: string, // yyyy-MM-dd
+    type: AttendanceType,
+    family?: string
+  ): Observable<{
+    ok: boolean;
+    date: string;
+    type: AttendanceType;
+    family?: string;
+    familyBase?: string | null;
+    total: number;
+    presentCount: number;
+    absentCount: number;
+    recordsCount: number;
+    present: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string; status: 'PRESENT' | 'ABSENT' }>;
+    absent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string; status: 'PRESENT' | 'ABSENT' }>;
+  }> {
+    const params: any = { date, type };
+    if (family) params.family = family;
+    return this.http.get<any>(`${this.baseUrl}/daily`, { params, withCredentials: true });
+  }
+
+  markAbsent(userId: number, date: string, type: AttendanceType, family?: string): Observable<any> {
+    return this.http.post(
+      `${this.baseUrl}/mark-absent`,
+      { userId, date, type, family },
+      { withCredentials: true }
+    );
+  }
+
   submit(
     users: { id: number; username?: string }[],
     type: AttendanceType,
