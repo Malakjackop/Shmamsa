@@ -19,6 +19,10 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .title{font-weight:700;font-size:18px;}
 .sub{color:#666;font-size:12px;}
 
+/* Profile modal cards (match family-info look) */
+.profileGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
+.profileGrid div{border:1px solid #eee;border-radius:12px;padding:10px;background:#fff;}
+
 /* ===== Iftekad column ===== */
 .iftekadWrap{position:relative;display:inline-block;}
 .iftekadBtn{background:#1faa59;color:#fff;border:none;border-radius:10px;width:39px;height:36px;font-size:18px;line-height:36px;cursor:pointer;}
@@ -112,13 +116,14 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .dailyControls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;}
 .dailyField{display:flex;flex-direction:column;gap:6px;}
 .dailyField label{font-size:12px;color:#666;}
-.dailyField input{padding:10px;border:1px solid #ddd;border-radius:10px;}
+.dailyField input,.dailyField select{padding:10px;border:1px solid #ddd;border-radius:10px;}
 
 .dailyStats{display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:10px;margin-top:6px;}
 .stat{border:1px solid #eee;border-radius:12px;padding:10px;text-align:center;background:#fafafa;}
 .statNum{font-weight:800;font-size:20px;}
 .statLbl{font-size:12px;color:#666;margin-top:4px;}
-.dailySummaryLine{margin:10px 0;font-weight:800;text-align:center;}
+.statExtra{font-size:12px;color:#444;margin-top:6px;font-weight:700;line-height:1.4;}
+.dailySummaryLine{font-weight:800;text-align:center;padding:8px 14px;border:1px solid #e6e6e6;border-radius:999px;background:#fafafa;}
 
 .dailyBoxes{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:12px;}
 .dailyBox{border:1px solid #eee;border-radius:14px;padding:12px;background:#fff;max-height:48vh;overflow:auto;}
@@ -126,14 +131,17 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .boxList{display:flex;flex-direction:column;gap:8px;}
 .boxRow{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #eee;border-radius:12px;padding:8px 10px;background:#fafafa;}
 .boxName{font-weight:700;}
-.minusBtn{width:44px;height:36px;display:inline-flex;align-items:center;justify-content:center;}
+.minusBtn{width:44px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:#d32f2f !important;border-color:#d32f2f !important;color:#fff !important;}
+.minusBtn:hover{background:#b71c1c !important;border-color:#b71c1c !important;}
+.minusBtn .pi{font-size:16px;line-height:1;color:#fff;}
 
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .iftekadForm{grid-template-columns:1fr;}
   .editGrid{grid-template-columns:1fr;}
-  .cards{grid-template-columns: 1fr;}
+  .cards{grid-template-columns:1fr;}
   .dailyBoxes{grid-template-columns:1fr;}
+  .profileGrid{grid-template-columns:1fr;}
 }
 .cards{
   display: grid;
@@ -180,3 +188,5 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .modalCard .detailList{
   margin-top: 6px;
 }
+
+

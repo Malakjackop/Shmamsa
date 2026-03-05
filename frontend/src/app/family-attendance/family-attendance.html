@@ -68,7 +68,7 @@
             </span>
           </td>
 
-          <td><button pButton type="button" icon="pi pi-file" class="fileBtn" (click)="openProfile(m)"></button></td>
+          <td><button pButton type="button" icon="pi pi-user" class="fileBtn" (click)="openProfile(m)">👤</button></td>
         </tr>
       </tbody>
     </table>
@@ -96,8 +96,21 @@
             [ngModelOptions]="{ standalone: true }"
           />
         </div>
-        <button pButton type="button" class="todayBtn" label="اليوم" (click)="setDailyToday(); onDailyDateChange()"></button>
+
+        <div class="dailyField">
+          <label>نوع الغياب/الحضور</label>
+          <select
+            [(ngModel)]="dailyType"
+            (change)="onDailyTypeChange()"
+            [ngModelOptions]="{ standalone: true }"
+          >
+            <option [ngValue]="null">اختار النوع</option>
+            <option *ngFor="let t of dailyTypeOptions()" [ngValue]="t">{{ dailyTypeLabel(t) }}</option>
+          </select>
+        </div>
       </div>
+
+      <button pButton type="button" class="todayBtn" label="اليوم" (click)="setDailyToday(); onDailyDateChange()"></button>
 
       <div *ngIf="dailyLoading" class="hint">جاري التحميل...</div>
 
@@ -114,10 +127,11 @@
           <div class="stat">
             <div class="statNum">{{ dailyTotal }}</div>
             <div class="statLbl">المجموع</div>
+            <div class="statExtra" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
           </div>
         </div>
 
-        <div class="dailySummaryLine" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
+
 
         <div class="dailyBoxes">
           <div class="dailyBox">
@@ -130,10 +144,13 @@
                   *ngIf="canEditDailyAttendance()"
                   pButton
                   type="button"
-                  icon="pi pi-minus"
                   class="minusBtn"
+                  title="تحويل إلى غياب"
+                  aria-label="تحويل إلى غياب"
                   (click)="askDailyMarkAbsent(p)"
-                ></button>
+                >
+                  🗑️
+                </button>
               </div>
             </div>
 
@@ -157,7 +174,7 @@
           </div>
         </div>
 
-        <div class="hint" *ngIf="dailyRecordsCount === 0">ملحوظة: لم يتم تسجيل حضور/غياب لهذا اليوم بعد.</div>
+        <div class="hint" *ngIf="dailyRecordsCount === 0">لا يوجد تسجيلات لهذا اليوم (غالبًا لم يتم عقد الاجتماع).</div>
       </ng-container>
 
       <!-- confirm: mark present -> absent -->
@@ -422,3 +439,5 @@
     </div>
   </div>
 </div>
+
+

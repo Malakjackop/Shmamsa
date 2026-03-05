@@ -49,6 +49,19 @@ export class TransferMembersComponent implements OnInit {
   selecting = false;
   selectedIds = new Set<number>();
 
+  private readonly preferredFamilyOrder: string[] = [
+    'اسره السمائين',
+    'اسره القديس ابانوب',
+    'اسره القديس ديسقورس',
+    'اسره القديس سيدهم بشاي',
+    'اسره القديس اسكلابيوس',
+    'اسره القديس البابا كيرلس',
+    'اسره القديس الانبا ابرام',
+    'اسره القديس اسطفانوس',
+    'خورس مارمرقس',
+    'خورس البابا اثناسيوس'
+  ];
+
   /** ✅ Registration lists (same as Register page) */
   servantFamilies: string[] = [
   'اسره السمائيين',
@@ -125,6 +138,8 @@ private normRole(v: any): string {
 }
 
   private bootstrapDefaults() {
+    this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
+    this.makhdomFamilies = this.sortFamiliesByPreferredOrder(this.makhdomFamilies);
 
     const mineBase = (this.me?.deaconFamily || '').trim();
 
@@ -148,17 +163,64 @@ private normRole(v: any): string {
     this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
   }
 
+  private normalizeFamilyName(value: any): string {
+    return String(value || '')
+      .trim()
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  private familyOrderKey(family: string): string {
+    const n = this.normalizeFamilyName(family);
+
+    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
+    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
+    if (n.includes('سمائ')) return 'اسره السمائين';
+    if (n.includes('ابانوب')) return 'اسره القديس ابانوب';
+    if (n.includes('ديسقورس')) return 'اسره القديس ديسقورس';
+    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسره القديس سيدهم بشاي';
+    if (n.includes('اسكلابيوس')) return 'اسره القديس اسكلابيوس';
+    if (n.includes('كيرلس')) return 'اسره القديس البابا كيرلس';
+    if (n.includes('ابرام')) return 'اسره القديس الانبا ابرام';
+    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسره القديس اسطفانوس';
+
+    return family;
+  }
+
+  private sortFamiliesByPreferredOrder(families: string[]): string[] {
+    const cleaned = (families || []).map((x) => String(x || '').trim()).filter(Boolean);
+    const orderMap = new Map(
+      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
+    );
+
+    return [...cleaned].sort((a, b) => {
+      const aKey = this.familyOrderKey(a);
+      const bKey = this.familyOrderKey(b);
+      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
+      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
+
+      if (aOrder != null && bOrder != null) {
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return a.localeCompare(b, 'ar');
+      }
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return a.localeCompare(b, 'ar');
+    });
+  }
 
   private loadFamilyLists() {
     this.familySvc.families().subscribe({
       next: (list) => {
         if (Array.isArray(list) && list.length) {
-          this.servantFamilies = list as any;
+          this.servantFamilies = this.sortFamiliesByPreferredOrder(list as any);
 
 if (this.isAminKhedmaOrDev()) {
-  this.viewFamilies = [...this.servantFamilies];
+  this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
 } else if (this.hasAnyScopedAminOsra()) {
-  this.viewFamilies = this.getAminOsraFamilies();
+  this.viewFamilies = this.sortFamiliesByPreferredOrder(this.getAminOsraFamilies());
 } else if (this.isKhadim()) {
   const mine = [
     this.me?.deaconFamily,
@@ -169,9 +231,9 @@ if (this.isAminKhedmaOrDev()) {
     .map((x: any) => String(x || '').trim())
     .filter((x: string) => !!x);
 
-  this.viewFamilies = Array.from(new Set(mine));
+  this.viewFamilies = this.sortFamiliesByPreferredOrder(Array.from(new Set(mine)));
 } else {
-  this.viewFamilies = [...this.servantFamilies];
+  this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
 }
 
 const first = this.viewFamilies[0] || '';

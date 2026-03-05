@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+﻿import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AdminService } from '../services/admin.service';
 import { AuthService } from '../services/auth.service';
@@ -60,6 +60,18 @@ export class FamilyInfoComponent implements OnInit {
   requestsOpen = false;
   requestsLoading = false;
   requests: KhorsJoinRequestView[] = [];
+  private readonly preferredFamilyOrder: string[] = [
+    'اسره السمائين',
+    'اسره القديس ابانوب',
+    'اسره القديس ديسقورس',
+    'اسره القديس سيدهم بشاي',
+    'اسره القديس اسكلابيوس',
+    'اسره القديس البابا كيرلس',
+    'اسره القديس الانبا ابرام',
+    'اسره الديس اسطفانوس',
+    'خورس مارمرقس',
+    'خورس البابا اثناسيوس'
+  ];
 
   ngOnInit() {
     this.auth.getUserData().subscribe({
@@ -205,7 +217,7 @@ export class FamilyInfoComponent implements OnInit {
     if (this.canSelectFamily()) {
       this.familySvc.families().subscribe({
         next: (f) => {
-          this.families = f || [];
+          this.families = this.sortFamiliesByPreferredOrder(f || []);
           if (this.families.length) {
             // ✅ default to first family (for KHADIM: one of his served families)
             this.selectedFamily = this.families[0];
@@ -225,6 +237,51 @@ export class FamilyInfoComponent implements OnInit {
       this.loadMembers();
       this.loadPendingRequestsCount();
     }
+  }
+
+  private normalizeFamilyName(value: any): string {
+    return String(value || '')
+      .trim()
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  private familyOrderKey(family: string): string {
+    const n = this.normalizeFamilyName(family);
+
+    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
+    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
+    if (n.includes('سمائ')) return 'اسره السمائين';
+    if (n.includes('ابانوب')) return 'اسره القديس ابانوب';
+    if (n.includes('ديسقورس')) return 'اسره القديس ديسقورس';
+    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسره القديس سيدهم بشاي';
+    if (n.includes('اسكلابيوس')) return 'اسره القديس اسكلابيوس';
+    if (n.includes('كيرلس')) return 'اسره القديس البابا كيرلس';
+    if (n.includes('ابرام')) return 'اسره القديس الانبا ابرام';
+    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسره الديس اسطفانوس';
+
+    return family;
+  }
+
+  private sortFamiliesByPreferredOrder(families: string[]): string[] {
+    const cleaned = (families || []).map((x) => String(x || '').trim()).filter(Boolean);
+    const orderMap = new Map(
+      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
+    );
+
+    return [...cleaned].sort((a, b) => {
+      const aKey = this.familyOrderKey(a);
+      const bKey = this.familyOrderKey(b);
+      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
+      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
+
+      if (aOrder != null && bOrder != null) return aOrder - bOrder;
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return a.localeCompare(b, 'ar');
+    });
   }
 
   onFamilyChange() {
@@ -632,3 +689,4 @@ export class FamilyInfoComponent implements OnInit {
     return (list || []).filter((x) => String(x?.requestedKhors || '').toUpperCase() === selected);
   }
 }
+

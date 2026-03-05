@@ -90,6 +90,18 @@ export class FamilyAttendanceComponent implements OnInit {
   members: Member[] = [];
   families: string[] = [];
   selectedFamily = '';
+  private readonly preferredFamilyOrder: string[] = [
+    'اسره السمائين',
+    'اسره القديس ابانوب',
+    'اسره القديس ديسقورس',
+    'اسره القديس سيدهم بشاي',
+    'اسره القديس اسكلابيوس',
+    'اسره القديس البابا كيرلس',
+    'اسره القديس الانبا ابرام',
+    'اسره الديس اسطفانوس',
+    'خورس مارمرقس',
+    'خورس البابا اثناسيوس'
+  ];
   loading = false;
 
   exportMode = false;
@@ -192,7 +204,7 @@ export class FamilyAttendanceComponent implements OnInit {
     if (this.canSelectFamily()) {
       this.familySvc.families().subscribe({
         next: (f) => {
-          this.families = f || [];
+          this.families = this.sortFamiliesByPreferredOrder(f || []);
           if (this.families.length) {
             this.selectedFamily = this.families[0];
             this.loadMembers();
@@ -208,6 +220,51 @@ export class FamilyAttendanceComponent implements OnInit {
       this.selectedFamily = this.me?.deaconFamily;
       this.loadMembers();
     }
+  }
+
+  private normalizeFamilyName(value: any): string {
+    return String(value || '')
+      .trim()
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  private familyOrderKey(family: string): string {
+    const n = this.normalizeFamilyName(family);
+
+    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
+    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
+    if (n.includes('سمائ')) return 'اسره السمائين';
+    if (n.includes('ابانوب')) return 'اسره القديس ابانوب';
+    if (n.includes('ديسقورس')) return 'اسره القديس ديسقورس';
+    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسره القديس سيدهم بشاي';
+    if (n.includes('اسكلابيوس')) return 'اسره القديس اسكلابيوس';
+    if (n.includes('كيرلس')) return 'اسره القديس البابا كيرلس';
+    if (n.includes('ابرام')) return 'اسره القديس الانبا ابرام';
+    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسره الديس اسطفانوس';
+
+    return family;
+  }
+
+  private sortFamiliesByPreferredOrder(families: string[]): string[] {
+    const cleaned = (families || []).map((x) => String(x || '').trim()).filter(Boolean);
+    const orderMap = new Map(
+      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
+    );
+
+    return [...cleaned].sort((a, b) => {
+      const aKey = this.familyOrderKey(a);
+      const bKey = this.familyOrderKey(b);
+      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
+      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
+
+      if (aOrder != null && bOrder != null) return aOrder - bOrder;
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return a.localeCompare(b, 'ar');
+    });
   }
 
   onFamilyChange() {
@@ -471,6 +528,7 @@ export class FamilyAttendanceComponent implements OnInit {
   openDailyAttendance() {
     this.showDaily = true;
     this.setDailyToday();
+    this.dailyType = this.defaultDailyTypeForDate(this.dailyDate);
     this.reloadDaily();
   }
 
@@ -503,22 +561,45 @@ export class FamilyAttendanceComponent implements OnInit {
     return this.me?.deaconFamily;
   }
 
-  private inferDailyType(dateIso: string): AttendanceType | null {
-    if (!dateIso) return null;
-    const d = new Date(`${dateIso}T00:00:00`);
-    if (isNaN(d.getTime())) return null;
-    const dow = d.getDay(); // 0 Sun .. 6 Sat
+  private canShowDailyKhorsTypes(): boolean {
+    const selected = String(this.selectedFamily || '').trim();
+    if (selected === 'خورس مارمرقس' || selected === 'خورس البابا اثناسيوس') return true;
 
-    // Thu / Fri / Sat only
-    if (dow === 4) return 'FAMILY_MEETING';
-    if (dow === 5) {
-      if (this.isMarmarkosChoir) return 'MARMARKOS_KHORS';
-      if (this.isAthanasiusChoir) return 'ATHANASIUS_KHORS';
-      return 'FRIDAY_LITURGY';
+    const role = String(this.me?.role || '').trim().toUpperCase();
+    if (role !== 'KHADIM') return false;
+
+    const scope = String(this.me?.servingScope || '').trim().toUpperCase();
+    if (scope === 'KHORS_ONLY' || scope === 'BOTH') return true;
+
+    const kh = String(this.me?.khors || '').trim().toUpperCase();
+    return kh === 'MARMARKOS' || kh === 'ATHANASIUS' || kh === 'BOTH';
+  }
+
+  dailyTypeOptions(): AttendanceType[] {
+    const base: AttendanceType[] = ['FRIDAY_LITURGY', 'TASBEEHA', 'FAMILY_MEETING'];
+    if (this.canShowDailyKhorsTypes()) {
+      base.push('MARMARKOS_KHORS', 'ATHANASIUS_KHORS');
     }
-    if (dow === 6) return 'TASBEEHA';
+    return base;
+  }
 
-    return null;
+  private defaultDailyTypeForDate(dateIso: string): AttendanceType | null {
+    const options = this.dailyTypeOptions();
+    if (!dateIso) return options[0] || null;
+
+    const d = new Date(`${dateIso}T00:00:00`);
+    if (isNaN(d.getTime())) return options[0] || null;
+    const dow = d.getDay();
+
+    if (dow === 4) return options.includes('FAMILY_MEETING') ? 'FAMILY_MEETING' : (options[0] || null);
+    if (dow === 5) {
+      if (this.isMarmarkosChoir && options.includes('MARMARKOS_KHORS')) return 'MARMARKOS_KHORS';
+      if (this.isAthanasiusChoir && options.includes('ATHANASIUS_KHORS')) return 'ATHANASIUS_KHORS';
+      if (options.includes('FRIDAY_LITURGY')) return 'FRIDAY_LITURGY';
+    }
+    if (dow === 6) return options.includes('TASBEEHA') ? 'TASBEEHA' : (options[0] || null);
+
+    return options[0] || null;
   }
 
   dailyTypeLabel(t: AttendanceType | null): string {
@@ -532,6 +613,13 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   onDailyDateChange() {
+    if (!this.dailyType) {
+      this.dailyType = this.defaultDailyTypeForDate(this.dailyDate);
+    }
+    this.reloadDaily();
+  }
+
+  onDailyTypeChange() {
     this.reloadDaily();
   }
 
@@ -544,12 +632,11 @@ export class FamilyAttendanceComponent implements OnInit {
       this.dailyTotal = 0;
       this.dailyPresentCount = 0;
       this.dailyAbsentCount = 0;
+      this.dailyRecordsCount = 0;
       return;
     }
 
-    const t = this.inferDailyType(this.dailyDate);
-    this.dailyType = t;
-
+    const t = this.dailyType;
     if (!t) {
       this.dailyPresent = [];
       this.dailyAbsent = [];
@@ -557,7 +644,7 @@ export class FamilyAttendanceComponent implements OnInit {
       this.dailyPresentCount = 0;
       this.dailyAbsentCount = 0;
       this.dailyRecordsCount = 0;
-      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار يوم خميس / جمعة / سبت' });
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار نوع الحضور' });
       return;
     }
 
@@ -565,12 +652,23 @@ export class FamilyAttendanceComponent implements OnInit {
     const fam = this.dailyFamilyParam();
     this.attendanceSvc.daily(this.dailyDate, t, fam).subscribe({
       next: (res: any) => {
-        this.dailyTotal = Number(res?.total || 0);
+        const familyTotal = Number(this.members?.length || 0);
+
         this.dailyPresentCount = Number(res?.presentCount || 0);
         this.dailyAbsentCount = Number(res?.absentCount || 0);
         this.dailyRecordsCount = Number(res?.recordsCount || 0);
         this.dailyPresent = (res?.present || []) as any;
         this.dailyAbsent = (res?.absent || []) as any;
+
+        // المجموع = إجمالي أفراد الأسرة المعروضة
+        this.dailyTotal = familyTotal > 0 ? familyTotal : Number(res?.total || 0);
+
+        // لو لا يوجد أي تسجيلات في اليوم ده، لا نعرض غياب (غالبًا مفيش اجتماع)
+        if (this.dailyRecordsCount === 0) {
+          this.dailyAbsent = [];
+          this.dailyAbsentCount = 0;
+        }
+
         this.dailyLoading = false;
       },
       error: (err: any) => {
@@ -1110,3 +1208,5 @@ export class FamilyAttendanceComponent implements OnInit {
     }
   }
 }
+
+
