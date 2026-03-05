@@ -11,6 +11,10 @@ type Member = {
   deaconFamily2?: string;
   deaconFamily3?: string;
   deaconFamily4?: string;
+  deaconFamilyRole?: string;
+  deaconFamilyRole2?: string;
+  deaconFamilyRole3?: string;
+  deaconFamilyRole4?: string;
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
@@ -72,6 +76,7 @@ export class TransferMembersComponent implements OnInit {
   'اسره اسطفانوس أ',
   'اسره اسطفانوس ب'
 ];
+viewFamilies: string[] = []; 
 
 marmarkosYearTargets: { label: string; value: string }[] = [
   { label: 'خورس مارمرقس (سنه اوله)', value: 'KHORS:MARMARKOS:YEAR:1' },
@@ -85,7 +90,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   mode: TransferMode = 'MAKHDOM';
   selectedFamilyView = '';
   targetFamily = '';
-  extraFamilies: string[] = [];
+  extraFamilies: Array<{ family: string; role: 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'MAKHDOM' }> = [];
   targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'KHADIM';
 
   ngOnInit() {
@@ -94,7 +99,6 @@ marmarkosYearTargets: { label: string; value: string }[] = [
         this.me = u;
         this.bootstrapDefaults();
         this.loadFamilyLists();
-        this.loadMembers();
       },
       error: () => {}
     });
@@ -109,8 +113,16 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   }
 
   isAminOsra(): boolean {
-    return this.me?.role === 'AMIN_OSRA';
-  }
+  return this.me?.role === 'AMIN_OSRA' || this.isScopedAminOsraForSelected();
+}
+
+private normRole(v: any): string {
+  return String(v || '')
+    .trim()
+    .toUpperCase()
+    .replace(/^ROLE_/, '')
+    .replace(/\s+/g, '_');
+}
 
   private bootstrapDefaults() {
 
@@ -138,20 +150,42 @@ marmarkosYearTargets: { label: string; value: string }[] = [
 
 
   private loadFamilyLists() {
-    // ✅ Use backend to return the right families for the logged-in user (especially KHADIM)
     this.familySvc.families().subscribe({
       next: (list) => {
         if (Array.isArray(list) && list.length) {
           this.servantFamilies = list as any;
-          // keep selection valid
-          if (!this.selectedFamilyView || !this.servantFamilies.some(x => (x || '').trim() === (this.selectedFamilyView || '').trim())) {
-            this.selectedFamilyView = '';
-          }
-          // if Marmarkos view, ensure target is set
+
+if (this.isAminKhedmaOrDev()) {
+  this.viewFamilies = [...this.servantFamilies];
+} else if (this.hasAnyScopedAminOsra()) {
+  this.viewFamilies = this.getAminOsraFamilies();
+} else if (this.isKhadim()) {
+  const mine = [
+    this.me?.deaconFamily,
+    this.me?.deaconFamily2,
+    this.me?.deaconFamily3,
+    this.me?.deaconFamily4,
+  ]
+    .map((x: any) => String(x || '').trim())
+    .filter((x: string) => !!x);
+
+  this.viewFamilies = Array.from(new Set(mine));
+} else {
+  this.viewFamilies = [...this.servantFamilies];
+}
+
+const first = this.viewFamilies[0] || '';
+if (!this.selectedFamilyView) this.selectedFamilyView = first;
+
+const ok = this.viewFamilies.some(
+  (x) => String(x || '').trim() === String(this.selectedFamilyView || '').trim()
+);
+if (!ok) this.selectedFamilyView = first;
           if (this.isMarmarkosView()) {
             this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
           }
         }
+        this.loadMembers();
       },
       error: () => {}
     });
@@ -162,7 +196,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
 
     let famParam: string | undefined = undefined;
 
-    if (this.isAminKhedmaOrDev() || this.isKhadim()) {
+    if (this.isAminKhedmaOrDev() || this.isKhadim() || this.isAminOsra()) {
       if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') {
         famParam = 'SERVANTS';
       } else {
@@ -189,6 +223,8 @@ marmarkosYearTargets: { label: string; value: string }[] = [
     list = list.filter((x: any) => ok.has(String(x?.role || '').trim().toUpperCase()));
   }
         } else if (this.isAminOsra()) {
+          // ✅ Amin Osra can transfer/view MAKHDOM only within his family
+          list = list.filter((x: any) => String(x?.role || '').trim().toUpperCase() === 'MAKHDOM');
         }
         this.members = list;
         this.loading = false;
@@ -217,8 +253,30 @@ private levelLabel(n?: number): string {
   return `سنه ${n}`;
 }
 
+
+private familyRoleFor(m: Member, fam: string): string {
+  const f = String(fam || '').trim();
+  const slots: Array<[string | undefined, string | undefined]> = [
+    [m.deaconFamily, (m as any).deaconFamilyRole],
+    [m.deaconFamily2, (m as any).deaconFamilyRole2],
+    [m.deaconFamily3, (m as any).deaconFamilyRole3],
+    [m.deaconFamily4, (m as any).deaconFamilyRole4],
+  ];
+  for (const [sf, sr] of slots) {
+    if (String(sf || '').trim() && String(sf || '').trim().toLowerCase() === f.toLowerCase()) {
+      return this.getRoleLabel(String(sr || '').trim().toUpperCase());
+    }
+  }
+  return '';
+}
+
+private familyWithRole(m: Member, fam: string): string {
+  const r = this.familyRoleFor(m, fam);
+  return r ? `${fam} (${r})` : fam;
+}
+
 displayFamily(m: Member): string {
-  // ✅ Choir year column is only for MAKHDOM view
+  // ✅ Choir year column is only for MAKHDOM view (when viewing Marmarkos bucket)
   if (this.mode === 'MAKHDOM' && this.isMarmarkosView()) {
     const yr = (m as any).khorsYear || 1;
     return this.levelLabel(yr);
@@ -227,26 +285,50 @@ displayFamily(m: Member): string {
   const role = String(m.role || '').trim().toUpperCase();
   const isServantRole = role === 'KHADIM' || role === 'AMIN_OSRA' || role === 'AMIN_KHEDMA';
 
-  const baseFamily = (m.deaconFamily || '').trim();
+  // ✅ collect all الأسرة assignments (up to 4) and dedupe
+  const rawFamilies = [m.deaconFamily, m.deaconFamily2, m.deaconFamily3, m.deaconFamily4]
+    .map(x => String(x || '').trim())
+    .filter(x => !!x && x.toUpperCase() !== 'SYSTEM' && !this.isChoirBucket(x));
+
+  const families: string[] = [];
+  for (const f of rawFamilies) {
+    if (!families.includes(f)) families.push(f);
+  }
+
   const khCode = String((m as any).khors || '').trim().toUpperCase();
   const kh = this.khorsLabel(khCode);
   const scope = String((m as any).servingScope || '').trim().toUpperCase();
 
-  // ✅ For servants: show الأسرة if he's serving family (BOTH), show الخورس only if KHORS_ONLY
+  const khLabel = (() => {
+    if (!kh) return '';
+    if (khCode === 'ATHANASIUS') return kh;
+    const lvl = this.levelLabel((m as any).khorsYear);
+    return lvl ? `${kh} (${lvl})` : kh;
+  })();
+
+  // ✅ For servants: show كل الأسر + الخورس (لو موجود) خصوصًا لو KHORS_ONLY
   if (isServantRole) {
-    if (scope === 'KHORS_ONLY' || this.isChoirBucket(baseFamily)) {
-      if (khCode === 'ATHANASIUS' && kh) return kh;
-      const lvl = this.levelLabel((m as any).khorsYear);
-      return kh ? (lvl ? `${kh} (${lvl})` : kh) : baseFamily;
-    }
-    return baseFamily;
+    const parts: string[] = [];
+    parts.push(...families.map(f => this.familyWithRole(m, f)));
+
+    // show khors when:
+    // - servant is KHORS_ONLY
+    // - or he actually has a khors code
+    // - or his base family was a choir bucket
+    const baseFamily = String(m.deaconFamily || '').trim();
+    const shouldShowKhors = (scope === 'KHORS_ONLY' || scope === 'BOTH') && !!khLabel;
+    if (shouldShowKhors && khLabel && !parts.includes(khLabel)) parts.push(khLabel);
+
+    // fallback: لو مفيش أي حاجة رجع الأسرة الأساسية (حتى لو كانت خورس bucket)
+    if (!parts.length) return baseFamily || '—';
+
+    return parts.join(' + ');
   }
 
-  // ✅ For مخدومين: keep old behavior (show choir if exists, else family)
-  if (khCode === 'ATHANASIUS' && kh) return kh;
-  const lvl = this.levelLabel((m as any).khorsYear);
-  if (kh) return lvl ? `${kh} (${lvl})` : kh;
-  return baseFamily;
+  const parts: string[] = [];
+  parts.push(...families.map(f => this.familyWithRole(m, f)));
+  if (khLabel && !parts.includes(khLabel)) parts.push(khLabel);
+  return parts.length ? parts.join(' + ') : (String(m.deaconFamily || '').trim() || '—');
 }
 
 private isChoirBucket(base: string): boolean {
@@ -254,27 +336,22 @@ private isChoirBucket(base: string): boolean {
   return x === 'خورس مارمرقس' || x === 'خورس البابا اثناسيوس';
 }
 
-// NOTE: not private because it's used in the template
 isPapaAthanasiusView(): boolean {
+  if (this.mode !== 'MAKHDOM') return false;
   const x = (this.selectedFamilyView || '').trim();
   return x === 'خورس البابا اثناسيوس';
 }
 
-// زوار النقل: غالبًا بيتسجلوا كـ "زوار" داخل واحدة من حقول الأسرة
 private isTransferVisitor(m: any): boolean {
   const fields = [m?.deaconFamily, m?.deaconFamily2, m?.deaconFamily3, m?.deaconFamily4]
     .map((x: any) => String(x || '').trim());
 
   const joined = fields.join(' | ');
-  // استبعاد واسع لتغطية اختلافات الكتابة
   if (joined.includes('زوار') || joined.includes('زائر')) {
-    // لو في كلمة "نقل" يبقى أكيد زوار النقل
     if (joined.includes('نقل')) return true;
-    // أو لو مكتوبة صراحة
     if (joined.includes('زوار النقل')) return true;
   }
 
-  // احتياط: لو فيه role مخصوص
   const role = String(m?.role || '').trim().toUpperCase();
   if (role === 'ZAYER' || role === 'VISITOR' || role === 'TRANSFER_VISITOR') return true;
 
@@ -388,10 +465,12 @@ removeFromChoir(m: Member) {
       rejectLabel: 'Cancel',
       accept: () => {
         const roleToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') ? this.targetRole : undefined;
-        const extrasToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
-          ? this.extraFamilies.map(x => (x || '').trim()).filter(x => !!x)
+        const extraAssignmentsToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
+          ? this.extraFamilies
+              .map(x => ({ family: String(x?.family || '').trim(), role: String(x?.role || 'KHADIM').trim().toUpperCase() }))
+              .filter(x => !!x.family)
           : undefined;
-        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend, extrasToSend).subscribe({
+        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend, undefined, extraAssignmentsToSend).subscribe({
           next: (res) => {
             const updated = res?.updated ?? 0;
             this.message.add({ severity: 'success', summary: 'Done', detail: `Transferred: ${updated}` });
@@ -410,9 +489,58 @@ removeFromChoir(m: Member) {
     return this.extraFamilies.length < 3;
   }
 
+  private myRoleForFamily(fam: string): string {
+  const f = String(fam || '').trim().toLowerCase();
+  const slots: Array<[string | undefined, string | undefined]> = [
+    [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
+    [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
+    [this.me?.deaconFamily3, this.me?.deaconFamilyRole3],
+    [this.me?.deaconFamily4, this.me?.deaconFamilyRole4],
+  ];
+
+  for (const [sf, sr] of slots) {
+    if (String(sf || '').trim().toLowerCase() === f) {
+      return this.normRole(sr);
+    }
+  }
+  return '';
+}
+
+private isScopedAminOsraForSelected(): boolean {
+  const fam = (this.selectedFamilyView || '').trim();
+  if (!fam) return false;
+  return this.myRoleForFamily(fam) === 'AMIN_OSRA';
+}
+
+private getAminOsraFamilies(): string[] {
+  const slots: Array<[string | undefined, string | undefined]> = [
+    [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
+    [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
+    [this.me?.deaconFamily3, this.me?.deaconFamilyRole3],
+    [this.me?.deaconFamily4, this.me?.deaconFamilyRole4],
+  ];
+
+  const res: string[] = [];
+  for (const [fam, role] of slots) {
+    const f = String(fam || '').trim();
+    if (!f) continue;
+
+    const r = this.normRole(role);
+    if (r === 'AMIN_OSRA') {
+      if (!res.includes(f)) res.push(f);
+    }
+  }
+  return res;
+}
+
+private hasAnyScopedAminOsra(): boolean {
+  return this.getAminOsraFamilies().length > 0;
+}
+
+
   addExtraFamily() {
     if (!this.canAddExtraFamily()) return;
-    this.extraFamilies.push('');
+    this.extraFamilies.push({ family: '', role: 'KHADIM' });
   }
 
   removeExtraFamily(idx: number) {
@@ -436,7 +564,9 @@ removeFromChoir(m: Member) {
 
   extraFamilyValue(m: Member, idx: number): string {
     const vals = [m.deaconFamily2, m.deaconFamily3, m.deaconFamily4];
-    return (vals[idx] || '').trim() || '—';
+    const fam = (vals[idx] || '').trim();
+    if (!fam) return '—';
+    return this.familyWithRole(m, fam);
   }
 
   getRoleLabel(role: string): string {

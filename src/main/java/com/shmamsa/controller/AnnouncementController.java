@@ -25,10 +25,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnnouncementController {
 
-    // ===== Choir buckets (match /api/family/families output) =====
-    private static final String KHORS_MARMARKOS = "خورس مارمرقس";
-    private static final String KHORS_ATHANASIUS = "خورس البابا اثناسيوس";
-
     private final AnnouncementRepository announcementRepo;
     private final UserRepository userRepo;
 
@@ -43,69 +39,12 @@ public class AnnouncementController {
         return RoleUtil.isAtLeast(role, "AMIN_KHEDMA");
     }
 
-    private static String normalizeTarget(String raw) {
-        if (raw == null) return null;
-        String x = raw.trim().replaceAll("\\s+", " ");
-
-        if (x.startsWith("خورس")) {
-            String plain = x.replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "");
-            if (plain.contains("اثناس")) return KHORS_ATHANASIUS;
-            if (plain.contains("مرقس")) return KHORS_MARMARKOS;
-        }
-
-        if (x.equalsIgnoreCase("خورس الانبا اثناسيوس") || x.equalsIgnoreCase("خورس الأنبا اثناسيوس")) {
-            return KHORS_ATHANASIUS;
-        }
-
-        return x;
+    private String baseFamily(User u) {
+        return FamilyUtil.mainFamily(u == null ? null : u.getDeaconFamily());
     }
 
-    private static boolean isChoirBucket(String base) {
-        if (base == null) return false;
-        String x = normalizeTarget(base);
-        return KHORS_MARMARKOS.equalsIgnoreCase(x) || KHORS_ATHANASIUS.equalsIgnoreCase(x);
-    }
-
-    private static void addKhorsBuckets(Set<String> set, String code) {
-        if (set == null) return;
-        String c = String.valueOf(code == null ? "" : code).trim().toUpperCase();
-        if (c.isBlank() || "NONE".equals(c)) return;
-
-        boolean both = c.contains("BOTH");
-        if (both || c.contains("MARMARKOS")) set.add(KHORS_MARMARKOS);
-        if (both || c.contains("ATHANASIUS")) set.add(KHORS_ATHANASIUS);
-    }
-
-    /** Bases that the user should SEE (family + choir membership). */
-    private Set<String> audienceBasesOf(User u) {
-        Set<String> set = new LinkedHashSet<>();
-        if (u == null) return set;
-
-        String fam = FamilyUtil.mainFamily(u.getDeaconFamily());
-        if (fam != null && !fam.isBlank() && !"SYSTEM".equalsIgnoreCase(fam)) set.add(fam);
-
-        addKhorsBuckets(set, u.getAttendKhors());
-        addKhorsBuckets(set, u.getKhors());
-
-        return set;
-    }
-
-    /** Bases that the user can MANAGE/WRITE to (family + served choir when servingScope indicates). */
-    private Set<String> manageBasesOf(User u) {
-        Set<String> set = new LinkedHashSet<>();
-        if (u == null) return set;
-
-        String fam = FamilyUtil.mainFamily(u.getDeaconFamily());
-        if (fam != null && !fam.isBlank() && !"SYSTEM".equalsIgnoreCase(fam)) set.add(fam);
-
-        String scope = String.valueOf(u.getServingScope() == null ? "" : u.getServingScope()).trim().toUpperCase();
-        if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
-            addKhorsBuckets(set, u.getKhors());
-        }
-
-        return set;
-    }
-
+    // - KHADIM: family only (no ALL)
+    // - AMIN_KHEDMA/DEVELOPER: any family or ALL
     private void validateTargetFamily(User me, String role, String targetFamily) {
         String tf = (targetFamily == null) ? "" : targetFamily.trim();
         if (tf.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "targetFamily is required");
@@ -116,24 +55,20 @@ public class AnnouncementController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        String tfBase = FamilyUtil.mainFamily(normalizeTarget(tf));
-        if (tfBase == null || tfBase.isBlank()) throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
-        if ("ALL".equalsIgnoreCase(tfBase)) throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
+        String myBase = baseFamily(me);
+        if (myBase == null || myBase.isBlank()) throw new ApiException(HttpStatus.FORBIDDEN, "No family");
 
-        Set<String> allowed = manageBasesOf(me);
-        boolean ok = allowed.stream().anyMatch(x -> x.equalsIgnoreCase(tfBase));
-        if (!ok) throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
+        if ("ALL".equalsIgnoreCase(tf) || !tf.equals(myBase)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
+        }
     }
 
     private boolean canManage(User me, String role, Announcement a) {
         if (isAdmin(role)) return true;
 
         if (RoleUtil.isAtLeast(role, "KHADIM")) {
-            String atBase = FamilyUtil.mainFamily(normalizeTarget(a.getTargetFamily()));
-            if (atBase == null || atBase.isBlank() || "ALL".equalsIgnoreCase(atBase)) return false;
-
-            Set<String> allowed = manageBasesOf(me);
-            return allowed.stream().anyMatch(x -> x.equalsIgnoreCase(atBase));
+            String myBase = baseFamily(me);
+            return myBase != null && myBase.equals(a.getTargetFamily());
         }
         return false;
     }
@@ -145,31 +80,13 @@ public class AnnouncementController {
         return meU != null && byU != null && byU.equals(meU);
     }
 
-    private static void addFamilyVariants(List<String> list, String base) {
-        if (base == null) return;
-        String b = base.trim();
-        if (b.isBlank()) return;
-
-        // choir: no variants
-        if (isChoirBucket(b)) {
-            if (!list.contains(b)) list.add(b);
-            return;
-        }
-
-        if (!list.contains(b)) list.add(b);
-        String a = b + " أ";
-        String bb = b + " ب";
-        if (!list.contains(a)) list.add(a);
-        if (!list.contains(bb)) list.add(bb);
-    }
-
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
         User me = requireUser(auth);
         String role = me.getRole();
 
-        String fam = normalizeTarget(family);
+        String fam = (family == null) ? null : family.trim();
 
         List<Announcement> list;
 
@@ -180,15 +97,13 @@ public class AnnouncementController {
                 list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(Arrays.asList("ALL", fam));
             }
         } else {
-            Set<String> bases = audienceBasesOf(me);
-            List<String> targets = new ArrayList<>();
-            targets.add("ALL");
-            for (String b : bases) addFamilyVariants(targets, b);
-
-            list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(targets);
+            String myBase = baseFamily(me);
+            List<String> fams = new ArrayList<>();
+            fams.add("ALL");
+            if (myBase != null && !myBase.isBlank()) fams.add(myBase);
+            list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(fams);
         }
 
-        Set<String> myAudience = audienceBasesOf(me);
         List<AnnouncementView> out = new ArrayList<>();
 
         for (Announcement a : list) {
@@ -199,13 +114,12 @@ public class AnnouncementController {
                 if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
                     matchesScope = true;
                 } else {
-                    String at = normalizeTarget(a.getTargetFamily());
-                    matchesScope = "ALL".equalsIgnoreCase(at) || fam.equalsIgnoreCase(at);
+                    matchesScope = "ALL".equalsIgnoreCase(a.getTargetFamily()) || fam.equals(a.getTargetFamily());
                 }
             } else {
-                String atBase = FamilyUtil.mainFamily(normalizeTarget(a.getTargetFamily()));
-                matchesScope = "ALL".equalsIgnoreCase(atBase)
-                        || (atBase != null && myAudience.stream().anyMatch(x -> x.equalsIgnoreCase(atBase)));
+                String myBase = baseFamily(me);
+                matchesScope = "ALL".equalsIgnoreCase(a.getTargetFamily())
+                        || (myBase != null && myBase.equals(a.getTargetFamily()));
             }
 
             if (!matchesScope) continue;
@@ -218,6 +132,7 @@ public class AnnouncementController {
                 continue;
             }
 
+            // ✅ Pending: للـ canManage أو creator
             if (st == EventStatus.PENDING && (can || creator)) {
                 out.add(toView(a, st, can, creator));
             }
@@ -259,6 +174,10 @@ public class AnnouncementController {
         Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Announcement not found"));
 
+        // NOTE:
+        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
+        // Without a transaction, accessing a.getCreatedBy() may throw LazyInitializationException
+        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean can = canManage(me, role, a);
         boolean creator = isCreator(me, a);
 
@@ -302,6 +221,10 @@ public class AnnouncementController {
         Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Announcement not found"));
 
+        // NOTE:
+        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
+        // Without a transaction, accessing a.getCreatedBy() may throw LazyInitializationException
+        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean can = canManage(me, role, a);
         boolean creator = isCreator(me, a);
 

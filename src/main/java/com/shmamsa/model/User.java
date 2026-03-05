@@ -107,6 +107,18 @@ public class User {
     @Column(length = 100)
     private String deaconFamily4;
 
+    @Column(length = 30)
+    private String deaconFamilyRole;
+
+    @Column(length = 30)
+    private String deaconFamilyRole2;
+
+    @Column(length = 30)
+    private String deaconFamilyRole3;
+
+    @Column(length = 30)
+    private String deaconFamilyRole4;
+
     @Column(length = 50)
     private String deaconDegree;
 
@@ -121,11 +133,31 @@ public class User {
     private String servingScope;
 
     @Column(length = 30)
-    private String attendKhors; // MARMARKOS / ATHANASIUS / NONE
+    private String attendKhors;
 
     @NotBlank(message = "Email is required")
     @Column(nullable = false, unique = true, length = 120)
     private String email;
 
     private String role = "MAKHDOM";
+
+    public String roleForFamilyBase(String familyBase) {
+        if (familyBase == null || familyBase.isBlank()) return null;
+        String base = familyBase.trim();
+
+        String f1 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily());
+        String f2 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily2());
+        String f3 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily3());
+        String f4 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily4());
+
+        if (f1 != null && f1.equalsIgnoreCase(base)) {
+            return (getDeaconFamilyRole() != null && !getDeaconFamilyRole().isBlank())
+                    ? getDeaconFamilyRole().trim().toUpperCase()
+                    : String.valueOf(getRole()).trim().toUpperCase();
+        }
+        if (f2 != null && f2.equalsIgnoreCase(base)) return getDeaconFamilyRole2() == null ? null : getDeaconFamilyRole2().trim().toUpperCase();
+        if (f3 != null && f3.equalsIgnoreCase(base)) return getDeaconFamilyRole3() == null ? null : getDeaconFamilyRole3().trim().toUpperCase();
+        if (f4 != null && f4.equalsIgnoreCase(base)) return getDeaconFamilyRole4() == null ? null : getDeaconFamilyRole4().trim().toUpperCase();
+        return null;
+    }
 }

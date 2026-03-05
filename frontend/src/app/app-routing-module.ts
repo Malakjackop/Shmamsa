@@ -23,6 +23,7 @@ import { FamilyAttendanceComponent } from './family-attendance/family-attendance
 import { FamilyInfoComponent } from './family-info/family-info';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
 import { StartNewYearComponent } from './start-new-year/start-new-year';
+import { GradesComponent } from './grades/grades';
 
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -43,6 +44,8 @@ const routes: Routes = [
       { path: 'about', component: AboutComponent },
       { path: 'resources', component: ResourcesComponent },
       { path: 'attendance-history', component: AttendanceHistoryComponent },
+
+      { path: 'grades', component: GradesComponent },
 
       {
         path: 'attendance',

@@ -30,6 +30,9 @@ export class DashBoard implements OnInit {
     phoneNumber: '',
     status: '',
     deaconFamily: '',
+    deaconFamily2: '',
+    deaconFamily3: '',
+    deaconFamily4: '',
     universityName: '',
     faculty: '',
     dateOfBirth: '',
@@ -118,6 +121,9 @@ export class DashBoard implements OnInit {
     ATHANASIUS_KHORS: 0
   };
 
+  familyMeetingCards: Array<{ family: string; count: number }> = [];
+
+
   // ===== Helpers =====
   private pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
 
@@ -150,14 +156,30 @@ export class DashBoard implements OnInit {
     return f;
   }
 
+  private isChoirBucket(f: string): boolean {
+    const x = String(f || '').trim();
+    return x === 'خورس مارمرقس' || x === 'خورس البابا اثناسيوس';
+  }
+
+  private userFamilies(): string[] {
+    const raw = [this.user?.deaconFamily, this.user?.deaconFamily2, this.user?.deaconFamily3, this.user?.deaconFamily4]
+      .map((x: any) => String(x || '').trim())
+      .filter((x: string) => !!x && x.toUpperCase() !== 'SYSTEM' && !this.isChoirBucket(x));
+
+    const out: string[] = [];
+    for (const f of raw) {
+      if (!out.includes(f)) out.push(f);
+    }
+    return out;
+  }
+
   get hasRealFamily(): boolean {
-    const family = String(this.user?.deaconFamily || '').trim();
-    return !!family && family.toUpperCase() !== 'SYSTEM';
+    return this.userFamilies().length > 0;
   }
 
   get showFamilyMeetingCard(): boolean {
-    const fam = String(this.user?.deaconFamily || '').trim();
-    return !!fam && fam.toUpperCase() !== 'SYSTEM';
+    // ✅ لو خادم في الخورس فقط (وملوش أسرة) ما نظهرش كارت اجتماع الأسرة
+    return this.userFamilies().length > 0;
   }
 
   private arKhorsName(khors: any): string {
@@ -193,12 +215,12 @@ export class DashBoard implements OnInit {
   }
 
   get currentFamilyLabel(): string {
-    const family = String(this.user?.deaconFamily || '').trim();
+    const families = this.userFamilies();
     const served = this.servedKhorsLabel();
     const attend = this.attendKhorsLabel();
 
     const labels: string[] = [];
-    if (family && family.toUpperCase() !== 'SYSTEM') labels.push(family);
+    labels.push(...families);
     if (served) labels.push(served);
     if (attend && !labels.some(x => x.includes(attend))) labels.push(attend);
     return labels.join(' + ');
@@ -271,13 +293,22 @@ export class DashBoard implements OnInit {
     this.attendanceService.getMyStats().subscribe({
       next: (data: any) => {
         this.stats = {
-          ...this.stats,
-          FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
-          TASBEEHA: data?.TASBEEHA ?? 0,
-          FAMILY_MEETING: data?.FAMILY_MEETING ?? 0,
-          MARMARKOS_KHORS: data?.MARMARKOS_KHORS ?? 0,
-          ATHANASIUS_KHORS: data?.ATHANASIUS_KHORS ?? 0
-        };
+  ...this.stats,
+  FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
+  TASBEEHA: data?.TASBEEHA ?? 0,
+  FAMILY_MEETING: data?.FAMILY_MEETING ?? 0,
+  MARMARKOS_KHORS: data?.MARMARKOS_KHORS ?? 0,
+  ATHANASIUS_KHORS: data?.ATHANASIUS_KHORS ?? 0
+};
+
+// ✅ If user serves in multiple families, show a separate card (and separate count) per family
+const byFam: Record<string, number> = data?.FAMILY_MEETING_BY_FAMILY || {};
+const fams = this.userFamilies();
+this.familyMeetingCards = fams.map(f => ({
+  family: f,
+  count: byFam[this.mainFamily(f)] ?? byFam[f] ?? 0
+}));
+
       },
       error: () => {}
     });

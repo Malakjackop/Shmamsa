@@ -26,6 +26,7 @@ import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
 import { StartNewYearComponent } from './start-new-year/start-new-year';
+import { GradesComponent } from './grades/grades';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -67,7 +68,8 @@ import { TableModule } from 'primeng/table';
     AttendanceComponent,
     ResourcesComponent,
     StartNewYearComponent,
-    
+    GradesComponent,
+
   ],
   imports: [
     BrowserModule,
@@ -81,7 +83,7 @@ import { TableModule } from 'primeng/table';
     FormsModule,
     CommonModule,
     BrowserAnimationsModule,
-    RouterModule, 
+    RouterModule,
     QRCodeComponent,
     ZXingScannerModule,
     // ✅ PrimeNG imports

@@ -18,14 +18,14 @@
   <div class="upload" *ngIf="isUploader()">
     <h3>رفع ملفات</h3>
 
-    <div class="row">
+    <div class="row fieldsRow">
       <input type="text" [(ngModel)]="title" placeholder="العنوان (اختياري)" />
       <input type="text" [(ngModel)]="description" placeholder="الوصف (اختياري)" />
     </div>
 
-    <div class="row">
-      <input type="file" (change)="onPickFile($event)" />
-      <button pButton type="button" label="رفع" (click)="upload()"></button>
+    <div class="row fileRow">
+      <input class="fileInput" type="file" (change)="onPickFile($event)" />
+      <button pButton class="uploadBtn" type="button" label="رفع" (click)="upload()"></button>
     </div>
   </div>
 
@@ -39,21 +39,21 @@
     <table *ngIf="resources.length > 0">
       <thead>
         <tr>
-          <th>العنوان</th>
-          <th>الملف</th>
-          <th>الأسرة</th>
-          <th>تم الرفع بواسطة</th>
-          <th style="width: 280px;">إجراءات</th>
+          <th class="col-title">العنوان</th>
+          <th class="col-file">الملف</th>
+          <th class="col-family">الأسرة</th>
+          <th class="col-uploader">تم الرفع بواسطة</th>
+          <th class="col-actions">إجراءات</th>
         </tr>
       </thead>
 
       <tbody>
         <tr *ngFor="let r of resources">
-          <td>{{ r.title || '-' }}</td>
-          <td>{{ r.originalName }}</td>
-          <td>{{ r.family }}</td>
-          <td>{{ r.uploadedByUsername }}</td>
-          <td class="actions">
+          <td class="col-title">{{ r.title || '-' }}</td>
+          <td class="col-file" [title]="r.originalName">{{ r.originalName }}</td>
+          <td class="col-family">{{ r.family }}</td>
+          <td class="col-uploader">{{ r.uploadedByUsername }}</td>
+          <td class="actions col-actions">
             <button pButton type="button" label="تحميل" (click)="download(r)"></button>
 
             <ng-container *ngIf="!isMakhdom() && isUploader()">

@@ -53,6 +53,13 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
 
     AttendanceRecord findFirstByUser_IdAndDateAndTypeAndArchivedFalse(Long userId, LocalDate date, AttendanceType type);
 
+
+// ✅ FAMILY_MEETING is scoped by familyBase (for multi-family servants)
+AttendanceRecord findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(Long userId, LocalDate date, AttendanceType type, String familyBase);
+
+long countByUser_IdAndTypeAndFamilyBaseAndArchivedFalse(Long userId, AttendanceType type, String familyBase);
+
+
     List<AttendanceRecord> findByUser_IdAndArchivedFalseOrderByCreatedAtDesc(Long userId);
 
     List<AttendanceRecord> findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(Long userId, AttendanceType type);

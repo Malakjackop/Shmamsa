@@ -17,7 +17,7 @@
 
 .upload {
   margin: 16px 0;
-  padding: 12px;
+  padding: 16px;
   border: 1px solid #ddd;
   border-radius: 12px;
 }
@@ -29,11 +29,49 @@
   flex-wrap: wrap;
 }
 
+.fieldsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
 .row input[type="text"] {
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid #ddd;
-  min-width: 260px;
+  min-width: 0;
+  width: 100%;
+  background: #fff;
+}
+
+.fileRow {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.fileInput {
+  width: 100%;
+  border: 1px dashed #bfc8cf;
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: #fafafa;
+}
+
+.fileInput::file-selector-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-inline-end: 10px;
+  background: #34d399;
+  color: #111;
+  cursor: pointer;
+}
+
+.uploadBtn {
+  white-space: nowrap;
+  min-width: 90px;
 }
 
 .card {
@@ -47,10 +85,12 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
+  table-layout: fixed;
+  direction: rtl;
 }
 
 thead th {
-  text-align: left;
+  text-align: right;
   border-bottom: 1px solid #ddd;
   padding: 10px 6px;
 }
@@ -58,12 +98,38 @@ thead th {
 tbody td {
   border-bottom: 1px solid #eee;
   padding: 10px 6px;
+  text-align: right;
+  vertical-align: middle;
 }
 
 .actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.col-title { width: 34%; }
+.col-file { width: 24%; }
+.col-family { width: 16%; }
+.col-uploader { width: 16%; }
+.col-actions { width: 220px; }
+
+td.col-title,
+td.col-family,
+td.col-uploader {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+td.col-file {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .empty {
@@ -82,4 +148,26 @@ tbody td {
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 12px;
+}
+
+@media (max-width: 720px) {
+  .fieldsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .fileRow {
+    grid-template-columns: 1fr;
+  }
+
+  .uploadBtn {
+    width: 100%;
+  }
+
+  .card {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 760px;
+  }
 }

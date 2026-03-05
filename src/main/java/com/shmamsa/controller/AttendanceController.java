@@ -121,6 +121,7 @@ public class AttendanceController {
         }
         LocalTime now = LocalTime.now();
 
+
         int createdPresent = 0;
         int updatedToPresent = 0;
         int createdAbsent = 0;
@@ -143,28 +144,47 @@ public class AttendanceController {
             presentIds.add(id);
         }
 
+        // ✅ For FAMILY_MEETING we separate attendance per family (multi-family servants)
+        // Compute the base family AFTER we have presentIds ready.
+        String meetingBase = null;
+        if (type == AttendanceType.FAMILY_MEETING) {
+            if (familyObj != null && !familyObj.toString().isBlank()) {
+                meetingBase = FamilyUtil.mainFamily(familyObj.toString());
+            }
+            if ((meetingBase == null || meetingBase.isBlank()) && !presentIds.isEmpty()) {
+                User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
+                meetingBase = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
+            }
+        }
+
         // Determine scope accounts for auto-absence
         List<User> scope;
-        if (type == AttendanceType.FAMILY_MEETING) {
-            // Thursday: only same family
-            String base = null;
+        
+if (type == AttendanceType.FAMILY_MEETING) {
+    // Thursday: only selected family, but support users serving in multiple families.
+    String base = null;
 
-            // لو محددناش أي حاضر (قائمة فاضية) هنحاول ناخد الأسرة من الـ request
-            if (presentIds.isEmpty() && familyObj != null && !familyObj.toString().isBlank()) {
-                base = FamilyUtil.mainFamily(familyObj.toString());
-            } else if (!presentIds.isEmpty()) {
-                User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
-                base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
-            }
+    // Prefer the explicit family parameter (required for correct multi-family separation)
+    if (familyObj != null && !familyObj.toString().isBlank()) {
+        base = FamilyUtil.mainFamily(familyObj.toString());
+    }
 
-            if (base == null || base.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
-            }
-            scope = userRepo.findByDeaconFamilyStartingWithAndRoleIn(
-                    base,
-                    List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
-            );
-        } else if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
+    // Backward compatibility: if family is missing, infer from the first selected member
+    if ((base == null || base.isBlank()) && !presentIds.isEmpty()) {
+        User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
+        base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
+    }
+
+    if (base == null || base.isBlank()) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
+    }
+
+    // Scope: anyone who belongs to this family in ANY family slot
+    scope = userRepo.findByAnyFamilyStartingWithAndRoleIn(
+            base,
+            List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
+    );
+} else if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
             // ✅ Choir: only members in that choir
             // Authorization: only choir servants of that choir (or Amin/Dev)
             String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
@@ -203,7 +223,12 @@ public class AttendanceController {
 
         // 1) Upsert PRESENT for selected
         for (Long id : presentIds) {
-            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
+            AttendanceRecord existing;
+if (type == AttendanceType.FAMILY_MEETING) {
+    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(id, selectedDate, type, meetingBase);
+} else {
+    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
+}
             if (existing != null) {
                 // If it was ABSENT, flip to PRESENT
                 if (existing.getStatus() == AttendanceStatus.ABSENT) {
@@ -233,7 +258,10 @@ public class AttendanceController {
             r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-            r.setStatus(AttendanceStatus.PRESENT);
+if (type == AttendanceType.FAMILY_MEETING) {
+    r.setFamilyBase(meetingBase);
+}
+r.setStatus(AttendanceStatus.PRESENT);
             r.setTakenBy(servant);
             attendanceRepo.save(r);
             createdPresent++;
@@ -245,7 +273,12 @@ public class AttendanceController {
             if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
             if (presentIds.contains(target.getId())) continue;
 
-            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(target.getId(), selectedDate, type);
+            AttendanceRecord existing;
+if (type == AttendanceType.FAMILY_MEETING) {
+    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(target.getId(), selectedDate, type, meetingBase);
+} else {
+    existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(target.getId(), selectedDate, type);
+}
             if (existing != null) {
                 // keep as-is (if present, don't overwrite)
                 continue;
@@ -256,7 +289,10 @@ public class AttendanceController {
             r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-            r.setStatus(AttendanceStatus.ABSENT);
+if (type == AttendanceType.FAMILY_MEETING) {
+    r.setFamilyBase(meetingBase);
+}
+r.setStatus(AttendanceStatus.ABSENT);
             r.setTakenBy(servant);
             attendanceRepo.save(r);
             createdAbsent++;
@@ -314,6 +350,41 @@ public class AttendanceController {
         ));
     }
 
+
+@GetMapping("/my-stats-v2")
+public ResponseEntity<?> myStatsV2(Authentication auth) {
+    if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+    User me = userRepo.findByUsername(auth.getName())
+            .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+    long f = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
+    long mk = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
+    long ak = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
+    long t = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
+    long mTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
+
+    // FAMILY_MEETING broken down by familyBase (multi-family)
+    Map<String, Long> familyMeetingByFamily = new LinkedHashMap<>();
+    for (AttendanceRecord r : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), AttendanceType.FAMILY_MEETING)) {
+        String fb = r.getFamilyBase() == null ? "" : r.getFamilyBase().trim();
+        if (fb.isBlank()) continue;
+        // count only PRESENT (or null treated as present for legacy)
+        if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
+        familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
+    }
+
+    return ResponseEntity.ok(Map.of(
+            "FRIDAY_LITURGY", f,
+            "MARMARKOS_KHORS", mk,
+            "ATHANASIUS_KHORS", ak,
+            "TASBEEHA", t,
+            "FAMILY_MEETING", mTotal,
+            "FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily
+    ));
+}
+
+
     @GetMapping("/history")
     public ResponseEntity<?> history(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -331,7 +402,8 @@ public class AttendanceController {
                     "date", r.getDate() == null ? null : r.getDate().toString(),
                     "time", r.getTime() == null ? null : r.getTime().toString(),
                     "type", r.getType() == null ? null : r.getType().name(),
-                    "takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName()
+                    "takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName(),
+                    "familyBase", r.getFamilyBase()
             ));
         }
         return ResponseEntity.ok(out);

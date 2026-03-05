@@ -1,0 +1,118 @@
+<p-toast position="top-left"></p-toast>
+
+<div class="gradesWrap">
+  <div class="toolbar">
+    <div>
+      <div><b>الدرجات</b></div>
+      <div class="status" *ngIf="viewMode==='SERVANT'">
+        الأسرة: {{ selectedFamilyBase || '-' }} • الحالة: {{ sheet?.status || '-' }}
+        <span *ngIf="sheet?.publishedAt"> • نُشرت: {{ sheet?.publishedAt | date:'short' }}</span>
+      </div>
+      <div class="status" *ngIf="viewMode==='MAKHDOM'">
+        الأسرة: {{ my?.familyBase || '-' }}
+        <span *ngIf="my?.publishedAt; else notPub"> • نُشرت: {{ my?.publishedAt | date:'short' }}</span>
+        <ng-template #notPub> • لم تُنشر بعد</ng-template>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- اختيار الأسرة (يظهر فقط لو عنده أكتر من أسرة يخدم/أمين عليها) -->
+    <div *ngIf="viewMode==='SERVANT' && familyChoices.length > 1">
+      <select [(ngModel)]="selectedFamilyBase" (change)="loadSheet()">
+        <option *ngFor="let f of familyChoices" [value]="f">{{ f }}</option>
+      </select>
+    </div>
+
+    <button class="btn" *ngIf="viewMode==='SERVANT' && canEdit" (click)="addColumn()">+ عمود جديد</button>
+    <button class="btn primary" *ngIf="viewMode==='SERVANT' && canEdit" (click)="save()" [disabled]="saving">حفظ</button>
+    <button class="btn danger" *ngIf="viewMode==='SERVANT' && canPublish" (click)="publish()" [disabled]="publishing">نشر</button>
+  </div>
+
+  <!-- خدام: جدول كامل -->
+  <div class="tableWrap" *ngIf="viewMode==='SERVANT'">
+    <table>
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الأسماء</th>
+          <th *ngFor="let c of columns" style="min-width:220px">
+            <div class="colActions" *ngIf="canEdit">
+              <button type="button" class="removeColBtn" (click)="removeColumn(c.id)">حذف</button>
+            </div>
+            <div class="headSplit">
+              <div class="headPart">
+                <span class="headLabel">العنوان</span>
+                <input
+                  class="head"
+                  [readOnly]="!canEdit"
+                  [ngModel]="columnMeta[c.id]?.title || ''"
+                  (ngModelChange)="setColumnTitle(c.id, $event)"
+                  placeholder="عنوان الدرجة" />
+              </div>
+              <span class="headSeparator" aria-hidden="true"></span>
+              <div class="headPart maxPart">
+                <span class="headLabel">الدرجة</span>
+                <input
+                  class="head max"
+                  [readOnly]="!canEdit"
+                  [ngModel]="columnMeta[c.id]?.max || ''"
+                  (ngModelChange)="setColumnMax(c.id, $event)"
+                  placeholder="0" />
+              </div>
+            </div>
+          </th>
+          <th class="totalHead" style="min-width:140px">
+            المجموع
+            <span class="totalMax" *ngIf="columnsMaxTotal() > 0">/ {{ columnsMaxTotal() }}</span>
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let m of members; let ri = index">
+          <td class="stickyIndex indexCell">{{ ri + 1 }}</td>
+          <td class="nameCell stickyName">{{ m.fullName }}</td>
+          <td *ngFor="let c of columns">
+            <input class="cell" [readOnly]="!canEdit" [(ngModel)]="m.values[c.id]" placeholder="-" />
+          </td>
+          <td class="totalCell">{{ rowTotal(m.values) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- مخدوم: يظهر صفه فقط -->
+  <div class="tableWrap" *ngIf="viewMode==='MAKHDOM'">
+    <table>
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الأسماء</th>
+          <th *ngFor="let c of (my?.columns || [])" style="min-width:180px">
+            {{ formatColumnTitleForView(c.title) }}
+            <span class="maxLabel" *ngIf="formatColumnMaxForView(c.title)">/ {{ formatColumnMaxForView(c.title) }}</span>
+          </th>
+          <th class="totalHead" style="min-width:140px">
+            المجموع
+            <span class="totalMax" *ngIf="columnsMaxTotalForColumns(my?.columns) > 0">/ {{ columnsMaxTotalForColumns(my?.columns) }}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="stickyIndex indexCell">1</td>
+          <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
+          <td *ngFor="let c of (my?.columns || [])">
+            {{ my?.values?.[c.id] || '-' }}
+          </td>
+          <td class="totalCell">{{ rowTotalForColumns(my?.values, my?.columns) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="small" style="margin-top:10px" *ngIf="viewMode==='SERVANT'">
+    * المخدوم لن يرى أي درجات إلا بعد ضغط "نشر" بواسطة أمين الأسرة.
+  </div>
+</div>

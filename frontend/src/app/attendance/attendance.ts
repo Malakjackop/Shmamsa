@@ -28,7 +28,7 @@ export class AttendanceComponent implements OnInit {
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
-  disabledDays: number[] = [0, 1, 2, 3]; 
+  disabledDays: number[] = [0, 1, 2, 3];
   firstDayOfWeek = 1; // Monday
 
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
@@ -36,7 +36,7 @@ export class AttendanceComponent implements OnInit {
   typeOptions: { value: AttendanceType; label: string }[] = [];
 
   families: string[] = [];
-  selectedFamily = ''; 
+  selectedFamily = '';
 
   members: PickUser[] = [];
 
@@ -57,13 +57,32 @@ export class AttendanceComponent implements OnInit {
     });
   }
 
+
+  private hasAnyAminOsraScope(): boolean {
+    const norm = (v: any) => {
+      const raw = String(v || '').trim();
+      const up = raw.toUpperCase();
+      if (!up) return '';
+      if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسره','امين الأسرة','أمين الأسرة','امين اسره'].includes(raw)) return 'AMIN_OSRA';
+      if (up.startsWith('ROLE_')) return up.substring(5);
+      return up;
+    };
+    const roles = [
+      this.me?.deaconFamilyRole,
+      this.me?.deaconFamilyRole2,
+      this.me?.deaconFamilyRole3,
+      this.me?.deaconFamilyRole4
+    ].map(norm);
+    return roles.includes('AMIN_OSRA');
+  }
+
   private initCalendarRules() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
 
-    const day = today.getDay(); 
-    const diffToMonday = (day + 6) % 7; 
+    const day = today.getDay();
+    const diffToMonday = (day + 6) % 7;
     const monday = new Date(today);
     monday.setDate(today.getDate() - diffToMonday);
 
@@ -71,7 +90,7 @@ export class AttendanceComponent implements OnInit {
     const rawRole = String(this.me?.role || '').trim();
     const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
     const roleArNorm = rawRole
-      .replace(/[\u064B-\u065F\u0670\u0640]/g, '') 
+      .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
       .trim()
       .replace(/\s+/g, ' ');
     const isKhadimRole =
@@ -80,7 +99,7 @@ export class AttendanceComponent implements OnInit {
 
     const canOverrideWeekClose =
       ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_OSRA', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm) ||
-      ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسره', 'امين الأسرة'].includes(roleArNorm);
+      ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسره', 'امين الأسرة'].includes(roleArNorm) || this.hasAnyAminOsraScope();
 
 
     if (canOverrideWeekClose) {
@@ -105,7 +124,7 @@ export class AttendanceComponent implements OnInit {
     }
     const allowed = (d: Date) => {
       const dow = d.getDay();
-      return dow === 4 || dow === 5 || dow === 6; 
+      return dow === 4 || dow === 5 || dow === 6;
     };
 
     let d = new Date(today);
@@ -128,8 +147,8 @@ export class AttendanceComponent implements OnInit {
 
     this.onDateChange();
   }
-  
-  
+
+
 
 
   onDateChange() {
@@ -141,42 +160,44 @@ export class AttendanceComponent implements OnInit {
     const d = new Date(this.selectedDate);
     d.setHours(0, 0, 0, 0);
     const dow = d.getDay();
-    if (dow === 4) {
-      this.selectedType = 'FAMILY_MEETING';
-      this.typeOptions = [{ value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' }];
-    } else if (dow === 5) {
-      const rawRole = String(this.me?.role || '').trim();
-      const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
 
-      const scopeNorm = String(this.me?.servingScope || '').trim().toUpperCase().replace(/[-\s]+/g, '_');
-      const myKhors = String(this.me?.khors || '').trim().toUpperCase();
-
-      const isDevOrAmin = ['AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm);
-      const isKhadim = ['KHADIM', 'ROLE_KHADIM'].includes(roleNorm);
-      const canChoir = isDevOrAmin || (isKhadim && (scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH'));
-
-      const opts: { value: AttendanceType; label: string }[] = [{ value: 'FRIDAY_LITURGY', label: 'قداس الجمعة' }];
-
-      if (canChoir) {
-
-        if (isDevOrAmin || myKhors === 'BOTH') {
-          opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
-          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
-        } else if (myKhors === 'MARMARKOS') {
-          opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
-        } else if (myKhors === 'ATHANASIUS') {
-          opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
-        }
-      }
-
-      this.typeOptions = opts;
-      this.selectedType = (opts[0]?.value || 'FRIDAY_LITURGY') as AttendanceType;
-    } else if (dow === 6) {
-      this.selectedType = 'TASBEEHA';
-      this.typeOptions = [{ value: 'TASBEEHA', label: 'تسبحة' }];
-    } else {
+    // الأيام المفتوحة: الخميس/الجمعة/السبت
+    if (!(dow === 4 || dow === 5 || dow === 6)) {
       this.typeOptions = [];
+      return;
     }
+
+    const scopeNorm = String(this.me?.servingScope || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]+/g, '_');
+    const myKhors = String(this.me?.khors || '').trim().toUpperCase();
+
+    // المطلوب: النوع يبقى مفتوح (قداس/تسبحة/اجتماع أسرة) على كل الأيام المفتوحة
+    const opts: { value: AttendanceType; label: string }[] = [
+      { value: 'FRIDAY_LITURGY', label: 'قداس' },
+      { value: 'TASBEEHA', label: 'تسبحة' },
+      { value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' }
+    ];
+
+    // حضور الخورس يظهر فقط للخادم اللي في الخورس بتاعه (حسب servingScope + khors)
+    const canChoir = scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH';
+    if (canChoir) {
+      if (myKhors === 'BOTH') {
+        opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
+        opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
+      } else if (myKhors === 'MARMARKOS') {
+        opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
+      } else if (myKhors === 'ATHANASIUS') {
+        opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
+      }
+    }
+
+    this.typeOptions = opts;
+
+    // حافظ على الاختيار لو لسه موجود، وإلا اختار أول نوع
+    const exists = opts.some((o) => o.value === this.selectedType);
+    this.selectedType = (exists ? this.selectedType : (opts[0]?.value || 'FRIDAY_LITURGY')) as AttendanceType;
 
     this.syncFamilyWithType();
   }
@@ -189,7 +210,7 @@ export class AttendanceComponent implements OnInit {
     if (!this.selectedDate) return;
     const d = new Date(this.selectedDate);
     d.setHours(0, 0, 0, 0);
-    if (d.getDay() !== 5) return; 
+    // ربط نوع الخورس بالأسرة المختارة (بدون ربط بيوم معين)
 
     if (this.selectedType === 'MARMARKOS_KHORS') {
       this.selectedFamily = 'خورس مارمرقس';

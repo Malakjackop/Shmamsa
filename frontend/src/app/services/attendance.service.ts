@@ -40,6 +40,7 @@ export class AttendanceService {
     ATHANASIUS_KHORS?: number;
     TASBEEHA: number;
     FAMILY_MEETING: number;
+    FAMILY_MEETING_BY_FAMILY?: Record<string, number>;
   }> {
     return this.http.get<{
       FRIDAY_LITURGY: number;
@@ -47,8 +48,9 @@ export class AttendanceService {
       ATHANASIUS_KHORS?: number;
       TASBEEHA: number;
       FAMILY_MEETING: number;
+      FAMILY_MEETING_BY_FAMILY?: Record<string, number>;
     }>(
-      `${this.baseUrl}/my-stats`,
+      `${this.baseUrl}/my-stats-v2`,
       { withCredentials: true }
     );
   }

@@ -31,6 +31,12 @@ public class AttendanceRecord {
     @Enumerated(EnumType.STRING)
     @Column
     private AttendanceStatus status = AttendanceStatus.PRESENT;
+// ✅ For FAMILY_MEETING (and any future family-scoped types), we store which family this record belongs to
+// so that a user serving in multiple families has separate attendance per family.
+@Column(length = 120)
+private String familyBase;
+
+
 
     @ManyToOne
     @JoinColumn(name = "taken_by_user_id")

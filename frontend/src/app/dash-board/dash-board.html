@@ -12,10 +12,12 @@
       <h1>{{ currentFamilyLabel }}</h1>
     </p-card>
 
-    <p-card *ngIf="showFamilyMeetingCard" class="stat-card credits">
-      <h3>حضور اجتماع الأسرة</h3>
-      <h1>{{ stats.FAMILY_MEETING }}</h1>
-    </p-card>
+    <ng-container *ngIf="showFamilyMeetingCard">
+      <p-card *ngFor="let c of familyMeetingCards" class="stat-card credits">
+        <h3>حضور اجتماع {{ c.family }}</h3>
+        <h1>{{ c.count }}</h1>
+      </p-card>
+    </ng-container>
 
     <p-card class="stat-card assignments">
       <h3>حضور قداس الجمعة</h3>
@@ -27,13 +29,13 @@
       <h1>{{ stats.TASBEEHA }}</h1>
     </p-card>
 
-    <p-card *ngIf="showAnyKhorsCards" class="stat-card credits">
-      <h3>الحضور</h3>
-      <div class="statCard" *ngFor="let c of khorsCards">
-        <div class="statTitle">حضور {{ c.label }}</div>
-        <div class="statValue">{{ c.count }}</div>
-      </div>
-    </p-card>
+    <!-- كل خورس يظهر في Card لوحده (بدل ما يتجمعوا داخل Card واحدة) -->
+    <ng-container *ngIf="showAnyKhorsCards">
+      <p-card *ngFor="let c of khorsCards" class="stat-card credits">
+        <h3>حضور {{ c.label }}</h3>
+        <h1>{{ c.count }}</h1>
+      </p-card>
+    </ng-container>
   </section>
 
   <section class="panels">
@@ -113,7 +115,6 @@
               *ngIf="e.canPublish"
               pButton
               type="button"
-              style="background-color: #4ade80; border:none"
               label="نشر"
               icon="pi pi-send"
               class="p-button-help p-button-sm"
@@ -143,7 +144,6 @@
             <button
               *ngIf="e.canSeeParticipants"
               pButton
-              style="background-color: rgb(42, 41, 41); border:none; color: rgb(200, 203, 206);"
               type="button"
               label="تفاصيل"
               icon="pi pi-list"
@@ -185,8 +185,7 @@
           </div>
 
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button pButton type="button" label="تفاصيل" icon="pi pi-info-circle" 
-            style="background-color: rgb(42, 41, 41); border:none; color: rgb(214, 217, 221);"
+            <button pButton type="button" label="تفاصيل" icon="pi pi-info-circle"
               class="p-button-info p-button-sm" (click)="openAnnDetails(a)"></button>
 
             <button *ngIf="a.canEdit" pButton type="button" label="تعديل" icon="pi pi-pencil"
@@ -196,7 +195,6 @@
               class="p-button-danger p-button-sm" (click)="deleteAnnouncement(a)"></button>
 
             <button *ngIf="a.canPublish" pButton type="button" label="نشر" icon="pi pi-send"
-            style="background-color: #4ade80; border:none;"
               class="p-button-help p-button-sm" (click)="publishAnnouncement(a)"></button>
           </div>
         </li>

@@ -218,7 +218,7 @@ export class FamilyAttendanceComponent implements OnInit {
     if (!ids.length) return;
 
     this.iftekadSvc.lastVisitDates(ids).subscribe({
-      next: (map) => {
+      next: (map: any) => {
         const m = (map as any) || {};
         this.members.forEach((mem) => {
           const key = String(mem.id);
@@ -489,7 +489,7 @@ export class FamilyAttendanceComponent implements OnInit {
     this.iftekadHistory = [];
 
     this.iftekadSvc.getVisits(memberId).subscribe({
-      next: (rows) => {
+      next: (rows: any) => {
         this.iftekadHistory = ((rows as any) || []) as IftekadVisitView[];
         this.iftekadHistoryLoading = false;
         this.refreshLastIftekadFromHistory();
@@ -539,7 +539,7 @@ export class FamilyAttendanceComponent implements OnInit {
         companions: this.iftekadCompanions || undefined
       })
       .subscribe({
-        next: (created) => {
+        next: (created: any) => {
           // update last date (for red dot)
           (this.iftekadFor as any).lastIftekadDate = this.iftekadDate;
           const idx = this.members.findIndex((x) => x.id === this.iftekadFor!.id);
@@ -568,7 +568,7 @@ export class FamilyAttendanceComponent implements OnInit {
           this.iftekadDesc = '';
           this.iftekadCompanions = '';
         },
-        error: (err) => {
+        error: (err: any) => {
           this.iftekadSaving = false;
           this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to save' });
         }
@@ -620,7 +620,7 @@ export class FamilyAttendanceComponent implements OnInit {
         this.cancelEditVisit();
         this.loadIftekadHistory(this.iftekadFor!.id); // يحدّث السجل فوراً
       },
-      error: (err) => {
+      error: (err: any) => {
         // ✅ هنا بدل ما نطلع Error وخلاص.. نتأكد هل اتعدّل فعلاً
         this.verifyVisitUpdatedAfterError(v.id, expected, err);
       }
@@ -639,7 +639,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   // نعمل Reload للسجل من الباك
   this.iftekadSvc.getVisits(this.iftekadFor.id).subscribe({
-    next: (rows) => {
+    next: (rows: any) => {
       this.iftekadHistory = ((rows as any) || []) as IftekadVisitView[];
 
       const found = (this.iftekadHistory || []).find((x) => x.id === visitId);
@@ -705,7 +705,7 @@ export class FamilyAttendanceComponent implements OnInit {
         this.visitToDelete = null;
         this.loadIftekadHistory(this.iftekadFor!.id);
       },
-      error: (err) => {
+      error: (err: any) => {
         // ✅ Same parsing edge-case safeguard
         if (err && err.status === 200) {
           this.message.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الافتقاد' });

@@ -1,0 +1,42 @@
+.gradesWrap{padding:16px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .spacer{flex:1}
+.tableWrap{overflow:auto;border:1px solid black;border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:700px}
+th,td{border:1px solid black;padding:8px;text-align:right;vertical-align:middle}
+th{background:black;font-weight:600;color:#fff}
+tbody td{color:black}
+input.cell,input.head{width:100%;border:0;outline:none;background:transparent;font-family:inherit;font-size:14px;color:black;}
+input.head{color:#fff}
+.nameCell{white-space:nowrap;font-weight:600;color:black;}
+.status{font-size:13px;color:black}
+.small{font-size:12px;color:#666}
+.btn{padding:8px 12px;border:1px solid #34d399;border-radius:8px;background:#34d399;cursor:pointer;color: black;}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.headSplit{display:grid;grid-template-columns:minmax(120px,1fr) 1px 80px;gap:8px;align-items:end}
+.headPart{display:flex;flex-direction:column;gap:3px;background:rgba(255,255,255,.06);padding:4px 6px;border-radius:6px}
+.headPart.maxPart{background:rgba(255,255,255,.12)}
+.headLabel{font-size:11px;line-height:1;color:#d1d5db}
+.headSeparator{display:block;align-self:stretch;background:rgba(255,255,255,.45);border-radius:1px}
+input.head.max{text-align:center}
+.maxLabel{opacity:.85;font-size:12px}
+.totalHead,.totalCell{text-align:center;font-weight:700}
+.totalMax{font-size:12px;opacity:.9}
+.colActions{display:flex;justify-content:flex-start;margin-bottom:6px}
+.removeColBtn{border:1px solid #ef4444;background:#7f1d1d;color:#fff;font-size:12px;border-radius:6px;padding:2px 8px;cursor:pointer}
+.removeColBtn:hover{background:#991b1b}
+.indexCell{text-align:center;font-weight:700}
+.stickyIndex{
+  position: sticky;
+  right: 0;
+  z-index: 5;
+}
+.stickyName{
+  position: sticky;
+  right: 64px;
+  z-index: 4;
+}
+thead .stickyIndex{z-index:6;background:black;color:#fff}
+tbody .stickyIndex{background:#f3f1ee}
+thead .stickyName{z-index:4;background:black;color:#fff}
+tbody .stickyName{background:#f3f1ee}

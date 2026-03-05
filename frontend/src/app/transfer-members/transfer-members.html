@@ -12,12 +12,19 @@
     </select>
   </div>
 
-  <div class="familyView" *ngIf="(isAminKhedmaOrDev() || isKhadim()) && mode === 'MAKHDOM'">
-    <label class="lbl">عرض مخدومين</label>
-    <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
-      <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
-    </select>
-  </div>
+  <div
+  class="familyView"
+  *ngIf="
+    mode === 'MAKHDOM' &&
+    (isAminKhedmaOrDev() || isKhadim() || isAminOsra()) &&
+    (isAminKhedmaOrDev() || (viewFamilies?.length || 0) > 1)
+  "
+>
+  <label class="lbl">عرض مخدومين</label>
+  <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
+    <option *ngFor="let f of viewFamilies" [value]="f">{{ f }}</option>
+  </select>
+</div>
 
   <div class="actions">
     <!-- إخفاء زرار النقل عند اختيار خورس البابا اثناسيوس -->
@@ -64,9 +71,14 @@
         <div class="extrasWrap">
           <ng-container *ngFor="let fam of extraFamilies; let i = index">
             <div class="extraRow">
-              <select class="select" [(ngModel)]="extraFamilies[i]">
+              <select class="select" [(ngModel)]="extraFamilies[i].family">
                 <option value="">—</option>
                 <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
+              </select>
+              <select class="select roleSelect" [(ngModel)]="extraFamilies[i].role">
+                <option value="KHADIM">خادم</option>
+                <option value="AMIN_OSRA">امين اسره</option>
+                <option value="AMIN_KHEDMA">امين خدمة</option>
               </select>
               <button type="button" class="miniBtn" (click)="removeExtraFamily(i)" title="حذف">🗑️</button>
             </div>
