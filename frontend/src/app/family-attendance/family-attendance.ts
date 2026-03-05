@@ -3,12 +3,22 @@ import { FamilyService } from '../services/family.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import type { AttendanceType } from '../services/attendance.service';
+import { IftekadService } from '../services/iftekad.service';
 
 type Member = {
   id: number;
   fullName: string;
   role: string;
   deaconFamily: string;
+
+  // choir membership (used to hide choir sections inside details)
+  attendKhors?: string; // MARMARKOS / ATHANASIUS / NONE / BOTH
+  khors?: string; // MARMARKOS / ATHANASIUS / BOTH
+  servingScope?: string;
+
+  // iftekad
+  lastIftekadDate?: string | null; // yyyy-MM-dd
+
   // backward compatible fields (present count)
   fridayLiturgy: number;
   tasbeeha: number;
@@ -21,6 +31,12 @@ type Member = {
   tasbeehaTotal?: number;
   familyMeetingPresent?: number;
   familyMeetingTotal?: number;
+
+  // choir (present/total)
+  marmarkosKhorsPresent?: number;
+  marmarkosKhorsTotal?: number;
+  athanasiusKhorsPresent?: number;
+  athanasiusKhorsTotal?: number;
 
   /** UI selection for export */
   selected?: boolean;
@@ -37,6 +53,16 @@ type AttendanceRow = {
   takenBy?: { id: number; fullName: string; role: string } | null;
 };
 
+type IftekadVisitView = {
+  id: number;
+  memberId: number;
+  visitDate: string; // yyyy-MM-dd
+  description?: string | null;
+  companions?: string | null;
+  createdAt?: string;
+  recordedBy?: { id: number; fullName: string; role: string } | null;
+};
+
 @Component({
   selector: 'app-family-attendance',
   standalone: false,
@@ -46,7 +72,6 @@ type AttendanceRow = {
 })
 export class FamilyAttendanceComponent implements OnInit {
 
-
   readonly allAttendanceTypes: AttendanceRow['type'][] = [
     'TASBEEHA',
     'FRIDAY_LITURGY',
@@ -54,9 +79,11 @@ export class FamilyAttendanceComponent implements OnInit {
     'ATHANASIUS_KHORS',
     'FAMILY_MEETING'
   ];
+
   private familySvc = inject(FamilyService);
   private auth = inject(AuthService);
   private message = inject(MessageService);
+  private iftekadSvc = inject(IftekadService);
 
   me: any;
   members: Member[] = [];
@@ -75,6 +102,26 @@ export class FamilyAttendanceComponent implements OnInit {
   profileFor: Member | null = null;
   profile: any = null;
 
+  // ===== Iftekad (visitation) =====
+  iftekadFor: Member | null = null;
+  iftekadDate = '';
+  iftekadDesc = '';
+  iftekadCompanions = '';
+  iftekadSaving = false;
+
+  iftekadHistory: IftekadVisitView[] = [];
+  iftekadHistoryLoading = false;
+
+  editingVisitId: number | null = null;
+  editVisitDate = '';
+  editVisitDesc = '';
+  editVisitCompanions = '';
+  editSaving = false;
+
+   // ✅ NEW: confirm dialog inside the page (no browser confirm)
+  showDeleteConfirm = false;
+  visitToDelete: IftekadVisitView | null = null;
+  deleteSaving = false;
 
   isChoirSelected(): boolean {
     const x = String(this.selectedFamily || '').trim();
@@ -92,25 +139,24 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   get selectedFamilyName(): string {
-  return String(this.selectedFamily || '').trim();
-}
+    return String(this.selectedFamily || '').trim();
+  }
 
-get isMarmarkosChoir(): boolean {
-  return this.selectedFamilyName === 'خورس مارمرقس';
-}
+  get isMarmarkosChoir(): boolean {
+    return this.selectedFamilyName === 'خورس مارمرقس';
+  }
 
-get isAthanasiusChoir(): boolean {
-  return this.selectedFamilyName === 'خورس البابا اثناسيوس';
-}
+  get isAthanasiusChoir(): boolean {
+    return this.selectedFamilyName === 'خورس البابا اثناسيوس';
+  }
 
+  get showMarmarkosColumn(): boolean {
+    return this.isMarmarkosChoir;
+  }
 
-get showMarmarkosColumn(): boolean {
-  return this.isMarmarkosChoir;
-}
-
-get showAthanasiusColumn(): boolean {
-  return this.isAthanasiusChoir;
-}
+  get showAthanasiusColumn(): boolean {
+    return this.isAthanasiusChoir;
+  }
 
   isAminKhedmaOrDev(): boolean {
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
@@ -157,6 +203,7 @@ get showAthanasiusColumn(): boolean {
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
         this.members = (m as any) || [];
+        this.refreshIftekadLastDates();
         this.loading = false;
       },
       error: (err) => {
@@ -166,54 +213,69 @@ get showAthanasiusColumn(): boolean {
     });
   }
 
-  
+  private refreshIftekadLastDates() {
+    const ids = (this.members || []).map((x) => x?.id).filter((x) => x != null) as number[];
+    if (!ids.length) return;
 
-toggleSelectAll() {
-  this.members.forEach((m) => (m.selected = this.selectAll));
-}
-
-onMemberSelectionChange() {
-  const any = this.members.some((m) => !!m.selected);
-  if (!any) {
-    this.selectAll = false;
-    return;
+    this.iftekadSvc.lastVisitDates(ids).subscribe({
+      next: (map) => {
+        const m = (map as any) || {};
+        this.members.forEach((mem) => {
+          const key = String(mem.id);
+          (mem as any).lastIftekadDate = m[key] || null;
+        });
+      },
+      error: () => {
+        this.members.forEach((mem) => ((mem as any).lastIftekadDate = null));
+      }
+    });
   }
-  this.selectAll = this.members.every((m) => !!m.selected);
-}
 
-private getSelectedMembers(): Member[] {
-  return (this.members || []).filter((m) => !!m.selected);
-}
+  toggleSelectAll() {
+    this.members.forEach((m) => (m.selected = this.selectAll));
+  }
 
-private async fetchDetailsForMembers(members: Member[], famParam?: string): Promise<any[]> {
-  const { firstValueFrom } = await import('rxjs');
-  const arr: any[] = [];
-  for (const m of members) {
-    try {
-      arr.push(await firstValueFrom(this.familySvc.memberDetails(m.id, famParam)));
-    } catch {
-      arr.push({});
+  onMemberSelectionChange() {
+    const any = this.members.some((m) => !!m.selected);
+    if (!any) {
+      this.selectAll = false;
+      return;
     }
+    this.selectAll = this.members.every((m) => !!m.selected);
   }
-  return arr;
-}
 
-private async fetchAttendanceForMembers(members: Member[], famParam?: string): Promise<AttendanceRow[][]> {
-  const { firstValueFrom } = await import('rxjs');
-  const out: AttendanceRow[][] = [];
-  for (const m of members) {
-    try {
-      const rows = await firstValueFrom(this.familySvc.memberAttendance(m.id, famParam));
-      out.push(((rows as any) || []) as AttendanceRow[]);
-    } catch {
-      out.push([]);
+  private getSelectedMembers(): Member[] {
+    return (this.members || []).filter((m) => !!m.selected);
+  }
+
+  private async fetchDetailsForMembers(members: Member[], famParam?: string): Promise<any[]> {
+    const { firstValueFrom } = await import('rxjs');
+    const arr: any[] = [];
+    for (const m of members) {
+      try {
+        arr.push(await firstValueFrom(this.familySvc.memberDetails(m.id, famParam)));
+      } catch {
+        arr.push({});
+      }
     }
+    return arr;
   }
-  return out;
-}
 
+  private async fetchAttendanceForMembers(members: Member[], famParam?: string): Promise<AttendanceRow[][]> {
+    const { firstValueFrom } = await import('rxjs');
+    const out: AttendanceRow[][] = [];
+    for (const m of members) {
+      try {
+        const rows = await firstValueFrom(this.familySvc.memberAttendance(m.id, famParam));
+        out.push(((rows as any) || []) as AttendanceRow[]);
+      } catch {
+        out.push([]);
+      }
+    }
+    return out;
+  }
 
-openDetails(member: Member) {
+  openDetails(member: Member) {
     this.detailsFor = member;
     this.detailsType = '';
     this.reloadDetails();
@@ -221,6 +283,12 @@ openDetails(member: Member) {
 
   reloadDetails() {
     if (!this.detailsFor) return;
+
+    // لو نوع الفلتر مش مسموح للعضو ده (مثلا مش في خورس) رجّعه للكل
+    if (this.detailsType && !this.isAttendanceTypeAllowedForMember(this.detailsFor, this.detailsType)) {
+      this.detailsType = '';
+    }
+
     const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
@@ -238,8 +306,7 @@ openDetails(member: Member) {
       const s = String(v ?? '').trim().toLowerCase();
       return v === true || v === 1 || s === 'true' || s === 'yes' || s === 'y';
     };
-    const hasArchiveRef =
-      row?.archiveId !== null && row?.archiveId !== undefined && row?.archiveId !== 0;
+    const hasArchiveRef = row?.archiveId !== null && row?.archiveId !== undefined && row?.archiveId !== 0;
 
     return (
       isTrue(row?.archived) ||
@@ -321,6 +388,34 @@ openDetails(member: Member) {
     return role || '';
   }
 
+  private memberChoirMembership(m: Member | any): '' | 'MARMARKOS' | 'ATHANASIUS' | 'BOTH' {
+    const attend = String((m as any)?.attendKhors || '').trim().toUpperCase();
+    if (attend === 'MARMARKOS') return 'MARMARKOS';
+    if (attend === 'ATHANASIUS') return 'ATHANASIUS';
+    if (attend === 'BOTH') return 'BOTH';
+
+    const k = String((m as any)?.khors || '').trim().toUpperCase();
+    if (k === 'MARMARKOS') return 'MARMARKOS';
+    if (k === 'ATHANASIUS') return 'ATHANASIUS';
+    if (k === 'BOTH') return 'BOTH';
+
+    return '';
+  }
+
+  isAttendanceTypeAllowedForMember(member: Member, t: AttendanceType): boolean {
+    if (t === 'MARMARKOS_KHORS' || t === 'ATHANASIUS_KHORS') {
+      const mem = this.memberChoirMembership(member);
+      if (t === 'MARMARKOS_KHORS') return mem === 'MARMARKOS' || mem === 'BOTH';
+      return mem === 'ATHANASIUS' || mem === 'BOTH';
+    }
+    return true;
+  }
+
+  visibleAttendanceTypes(): AttendanceRow['type'][] {
+    if (!this.detailsFor) return this.allAttendanceTypes;
+    return this.allAttendanceTypes.filter((t) => this.isAttendanceTypeAllowedForMember(this.detailsFor!, t as any));
+  }
+
   filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
     return (this.details || []).filter((d) => d?.type === t);
   }
@@ -348,219 +443,496 @@ openDetails(member: Member) {
     this.profile = null;
   }
 
-formatRecordedAt(dateStr?: string): string {
-  if (!dateStr) return '';
+  // ===== Iftekad =====
+  openIftekad(member: Member) {
+    this.iftekadFor = member;
+    this.iftekadDesc = '';
+    this.iftekadCompanions = '';
+    this.iftekadDate = '';
 
-  let s = String(dateStr).trim();
+    this.editingVisitId = null;
+    this.editVisitDate = '';
+    this.editVisitDesc = '';
+    this.editVisitCompanions = '';
+    this.editSaving = false;
 
-  s = s.replace(/(\.\d{3})\d+/, '$1');
-
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return dateStr;
-
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-
-const h24 = d.getHours();
-const ampmRaw = h24 >= 12 ? 'م' : 'ص';
-const LRM = '\u200E'; 
-const ampm = `${LRM}${ampmRaw}${LRM}`;
-const h12 = h24 % 12 || 12;
-
-return `${day}/${month}/${year} - ${h12}:${minutes} ${ampm}`;
-}
-
-  // ===== Export =====
-async exportPdf() {
-  // 1st click -> enter selection mode
-  if (!this.exportMode) {
-    this.exportMode = true;
-    this.pendingExport = 'pdf';
-    this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export PDF مرة أخرى' });
-    return;
+    this.loadIftekadHistory(member.id);
   }
 
-  if (this.pendingExport && this.pendingExport !== 'pdf') {
-    this.pendingExport = 'pdf';
-    this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export PDF مرة أخرى' });
-    return;
+  closeIftekad() {
+    this.iftekadFor = null;
+    this.iftekadDesc = '';
+    this.iftekadCompanions = '';
+    this.iftekadDate = '';
+    this.iftekadSaving = false;
+
+    this.iftekadHistory = [];
+    this.iftekadHistoryLoading = false;
+
+    this.editingVisitId = null;
+    this.editVisitDate = '';
+    this.editVisitDesc = '';
+    this.editVisitCompanions = '';
+    this.editSaving = false;
   }
 
-  try {
-    const jsPDF = (await import('jspdf')).default;
-    const autoTable = (await import('jspdf-autotable')).default;
+  setIftekadToday() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    this.iftekadDate = `${yyyy}-${mm}-${dd}`;
+  }
 
-    // Load Arabic-capable font (DejaVuSans) so Arabic text doesn't become garbled.
-    // Keep direction LTR to avoid "mirrored" text.
-    const ensureDejaVu = async (doc: any) => {
-      try {
-        if (typeof doc.setR2L === 'function') doc.setR2L(false);
-        if (doc.__hasDejaVu) {
-          doc.setFont('DejaVu', 'normal');
-          return;
-        }
+  private loadIftekadHistory(memberId: number) {
+    this.iftekadHistoryLoading = true;
+    this.iftekadHistory = [];
 
-        const res = await fetch('assets/fonts/DejaVuSans.ttf');
-        const buf = await res.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const base64 = btoa(binary);
-
-        doc.addFileToVFS('DejaVuSans.ttf', base64);
-        doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
-        doc.__hasDejaVu = true;
-        doc.setFont('DejaVu', 'normal');
-      } catch {
-        // If font loading fails, PDF still generates (Arabic may not render correctly)
+    this.iftekadSvc.getVisits(memberId).subscribe({
+      next: (rows) => {
+        this.iftekadHistory = ((rows as any) || []) as IftekadVisitView[];
+        this.iftekadHistoryLoading = false;
+        this.refreshLastIftekadFromHistory();
+      },
+      error: () => {
+        this.iftekadHistory = [];
+        this.iftekadHistoryLoading = false;
+        this.refreshLastIftekadFromHistory();
       }
-    };
+    });
+  }
 
-    const selected = this.getSelectedMembers();
-    if (!selected.length) {
-      this.message.add({ severity: 'warn', summary: 'Select members', detail: 'اختر على الأقل عضو واحد' });
+  private refreshLastIftekadFromHistory() {
+    if (!this.iftekadFor) return;
+    const last = (this.iftekadHistory && this.iftekadHistory.length) ? this.iftekadHistory[0].visitDate : null;
+    (this.iftekadFor as any).lastIftekadDate = last;
+    const idx = this.members.findIndex((x) => x.id === this.iftekadFor!.id);
+    if (idx >= 0) (this.members[idx] as any).lastIftekadDate = last;
+  }
+
+  needsIftekadAttention(member: Member): boolean {
+    const s = String((member as any)?.lastIftekadDate || '').trim();
+    if (!s) return true;
+
+    const last = new Date(`${s}T00:00:00`);
+    if (isNaN(last.getTime())) return true;
+
+    const threshold = new Date();
+    threshold.setHours(0, 0, 0, 0);
+    threshold.setMonth(threshold.getMonth() - 3);
+    return last.getTime() < threshold.getTime();
+  }
+
+  saveIftekad() {
+    if (!this.iftekadFor) return;
+    if (!this.iftekadDate) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار التاريخ أولاً' });
       return;
     }
 
-    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
-    const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
-    const attArr = await this.fetchAttendanceForMembers(selected, famParam);
+    this.iftekadSaving = true;
+    this.iftekadSvc
+      .createVisit({
+        memberId: this.iftekadFor.id,
+        date: this.iftekadDate,
+        description: this.iftekadDesc || undefined,
+        companions: this.iftekadCompanions || undefined
+      })
+      .subscribe({
+        next: (created) => {
+          // update last date (for red dot)
+          (this.iftekadFor as any).lastIftekadDate = this.iftekadDate;
+          const idx = this.members.findIndex((x) => x.id === this.iftekadFor!.id);
+          if (idx >= 0) (this.members[idx] as any).lastIftekadDate = this.iftekadDate;
 
-    const doc = new jsPDF({ orientation: 'landscape' });
-    await ensureDejaVu(doc);
-    const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
-    const processArabic =
-      (doc as any).processArabic ||
-      ((jsPDF as any)?.API?.processArabic
-        ? (text: string) => (jsPDF as any).API.processArabic(text)
-        : null);
-    const pdfText = (v: any) => {
-      const s = (v ?? '') + '';
-      if (!s) return '';
-      if (!hasArabic(s)) return s;
-      return typeof processArabic === 'function' ? processArabic(s) : s;
-    };
-    const pageRight = doc.internal.pageSize.getWidth() - 14;
-    doc.setFontSize(14);
-    doc.text(pdfText('تفاصيل حضور الأعضاء'), pageRight, 14, { align: 'right' });
-    doc.setFontSize(10);
+          // add to history instantly
+          if (created) {
+            const row: IftekadVisitView = {
+              id: created.id,
+              memberId: created.memberId,
+              visitDate: created.visitDate,
+              description: created.description,
+              companions: created.companions,
+              createdAt: created.createdAt,
+              recordedBy: created.recordedBy
+            };
+            this.iftekadHistory = [row, ...(this.iftekadHistory || [])];
+          } else {
+            this.loadIftekadHistory(this.iftekadFor!.id);
+          }
 
-    let y = 20;
-    for (let idx = 0; idx < selected.length; idx++) {
-      const m = selected[idx];
-      const d = detailsArr[idx] || {};
-      const fam = (d.deaconFamily ?? m.deaconFamily) || '';
-      const phone = d.phoneNumber || '';
-      const records = attArr[idx] || [];
+          this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تسجيل الافتقاد' });
+          this.iftekadSaving = false;
 
-      doc.setFontSize(12);
-      doc.text(pdfText(`${m.fullName} (${this.roleAr(m.role)})`), pageRight, y, { align: 'right' });
-      y += 6;
-      doc.setFontSize(10);
-      doc.text(pdfText(`الأسرة: ${fam}`), pageRight, y, { align: 'right' });
-      doc.text(pdfText(`الهاتف: ${phone}`), pageRight - 110, y, { align: 'right' });
-      y += 4;
-
-      // Group by Type and merge the Type cell (rowSpan) so each type appears once.
-      const body: any[] = [];
-      if (records.length) {
-        const sorted = [...records].sort((a, b) => {
-          const t = (a.type || '').localeCompare(b.type || '');
-          if (t !== 0) return t;
-          return (a.date || '').localeCompare(b.date || '');
-        });
-
-        const groups = new Map<string, AttendanceRow[]>();
-        sorted.forEach((r) => {
-          const key = r.type || '';
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key)!.push(r);
-        });
-
-        for (const [type, list] of groups) {
-          list.forEach((r, i) => {
-            // IMPORTANT: With rowSpan, subsequent rows must NOT include a placeholder cell
-            // for the spanned column, otherwise cells shift into wrong columns.
-            if (i === 0) {
-              const typeCell = {
-                content: pdfText(this.titleForType(type as AttendanceRow['type'])),
-                rowSpan: list.length,
-                styles: { valign: 'middle', fontStyle: 'bold' , font: 'DejaVu', halign: 'right'}
-              };
-              body.push([
-                typeCell,
-                pdfText(r.date || ''),
-                pdfText(this.statusAr(r.status)),
-                pdfText(this.formatRecordedAt(r.createdAt)),
-                r.takenBy?.fullName ? pdfText(`${r.takenBy.fullName}`) : ''
-              ]);
-            } else {
-              body.push([
-                pdfText(r.date || ''),
-                pdfText(this.statusAr(r.status)),
-                pdfText(this.formatRecordedAt(r.createdAt)),
-                r.takenBy?.fullName ? pdfText(`${r.takenBy.fullName}`) : ''
-              ]);
-            }
-          });
-        }
-      }
-
-      autoTable(doc, {
-        startY: y,
-        head: [[pdfText('النوع'), pdfText('تاريخ المناسبة'), pdfText('الحالة'), pdfText('وقت التسجيل'), pdfText('المسجّل')]],
-        body: body.length ? body : [['', '', '', '', '']],
-        theme: 'grid',
-        margin: { left: 14, right: 14 },
-        tableWidth: doc.internal.pageSize.getWidth() - 28,
-        tableLineColor: [120, 120, 120],
-        tableLineWidth: 0.25,
-        styles: {
-          fontSize: 9,
-          font: 'DejaVu',
-          halign: 'right',
-          lineColor: [145, 145, 145],
-          lineWidth: 0.2
+          // clear optional fields after save
+          this.iftekadDesc = '';
+          this.iftekadCompanions = '';
         },
-        headStyles: {
-          lineColor: [90, 90, 90],
-          lineWidth: 0.3,
-          textColor: [255, 255, 255]
-        },
-        bodyStyles: {
-          lineColor: [150, 150, 150],
-          lineWidth: 0.2
-        },
-        columnStyles: {
-          0: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.24 },
-          1: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.18 },
-          2: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.12 },
-          3: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.22 },
-          4: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.24 }
+        error: (err) => {
+          this.iftekadSaving = false;
+          this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to save' });
         }
       });
-
-      // @ts-ignore
-      y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : y + 20;
-      if (y > 180) {
-        doc.addPage();
-        y = 14;
-      }
-    }
-
-    doc.save('members_attendance.pdf');
-
-    this.exportMode = false;
-    this.pendingExport = '';
-    this.selectAll = false;
-    this.members.forEach((m) => (m.selected = false));
-  } catch {
-    this.message.add({ severity: 'error', summary: 'Export failed', detail: 'PDF export failed' });
   }
+
+  startEditVisit(v: IftekadVisitView) {
+    this.editingVisitId = v.id;
+    this.editVisitDate = v.visitDate || '';
+    this.editVisitDesc = (v.description || '') as string;
+    this.editVisitCompanions = (v.companions || '') as string;
+  }
+
+  cancelEditVisit() {
+    this.editingVisitId = null;
+    this.editVisitDate = '';
+    this.editVisitDesc = '';
+    this.editVisitCompanions = '';
+    this.editSaving = false;
+  }
+
+ saveEditVisit(v: IftekadVisitView) {
+  if (!this.iftekadFor) return;
+  if (!this.editVisitDate) {
+    this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار التاريخ أولاً' });
+    return;
+  }
+
+  this.editSaving = true;
+
+  // ✅ القيم اللي المفروض تتسجل بعد التعديل
+  const expected = {
+    date: this.editVisitDate,
+    description: (this.editVisitDesc || '').trim(),
+    companions: (this.editVisitCompanions || '').trim()
+  };
+
+  this.iftekadSvc
+    .updateVisit(v.id, {
+      date: expected.date,
+      description: expected.description || undefined,
+      companions: expected.companions || undefined
+    })
+    .subscribe({
+      next: () => {
+        // ✅ نجاح طبيعي
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الافتقاد' });
+        this.editSaving = false;
+        this.cancelEditVisit();
+        this.loadIftekadHistory(this.iftekadFor!.id); // يحدّث السجل فوراً
+      },
+      error: (err) => {
+        // ✅ هنا بدل ما نطلع Error وخلاص.. نتأكد هل اتعدّل فعلاً
+        this.verifyVisitUpdatedAfterError(v.id, expected, err);
+      }
+    });
+  }
+  private verifyVisitUpdatedAfterError(
+  visitId: number,
+  expected: { date: string; description: string; companions: string },
+  originalErr: any
+) {
+  if (!this.iftekadFor) {
+    this.editSaving = false;
+    this.message.add({ severity: 'error', summary: 'Error', detail: 'Failed to update' });
+    return;
+  }
+
+  // نعمل Reload للسجل من الباك
+  this.iftekadSvc.getVisits(this.iftekadFor.id).subscribe({
+    next: (rows) => {
+      this.iftekadHistory = ((rows as any) || []) as IftekadVisitView[];
+
+      const found = (this.iftekadHistory || []).find((x) => x.id === visitId);
+
+      const norm = (v: any) => String(v ?? '').trim();
+
+      // ✅ لو لقينا نفس الزيارة ومتسجلة بالقيم الجديدة يبقى التعديل حصل فعلاً
+      const ok =
+        !!found &&
+        norm(found.visitDate) === norm(expected.date) &&
+        norm(found.description) === norm(expected.description) &&
+        norm(found.companions) === norm(expected.companions);
+
+      if (ok) {
+        // ✅ التعديل حصل.. اعرض Success بدل Error
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الافتقاد' });
+        this.editSaving = false;
+        this.cancelEditVisit();
+        this.refreshLastIftekadFromHistory(); // علشان النقطة الحمرا
+      } else {
+        // ❌ فعلاً فشل
+        this.editSaving = false;
+        this.message.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: originalErr?.error?.error || originalErr?.message || 'Failed to update'
+        });
+      }
+    },
+    error: () => {
+      this.editSaving = false;
+      this.message.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: originalErr?.error?.error || originalErr?.message || 'Failed to update'
+      });
+    }
+  });
 }
 
+  // ✅ open confirm dialog
+  askDeleteVisit(v: IftekadVisitView) {
+    this.visitToDelete = v;
+    this.showDeleteConfirm = true;
+    this.deleteSaving = false;
+  }
 
+  cancelDelete() {
+    this.showDeleteConfirm = false;
+    this.visitToDelete = null;
+    this.deleteSaving = false;
+  }
+
+  confirmDelete() {
+    if (!this.iftekadFor || !this.visitToDelete) return;
+
+    this.deleteSaving = true;
+    this.iftekadSvc.deleteVisit(this.visitToDelete.id).subscribe({
+      next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الافتقاد' });
+        this.deleteSaving = false;
+        this.showDeleteConfirm = false;
+        this.visitToDelete = null;
+        this.loadIftekadHistory(this.iftekadFor!.id);
+      },
+      error: (err) => {
+        // ✅ Same parsing edge-case safeguard
+        if (err && err.status === 200) {
+          this.message.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الافتقاد' });
+          this.deleteSaving = false;
+          this.showDeleteConfirm = false;
+          this.visitToDelete = null;
+          this.loadIftekadHistory(this.iftekadFor!.id);
+          return;
+        }
+
+        this.deleteSaving = false;
+        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to delete' });
+      }
+    });
+  }
+
+  formatRecordedAt(dateStr?: string): string {
+    if (!dateStr) return '';
+
+    let s = String(dateStr).trim();
+
+    s = s.replace(/(\.\d{3})\d+/, '$1');
+
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return dateStr;
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+
+    const h24 = d.getHours();
+    const ampmRaw = h24 >= 12 ? 'م' : 'ص';
+    const LRM = '\u200E';
+    const ampm = `${LRM}${ampmRaw}${LRM}`;
+    const h12 = h24 % 12 || 12;
+
+    return `${day}/${month}/${year} - ${h12}:${minutes} ${ampm}`;
+  }
+
+  // ===== Export =====
+  async exportPdf() {
+    // 1st click -> enter selection mode
+    if (!this.exportMode) {
+      this.exportMode = true;
+      this.pendingExport = 'pdf';
+      this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export PDF مرة أخرى' });
+      return;
+    }
+
+    if (this.pendingExport && this.pendingExport !== 'pdf') {
+      this.pendingExport = 'pdf';
+      this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export PDF مرة أخرى' });
+      return;
+    }
+
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const autoTable = (await import('jspdf-autotable')).default;
+
+      // Load Arabic-capable font (DejaVuSans) so Arabic text doesn't become garbled.
+      // Keep direction LTR to avoid "mirrored" text.
+      const ensureDejaVu = async (doc: any) => {
+        try {
+          if (typeof doc.setR2L === 'function') doc.setR2L(false);
+          if (doc.__hasDejaVu) {
+            doc.setFont('DejaVu', 'normal');
+            return;
+          }
+
+          const res = await fetch('assets/fonts/DejaVuSans.ttf');
+          const buf = await res.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          const base64 = btoa(binary);
+
+          doc.addFileToVFS('DejaVuSans.ttf', base64);
+          doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
+          doc.__hasDejaVu = true;
+          doc.setFont('DejaVu', 'normal');
+        } catch {
+          // If font loading fails, PDF still generates (Arabic may not render correctly)
+        }
+      };
+
+      const selected = this.getSelectedMembers();
+      if (!selected.length) {
+        this.message.add({ severity: 'warn', summary: 'Select members', detail: 'اختر على الأقل عضو واحد' });
+        return;
+      }
+
+      const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
+      const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
+      const attArr = await this.fetchAttendanceForMembers(selected, famParam);
+
+      const doc = new jsPDF({ orientation: 'landscape' });
+      await ensureDejaVu(doc);
+      const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
+      const processArabic =
+        (doc as any).processArabic ||
+        ((jsPDF as any)?.API?.processArabic
+          ? (text: string) => (jsPDF as any).API.processArabic(text)
+          : null);
+      const pdfText = (v: any) => {
+        const s = (v ?? '') + '';
+        if (!s) return '';
+        if (!hasArabic(s)) return s;
+        return typeof processArabic === 'function' ? processArabic(s) : s;
+      };
+      const pageRight = doc.internal.pageSize.getWidth() - 14;
+      doc.setFontSize(14);
+      doc.text(pdfText('تفاصيل حضور الأعضاء'), pageRight, 14, { align: 'right' });
+      doc.setFontSize(10);
+
+      let y = 20;
+      for (let idx = 0; idx < selected.length; idx++) {
+        const m = selected[idx];
+        const d = detailsArr[idx] || {};
+        const fam = (d.deaconFamily ?? m.deaconFamily) || '';
+        const phone = d.phoneNumber || '';
+        const records = attArr[idx] || [];
+
+        doc.setFontSize(12);
+        doc.text(pdfText(`${m.fullName} (${this.roleAr(m.role)})`), pageRight, y, { align: 'right' });
+        y += 6;
+        doc.setFontSize(10);
+        doc.text(pdfText(`الأسرة: ${fam}`), pageRight, y, { align: 'right' });
+        doc.text(pdfText(`الهاتف: ${phone}`), pageRight - 110, y, { align: 'right' });
+        y += 4;
+
+        // Group by Type and merge the Type cell (rowSpan) so each type appears once.
+        const body: any[] = [];
+        if (records.length) {
+          const sorted = [...records].sort((a, b) => {
+            const t = (a.type || '').localeCompare(b.type || '');
+            if (t !== 0) return t;
+            return (a.date || '').localeCompare(b.date || '');
+          });
+
+          const groups = new Map<string, AttendanceRow[]>();
+          sorted.forEach((r) => {
+            const key = r.type || '';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(r);
+          });
+
+          for (const [type, list] of groups) {
+            list.forEach((r, i) => {
+              // IMPORTANT: With rowSpan, subsequent rows must NOT include a placeholder cell
+              // for the spanned column, otherwise cells shift into wrong columns.
+              if (i === 0) {
+                const typeCell = {
+                  content: pdfText(this.titleForType(type as AttendanceRow['type'])),
+                  rowSpan: list.length,
+                  styles: { valign: 'middle', fontStyle: 'bold', font: 'DejaVu', halign: 'right' }
+                };
+                body.push([
+                  typeCell,
+                  pdfText(r.date || ''),
+                  pdfText(this.statusAr(r.status)),
+                  pdfText(this.formatRecordedAt(r.createdAt)),
+                  r.takenBy?.fullName ? pdfText(`${r.takenBy.fullName}`) : ''
+                ]);
+              } else {
+                body.push([
+                  pdfText(r.date || ''),
+                  pdfText(this.statusAr(r.status)),
+                  pdfText(this.formatRecordedAt(r.createdAt)),
+                  r.takenBy?.fullName ? pdfText(`${r.takenBy.fullName}`) : ''
+                ]);
+              }
+            });
+          }
+        }
+
+        autoTable(doc, {
+          startY: y,
+          head: [[pdfText('النوع'), pdfText('تاريخ المناسبة'), pdfText('الحالة'), pdfText('وقت التسجيل'), pdfText('المسجّل')]],
+          body: body.length ? body : [['', '', '', '', '']],
+          theme: 'grid',
+          margin: { left: 14, right: 14 },
+          tableWidth: doc.internal.pageSize.getWidth() - 28,
+          tableLineColor: [120, 120, 120],
+          tableLineWidth: 0.25,
+          styles: {
+            fontSize: 9,
+            font: 'DejaVu',
+            halign: 'right',
+            lineColor: [145, 145, 145],
+            lineWidth: 0.2
+          },
+          headStyles: {
+            lineColor: [90, 90, 90],
+            lineWidth: 0.3,
+            textColor: [255, 255, 255]
+          },
+          bodyStyles: {
+            lineColor: [150, 150, 150],
+            lineWidth: 0.2
+          },
+          columnStyles: {
+            0: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.24 },
+            1: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.18 },
+            2: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.12 },
+            3: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.22 },
+            4: { cellWidth: (doc.internal.pageSize.getWidth() - 28) * 0.24 }
+          }
+        });
+
+        // @ts-ignore
+        y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : y + 20;
+        if (y > 180) {
+          doc.addPage();
+          y = 14;
+        }
+      }
+
+      doc.save('members_attendance.pdf');
+
+      this.exportMode = false;
+      this.pendingExport = '';
+      this.selectAll = false;
+      this.members.forEach((m) => (m.selected = false));
+    } catch {
+      this.message.add({ severity: 'error', summary: 'Export failed', detail: 'PDF export failed' });
+    }
+  }
 }
