@@ -28,6 +28,10 @@ export class GradesComponent implements OnInit {
   columns: GradeColumn[] = [];
   columnMeta: Record<string, { title: string; max: string }> = {};
   members: Array<{ id: number; fullName: string; values: Record<string,string> }> = [];
+  rankedMembers: Array<{ id: number; fullName: string; values: Record<string,string> }> = [];
+  rankViewEnabled = false;
+  topThreeMemberIds = new Set<number>();
+  rankByMemberId = new Map<number, number>();
   canEdit = false;
   canPublish = false;
   saving = false;
@@ -196,12 +200,17 @@ export class GradesComponent implements OnInit {
           fullName: m.fullName,
           values: { ...(m.values || {}) }
         }));
+        this.rankViewEnabled = false;
+        this.rebuildMembersView();
       },
       error: (err: any) => {
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الدرجات' });
         this.sheet = null;
         this.columns = [];
         this.members = [];
+        this.rankedMembers = [];
+        this.topThreeMemberIds.clear();
+        this.rankByMemberId.clear();
       }
     });
   }
@@ -216,6 +225,7 @@ export class GradesComponent implements OnInit {
       m.values[id] = '';
       return m;
     });
+    this.rebuildMembersView();
   }
 
   removeColumn(colId: string): void {
@@ -231,6 +241,26 @@ export class GradesComponent implements OnInit {
       delete nextValues[colId];
       return { ...m, values: nextValues };
     });
+    this.rebuildMembersView();
+  }
+
+  toggleTopRanksView(): void {
+    this.rankViewEnabled = !this.rankViewEnabled;
+    this.rebuildMembersView();
+  }
+
+  onMemberValueChange(): void {
+    this.rebuildMembersView();
+  }
+
+  isTopThreeMember(memberId: number): boolean {
+    if (!this.rankViewEnabled) return false;
+    return this.topThreeMemberIds.has(memberId);
+  }
+
+  getDisplayedRank(memberId: number, fallbackRank: number): number {
+    if (!this.rankViewEnabled) return fallbackRank;
+    return this.rankByMemberId.get(memberId) ?? fallbackRank;
   }
 
   setColumnTitle(colId: string, title: string): void {
@@ -333,6 +363,34 @@ export class GradesComponent implements OnInit {
     return Number.isFinite(val) ? val : 0;
   }
 
+  private rebuildMembersView(): void {
+    const ranked = [...this.members].sort((a, b) => {
+      const totalDiff = this.rowTotal(b.values) - this.rowTotal(a.values);
+      if (totalDiff !== 0) return totalDiff;
+      return a.fullName.localeCompare(b.fullName, 'ar');
+    });
+
+    const rankMap = new Map<number, number>();
+    const highlightedIds = new Set<number>();
+    let lastTotal: number | null = null;
+    let currentRank = 0;
+
+    for (const m of ranked) {
+      const total = this.rowTotal(m.values);
+      if (lastTotal === null || total !== lastTotal) {
+        currentRank += 1;
+        lastTotal = total;
+      }
+      rankMap.set(m.id, currentRank);
+      if (currentRank <= 3) {
+        highlightedIds.add(m.id);
+      }
+    }
+
+    this.rankByMemberId = rankMap;
+    this.topThreeMemberIds = highlightedIds;
+    this.rankedMembers = this.rankViewEnabled ? ranked : [...this.members];
+  }
   save() {
     if (!this.canEdit || !this.selectedFamilyBase) return;
     this.saving = true;
@@ -373,3 +431,10 @@ export class GradesComponent implements OnInit {
     });
   }
 }
+
+
+
+
+
+
+

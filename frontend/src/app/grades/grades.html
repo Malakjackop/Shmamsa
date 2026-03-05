@@ -25,6 +25,7 @@
     </div>
 
     <button class="btn" *ngIf="viewMode==='SERVANT' && canEdit" (click)="addColumn()">+ عمود جديد</button>
+    <button class="btn rankBtn" *ngIf="viewMode==='SERVANT'" (click)="toggleTopRanksView()">{{ rankViewEnabled ? 'إلغاء ترتيب الأوائل' : 'الأوائل' }}</button>
     <button class="btn primary" *ngIf="viewMode==='SERVANT' && canEdit" (click)="save()" [disabled]="saving">حفظ</button>
     <button class="btn danger" *ngIf="viewMode==='SERVANT' && canPublish" (click)="publish()" [disabled]="publishing">نشر</button>
   </div>
@@ -70,11 +71,11 @@
       </thead>
 
       <tbody>
-        <tr *ngFor="let m of members; let ri = index">
-          <td class="stickyIndex indexCell">{{ ri + 1 }}</td>
+        <tr *ngFor="let m of rankedMembers; let ri = index" [class.topThreeRow]="isTopThreeMember(m.id)">
+          <td class="stickyIndex indexCell">{{ getDisplayedRank(m.id, ri + 1) }}</td>
           <td class="nameCell stickyName">{{ m.fullName }}</td>
           <td *ngFor="let c of columns">
-            <input class="cell" [readOnly]="!canEdit" [(ngModel)]="m.values[c.id]" placeholder="-" />
+            <input class="cell" [readOnly]="!canEdit" [(ngModel)]="m.values[c.id]" (ngModelChange)="onMemberValueChange()" placeholder="-" />
           </td>
           <td class="totalCell">{{ rowTotal(m.values) }}</td>
         </tr>
@@ -116,3 +117,5 @@
     * المخدوم لن يرى أي درجات إلا بعد ضغط "نشر" بواسطة أمين الأسرة.
   </div>
 </div>
+
+

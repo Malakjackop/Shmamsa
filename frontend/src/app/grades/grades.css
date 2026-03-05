@@ -40,3 +40,8 @@ thead .stickyIndex{z-index:6;background:black;color:#fff}
 tbody .stickyIndex{background:#f3f1ee}
 thead .stickyName{z-index:4;background:black;color:#fff}
 tbody .stickyName{background:#f3f1ee}
+.rankBtn{border-color:#f59e0b;background:#f59e0b;color:#111827}
+.rankBtn:hover{background:#d97706}
+.topThreeRow td{background:#fff8db;font-weight:700}
+.topThreeRow .stickyIndex,
+.topThreeRow .stickyName{background:#fff1b8}
