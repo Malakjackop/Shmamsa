@@ -107,8 +107,11 @@ public class AttendanceController {
 
         // Enforce day-of-week per type
         DayOfWeek dow = selectedDate.getDayOfWeek();
-        if (type == AttendanceType.FAMILY_MEETING && dow != DayOfWeek.THURSDAY) {
-            return ResponseEntity.status(400).body(Map.of("error", "Family meeting must be on Thursday"));
+        if (type == AttendanceType.FAMILY_MEETING
+                && dow != DayOfWeek.THURSDAY
+                && dow != DayOfWeek.FRIDAY
+                && dow != DayOfWeek.SATURDAY) {
+            return ResponseEntity.status(400).body(Map.of("error", "Family meeting must be on Thursday, Friday, or Saturday"));
         }
         if ((type == AttendanceType.FRIDAY_LITURGY
                 || type == AttendanceType.MARMARKOS_KHORS
@@ -641,8 +644,11 @@ public class AttendanceController {
     private void enforceDayOfWeek(AttendanceType type, LocalDate selectedDate) {
         if (type == null || selectedDate == null) return;
         DayOfWeek dow = selectedDate.getDayOfWeek();
-        if (type == AttendanceType.FAMILY_MEETING && dow != DayOfWeek.THURSDAY) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting must be on Thursday");
+        if (type == AttendanceType.FAMILY_MEETING
+                && dow != DayOfWeek.THURSDAY
+                && dow != DayOfWeek.FRIDAY
+                && dow != DayOfWeek.SATURDAY) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting must be on Thursday, Friday, or Saturday");
         }
         if ((type == AttendanceType.FRIDAY_LITURGY
                 || type == AttendanceType.MARMARKOS_KHORS

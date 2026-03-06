@@ -47,7 +47,6 @@
 
       <div class="scanner" *ngIf="scanning">
         <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
-        <p class="hint">وجّه الكاميرا للـ كيو آر.</p>
       </div>
 
       <!-- Search (قبل وبعد اختيار الأسرة) -->
@@ -108,7 +107,7 @@
 
       <!-- Selected + Submit -->
       <div class="selectedBox" *ngIf="selected.length">
-        <h2>المختارون</h2>
+        <h2>الأسماء التي سيتم تسجيل حضورها</h2>
 
         <div class="list">
           <div class="row" *ngFor="let u of selected">

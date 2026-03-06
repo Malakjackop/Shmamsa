@@ -58,6 +58,8 @@ export class AttendanceComponent implements OnInit {
   private searchTimer: any = null;
   searching = false;
   selected: PickUser[] = [];
+  private lastScannedToken = '';
+  private lastScannedAt = 0;
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -421,15 +423,43 @@ export class AttendanceComponent implements OnInit {
     const token = (resultString || '').trim();
     if (!token) return;
 
+    const now = Date.now();
+    if (token === this.lastScannedToken && now - this.lastScannedAt < 1500) {
+      return;
+    }
+    this.lastScannedToken = token;
+    this.lastScannedAt = now;
+
     this.attendance.scanToken(token).subscribe({
       next: (u) => {
         const pu = this.toPickUser(u);
         if (!pu?.id) return;
-        if (this.isSelected(pu.id)) return;
+
+        if (this.isSelected(pu.id)) {
+          this.message.add({
+            severity: 'info',
+            summary: 'الاسم موجود بالفعل',
+            detail: `${pu.fullName} موجود بالفعل في قائمة التسجيل.`,
+            life: 2500
+          });
+          return;
+        }
+
         this.selected = [...this.selected, pu];
+        this.message.add({
+          severity: 'success',
+          summary: 'تم الاسكان بنجاح',
+          detail: `${pu.fullName} اتضاف تحت في قائمة التسجيل. اضغط تسجيل لحفظ الحضور.`,
+          life: 3000
+        });
       },
       error: () => {
-        this.message.add({ severity: 'warn', summary: 'Invalid QR', detail: 'This QR is not valid or user not found' });
+        this.message.add({
+          severity: 'warn',
+          summary: 'QR غير صالح',
+          detail: 'الكود غير صحيح أو العضو غير موجود.',
+          life: 3000
+        });
       }
     });
   }
@@ -469,10 +499,11 @@ export class AttendanceComponent implements OnInit {
         const updated = res?.presentUpdated ?? res?.updated ?? 0;
         const absent = res?.absentCreated ?? 0;
         const skipped = res?.skipped ?? 0;
+        const totalPresent = created + updated;
         this.message.add({
           severity: 'success',
-          summary: 'Saved',
-          detail: `Date: ${res?.date || iso} | حضور: +${created} | تحويل غياب→حضور: ${updated} | غياب اتعمل: ${absent} | Skipped: ${skipped}`
+          summary: 'تم حفظ تسجيل الحضور',
+          detail: `تم حفظ الحضور بنجاح ليوم ${res?.date || iso} — الحضور: ${totalPresent}، الغياب: ${absent}، بدون تغيير: ${skipped}`,          life: 4000
         });
         this.selected = [];
       },
