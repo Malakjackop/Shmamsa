@@ -46,8 +46,8 @@ this.authService.login(username, password).subscribe({
   next: (user) => {
     this.messageService.add({
       severity: 'success',
-      summary: 'Login Successful',
-      detail: `Welcome back, ${user?.username ?? username}!`
+      summary: 'تسجيل دخول ناجح',
+      detail: `اهلا بعودتك،  ${user?.username ?? username}!`
     });
     setTimeout(() => this.router.navigate(['/dashboard']), 500);
   },

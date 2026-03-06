@@ -322,13 +322,59 @@ public class AttendanceController {
         User u = userRepo.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
 
-        return ResponseEntity.ok(Map.of(
-                "id", u.getId(),
-                "username", u.getUsername(),
-                "fullName", u.getFullName(),
-                "role", u.getRole(),
-                "deaconFamily", ("DEVELOPER".equalsIgnoreCase(u.getRole()) && "SYSTEM".equalsIgnoreCase(u.getDeaconFamily())) ? null : u.getDeaconFamily()
-        ));
+        AttendanceType selectedType = null;
+        String typeRaw = body.get("type");
+        if (typeRaw != null && !typeRaw.isBlank()) {
+            try {
+                selectedType = AttendanceType.valueOf(typeRaw.trim());
+            } catch (Exception ignored) {
+                selectedType = null;
+            }
+        }
+
+        LocalDate selectedDate = null;
+        String dateRaw = body.get("date");
+        if (dateRaw != null && !dateRaw.isBlank()) {
+            try {
+                selectedDate = LocalDate.parse(dateRaw.trim());
+            } catch (Exception ignored) {
+                selectedDate = null;
+            }
+        }
+
+        String familyBase = null;
+        String familyRaw = body.get("family");
+        if (familyRaw != null && !familyRaw.isBlank()) {
+            familyBase = FamilyUtil.mainFamily(familyRaw.trim());
+        }
+
+        AttendanceRecord existing = null;
+        if (selectedType != null && selectedDate != null) {
+            if (selectedType == AttendanceType.FAMILY_MEETING && familyBase != null && !familyBase.isBlank()) {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(
+                        u.getId(), selectedDate, selectedType, familyBase
+                );
+            } else if (selectedType != AttendanceType.FAMILY_MEETING) {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(
+                        u.getId(), selectedDate, selectedType
+                );
+            }
+        }
+
+        boolean alreadyRecorded = existing != null;
+        boolean alreadyPresent = existing != null && (existing.getStatus() == null || existing.getStatus() == AttendanceStatus.PRESENT);
+        String existingStatus = existing == null || existing.getStatus() == null ? null : existing.getStatus().name();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", u.getId());
+        out.put("username", u.getUsername());
+        out.put("fullName", u.getFullName());
+        out.put("role", u.getRole());
+        out.put("deaconFamily", ("DEVELOPER".equalsIgnoreCase(u.getRole()) && "SYSTEM".equalsIgnoreCase(u.getDeaconFamily())) ? null : u.getDeaconFamily());
+        out.put("alreadyRecorded", alreadyRecorded);
+        out.put("alreadyPresent", alreadyPresent);
+        out.put("existingStatus", existingStatus);
+        return ResponseEntity.ok(out);
     }
 
     @GetMapping("/my-stats")

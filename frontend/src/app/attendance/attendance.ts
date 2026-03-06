@@ -419,50 +419,79 @@ export class AttendanceComponent implements OnInit {
     this.selected = this.selected.filter((x) => x.id !== id);
   }
 
-  onCodeResult(resultString: string) {
-    const token = (resultString || '').trim();
-    if (!token) return;
+onCodeResult(resultString: string) {
+  const token = (resultString || '').trim();
+  if (!token) return;
 
-    const now = Date.now();
-    if (token === this.lastScannedToken && now - this.lastScannedAt < 1500) {
-      return;
-    }
-    this.lastScannedToken = token;
-    this.lastScannedAt = now;
+  const now = Date.now();
+  if (token === this.lastScannedToken && now - this.lastScannedAt < 1500) {
+    return;
+  }
+  this.lastScannedToken = token;
+  this.lastScannedAt = now;
 
-    this.attendance.scanToken(token).subscribe({
-      next: (u) => {
-        const pu = this.toPickUser(u);
-        if (!pu?.id) return;
+  const iso = this.selectedDate ? this.toIsoDate(this.selectedDate) : undefined;
+  const family = this.selectedType === 'FAMILY_MEETING'
+    ? (this.selectedFamily || undefined)
+    : undefined;
 
-        if (this.isSelected(pu.id)) {
-          this.message.add({
-            severity: 'info',
-            summary: 'الاسم موجود بالفعل',
-            detail: `${pu.fullName} موجود بالفعل في قائمة التسجيل.`,
-            life: 2500
-          });
-          return;
-        }
+  this.attendance.scanToken(token, iso, this.selectedType, family).subscribe({
+    next: (u) => {
+      const pu = this.toPickUser(u);
+      if (!pu?.id) return;
 
-        this.selected = [...this.selected, pu];
-        this.message.add({
-          severity: 'success',
-          summary: 'تم الاسكان بنجاح',
-          detail: `${pu.fullName} اتضاف تحت في قائمة التسجيل. اضغط تسجيل لحفظ الحضور.`,
-          life: 3000
-        });
-      },
-      error: () => {
+      // لو متسجل بالفعل في نفس اليوم ونفس النوع
+      if (u?.alreadyPresent) {
         this.message.add({
           severity: 'warn',
-          summary: 'QR غير صالح',
-          detail: 'الكود غير صحيح أو العضو غير موجود.',
+          summary: 'تم تسجيله بالفعل',
+          detail: `${pu.fullName} متسجل بالفعل في نفس اليوم.`,
+          life: 3500
+        });
+        return;
+      }
+
+      // لو موجود بالفعل في القائمة الحالية
+      if (this.isSelected(pu.id)) {
+        this.message.add({
+          severity: 'warn',
+          summary: 'الاسم موجود بالفعل',
+          detail: `${pu.fullName} موجود بالفعل في قائمة التسجيل.`,
           life: 3000
         });
+        return;
       }
-    });
-  }
+
+      this.selected = [...this.selected, pu];
+
+      // لو كان غياب قبل كده
+      if (u?.alreadyRecorded && u?.existingStatus === 'ABSENT') {
+        this.message.add({
+          severity: 'info',
+          summary: 'كان مسجل غياب',
+          detail: `${pu.fullName} كان متسجل غياب في نفس اليوم. اضغط تسجيل لتحويله إلى حضور.`,
+          life: 3500
+        });
+        return;
+      }
+
+      this.message.add({
+        severity: 'success',
+        summary: 'تم الاسكان بنجاح',
+        detail: `${pu.fullName} اتضاف في قائمة التسجيل.`,
+        life: 3000
+      });
+    },
+    error: () => {
+      this.message.add({
+        severity: 'warn',
+        summary: 'QR غير صالح',
+        detail: 'الكود غير صحيح أو العضو غير موجود.',
+        life: 3000
+      });
+    }
+  });
+}
 
   submit() {
     if (!this.selectedDate) {
@@ -494,23 +523,46 @@ export class AttendanceComponent implements OnInit {
     const iso = this.toIsoDate(this.selectedDate);
 
     this.attendance.submit(users, this.selectedType, iso, this.selectedFamily || undefined).subscribe({
-      next: (res) => {
-        const created = res?.presentCreated ?? res?.created ?? 0;
-        const updated = res?.presentUpdated ?? res?.updated ?? 0;
-        const absent = res?.absentCreated ?? 0;
-        const skipped = res?.skipped ?? 0;
-        const totalPresent = created + updated;
+    next: (res) => {
+      const created = res?.presentCreated ?? res?.created ?? 0;
+      const updated = res?.presentUpdated ?? res?.updated ?? 0;
+      const absent = res?.absentCreated ?? 0;
+      const skipped = res?.skipped ?? 0;
+      const totalPresent = created + updated;
+
+      if (totalPresent === 0 && skipped > 0) {
         this.message.add({
-          severity: 'success',
-          summary: 'تم حفظ تسجيل الحضور',
-          detail: `تم حفظ الحضور بنجاح ليوم ${res?.date || iso} — الحضور: ${totalPresent}، الغياب: ${absent}، بدون تغيير: ${skipped}`,          life: 4000
+          severity: 'warn',
+          summary: 'لم يتم تسجيل حضور جديد',
+          detail: `قد تم تسجيل هذا الاسم من قبل`,
+          life: 4000
         });
         this.selected = [];
-      },
+        return;
+      }
+
+      if (skipped > 0) {
+        this.message.add({
+          severity: 'warn',
+          summary: 'تم الحفظ مع تجاهل مكرر',
+          detail: `تم تسجيل حضور ${totalPresent}، وفيه ${skipped} متسجلين بالفعل.`,
+          life: 4000
+        });
+        this.selected = [];
+        return;
+      }
+
+      this.message.add({
+        severity: 'success',
+        summary: 'تم حفظ تسجيل الحضور',
+        detail: `تم حفظ الحضور بنجاح ليوم ${res?.date || iso} — الحضور: ${totalPresent}`,
+        life: 4000
+      });
+      this.selected = [];
+    },
       error: (err) => {
         this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
       }
     });
   }
 }
-

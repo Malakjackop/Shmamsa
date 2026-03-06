@@ -57,10 +57,31 @@ export class AttendanceService {
     );
   }
 
-  scanToken(token: string): Observable<{ id: number; username: string; fullName: string; deaconFamily?: string }> {
-    return this.http.post<{ id: number; username: string; fullName: string; deaconFamily?: string }>(
+  scanToken(
+    token: string,
+    date?: string,
+    type?: AttendanceType,
+    family?: string
+  ): Observable<{
+    id: number;
+    username: string;
+    fullName: string;
+    deaconFamily?: string;
+    alreadyRecorded?: boolean;
+    alreadyPresent?: boolean;
+    existingStatus?: 'PRESENT' | 'ABSENT' | null;
+  }> {
+    return this.http.post<{
+      id: number;
+      username: string;
+      fullName: string;
+      deaconFamily?: string;
+      alreadyRecorded?: boolean;
+      alreadyPresent?: boolean;
+      existingStatus?: 'PRESENT' | 'ABSENT' | null;
+    }>(
       `${this.baseUrl}/scan-token`,
-      { token }
+      { token, date, type, family }
     , { withCredentials: true });
   }
 
