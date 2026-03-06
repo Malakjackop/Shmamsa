@@ -48,6 +48,8 @@ public class GradesController {
             Map<String, String> values
     ) {}
 
+    public record ConfirmSchoolResultRequest(String result, String studyYear) {} // school/university confirmation payload
+
     // ----- Helpers -----
     private String normRole(String raw) {
         if (raw == null) return "MAKHDOM";
@@ -192,6 +194,119 @@ private void ensureCanViewSheet(User me, String familyBase) {
         if (base == null || base.isBlank()) return List.of();
         // return all MAKHDOM in base + A/B
         return userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, List.of("MAKHDOM"));
+    }
+
+    // --- School grade advancement helpers (Arabic strings) ---
+    private static String normAr(String s) {
+        if (s == null) return "";
+        return s
+                .replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "") // remove tashkeel/tatweel
+                .replace('أ', 'ا')
+                .replace('إ', 'ا')
+                .replace('آ', 'ا')
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private static String advanceSchoolGradeString(String currentRaw) {
+        String current = normAr(currentRaw);
+        if (current.isBlank()) return null;
+
+        // Common normalization of year words
+        // Accept: اولى/اوله/اولا/1, تانيه/ثانيه/2, تالته/ثالثه/3, رابعه/4, خامسه/5, سادسه/6
+        // Stages: ابتدائي, اعدادي, ثانوي
+        record Step(String from, String to) {}
+        List<Step> map = List.of(
+                // Primary
+                new Step("اولى ابتدائي", "تانيه ابتدائي"),
+                new Step("اوله ابتدائي", "تانيه ابتدائي"),
+                new Step("تانيه ابتدائي", "تالته ابتدائي"),
+                new Step("ثانيه ابتدائي", "تالته ابتدائي"),
+                new Step("تالته ابتدائي", "رابعه ابتدائي"),
+                new Step("ثالثه ابتدائي", "رابعه ابتدائي"),
+                new Step("رابعه ابتدائي", "خامسه ابتدائي"),
+                new Step("خامسه ابتدائي", "سادسه ابتدائي"),
+                new Step("سادسه ابتدائي", "اولى اعدادي"),
+                // Preparatory
+                new Step("اولى اعدادي", "تانيه اعدادي"),
+                new Step("اوله اعدادي", "تانيه اعدادي"),
+                new Step("تانيه اعدادي", "تالته اعدادي"),
+                new Step("ثانيه اعدادي", "تالته اعدادي"),
+                new Step("تالته اعدادي", "اولى ثانوي"),
+                new Step("ثالثه اعدادي", "اولى ثانوي"),
+                // Secondary
+                new Step("اولى ثانوي", "تانيه ثانوي"),
+                new Step("اوله ثانوي", "تانيه ثانوي"),
+                new Step("تانيه ثانوي", "تالته ثانوي"),
+                new Step("ثانيه ثانوي", "تالته ثانوي")
+        );
+
+        for (Step s : map) {
+            if (current.equals(s.from)) return s.to;
+        }
+
+        // Digits-based fallback like "3 ابتدائي" or "3 ثانوي"
+        StringBuilder sbDigits = new StringBuilder();
+        String arNums = "٠١٢٣٤٥٦٧٨٩";
+        for (int i = 0; i < current.length(); i++) {
+            char ch = current.charAt(i);
+            int idx = arNums.indexOf(ch);
+            if (idx >= 0) sbDigits.append(idx);
+            else sbDigits.append(ch);
+        }
+        String digits = sbDigits.toString();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^(\\d+)\\s*(ابتدائي|اعدادي|ثانوي)$")
+                .matcher(digits);
+        if (m.find()) {
+            int year = Integer.parseInt(m.group(1));
+            String stage = m.group(2);
+            if ("ابتدائي".equals(stage) && year >= 1 && year <= 6) {
+                if (year < 6) return switch (year + 1) {
+                    case 2 -> "تانيه ابتدائي";
+                    case 3 -> "تالته ابتدائي";
+                    case 4 -> "رابعه ابتدائي";
+                    case 5 -> "خامسه ابتدائي";
+                    case 6 -> "سادسه ابتدائي";
+                    default -> null;
+                };
+                return "اولى اعدادي";
+            }
+            if ("اعدادي".equals(stage) && year >= 1 && year <= 3) {
+                if (year < 3) return (year + 1 == 2) ? "تانيه اعدادي" : "تالته اعدادي";
+                return "اولى ثانوي";
+            }
+            if ("ثانوي".equals(stage) && year >= 1 && year <= 3) {
+                if (year < 3) return (year + 1 == 2) ? "تانيه ثانوي" : "تالته ثانوي";
+                return "جامعة";
+            }
+        }
+
+        // If already third secondary in words
+        if (current.equals("تالته ثانوي") || current.equals("ثالثه ثانوي")) return "جامعة";
+
+        return null;
+    }
+
+    private static String normalizeStoredStudyYear(String raw) {
+        String value = normAr(raw);
+        if (value.isBlank()) return null;
+
+        return switch (value) {
+            case "grade1_primary" -> "اولى ابتدائي";
+            case "grade2_primary" -> "تانيه ابتدائي";
+            case "grade3_primary" -> "تالته ابتدائي";
+            case "grade4_primary" -> "رابعه ابتدائي";
+            case "grade5_primary" -> "خامسه ابتدائي";
+            case "grade6_primary" -> "سادسه ابتدائي";
+            case "grade1_prep" -> "اولى اعدادي";
+            case "grade2_prep" -> "تانيه اعدادي";
+            case "grade3_prep" -> "تالته اعدادي";
+            case "grade1_secondary" -> "اولى ثانوي";
+            case "grade2_secondary" -> "تانيه ثانوي";
+            case "grade3_secondary" -> "تالته ثانوي";
+            default -> raw == null ? null : raw.trim();
+        };
     }
 
     // ----- Endpoints -----
@@ -396,5 +511,74 @@ private void ensureCanViewSheet(User me, String familyBase) {
         }
 
         return ResponseEntity.ok(new MyGradesView(base, sheet.getPublishedAt(), cols, aligned));
+    }
+
+    // Makhdom confirms school result after publish (PASS advances grade / transitions to university)
+    @PostMapping("/confirm-school-result")
+    public ResponseEntity<?> confirmSchoolResult(
+            @RequestParam(required = false) String family,
+            @RequestBody(required = false) ConfirmSchoolResultRequest body,
+            Authentication auth
+    ) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String base = FamilyUtil.mainFamily(family != null && !family.isBlank() ? family : me.getDeaconFamily());
+        if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
+
+        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        if (sheet == null || !"PUBLISHED".equalsIgnoreCase(String.valueOf(sheet.getStatus())) || sheet.getPublishedAt() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Grades are not published");
+        }
+
+        String status = normAr(me.getStatus());
+        String studyType = normAr(me.getStudyType());
+        String studyYear = body == null || body.studyYear() == null ? "" : body.studyYear().trim();
+        String result = body == null || body.result() == null ? "" : body.result().trim().toUpperCase();
+
+        if ("graduate".equalsIgnoreCase(status) || "خريج".equals(status)) {
+            result = "GRADUATE";
+        } else if ("university".equalsIgnoreCase(studyType) || "جامعه".equals(studyType) || "جامعة".equals(studyType)) {
+            if (studyYear.isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "studyYear is required");
+            }
+            me.setUniversityGrade(studyYear);
+            result = "UNIVERSITY";
+        } else {
+            if (!studyYear.isBlank()) {
+                me.setSchoolGrade(studyYear);
+                result = "PASS";
+            } else {
+                if (!("PASS".equals(result) || "FAIL".equals(result))) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "result must be PASS or FAIL");
+                }
+
+                if ("PASS".equals(result)) {
+                    String normalizedCurrent = normalizeStoredStudyYear(me.getSchoolGrade());
+                    String next = advanceSchoolGradeString(normalizedCurrent);
+                    if (next != null) {
+                        if ("جامعة".equals(next)) {
+                            me.setStudyType("جامعة");
+                            me.setUniversityGrade(me.getUniversityGrade() == null || me.getUniversityGrade().isBlank() ? "أولى جامعة" : me.getUniversityGrade());
+                            me.setSchoolGrade(null);
+                        } else {
+                            me.setSchoolGrade(next);
+                        }
+                    }
+                }
+            }
+        }
+
+        // mark confirmation (always)
+        me.setLastSchoolResultFamilyBase(base);
+        me.setLastSchoolResultPublishedAt(sheet.getPublishedAt());
+        me.setLastSchoolResultStatus(result);
+
+        userRepo.save(me);
+        me.setPassword(null);
+
+        return ResponseEntity.ok(me);
     }
 }

@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -140,6 +141,16 @@ public class User {
     private String email;
 
     private String role = "MAKHDOM";
+
+    // --- Grades publish confirmation (used by /api/grades to show success/fail choice once per publish) ---
+    @Column(name = "last_school_result_family_base", length = 100)
+    private String lastSchoolResultFamilyBase;
+
+    @Column(name = "last_school_result_published_at")
+    private LocalDateTime lastSchoolResultPublishedAt;
+
+    @Column(name = "last_school_result_status", length = 10)
+    private String lastSchoolResultStatus; // PASS / FAIL
 
     public String roleForFamilyBase(String familyBase) {
         if (familyBase == null || familyBase.isBlank()) return null;

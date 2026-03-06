@@ -1,0 +1,4 @@
+/* Root app styles */
+:host {
+  display: block;
+}

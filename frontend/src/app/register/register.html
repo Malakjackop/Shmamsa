@@ -11,7 +11,7 @@
       <!-- Row 1 -->
       <div class="input-row">
         <div class="input-group small">
-          <input type="text" formControlName="fullName" placeholder="الاسم بالكامل" required
+          <input type="text" formControlName="fullName" placeholder="الاسم بالكامل بالعربي" required
                  (click)="markInteracted('fullName')" (blur)="markTouched('fullName')" />
           <small class="error-text" *ngIf="shouldShowError('fullName')">{{ errorText('fullName','الاسم بالكامل') }}</small>
         </div>
@@ -88,7 +88,7 @@
       <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
       <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
       <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-      <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
+      <option value="اسرة القديس اسكلابيوس">اسرة القديس اسكلابيوس</option>
 
       <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
       <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
@@ -131,7 +131,7 @@
       <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
       <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
       <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-      <option value="اسرة القديس  اسكلابيوس">اسرة القديس اسكلابيوس</option>
+      <option value="اسرة القديس اسكلابيوس">اسرة القديس اسكلابيوس</option>
       <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
       <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
       <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
@@ -224,18 +224,18 @@
           <div class="input-group small">
             <select class="form-select" formControlName="schoolGrade" (change)="markTouchedFromList('schoolGrade')">
               <option value="" disabled>اختر الصف</option>
-              <option value="grade1_primary">أولى ابتدائي</option>
-              <option value="grade2_primary">تانية ابتدائي</option>
-              <option value="grade3_primary">تالتة ابتدائي</option>
-              <option value="grade4_primary">رابعة ابتدائي</option>
-              <option value="grade5_primary">خامسة ابتدائي</option>
-              <option value="grade6_primary">سادسة ابتدائي</option>
-              <option value="grade1_prep">أولى إعدادي</option>
-              <option value="grade2_prep">تانية إعدادي</option>
-              <option value="grade3_prep">تالتة إعدادي</option>
-              <option value="grade1_secondary">أولى ثانوي</option>
-              <option value="grade2_secondary">تانية ثانوي</option>
-              <option value="grade3_secondary">تالتة ثانوي</option>
+              <option value="أولى ابتدائي">أولى ابتدائي</option>
+              <option value="تانية ابتدائي">تانية ابتدائي</option>
+              <option value="تالتة ابتدائي">تالتة ابتدائي</option>
+              <option value="رابعة ابتدائي">رابعة ابتدائي</option>
+              <option value="خامسة ابتدائي">خامسة ابتدائي</option>
+              <option value="سادسة ابتدائي">سادسة ابتدائي</option>
+              <option value="أولى إعدادي">أولى إعدادي</option>
+              <option value="تانية إعدادي">تانية إعدادي</option>
+              <option value="تالتة إعدادي">تالتة إعدادي</option>
+              <option value="أولى ثانوي">أولى ثانوي</option>
+              <option value="تانية ثانوي">تانية ثانوي</option>
+              <option value="تالتة ثانوي">تالتة ثانوي</option>
               <option value="other">أخر</option>
             </select>
             <small class="error-text" *ngIf="shouldShowError('schoolGrade')">{{ errorText('schoolGrade','الصف الدراسي') }}</small>

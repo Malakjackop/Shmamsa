@@ -18,7 +18,7 @@ export class RoleLabelPipe implements PipeTransform {
       case 'KHADIM':
         return 'خادم';
       case 'AMIN_OSRA':
-        return 'امين اسره';
+        return 'امين اسرة';
       case 'AMIN_KHEDMA':
         return 'امين خدمة';
       case 'DEVELOPER':
@@ -29,3 +29,4 @@ export class RoleLabelPipe implements PipeTransform {
     }
   }
 }
+

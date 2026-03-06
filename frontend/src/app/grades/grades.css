@@ -38,6 +38,9 @@ input.head.max{text-align:center}
 }
 thead .stickyIndex{z-index:6;background:black;color:#fff}
 tbody .stickyIndex{background:#f3f1ee}
+
+/* Blur the grades table while the confirmation dialog is open */
+.tableWrap.blurred{filter:blur(6px);pointer-events:none;user-select:none}
 thead .stickyName{z-index:4;background:black;color:#fff}
 tbody .stickyName{background:#f3f1ee}
 .rankBtn{border-color:#f59e0b;background:#f59e0b;color:#111827}
@@ -45,3 +48,5 @@ tbody .stickyName{background:#f3f1ee}
 .topThreeRow td{background:#fff8db;font-weight:700}
 .topThreeRow .stickyIndex,
 .topThreeRow .stickyName{background:#fff1b8}
+
+.dialogInput{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-family:inherit;font-size:14px;box-sizing:border-box}

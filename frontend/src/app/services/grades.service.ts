@@ -28,6 +28,8 @@ export interface MyGradesView {
   values: Record<string, string>;
 }
 
+export type SchoolResultChoice = 'PASS' | 'FAIL';
+
 @Injectable({ providedIn: 'root' })
 export class GradesService {
   private http = inject(HttpClient);
@@ -52,5 +54,11 @@ export class GradesService {
     let params = new HttpParams();
     if (family) params = params.set('family', family);
     return this.http.get<MyGradesView>(`${this.baseUrl}/me`, { params, withCredentials: true });
+  }
+
+  confirmSchoolResult(result: SchoolResultChoice, family?: string, studyYear?: string): Observable<any> {
+    let params = new HttpParams();
+    if (family) params = params.set('family', family);
+    return this.http.post(`${this.baseUrl}/confirm-school-result`, { result, studyYear }, { params, withCredentials: true });
   }
 }

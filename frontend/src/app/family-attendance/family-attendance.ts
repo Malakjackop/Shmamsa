@@ -91,14 +91,14 @@ export class FamilyAttendanceComponent implements OnInit {
   families: string[] = [];
   selectedFamily = '';
   private readonly preferredFamilyOrder: string[] = [
-    'اسره السمائين',
-    'اسره القديس ابانوب',
-    'اسره القديس ديسقورس',
-    'اسره القديس سيدهم بشاي',
-    'اسره القديس اسكلابيوس',
-    'اسره القديس البابا كيرلس',
-    'اسره القديس الانبا ابرام',
-    'اسره الديس اسطفانوس',
+    'اسرة السمائين',
+    'اسرة القديس ابانوب',
+    'اسرة القديس ديسقورس',
+    'اسرة القديس سيدهم بشاي',
+    'اسرة القديس اسكلابيوس',
+    'اسرة القديس البابا كيرلس',
+    'اسرة القديس الانبا ابرام',
+    'اسرة القديس اسطفانوس',
     'خورس مارمرقس',
     'خورس البابا اثناسيوس'
   ];
@@ -236,25 +236,26 @@ export class FamilyAttendanceComponent implements OnInit {
 
     if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
     if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
-    if (n.includes('سمائ')) return 'اسره السمائين';
-    if (n.includes('ابانوب')) return 'اسره القديس ابانوب';
-    if (n.includes('ديسقورس')) return 'اسره القديس ديسقورس';
-    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسره القديس سيدهم بشاي';
-    if (n.includes('اسكلابيوس')) return 'اسره القديس اسكلابيوس';
-    if (n.includes('كيرلس')) return 'اسره القديس البابا كيرلس';
-    if (n.includes('ابرام')) return 'اسره القديس الانبا ابرام';
-    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسره الديس اسطفانوس';
+    if (n.includes('سمائ')) return 'اسرة السمائين';
+    if (n.includes('ابانوب')) return 'اسرة القديس ابانوب';
+    if (n.includes('ديسقورس')) return 'اسرة القديس ديسقورس';
+    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسرة القديس سيدهم بشاي';
+    if (n.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
+    if (n.includes('كيرلس')) return 'اسرة القديس البابا كيرلس';
+    if (n.includes('ابرام')) return 'اسرة القديس الانبا ابرام';
+    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسرة القديس اسطفانوس';
 
     return family;
   }
 
   private sortFamiliesByPreferredOrder(families: string[]): string[] {
-    const cleaned = (families || []).map((x) => String(x || '').trim()).filter(Boolean);
+    const cleaned = (families || []).map((x) => this.familyOrderKey(String(x || '').trim())).filter(Boolean);
+    const deduped = Array.from(new Set(cleaned));
     const orderMap = new Map(
       this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
     );
 
-    return [...cleaned].sort((a, b) => {
+    return [...deduped].sort((a, b) => {
       const aKey = this.familyOrderKey(a);
       const bKey = this.familyOrderKey(b);
       const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
@@ -1208,5 +1209,4 @@ export class FamilyAttendanceComponent implements OnInit {
     }
   }
 }
-
 

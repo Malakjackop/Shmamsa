@@ -41,6 +41,11 @@ export class GradesComponent implements OnInit {
   // makhdom mode
   my: MyGradesView | null = null;
 
+  // confirmation modal (makhdom)
+  showSchoolResultDialog = false;
+  confirmingSchoolResult = false;
+  selectedStudyYear = '';
+
   ngOnInit(): void {
     this.auth.getUserData(true).subscribe({
       next: (u) => {
@@ -75,10 +80,10 @@ export class GradesComponent implements OnInit {
         'امين اسرة',
         'امين الاسرة',
         'أمين أسرة',
-        'أمين الاسره',
+        'أمين الاسرة',
         'امين الأسرة',
         'أمين الأسرة',
-        'امين اسره'
+        'امين اسرة'
       ].includes(ar)
     )
       return 'AMIN_OSRA';
@@ -426,11 +431,208 @@ export class GradesComponent implements OnInit {
 
   private loadMyGrades() {
     this.gradesSvc.myGrades().subscribe({
-      next: (v) => this.my = v,
+      next: (v) => {
+        this.my = v;
+        this.maybeAskForSchoolResult();
+      },
       error: () => this.my = { familyBase: this.mainFamily(this.me?.deaconFamily), columns: [], values: {}, publishedAt: null }
     });
   }
+
+  private maybeAskForSchoolResult(): void {
+    if (this.viewMode !== 'MAKHDOM') return;
+    if (!this.my?.publishedAt || this.isGraduate()) {
+      this.showSchoolResultDialog = false;
+      return;
+    }
+
+    const base = String(this.my?.familyBase || '').trim();
+    const pub = String(this.my?.publishedAt || '').trim();
+
+    const lastBase = String(this.me?.lastSchoolResultFamilyBase || '').trim();
+    const lastPub = String(this.me?.lastSchoolResultPublishedAt || '').trim();
+
+    this.selectedStudyYear = this.currentStudyYear();
+    this.showSchoolResultDialog = !(lastBase === base && lastPub === pub);
+  }
+
+  private normalizeArabicText(value: any): string {
+    return String(value ?? '')
+      .trim()
+      .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  private canonicalSchoolGrade(raw: string): string {
+    const value = this.normalizeArabicText(raw);
+    const aliases: Record<string, string> = {
+      'grade1_primary': 'اولى ابتدائي',
+      'اولى ابتدائي': 'اولى ابتدائي',
+      'اولي ابتدائي': 'اولى ابتدائي',
+      'اوله ابتدائي': 'اولى ابتدائي',
+      'اول ابتدائي': 'اولى ابتدائي',
+
+      'grade2_primary': 'تانيه ابتدائي',
+      'تانيه ابتدائي': 'تانيه ابتدائي',
+      'ثانيه ابتدائي': 'تانيه ابتدائي',
+      'ثاني ابتدائي': 'تانيه ابتدائي',
+      'ثانيه ابتدائية': 'تانيه ابتدائي',
+      'تانيه ابتدائية': 'تانيه ابتدائي',
+
+      'grade3_primary': 'تالته ابتدائي',
+      'تالته ابتدائي': 'تالته ابتدائي',
+      'ثالثه ابتدائي': 'تالته ابتدائي',
+      'ثالث ابتدائي': 'تالته ابتدائي',
+      'ثالثه ابتدائية': 'تالته ابتدائي',
+      'تالته ابتدائية': 'تالته ابتدائي',
+
+      'grade4_primary': 'رابعه ابتدائي',
+      'رابعه ابتدائي': 'رابعه ابتدائي',
+      'رابع ابتدائي': 'رابعه ابتدائي',
+      'رابعه ابتدائية': 'رابعه ابتدائي',
+
+      'grade5_primary': 'خامسه ابتدائي',
+      'خامسه ابتدائي': 'خامسه ابتدائي',
+      'خامس ابتدائي': 'خامسه ابتدائي',
+      'خامسه ابتدائية': 'خامسه ابتدائي',
+
+      'grade6_primary': 'سادسه ابتدائي',
+      'سادسه ابتدائي': 'سادسه ابتدائي',
+      'سادس ابتدائي': 'سادسه ابتدائي',
+      'سادسه ابتدائية': 'سادسه ابتدائي',
+
+      'grade1_prep': 'اولى اعدادي',
+      'اولى اعدادي': 'اولى اعدادي',
+      'اولي اعدادي': 'اولى اعدادي',
+      'اوله اعدادي': 'اولى اعدادي',
+      'اول اعدادي': 'اولى اعدادي',
+      'اولى اعدادية': 'اولى اعدادي',
+
+      'grade2_prep': 'تانيه اعدادي',
+      'تانيه اعدادي': 'تانيه اعدادي',
+      'ثانيه اعدادي': 'تانيه اعدادي',
+      'ثاني اعدادي': 'تانيه اعدادي',
+      'ثانيه اعدادية': 'تانيه اعدادي',
+      'تانيه اعدادية': 'تانيه اعدادي',
+
+      'grade3_prep': 'تالته اعدادي',
+      'تالته اعدادي': 'تالته اعدادي',
+      'ثالثه اعدادي': 'تالته اعدادي',
+      'ثالث اعدادي': 'تالته اعدادي',
+      'ثالثه اعدادية': 'تالته اعدادي',
+      'تالته اعدادية': 'تالته اعدادي',
+
+      'grade1_secondary': 'اولى ثانوي',
+      'اولى ثانوي': 'اولى ثانوي',
+      'اولي ثانوي': 'اولى ثانوي',
+      'اوله ثانوي': 'اولى ثانوي',
+      'اول ثانوي': 'اولى ثانوي',
+      'اولى ثانويه': 'اولى ثانوي',
+
+      'grade2_secondary': 'تانيه ثانوي',
+      'تانيه ثانوي': 'تانيه ثانوي',
+      'ثانيه ثانوي': 'تانيه ثانوي',
+      'ثاني ثانوي': 'تانيه ثانوي',
+      'ثانيه ثانويه': 'تانيه ثانوي',
+      'تانيه ثانويه': 'تانيه ثانوي',
+
+      'grade3_secondary': 'تالته ثانوي',
+      'تالته ثانوي': 'تالته ثانوي',
+      'ثالثه ثانوي': 'تالته ثانوي',
+      'ثالث ثانوي': 'تالته ثانوي',
+      'ثالثه ثانويه': 'تالته ثانوي',
+      'تالته ثانويه': 'تالته ثانوي'
+    };
+    return aliases[value] || String(raw || '').trim();
+  }
+
+  private schoolGradeMap(raw: string): string {
+    return this.canonicalSchoolGrade(raw);
+  }
+
+  private nextSchoolGrade(raw: string): string {
+    const orderedGrades = [
+      'اولى ابتدائي',
+      'تانيه ابتدائي',
+      'تالته ابتدائي',
+      'رابعه ابتدائي',
+      'خامسه ابتدائي',
+      'سادسه ابتدائي',
+      'اولى اعدادي',
+      'تانيه اعدادي',
+      'تالته اعدادي',
+      'اولى ثانوي',
+      'تانيه ثانوي',
+      'تالته ثانوي'
+    ];
+
+    const current = this.canonicalSchoolGrade(raw);
+    const normalizedCurrent = this.normalizeArabicText(current);
+    const index = orderedGrades.findIndex((g) => this.normalizeArabicText(g) === normalizedCurrent);
+    if (index === -1) return current;
+    if (index >= orderedGrades.length - 1) return orderedGrades[index];
+    return orderedGrades[index + 1];
+  }
+
+  isGraduate(): boolean {
+    const status = this.normalizeArabicText(this.me?.status);
+    return status === 'graduate' || status === 'خريج';
+  }
+
+  isUniversityStudent(): boolean {
+    const studyType = this.normalizeArabicText(this.me?.studyType);
+    return studyType === 'university' || studyType === 'جامعه' || studyType === 'جامعة';
+  }
+
+  isSchoolStudent(): boolean {
+    return !this.isGraduate() && !this.isUniversityStudent();
+  }
+
+  currentStudyYear(): string {
+    if (this.isUniversityStudent()) return String(this.me?.universityGrade || '').trim();
+    return this.schoolGradeMap(String(this.me?.schoolGrade || '').trim());
+  }
+
+  nextSchoolStudyYear(): string {
+    return this.nextSchoolGrade(String(this.me?.schoolGrade || '').trim());
+  }
+
+  hasSelectedStudyYear(): boolean {
+    return !!String(this.selectedStudyYear || '').trim();
+  }
+
+  saveStudyYear(year: string): void {
+    const selected = String(year || '').trim();
+    if (!selected || this.confirmingSchoolResult || !this.my?.publishedAt) return;
+
+    this.confirmingSchoolResult = true;
+    this.gradesSvc.confirmSchoolResult('PASS', this.my?.familyBase, selected).subscribe({
+      next: () => {
+        this.auth.refreshUser().subscribe({
+          next: (u) => {
+            this.me = u;
+            this.selectedStudyYear = selected;
+            this.confirmingSchoolResult = false;
+            this.showSchoolResultDialog = false;
+          },
+          error: () => {
+            this.confirmingSchoolResult = false;
+            this.showSchoolResultDialog = false;
+          }
+        });
+      },
+      error: () => {
+        this.confirmingSchoolResult = false;
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'حصل خطأ أثناء تسجيل السنة الدراسية' });
+      }
+    });
+  }
 }
+
 
 
 

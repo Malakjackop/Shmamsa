@@ -50,44 +50,44 @@ export class TransferMembersComponent implements OnInit {
   selectedIds = new Set<number>();
 
   private readonly preferredFamilyOrder: string[] = [
-    'اسره السمائين',
-    'اسره القديس ابانوب',
-    'اسره القديس ديسقورس',
-    'اسره القديس سيدهم بشاي',
-    'اسره القديس اسكلابيوس',
-    'اسره القديس البابا كيرلس',
-    'اسره القديس الانبا ابرام',
-    'اسره القديس اسطفانوس',
+    'اسرة السمائين',
+    'اسرة القديس ابانوب',
+    'اسرة القديس ديسقورس',
+    'اسرة القديس سيدهم بشاي',
+    'اسرة القديس اسكلابيوس',
+    'اسرة القديس البابا كيرلس',
+    'اسرة القديس الانبا ابرام',
+    'اسرة القديس اسطفانوس',
     'خورس مارمرقس',
     'خورس البابا اثناسيوس'
   ];
 
   /** ✅ Registration lists (same as Register page) */
   servantFamilies: string[] = [
-  'اسره السمائيين',
-  'اسره القديس ابانوب',
-  'اسره القديس ديسقورس',
-  'اسره القديس سيدهم بشاي',
-  'اسره القديس اسكلابيوس',
-  'اسره البابا كيرلس',
-  'اسره الانبا ابرام',
-  'اسره اسطفانوس',
+  'اسرة السمائين',
+  'اسرة القديس ابانوب',
+  'اسرة القديس ديسقورس',
+  'اسرة القديس سيدهم بشاي',
+  'اسرة القديس اسكلابيوس',
+  'اسرة القديس البابا كيرلس',
+  'اسرة القديس الانبا ابرام',
+  'اسرة القديس اسطفانوس',
   'خورس مارمرقس',
   'خورس البابا اثناسيوس'
 ];
 
   makhdomFamilies: string[] = [
-  'اسره السمائيين',
-  'اسره القديس ابانوب',
-  'اسره القديس ديسقورس',
-  'اسره القديس سيدهم بشاي',
-  'اسره القديس اسكلابيوس',
-  'اسره البابا كيرلس أ',
-  'اسره البابا كيرلس ب',
-  'اسره الانبا ابرام أ',
-  'اسره الانبا ابرام ب',
-  'اسره اسطفانوس أ',
-  'اسره اسطفانوس ب'
+  'اسرة السمائين',
+  'اسرة القديس ابانوب',
+  'اسرة القديس ديسقورس',
+  'اسرة القديس سيدهم بشاي',
+  'اسرة القديس اسكلابيوس',
+  'اسرة القديس البابا كيرلس أ',
+  'اسرة القديس البابا كيرلس ب',
+  'اسرة القديس الانبا ابرام أ',
+  'اسرة القديس الانبا ابرام ب',
+  'اسرة القديس اسطفانوس أ',
+  'اسرة القديس اسطفانوس ب'
 ];
 viewFamilies: string[] = []; 
 
@@ -172,30 +172,51 @@ private normRole(v: any): string {
       .toLowerCase();
   }
 
-  private familyOrderKey(family: string): string {
-    const n = this.normalizeFamilyName(family);
+  private canonicalFamilyName(value: any): string {
+    const raw = String(value || '').trim();
+    const n = this.normalizeFamilyName(raw);
 
+    if (!n) return '';
     if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
     if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
-    if (n.includes('سمائ')) return 'اسره السمائين';
-    if (n.includes('ابانوب')) return 'اسره القديس ابانوب';
-    if (n.includes('ديسقورس')) return 'اسره القديس ديسقورس';
-    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسره القديس سيدهم بشاي';
-    if (n.includes('اسكلابيوس')) return 'اسره القديس اسكلابيوس';
-    if (n.includes('كيرلس')) return 'اسره القديس البابا كيرلس';
-    if (n.includes('ابرام')) return 'اسره القديس الانبا ابرام';
-    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسره القديس اسطفانوس';
+    if (n.includes('سمائ')) return 'اسرة السمائين';
+    if (n.includes('ابانوب')) return 'اسرة القديس ابانوب';
+    if (n.includes('ديسقورس')) return 'اسرة القديس ديسقورس';
+    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسرة القديس سيدهم بشاي';
+    if (n.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
+    if (n.includes('كيرلس')) {
+      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(n)) return 'اسرة القديس البابا كيرلس أ';
+      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(n)) return 'اسرة القديس البابا كيرلس ب';
+      return 'اسرة القديس البابا كيرلس';
+    }
+    if (n.includes('ابرام')) {
+      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(n)) return 'اسرة القديس الانبا ابرام أ';
+      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(n)) return 'اسرة القديس الانبا ابرام ب';
+      return 'اسرة القديس الانبا ابرام';
+    }
+    if (n.includes('اسطفانوس') || n.includes('استفانوس')) {
+      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(n)) return 'اسرة القديس اسطفانوس أ';
+      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(n)) return 'اسرة القديس اسطفانوس ب';
+      return 'اسرة القديس اسطفانوس';
+    }
 
-    return family;
+    return raw;
+  }
+
+  private familyOrderKey(family: string): string {
+    return this.canonicalFamilyName(family);
   }
 
   private sortFamiliesByPreferredOrder(families: string[]): string[] {
-    const cleaned = (families || []).map((x) => String(x || '').trim()).filter(Boolean);
+    const cleaned = (families || [])
+      .map((x) => this.canonicalFamilyName(x))
+      .filter(Boolean);
+    const deduped = Array.from(new Set(cleaned));
     const orderMap = new Map(
       this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
     );
 
-    return [...cleaned].sort((a, b) => {
+    return [...deduped].sort((a, b) => {
       const aKey = this.familyOrderKey(a);
       const bKey = this.familyOrderKey(b);
       const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
@@ -214,45 +235,52 @@ private normRole(v: any): string {
   private loadFamilyLists() {
     this.familySvc.families().subscribe({
       next: (list) => {
-        if (Array.isArray(list) && list.length) {
-          this.servantFamilies = this.sortFamiliesByPreferredOrder(list as any);
+        this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
+        this.makhdomFamilies = this.sortFamiliesByPreferredOrder(this.makhdomFamilies);
 
-if (this.isAminKhedmaOrDev()) {
-  this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
-} else if (this.hasAnyScopedAminOsra()) {
-  this.viewFamilies = this.sortFamiliesByPreferredOrder(this.getAminOsraFamilies());
-} else if (this.isKhadim()) {
-  const mine = [
-    this.me?.deaconFamily,
-    this.me?.deaconFamily2,
-    this.me?.deaconFamily3,
-    this.me?.deaconFamily4,
-  ]
-    .map((x: any) => String(x || '').trim())
-    .filter((x: string) => !!x);
+        if (this.isAminKhedmaOrDev()) {
+          this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
+        } else if (this.hasAnyScopedAminOsra()) {
+          this.viewFamilies = this.sortFamiliesByPreferredOrder(this.getAminOsraFamilies());
+        } else if (this.isKhadim()) {
+          const mine = [
+            this.me?.deaconFamily,
+            this.me?.deaconFamily2,
+            this.me?.deaconFamily3,
+            this.me?.deaconFamily4,
+          ]
+            .map((x: any) => this.canonicalFamilyName(x))
+            .filter((x: string) => !!x);
 
-  this.viewFamilies = this.sortFamiliesByPreferredOrder(Array.from(new Set(mine)));
-} else {
-  this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
-}
-
-const first = this.viewFamilies[0] || '';
-if (!this.selectedFamilyView) this.selectedFamilyView = first;
-
-const ok = this.viewFamilies.some(
-  (x) => String(x || '').trim() === String(this.selectedFamilyView || '').trim()
-);
-if (!ok) this.selectedFamilyView = first;
-          if (this.isMarmarkosView()) {
-            this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
-          }
+          this.viewFamilies = this.sortFamiliesByPreferredOrder(Array.from(new Set(mine)));
+        } else {
+          this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
         }
+
+        if (Array.isArray(list) && list.length) {
+          this.viewFamilies = this.sortFamiliesByPreferredOrder([
+            ...this.viewFamilies,
+            ...(list as any[]).map((x) => this.canonicalFamilyName(x))
+          ]);
+        }
+
+        const first = this.viewFamilies[0] || '';
+        if (!this.selectedFamilyView) this.selectedFamilyView = first;
+
+        const ok = this.viewFamilies.some(
+          (x) => String(x || '').trim() === String(this.selectedFamilyView || '').trim()
+        );
+        if (!ok) this.selectedFamilyView = first;
+
+        if (this.isMarmarkosView()) {
+          this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+        }
+
         this.loadMembers();
       },
       error: () => {}
     });
   }
-
   private loadMembers() {
     this.loading = true;
 
@@ -584,7 +612,7 @@ private getAminOsraFamilies(): string[] {
 
   const res: string[] = [];
   for (const [fam, role] of slots) {
-    const f = String(fam || '').trim();
+    const f = this.canonicalFamilyName(fam);
     if (!f) continue;
 
     const r = this.normRole(role);
@@ -634,9 +662,10 @@ private hasAnyScopedAminOsra(): boolean {
   getRoleLabel(role: string): string {
     if (role === 'MAKHDOM') return 'مخدوم';
     if (role === 'KHADIM') return 'خادم';
-    if (role === 'AMIN_OSRA') return 'امين اسره';
+    if (role === 'AMIN_OSRA') return 'امين اسرة';
     if (role === 'AMIN_KHEDMA') return 'امين خدمة';
     if (role === 'DEVELOPER' || role === 'DEV' || role.toLowerCase() === 'dev') return 'dev';
     return role;
   }
 }
+

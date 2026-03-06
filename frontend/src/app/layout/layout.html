@@ -10,8 +10,7 @@
 
     <ul class="menu">
       <li routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">
-        <i class="pi pi-home"></i> الرئيسية
-      </li>
+        <i class="pi pi-home"></i> الصفحة الرئيسية </li>
 
       <ng-container *ngIf="isServantOrAbove();  ">
         <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> تسجيل الحضور</li>

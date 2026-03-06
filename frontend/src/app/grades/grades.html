@@ -84,7 +84,7 @@
   </div>
 
   <!-- مخدوم: يظهر صفه فقط -->
-  <div class="tableWrap" *ngIf="viewMode==='MAKHDOM'">
+  <div class="tableWrap" *ngIf="viewMode==='MAKHDOM'" [class.blurred]="showSchoolResultDialog">
     <table>
       <thead>
         <tr>
@@ -112,6 +112,37 @@
       </tbody>
     </table>
   </div>
+
+  <p-dialog
+    [(visible)]="showSchoolResultDialog"
+    [modal]="true"
+    [closable]="false"
+    [dismissableMask]="false"
+    [style]="{width:'520px'}"
+    header="تحديث السنة الدراسية">
+
+    <div *ngIf="isUniversityStudent()" style="line-height:1.9; font-size:16px; margin-bottom:14px">
+      <div style="margin-bottom:10px">حدث السنة الجامعية الحالية ثم اضغط حفظ.</div>
+      <input class="dialogInput" [(ngModel)]="selectedStudyYear" placeholder="مثال: ثالثة جامعة" />
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px">
+        <button class="btn primary" (click)="saveStudyYear(selectedStudyYear)" [disabled]="confirmingSchoolResult || !hasSelectedStudyYear()">
+          حفظ
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="isSchoolStudent()" style="line-height:1.9; font-size:16px; margin-bottom:14px">
+      <div style="margin-bottom:10px">اختار السنة الدراسية الحالية عشان تكمل وتشوف النتيجة.</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end">
+        <button class="btn" (click)="saveStudyYear(currentStudyYear())" [disabled]="confirmingSchoolResult">
+          {{ currentStudyYear() }}
+        </button>
+        <button class="btn primary" (click)="saveStudyYear(nextSchoolStudyYear())" [disabled]="confirmingSchoolResult">
+          {{ nextSchoolStudyYear() }}
+        </button>
+      </div>
+    </div>
+  </p-dialog>
 
   <div class="small" style="margin-top:10px" *ngIf="viewMode==='SERVANT'">
     * المخدوم لن يرى أي درجات إلا بعد ضغط "نشر" بواسطة أمين الأسرة.

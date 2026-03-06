@@ -34,7 +34,7 @@ export class RoleGuard implements CanActivate {
           const raw = String(v || '').trim();
           const up = raw.toUpperCase();
           if (!up) return '';
-          if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسره','امين الأسرة','أمين الأسرة','امين اسره'].includes(raw)) return 'AMIN_OSRA';
+          if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
           if (['امين الخدمة','امين الخدمه','أمين الخدمة','أمين الخدمه','امين خدمه','أمين خدمه'].includes(raw)) return 'AMIN_KHEDMA';
           if (up.startsWith('ROLE_')) return up.substring(5);
           return up;
@@ -65,3 +65,4 @@ export class RoleGuard implements CanActivate {
     );
   }
 }
+
