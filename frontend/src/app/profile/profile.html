@@ -39,16 +39,18 @@
         <input formControlName="address" />
       </div>
 
-      <div *ngIf="!isServant()">
+      <div>
         <label>هاتف ولي الأمر</label>
         <input formControlName="guardiansPhone" />
       </div>
 
-      <div *ngIf="!isServant()">
+      <div>
         <label>صلة القرابة</label>
-        <input formControlName="guardianRelation" />
+        <select formControlName="guardianRelation">
+          <option value="">اختر صلة القرابة</option>
+          <option *ngFor="let opt of guardianRelationOptions" [value]="opt.value">{{ opt.label }}</option>
+        </select>
       </div>
-
 
       <div>
         <label>الأسرة</label>
@@ -57,10 +59,28 @@
 
       <div>
         <label>رتبة الشماس</label>
-        <input formControlName="deaconDegree" />
+        <select formControlName="deaconDegree">
+          <option value="">اختر الرتبة</option>
+          <option *ngFor="let d of deaconDegreeOptions" [value]="d">{{ d }}</option>
+        </select>
       </div>
 
       <div>
+        <label>الخورس</label>
+        <select formControlName="khors">
+          <option *ngFor="let kh of khorsOptions" [value]="kh.value">{{ kh.label }}</option>
+        </select>
+      </div>
+
+      <div *ngIf="isMarmarkosKhors()">
+        <label>سنة الخورس</label>
+        <select formControlName="khorsYear">
+          <option [ngValue]="null" disabled>اختر السنة</option>
+          <option *ngFor="let y of khorsYearOptions" [ngValue]="y.value">{{ y.label }}</option>
+        </select>
+      </div>
+
+      <div *ngIf="showStatusField()">
         <label>الحالة</label>
         <select formControlName="status">
           <option value="" disabled>اختر الحالة</option>
@@ -71,50 +91,47 @@
 
       <div *ngIf="!isGraduate()">
         <label>نوع الدراسة</label>
-<select formControlName="studyType">
-  <option value="" disabled>اختر نوع الدراسة</option>
-  <option *ngIf="!isServant()" value="school">مدرسة</option>
-  <option value="university">جامعة</option>
-</select>
-
+        <select formControlName="studyType">
+          <option value="" disabled>اختر نوع الدراسة</option>
+          <option *ngIf="canSelectSchoolOption()" value="school">مدرسة</option>
+          <option value="university">جامعة</option>
+        </select>
       </div>
 
-<div *ngIf="!isGraduate() && !isServant() && isSchool()">
-  <label>اسم المدرسة</label>
-  <input formControlName="schoolName" />
-</div>
+      <div *ngIf="!isGraduate() && isSchool()">
+        <label>اسم المدرسة</label>
+        <input formControlName="schoolName" />
+      </div>
 
-<div *ngIf="!isGraduate() && !isServant() && isSchool()">
-  <label>الصف الدراسي</label>
-  <input formControlName="schoolGrade" />
-</div>
+      <div *ngIf="!isGraduate() && isSchool()">
+        <label>الصف الدراسي</label>
+        <input formControlName="schoolGrade" />
+      </div>
 
+      <div *ngIf="!isGraduate() && isUniversity()">
+        <label>اسم الجامعة</label>
+        <input formControlName="universityName" />
+      </div>
 
-<div *ngIf="!isGraduate() && isUniversity()">
-  <label>اسم الجامعة</label>
-  <input formControlName="universityName" />
-</div>
+      <div *ngIf="!isGraduate() && isUniversity()">
+        <label>الكلية</label>
+        <input formControlName="faculty" />
+      </div>
 
-<div *ngIf="!isGraduate() && isUniversity()">
-  <label>الكلية</label>
-  <input formControlName="faculty" />
-</div>
+      <div *ngIf="!isGraduate() && isUniversity()">
+        <label>السنة/الفرقة</label>
+        <input formControlName="universityGrade" />
+      </div>
 
-<div *ngIf="!isGraduate() && isUniversity()">
-  <label>السنة/الفرقة</label>
-  <input formControlName="universityGrade" />
-</div>
+      <div *ngIf="isGraduate()">
+        <label>تخرج من</label>
+        <input formControlName="graduatedFrom" />
+      </div>
 
-<div *ngIf="isGraduate()">
-  <label>تخرج من</label>
-  <input formControlName="graduatedFrom" />
-</div>
-
-<div *ngIf="isGraduate()">
-  <label>الوظيفة الحالية</label>
-  <input formControlName="graduateJob" />
-</div>
-
+      <div *ngIf="isGraduate()">
+        <label>الوظيفة الحالية</label>
+        <input formControlName="graduateJob" />
+      </div>
 
       <div class="wide">
         <label>تفاصيل العمل</label>

@@ -194,18 +194,26 @@ export class AttendanceComponent implements OnInit {
       { value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' }
     ];
 
-    // حضور الخورس يظهر فقط للخادم اللي في الخورس بتاعه (حسب servingScope + khors)
-    const canChoir = scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH';
-    if (canChoir) {
-      if (myKhors === 'BOTH') {
-        opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
-        opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
-      } else if (myKhors === 'MARMARKOS') {
-        opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
-      } else if (myKhors === 'ATHANASIUS') {
-        opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
-      }
-    }
+const roleNorm = String(this.me?.role || '')
+  .trim()
+  .toUpperCase()
+  .replace(/[-\s]+/g, '_');
+
+const isAminKhedmaOrDev =
+  ['AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm);
+
+const canChoir = isAminKhedmaOrDev || scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH';
+
+if (canChoir) {
+  if (isAminKhedmaOrDev || myKhors === 'BOTH') {
+    opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
+    opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
+  } else if (myKhors === 'MARMARKOS') {
+    opts.push({ value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' });
+  } else if (myKhors === 'ATHANASIUS') {
+    opts.push({ value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' });
+  }
+}
 
     this.typeOptions = opts;
 

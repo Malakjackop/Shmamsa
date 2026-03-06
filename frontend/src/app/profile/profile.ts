@@ -17,10 +17,37 @@ export class ProfileComponent implements OnInit {
   messageService = inject(MessageService);
   router = inject(Router);
 
-
   editMode = false;
-  qrData = ''; 
+  qrData = '';
   user: any;
+
+  readonly guardianRelationOptions = [
+    { value: 'mom', label: 'الأم' },
+    { value: 'dad', label: 'الأب' }
+  ];
+
+  readonly deaconDegreeOptions = [
+    'مش مرشوم',
+    'ابصالتس',
+    'اغنسطس',
+    'ايبودياكون',
+    'دياكون',
+    'ارشي دياكون'
+  ];
+
+  readonly khorsOptions = [
+    { value: 'ATHANASIUS', label: 'خورس البابا اثناسيوس' },
+    { value: 'MARMARKOS', label: 'خورس مارمرقس' },
+    { value: 'NONE', label: 'مش موجود في خورس' }
+  ];
+
+  readonly khorsYearOptions = [
+    { value: 1, label: 'سنه اوله' },
+    { value: 2, label: 'سنه تانيه' },
+    { value: 3, label: 'سنه تالته' },
+    { value: 4, label: 'سنه رابعه' },
+    { value: 5, label: 'سنه خامسه' }
+  ];
 
   profileForm = this.fb.group({
     fullName: [{ value: '', disabled: true }, Validators.required],
@@ -31,6 +58,8 @@ export class ProfileComponent implements OnInit {
     guardianRelation: [{ value: '', disabled: true }],
     deaconFamily: [{ value: '', disabled: true }],
     deaconDegree: [{ value: '', disabled: true }],
+    khors: [{ value: 'NONE', disabled: true }],
+    khorsYear: [{ value: null as number | null, disabled: true }],
     status: [{ value: '', disabled: true }],
     studyType: [{ value: '', disabled: true }],
     schoolName: [{ value: '', disabled: true }],
@@ -44,57 +73,13 @@ export class ProfileComponent implements OnInit {
     workDetails: [{ value: '', disabled: true }]
   });
 
-ngOnInit() {
+  ngOnInit() {
+    this.profileForm.get('status')?.valueChanges.subscribe(() => this.applyStatusRules());
+    this.profileForm.get('studyType')?.valueChanges.subscribe(() => this.applyStudyTypeRules());
+    this.profileForm.get('khors')?.valueChanges.subscribe(() => this.applyKhorsRules());
 
-this.profileForm.get('status')?.valueChanges.subscribe((v) => {
-
-  this.profileForm.get('studyType')?.valueChanges.subscribe((v) => {
-  if (!this.editMode) return;
-
-  if (this.isServant() && v === 'school') {
-    this.profileForm.patchValue({ studyType: 'university' }, { emitEvent: false });
-    v = 'university';
-  }
-});
-
-
-  if (!this.editMode) return;
-
-  if (v === 'graduate') {
-    this.profileForm.patchValue({
-      studyType: '',
-      schoolName: '',
-      schoolGrade: '',
-      universityName: '',
-      faculty: '',
-      universityGrade: ''
-    });
-
-    this.profileForm.get('studyType')?.disable();
-    this.profileForm.get('schoolName')?.disable();
-    this.profileForm.get('schoolGrade')?.disable();
-    this.profileForm.get('universityName')?.disable();
-    this.profileForm.get('faculty')?.disable();
-    this.profileForm.get('universityGrade')?.disable();
-
-    this.profileForm.get('graduatedFrom')?.enable();
-    this.profileForm.get('graduateJob')?.enable();
-  } else {
-    this.profileForm.get('graduatedFrom')?.disable();
-    this.profileForm.get('graduateJob')?.disable();
-    this.profileForm.patchValue({
-      graduatedFrom: '',
-      graduateJob: ''
-    });
-
-    this.profileForm.get('studyType')?.enable();
-  }
-});
-
-
-
-  this.authService.getUserData().subscribe({
-    next: (user) => {
+    this.authService.getUserData().subscribe({
+      next: (user) => {
         if (!user) {
           this.user = null;
           this.messageService.add({
@@ -106,136 +91,212 @@ this.profileForm.get('status')?.valueChanges.subscribe((v) => {
           return;
         }
 
-const normalizedUser = {
-  ...user,
-  status: (user?.status || '').toLowerCase(),
-  studyType: (user?.studyType || '').toLowerCase()
-};
+        const normalizedUser = {
+          ...user,
+          status: this.normalizeStatus(user?.status),
+          studyType: this.normalizeStudyType(user?.studyType),
+          khors: this.normalizeKhors(user?.khors),
+          khorsYear: user?.khorsYear ? Number(user.khorsYear) : null
+        };
 
-this.user = normalizedUser;
-this.profileForm.patchValue(normalizedUser);
+        this.user = normalizedUser;
+        this.profileForm.patchValue(normalizedUser, { emitEvent: false });
+        this.profileForm.get('isWorking')?.setValue(!!user?.workDetails, { emitEvent: false });
+        this.profileForm.disable({ emitEvent: false });
 
+        this.applyStatusRules();
+        this.applyStudyTypeRules();
+        this.applyKhorsRules();
 
-        this.profileForm.get('isWorking')?.setValue(!!user?.workDetails);
         this.authService.getMyQrToken().subscribe({
           next: (res) => (this.qrData = res?.token || ''),
           error: () => {
             this.qrData = '';
           }
         });
-    },
-    error: () => this.messageService.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to load profile.',
-    }),
-  });
-}
-isServantOrAbove(): boolean {
-  return ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
-}
-isServant(): boolean {
-  return ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
-}
-
-isSchool(): boolean {
-  return this.profileForm.get('studyType')?.value === 'school';
-}
-
-isUniversity(): boolean {
-  return this.profileForm.get('studyType')?.value === 'university';
-}
-
-isGraduate(): boolean {
-  return this.profileForm.get('status')?.value === 'graduate';
-}
-
-
-
-
-isMinor(): boolean {
-  const dob = this.user?.dateOfBirth;
-  if (!dob) return false;
-  const d = new Date(dob);
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-  return age < 18;
-}
-
-
-
-toggleEdit() {
-  this.editMode = !this.editMode;
-
-  if (!this.editMode) {
-    this.profileForm.disable();
-    this.profileForm.patchValue(this.user); 
-    return;
+      },
+      error: () =>
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to load profile.'
+        })
+    });
   }
 
-  this.profileForm.disable();
-  this.profileForm.get('status')?.enable();
-
-  // ✅ allow editing email from profile
-  this.profileForm.get('email')?.enable();
-
-
-  this.profileForm.get('phoneNumber')?.enable();
-  this.profileForm.get('address')?.enable();
-  this.profileForm.get('workDetails')?.enable();
-
-  if (!this.isServant()) {
-    this.profileForm.get('guardiansPhone')?.enable();
-    this.profileForm.get('guardianRelation')?.enable();
+  isServantOrAbove(): boolean {
+    return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.normalizeRole(this.user?.role));
   }
 
-  const st = this.profileForm.get('status')?.value;
-
-if (st === 'graduate') {
-  this.profileForm.get('graduatedFrom')?.enable();
-  this.profileForm.get('graduateJob')?.enable();
-  return; 
-}
-
-
-const status = this.profileForm.get('status')?.value;
-
-if (status === 'student') {
-  this.profileForm.get('studyType')?.enable();
-
-  const st = this.profileForm.get('studyType')?.value;
-
-  if (this.isServant() && st === 'school') {
-    this.profileForm.patchValue({ studyType: 'university' });
+  isServant(): boolean {
+    return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.normalizeRole(this.user?.role));
   }
 
-  if (st === 'school' && !this.isServant()) {
-    this.profileForm.get('schoolName')?.enable();
-    this.profileForm.get('schoolGrade')?.enable();
+  isSchool(): boolean {
+    return this.profileForm.get('studyType')?.value === 'school';
   }
 
-  if (st === 'university') {
-    this.profileForm.get('universityName')?.enable();
-    this.profileForm.get('faculty')?.enable();
-    this.profileForm.get('universityGrade')?.enable();
+  isUniversity(): boolean {
+    return this.profileForm.get('studyType')?.value === 'university';
   }
-}
 
-
-
-
-  if (this.isServant()) {
-    this.profileForm.get('status')?.enable();
+  isGraduate(): boolean {
+    return this.profileForm.get('status')?.value === 'graduate';
   }
-}
 
+  showStatusField(): boolean {
+    return !this.isGraduate();
+  }
 
+  canSelectSchoolOption(): boolean {
+    if (!this.editMode) return true;
+    return !this.isUniversity();
+  }
+
+  isMarmarkosKhors(): boolean {
+    return String(this.profileForm.get('khors')?.value || '').toUpperCase() === 'MARMARKOS';
+  }
+
+  isMinor(): boolean {
+    const dob = this.user?.dateOfBirth;
+    if (!dob) return false;
+    const d = new Date(dob);
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age < 18;
+  }
+
+  private normalizeRole(v: any): string {
+    return String(v || '')
+      .trim()
+      .toUpperCase()
+      .replace(/^ROLE_/, '');
+  }
+
+  private normalizeStatus(v: any): string {
+    const x = String(v || '').trim().toLowerCase();
+    if (x === 'graduate' || x === 'خريج') return 'graduate';
+    if (x === 'student' || x === 'طالب') return 'student';
+    return x;
+  }
+
+  private normalizeStudyType(v: any): string {
+    const x = String(v || '').trim().toLowerCase();
+    if (x === 'school' || x === 'مدرسة') return 'school';
+    if (x === 'university' || x === 'جامعة' || x === 'جامعه') return 'university';
+    return x;
+  }
+
+  private normalizeKhors(v: any): string {
+    const x = String(v || '').trim().toUpperCase();
+    if (!x) return 'NONE';
+    if (x === 'MARMARKOS' || x === 'ATHANASIUS' || x === 'NONE') return x;
+    return 'NONE';
+  }
+
+  private applyStatusRules() {
+    if (this.isGraduate()) {
+      this.profileForm.get('studyType')?.disable({ emitEvent: false });
+      this.profileForm.get('schoolName')?.disable({ emitEvent: false });
+      this.profileForm.get('schoolGrade')?.disable({ emitEvent: false });
+      this.profileForm.get('universityName')?.disable({ emitEvent: false });
+      this.profileForm.get('faculty')?.disable({ emitEvent: false });
+      this.profileForm.get('universityGrade')?.disable({ emitEvent: false });
+      this.profileForm.get('graduatedFrom')?.enable({ emitEvent: false });
+      this.profileForm.get('graduateJob')?.enable({ emitEvent: false });
+      return;
+    }
+
+    this.profileForm.get('graduatedFrom')?.disable({ emitEvent: false });
+    this.profileForm.get('graduateJob')?.disable({ emitEvent: false });
+    this.applyStudyTypeRules();
+  }
+
+  private applyStudyTypeRules() {
+    if (this.isGraduate() || !this.editMode) return;
+
+    this.profileForm.get('schoolName')?.disable({ emitEvent: false });
+    this.profileForm.get('schoolGrade')?.disable({ emitEvent: false });
+    this.profileForm.get('universityName')?.disable({ emitEvent: false });
+    this.profileForm.get('faculty')?.disable({ emitEvent: false });
+    this.profileForm.get('universityGrade')?.disable({ emitEvent: false });
+
+    const type = this.profileForm.get('studyType')?.value;
+
+    if (type === 'school') {
+      this.profileForm.get('schoolName')?.enable({ emitEvent: false });
+      // الصف الدراسي مطلوب يفضل ثابت
+      this.profileForm.get('schoolGrade')?.disable({ emitEvent: false });
+    }
+
+    if (type === 'university') {
+      this.profileForm.get('universityName')?.enable({ emitEvent: false });
+      this.profileForm.get('faculty')?.enable({ emitEvent: false });
+      this.profileForm.get('universityGrade')?.enable({ emitEvent: false });
+    }
+  }
+
+  private applyKhorsRules() {
+    const kh = this.normalizeKhors(this.profileForm.get('khors')?.value);
+
+    if (kh === 'MARMARKOS') {
+      this.profileForm.get('khorsYear')?.disable({ emitEvent: false });
+      return;
+    }
+
+    this.profileForm.patchValue({ khorsYear: null }, { emitEvent: false });
+    this.profileForm.get('khorsYear')?.disable({ emitEvent: false });
+  }
+
+  toggleEdit() {
+    this.editMode = !this.editMode;
+
+    if (!this.editMode) {
+      this.profileForm.disable({ emitEvent: false });
+      this.profileForm.patchValue(this.user, { emitEvent: false });
+      this.applyStatusRules();
+      this.applyStudyTypeRules();
+      this.applyKhorsRules();
+      return;
+    }
+
+    this.profileForm.disable({ emitEvent: false });
+
+    this.profileForm.get('email')?.enable({ emitEvent: false });
+    this.profileForm.get('phoneNumber')?.enable({ emitEvent: false });
+    this.profileForm.get('address')?.enable({ emitEvent: false });
+    this.profileForm.get('guardiansPhone')?.enable({ emitEvent: false });
+    this.profileForm.get('guardianRelation')?.enable({ emitEvent: false });
+    this.profileForm.get('deaconDegree')?.enable({ emitEvent: false });
+    this.profileForm.get('workDetails')?.enable({ emitEvent: false });
+
+    if (this.showStatusField()) {
+      this.profileForm.get('status')?.enable({ emitEvent: false });
+    }
+
+    if (!this.isGraduate()) {
+      this.profileForm.get('studyType')?.enable({ emitEvent: false });
+    }
+
+    this.applyStatusRules();
+    this.applyStudyTypeRules();
+    this.applyKhorsRules();
+  }
 
   saveChanges() {
     const raw = this.profileForm.getRawValue();
     const payload: any = { ...raw };
+
+    payload.status = this.normalizeStatus(payload.status);
+    payload.studyType = this.normalizeStudyType(payload.studyType);
+    payload.khors = this.normalizeKhors(payload.khors);
+
+    if (payload.khors !== 'MARMARKOS') {
+      payload.khorsYear = null;
+    }
+
     if (!payload.isWorking) payload.workDetails = '';
 
     this.authService.updateProfile(payload).subscribe({
@@ -245,8 +306,9 @@ if (status === 'student') {
           summary: 'Saved',
           detail: 'Profile updated successfully!'
         });
-        this.profileForm.disable();
+        this.profileForm.disable({ emitEvent: false });
         this.editMode = false;
+        this.user = { ...this.user, ...payload };
       },
       error: (err) =>
         this.messageService.add({
@@ -264,3 +326,4 @@ if (status === 'student') {
     });
   }
 }
+
