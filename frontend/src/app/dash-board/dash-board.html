@@ -114,6 +114,7 @@
             <button
               *ngIf="e.canPublish"
               pButton
+              style="background-color: #4ade80; border: none;"
               type="button"
               label="نشر"
               icon="pi pi-send"
@@ -144,6 +145,7 @@
             <button
               *ngIf="e.canSeeParticipants"
               pButton
+              style="background-color: #27272a; border: none; color: #d8d3d3;"
               type="button"
               label="تفاصيل"
               icon="pi pi-list"
@@ -186,6 +188,7 @@
 
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button pButton type="button" label="تفاصيل" icon="pi pi-info-circle"
+              style="background-color: #27272a; border: none; color: #d8d3d3;"
               class="p-button-info p-button-sm" (click)="openAnnDetails(a)"></button>
 
             <button *ngIf="a.canEdit" pButton type="button" label="تعديل" icon="pi pi-pencil"
@@ -195,6 +198,7 @@
               class="p-button-danger p-button-sm" (click)="deleteAnnouncement(a)"></button>
 
             <button *ngIf="a.canPublish" pButton type="button" label="نشر" icon="pi pi-send"
+              style="background-color: #4ade80; border: none;"
               class="p-button-help p-button-sm" (click)="publishAnnouncement(a)"></button>
           </div>
         </li>

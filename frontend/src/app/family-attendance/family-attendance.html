@@ -110,8 +110,6 @@
         </div>
       </div>
 
-      <button pButton type="button" class="todayBtn" label="اليوم" (click)="setDailyToday(); onDailyDateChange()"></button>
-
       <div *ngIf="dailyLoading" class="hint">جاري التحميل...</div>
 
       <ng-container *ngIf="!dailyLoading && dailyType">
@@ -125,51 +123,51 @@
             <div class="statLbl">غياب</div>
           </div>
           <div class="stat">
-            <div class="statNum">{{ dailyTotal }}</div>
+            <div class="statNum" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
             <div class="statLbl">المجموع</div>
-            <div class="statExtra" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
           </div>
         </div>
 
 
 
         <div class="dailyBoxes">
-          <div class="dailyBox">
-            <div class="boxTitle">الحضور</div>
+          <!-- الحضور -->
+          <div class="attBox">
+            <div class="attBoxHead">الحضور</div>
 
-            <div class="boxList" *ngIf="dailyPresent?.length; else noPresent">
-              <div class="boxRow" *ngFor="let p of dailyPresent">
-                <span class="boxName">{{ p.fullName }}</span>
+            <div class="attBoxBody" *ngIf="dailyPresent?.length; else noPresent">
+              <div class="attRow" *ngFor="let p of dailyPresent">
+                <span class="attName">{{ p.fullName }}</span>
+
                 <button
                   *ngIf="canEditDailyAttendance()"
-                  pButton
                   type="button"
-                  class="minusBtn"
+                  class="miniDanger"
                   title="تحويل إلى غياب"
-                  aria-label="تحويل إلى غياب"
                   (click)="askDailyMarkAbsent(p)"
                 >
-                  🗑️
+                  −
                 </button>
               </div>
             </div>
 
             <ng-template #noPresent>
-              <div class="hint">لا يوجد حضور</div>
+              <div class="attEmpty">لا يوجد حضور</div>
             </ng-template>
           </div>
 
-          <div class="dailyBox">
-            <div class="boxTitle">الغياب</div>
+          <!-- الغياب -->
+          <div class="attBox">
+            <div class="attBoxHead">الغياب</div>
 
-            <div class="boxList" *ngIf="dailyAbsent?.length; else noAbsent">
-              <div class="boxRow" *ngFor="let a of dailyAbsent">
-                <span class="boxName">{{ a.fullName }}</span>
+            <div class="attBoxBody" *ngIf="dailyAbsent?.length; else noAbsent">
+              <div class="attRow" *ngFor="let a of dailyAbsent">
+                <span class="attName">{{ a.fullName }}</span>
               </div>
             </div>
 
             <ng-template #noAbsent>
-              <div class="hint">لا يوجد غياب</div>
+              <div class="attEmpty">لا يوجد غياب</div>
             </ng-template>
           </div>
         </div>
