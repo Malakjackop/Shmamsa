@@ -4,34 +4,46 @@
   <div class="toolbar">
     <div>
       <div><b>الدرجات</b></div>
-      <div class="status" *ngIf="viewMode==='SERVANT'">
-        الأسرة: {{ selectedFamilyBase || '-' }} • الحالة: {{ sheet?.status || '-' }}
+      <div class="status" *ngIf="viewMode==='SERVANT' && selectedTerm!=='BOTH'">
+        الأسرة: {{ selectedFamilyBase || '-' }}
         <span *ngIf="sheet?.publishedAt"> • نُشرت: {{ sheet?.publishedAt | date:'short' }}</span>
+      </div>
+      <div class="status" *ngIf="viewMode==='SERVANT' && selectedTerm==='BOTH'">
+        الأسرة: {{ selectedFamilyBase || '-' }} • عرض الترمين معًا
       </div>
       <div class="status" *ngIf="viewMode==='MAKHDOM'">
         الأسرة: {{ my?.familyBase || '-' }}
-        <span *ngIf="my?.publishedAt; else notPub"> • نُشرت: {{ my?.publishedAt | date:'short' }}</span>
-        <ng-template #notPub> • لم تُنشر بعد</ng-template>
       </div>
     </div>
 
     <div class="spacer"></div>
 
-    <!-- اختيار الأسرة (يظهر فقط لو عنده أكتر من أسرة يخدم/أمين عليها) -->
     <div *ngIf="viewMode==='SERVANT' && familyChoices.length > 1">
-      <select [(ngModel)]="selectedFamilyBase" (change)="loadSheet()">
+      <select [(ngModel)]="selectedFamilyBase" (change)="loadServantView()">
         <option *ngFor="let f of familyChoices" [value]="f">{{ f }}</option>
       </select>
     </div>
 
-    <button class="btn" *ngIf="viewMode==='SERVANT' && canEdit" (click)="addColumn()">+ عمود جديد</button>
-    <button class="btn rankBtn" *ngIf="viewMode==='SERVANT'" (click)="toggleTopRanksView()">{{ rankViewEnabled ? 'إلغاء ترتيب الأوائل' : 'الأوائل' }}</button>
-    <button class="btn primary" *ngIf="viewMode==='SERVANT' && canEdit" (click)="save()" [disabled]="saving">حفظ</button>
-    <button class="btn danger" *ngIf="viewMode==='SERVANT' && canPublish" (click)="publish()" [disabled]="publishing">نشر</button>
+    <div class="termChooser" *ngIf="viewMode==='SERVANT'">
+      <label for="resultTerm">الترم:</label>
+      <select id="resultTerm" [(ngModel)]="selectedTerm" (change)="onServantTermChange()">
+        <option value="FIRST">الترم الأول</option>
+        <option value="SECOND">الترم الثاني</option>
+        <option value="BOTH">الترمين معًا</option>
+      </select>
+    </div>
+
+    <button class="btn" *ngIf="viewMode==='SERVANT' && canEdit && selectedTerm!=='BOTH'" (click)="addColumn()">+ عمود جديد</button>
+    <button class="btn rankBtn" *ngIf="viewMode==='SERVANT' && selectedTerm!=='BOTH'" (click)="toggleTopRanksView()">{{ rankViewEnabled ? 'إلغاء ترتيب الأوائل' : 'الأوائل' }}</button>
+    <button class="btn primary" *ngIf="viewMode==='SERVANT' && canEdit && selectedTerm!=='BOTH'" (click)="save()" [disabled]="saving">حفظ</button>
+    <button class="btn danger" *ngIf="viewMode==='SERVANT' && canPublish && selectedTerm!=='BOTH'" (click)="publish()" [disabled]="publishing">نشر</button>
+    <button class="btn pdfBtn" *ngIf="viewMode==='SERVANT'" (click)="exportServantSheetPdf()">تصدير PDF</button>
+    <button class="btn pdfBtn" *ngIf="viewMode==='MAKHDOM'" (click)="exportMyResultPdf()">تصدير PDF</button>
   </div>
 
-  <!-- خدام: جدول كامل -->
-  <div class="tableWrap" *ngIf="viewMode==='SERVANT'">
+  <!-- servant first/second single view -->
+  <div class="tableWrap" *ngIf="viewMode==='SERVANT' && selectedTerm!=='BOTH'">
+    <div class="status" style="margin-bottom:10px; font-weight:700">{{ selectedTerm === 'SECOND' ? 'جدول الترم الثاني' : 'جدول الترم الأول' }}</div>
     <table>
       <thead>
         <tr>
@@ -44,109 +56,182 @@
             <div class="headSplit">
               <div class="headPart">
                 <span class="headLabel">العنوان</span>
-                <input
-                  class="head"
-                  [readOnly]="!canEdit"
-                  [ngModel]="columnMeta[c.id]?.title || ''"
-                  (ngModelChange)="setColumnTitle(c.id, $event)"
-                  placeholder="عنوان الدرجة" />
+                <input class="head" [readOnly]="!canEdit" [ngModel]="columnMeta[c.id]?.title || ''" (ngModelChange)="setColumnTitle(c.id, $event)" placeholder="عنوان الدرجة" />
               </div>
               <span class="headSeparator" aria-hidden="true"></span>
               <div class="headPart maxPart">
                 <span class="headLabel">الدرجة</span>
-                <input
-                  class="head max"
-                  [readOnly]="!canEdit"
-                  [ngModel]="columnMeta[c.id]?.max || ''"
-                  (ngModelChange)="setColumnMax(c.id, $event)"
-                  placeholder="0" />
+                <input class="head max" [readOnly]="!canEdit" [ngModel]="columnMeta[c.id]?.max || ''" (ngModelChange)="setColumnMax(c.id, $event)" placeholder="0" />
               </div>
             </div>
           </th>
-          <th class="totalHead" style="min-width:140px">
-            المجموع
-            <span class="totalMax" *ngIf="columnsMaxTotal() > 0">/ {{ columnsMaxTotal() }}</span>
-          </th>
+          <th class="totalHead" style="min-width:140px">المجموع <span class="totalMax" *ngIf="columnsMaxTotal() > 0">/ {{ columnsMaxTotal() }}</span></th>
         </tr>
       </thead>
-
       <tbody>
         <tr *ngFor="let m of rankedMembers; let ri = index" [class.topThreeRow]="isTopThreeMember(m.id)">
           <td class="stickyIndex indexCell">{{ getDisplayedRank(m.id, ri + 1) }}</td>
           <td class="nameCell stickyName">{{ m.fullName }}</td>
-          <td *ngFor="let c of columns">
-            <input class="cell" [readOnly]="!canEdit" [(ngModel)]="m.values[c.id]" (ngModelChange)="onMemberValueChange()" placeholder="-" />
-          </td>
+          <td *ngFor="let c of columns"><input class="cell" [readOnly]="!canEdit" [(ngModel)]="m.values[c.id]" (ngModelChange)="onMemberValueChange()" placeholder="-" /></td>
           <td class="totalCell">{{ rowTotal(m.values) }}</td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <!-- مخدوم: يظهر صفه فقط -->
-  <div class="tableWrap" *ngIf="viewMode==='MAKHDOM'" [class.blurred]="showSchoolResultDialog">
+  <!-- servant both view -->
+  <div class="tableWrap" *ngIf="viewMode==='SERVANT' && selectedTerm==='BOTH'">
+    <div class="status" style="margin-bottom:10px; font-weight:700">جدول الترم الأول</div>
+    <table style="margin-bottom:18px">
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الأسماء</th>
+          <th *ngFor="let c of bothFirstColumns" style="min-width:180px">{{ formatColumnTitleForView(c.title) }} <span class="maxLabel" *ngIf="formatColumnMaxForView(c.title)">/ {{ formatColumnMaxForView(c.title) }}</span></th>
+          <th class="totalHead" style="min-width:140px">المجموع <span class="totalMax" *ngIf="columnsMaxTotalForColumns(bothFirstColumns) > 0">/ {{ columnsMaxTotalForColumns(bothFirstColumns) }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of bothFirstMembers; let ri = index">
+          <td class="stickyIndex indexCell">{{ ri + 1 }}</td>
+          <td class="nameCell stickyName">{{ m.fullName }}</td>
+          <td *ngFor="let c of bothFirstColumns">{{ m.values[c.id] || '-' }}</td>
+          <td class="totalCell">{{ rowTotalForColumns(m.values, bothFirstColumns) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="status" style="margin:14px 0 10px; font-weight:700">جدول الترم الثاني</div>
+    <table style="margin-bottom:18px">
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الأسماء</th>
+          <th *ngFor="let c of bothSecondColumns" style="min-width:180px">{{ formatColumnTitleForView(c.title) }} <span class="maxLabel" *ngIf="formatColumnMaxForView(c.title)">/ {{ formatColumnMaxForView(c.title) }}</span></th>
+          <th class="totalHead" style="min-width:140px">المجموع <span class="totalMax" *ngIf="columnsMaxTotalForColumns(bothSecondColumns) > 0">/ {{ columnsMaxTotalForColumns(bothSecondColumns) }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of bothSecondMembers; let ri = index">
+          <td class="stickyIndex indexCell">{{ ri + 1 }}</td>
+          <td class="nameCell stickyName">{{ m.fullName }}</td>
+          <td *ngFor="let c of bothSecondColumns">{{ m.values[c.id] || '-' }}</td>
+          <td class="totalCell">{{ rowTotalForColumns(m.values, bothSecondColumns) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="status" style="margin:14px 0 10px; font-weight:700">نتيجة الترمين معًا</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الاسم</th>
+          <th style="min-width:160px">مجموع الترم الأول</th>
+          <th style="min-width:160px">مجموع الترم الثاني</th>
+          <th class="totalHead" style="min-width:160px">مجموع الترمين</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of combinedServantMembers(); let ri = index">
+          <td class="stickyIndex indexCell">{{ ri + 1 }}</td>
+          <td class="nameCell stickyName">{{ m.fullName }}</td>
+          <td>{{ m.firstTotal }}</td>
+          <td>{{ m.secondTotal }}</td>
+          <td class="totalCell">{{ m.allTotal }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- makhdom always stacked -->
+  <div class="tableWrap" *ngIf="viewMode==='MAKHDOM' && hasFirstPublished()">
+    <div class="status" style="margin-bottom:10px; font-weight:700">نتيجة الترم الأول</div>
     <table>
       <thead>
         <tr>
           <th class="stickyIndex" style="min-width:64px">م</th>
           <th class="stickyName" style="min-width:220px">الأسماء</th>
-          <th *ngFor="let c of (my?.columns || [])" style="min-width:180px">
-            {{ formatColumnTitleForView(c.title) }}
-            <span class="maxLabel" *ngIf="formatColumnMaxForView(c.title)">/ {{ formatColumnMaxForView(c.title) }}</span>
-          </th>
-          <th class="totalHead" style="min-width:140px">
-            المجموع
-            <span class="totalMax" *ngIf="columnsMaxTotalForColumns(my?.columns) > 0">/ {{ columnsMaxTotalForColumns(my?.columns) }}</span>
-          </th>
+          <th *ngFor="let c of (my?.firstColumns || [])" style="min-width:180px">{{ formatColumnTitleForView(c.title) }} <span class="maxLabel" *ngIf="formatColumnMaxForView(c.title)">/ {{ formatColumnMaxForView(c.title) }}</span></th>
+          <th class="totalHead" style="min-width:140px">المجموع <span class="totalMax" *ngIf="columnsMaxTotalForColumns(my?.firstColumns) > 0">/ {{ columnsMaxTotalForColumns(my?.firstColumns) }}</span></th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td class="stickyIndex indexCell">1</td>
           <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
-          <td *ngFor="let c of (my?.columns || [])">
-            {{ my?.values?.[c.id] || '-' }}
-          </td>
-          <td class="totalCell">{{ rowTotalForColumns(my?.values, my?.columns) }}</td>
+          <td *ngFor="let c of (my?.firstColumns || [])">{{ my?.firstValues?.[c.id] || '-' }}</td>
+          <td class="totalCell">{{ rowTotalForColumns(my?.firstValues, my?.firstColumns) }}</td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <p-dialog
-    [(visible)]="showSchoolResultDialog"
-    [modal]="true"
-    [closable]="false"
-    [dismissableMask]="false"
-    [style]="{width:'520px'}"
-    header="تحديث السنة الدراسية">
+  <div *ngIf="viewMode==='MAKHDOM' && showSchoolResultDialog" class="tableWrap" style="padding:16px; border:1px solid #eee; border-radius:12px; margin-top:16px;">
+    <div style="font-weight:700; margin-bottom:10px">عشان تشوف نتيجة الترم الثاني جاوب على السؤال ده</div>
 
     <div *ngIf="isUniversityStudent()" style="line-height:1.9; font-size:16px; margin-bottom:14px">
       <div style="margin-bottom:10px">حدث السنة الجامعية الحالية ثم اضغط حفظ.</div>
       <input class="dialogInput" [(ngModel)]="selectedStudyYear" placeholder="مثال: ثالثة جامعة" />
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px">
-        <button class="btn primary" (click)="saveStudyYear(selectedStudyYear)" [disabled]="confirmingSchoolResult || !hasSelectedStudyYear()">
-          حفظ
-        </button>
+        <button class="btn primary" (click)="saveStudyYear(selectedStudyYear)" [disabled]="confirmingSchoolResult || !hasSelectedStudyYear()">حفظ</button>
       </div>
     </div>
 
     <div *ngIf="isSchoolStudent()" style="line-height:1.9; font-size:16px; margin-bottom:14px">
       <div style="margin-bottom:10px">اختار السنة الدراسية الحالية عشان تكمل وتشوف النتيجة.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end">
-        <button class="btn" (click)="saveStudyYear(currentStudyYear())" [disabled]="confirmingSchoolResult">
-          {{ currentStudyYear() }}
-        </button>
-        <button class="btn primary" (click)="saveStudyYear(nextSchoolStudyYear())" [disabled]="confirmingSchoolResult">
-          {{ nextSchoolStudyYear() }}
-        </button>
+        <button class="btn" (click)="saveStudyYear(currentStudyYear())" [disabled]="confirmingSchoolResult">{{ currentStudyYear() }}</button>
+        <button class="btn primary" (click)="saveStudyYear(nextSchoolStudyYear())" [disabled]="confirmingSchoolResult">{{ nextSchoolStudyYear() }}</button>
       </div>
     </div>
-  </p-dialog>
+  </div>
+
+  <div class="tableWrap" *ngIf="viewMode==='MAKHDOM' && canShowSecondResult()">
+    <div class="status" style="margin:14px 0 10px; font-weight:700">نتيجة الترم الثاني</div>
+    <table style="margin-bottom:18px">
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الأسماء</th>
+          <th *ngFor="let c of (my?.secondColumns || [])" style="min-width:180px">{{ formatColumnTitleForView(c.title) }} <span class="maxLabel" *ngIf="formatColumnMaxForView(c.title)">/ {{ formatColumnMaxForView(c.title) }}</span></th>
+          <th class="totalHead" style="min-width:140px">المجموع <span class="totalMax" *ngIf="columnsMaxTotalForColumns(my?.secondColumns) > 0">/ {{ columnsMaxTotalForColumns(my?.secondColumns) }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="stickyIndex indexCell">1</td>
+          <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
+          <td *ngFor="let c of (my?.secondColumns || [])">{{ my?.secondValues?.[c.id] || '-' }}</td>
+          <td class="totalCell">{{ rowTotalForColumns(my?.secondValues, my?.secondColumns) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="status" style="margin:14px 0 10px; font-weight:700">نتيجة الترمين معًا</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="stickyIndex" style="min-width:64px">م</th>
+          <th class="stickyName" style="min-width:220px">الاسم</th>
+          <th style="min-width:180px">مجموع الترم الأول</th>
+          <th style="min-width:180px">مجموع الترم الثاني</th>
+          <th class="totalHead" style="min-width:180px">مجموع الترمين</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="stickyIndex indexCell">1</td>
+          <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
+          <td>{{ rowTotalForColumns(my?.firstValues, my?.firstColumns) }}</td>
+          <td>{{ rowTotalForColumns(my?.secondValues, my?.secondColumns) }}</td>
+          <td class="totalCell">{{ combinedMyTotal() }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
   <div class="small" style="margin-top:10px" *ngIf="viewMode==='SERVANT'">
-    * المخدوم لن يرى أي درجات إلا بعد ضغط "نشر" بواسطة أمين الأسرة.
+    * الليستة دي للخادم فقط: الترم الأول / الترم الثاني / الترمين معًا. المخدوم يشوف نتيجته فقط.
   </div>
 </div>
-
-

@@ -27,30 +27,34 @@ public class GradesController {
     private final GradeSheetRepository gradeRepo;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // ----- DTOs -----
     public record Column(String id, String title) {}
-    public record SheetPayload(List<Column> columns, Map<String, Map<String, String>> rows) {} 
-    // rows: userId -> {colId -> value}
+    public record SheetPayload(List<Column> columns, Map<String, Map<String, String>> rows) {}
 
     public record SheetView(
             String familyBase,
+            String selectedTerm,
             String status,
             LocalDateTime updatedAt,
             LocalDateTime publishedAt,
+            LocalDateTime firstPublishedAt,
+            LocalDateTime secondPublishedAt,
             List<Column> columns,
             List<Map<String, Object>> members
     ) {}
 
     public record MyGradesView(
             String familyBase,
-            LocalDateTime publishedAt,
-            List<Column> columns,
-            Map<String, String> values
+            LocalDateTime firstPublishedAt,
+            LocalDateTime secondPublishedAt,
+            List<Column> firstColumns,
+            Map<String, String> firstValues,
+            List<Column> secondColumns,
+            Map<String, String> secondValues
     ) {}
 
-    public record ConfirmSchoolResultRequest(String result, String studyYear) {} // school/university confirmation payload
+    public record PublishSheetRequest(String resultTerm) {}
+    public record ConfirmSchoolResultRequest(String result, String studyYear) {}
 
-    // ----- Helpers -----
     private String normRole(String raw) {
         if (raw == null) return "MAKHDOM";
         String r = raw.trim().replace("ROLE_", "");
@@ -90,45 +94,32 @@ public class GradesController {
         String scoped = me.roleForFamilyBase(base);
         if (scoped != null && !scoped.isBlank()) return normRole(scoped);
 
-        // ✅ Important: if user serves this family but has a global AMIN_OSRA (legacy/global role),
-        // treat them as KHADIM in families where they don't have AMIN_OSRA scoped.
         String global = normRole(me.getRole());
         if ("AMIN_OSRA".equals(global)) {
             List<String> my = servingBasesOf(me);
-            if (my.stream().anyMatch(b -> b.equalsIgnoreCase(base))) {
-                return "KHADIM";
-            }
+            if (my.stream().anyMatch(b -> b.equalsIgnoreCase(base))) return "KHADIM";
         }
-
         return global;
     }
 
-private void ensureCanViewSheet(User me, String familyBase) {
+    private void ensureCanViewSheet(User me, String familyBase) {
         String global = normRole(me.getRole());
         if ("AMIN_KHEDMA".equals(global) || "DEVELOPER".equals(global)) return;
 
         String base = FamilyUtil.mainFamily(familyBase);
         if (base == null) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
-
         String eff = effectiveRoleIn(me, base);
 
         if ("KHADIM".equals(eff)) {
             List<String> my = servingBasesOf(me);
-            if (my.stream().noneMatch(b -> b.equalsIgnoreCase(base))) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+            if (my.stream().noneMatch(b -> b.equalsIgnoreCase(base))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
             return;
         }
-
         if ("AMIN_OSRA".equals(eff)) {
-            // allowed only where scoped role is AMIN_OSRA
             String scoped = me.roleForFamilyBase(base);
-            if (scoped == null || !"AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+            if (scoped == null || !"AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
             return;
         }
-
         throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
     }
 
@@ -143,17 +134,11 @@ private void ensureCanViewSheet(User me, String familyBase) {
 
         if ("KHADIM".equals(eff)) {
             List<String> my = servingBasesOf(me);
-            if (my.stream().noneMatch(b -> b.equalsIgnoreCase(base))) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+            if (my.stream().noneMatch(b -> b.equalsIgnoreCase(base))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
-
         if ("AMIN_OSRA".equals(eff)) {
-            // only if scoped
             String scoped = me.roleForFamilyBase(base);
-            if (scoped == null || !"AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+            if (scoped == null || !"AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
     }
 
@@ -167,22 +152,54 @@ private void ensureCanViewSheet(User me, String familyBase) {
         String scoped = me.roleForFamilyBase(base);
         if (scoped != null && "AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) return;
 
-        // fallback: if user is global AMIN_OSRA and base is his primary family
         String eff = effectiveRoleIn(me, base);
         if ("AMIN_OSRA".equals(eff) && FamilyUtil.mainFamily(me.getDeaconFamily()).equalsIgnoreCase(base)) return;
 
         throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
     }
 
-    private SheetPayload parseOrEmpty(GradeSheet sheet) {
-        if (sheet == null || sheet.getDataJson() == null || sheet.getDataJson().isBlank()) {
-            return new SheetPayload(new ArrayList<>(), new LinkedHashMap<>());
-        }
+    private String normalizeTerm(String raw) {
+        String t = String.valueOf(raw == null ? "FIRST" : raw).trim().toUpperCase();
+        return "SECOND".equals(t) ? "SECOND" : "FIRST";
+    }
+
+    private SheetPayload emptyPayload() {
+        return new SheetPayload(new ArrayList<>(), new LinkedHashMap<>());
+    }
+
+    private SheetPayload parsePayloadJson(String json) {
+        if (json == null || json.isBlank()) return emptyPayload();
         try {
-            return mapper.readValue(sheet.getDataJson(), new TypeReference<SheetPayload>() {});
+            return mapper.readValue(json, new TypeReference<SheetPayload>() {});
         } catch (Exception e) {
-            return new SheetPayload(new ArrayList<>(), new LinkedHashMap<>());
+            return emptyPayload();
         }
+    }
+
+    private SheetPayload parseTermPayload(GradeSheet sheet, String term) {
+        if (sheet == null) return emptyPayload();
+        String json = "SECOND".equals(normalizeTerm(term)) ? sheet.getSecondTermDataJson() : sheet.getFirstTermDataJson();
+        if ((json == null || json.isBlank()) && "FIRST".equals(normalizeTerm(term))) json = sheet.getDataJson();
+        return parsePayloadJson(json);
+    }
+
+    private void storeTermPayload(GradeSheet sheet, String term, SheetPayload payload) {
+        try {
+            String json = mapper.writeValueAsString(payload);
+            if ("SECOND".equals(normalizeTerm(term))) {
+                sheet.setSecondTermDataJson(json);
+            } else {
+                sheet.setFirstTermDataJson(json);
+                sheet.setDataJson(json);
+            }
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid sheet payload");
+        }
+    }
+
+    private LocalDateTime publishedAtForTerm(GradeSheet sheet, String term) {
+        if (sheet == null) return null;
+        return "SECOND".equals(normalizeTerm(term)) ? sheet.getSecondPublishedAt() : sheet.getFirstPublishedAt();
     }
 
     private String newColId() {
@@ -192,106 +209,53 @@ private void ensureCanViewSheet(User me, String familyBase) {
     private List<User> loadMakhdomMembers(String familyBase) {
         String base = FamilyUtil.mainFamily(familyBase);
         if (base == null || base.isBlank()) return List.of();
-        // return all MAKHDOM in base + A/B
         return userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, List.of("MAKHDOM"));
     }
 
-    // --- School grade advancement helpers (Arabic strings) ---
+    private List<Column> normalizedColumns(SheetPayload payload, boolean ensureOneColumn) {
+        List<Column> cols = payload.columns() == null ? new ArrayList<>() : new ArrayList<>(payload.columns());
+        if (ensureOneColumn && cols.isEmpty()) cols.add(new Column(newColId(), ""));
+        return cols;
+    }
+
+    private Map<String, String> alignValues(List<Column> cols, Map<String, String> values) {
+        Map<String, String> aligned = new LinkedHashMap<>();
+        Map<String, String> safe = values == null ? Map.of() : values;
+        for (Column c : cols) aligned.put(c.id(), safe.getOrDefault(c.id(), ""));
+        return aligned;
+    }
+
     private static String normAr(String s) {
         if (s == null) return "";
-        return s
-                .replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "") // remove tashkeel/tatweel
-                .replace('أ', 'ا')
-                .replace('إ', 'ا')
-                .replace('آ', 'ا')
-                .replaceAll("\\s+", " ")
-                .trim();
+        return s.replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "")
+                .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+                .replaceAll("\\s+", " ").trim();
     }
 
     private static String advanceSchoolGradeString(String currentRaw) {
         String current = normAr(currentRaw);
         if (current.isBlank()) return null;
-
-        // Common normalization of year words
-        // Accept: اولى/اوله/اولا/1, تانيه/ثانيه/2, تالته/ثالثه/3, رابعه/4, خامسه/5, سادسه/6
-        // Stages: ابتدائي, اعدادي, ثانوي
         record Step(String from, String to) {}
         List<Step> map = List.of(
-                // Primary
-                new Step("اولى ابتدائي", "تانيه ابتدائي"),
-                new Step("اوله ابتدائي", "تانيه ابتدائي"),
-                new Step("تانيه ابتدائي", "تالته ابتدائي"),
-                new Step("ثانيه ابتدائي", "تالته ابتدائي"),
-                new Step("تالته ابتدائي", "رابعه ابتدائي"),
-                new Step("ثالثه ابتدائي", "رابعه ابتدائي"),
-                new Step("رابعه ابتدائي", "خامسه ابتدائي"),
-                new Step("خامسه ابتدائي", "سادسه ابتدائي"),
-                new Step("سادسه ابتدائي", "اولى اعدادي"),
-                // Preparatory
-                new Step("اولى اعدادي", "تانيه اعدادي"),
-                new Step("اوله اعدادي", "تانيه اعدادي"),
-                new Step("تانيه اعدادي", "تالته اعدادي"),
-                new Step("ثانيه اعدادي", "تالته اعدادي"),
-                new Step("تالته اعدادي", "اولى ثانوي"),
-                new Step("ثالثه اعدادي", "اولى ثانوي"),
-                // Secondary
-                new Step("اولى ثانوي", "تانيه ثانوي"),
-                new Step("اوله ثانوي", "تانيه ثانوي"),
-                new Step("تانيه ثانوي", "تالته ثانوي"),
+                new Step("اولى ابتدائي", "تانيه ابتدائي"), new Step("اوله ابتدائي", "تانيه ابتدائي"),
+                new Step("تانيه ابتدائي", "تالته ابتدائي"), new Step("ثانيه ابتدائي", "تالته ابتدائي"),
+                new Step("تالته ابتدائي", "رابعه ابتدائي"), new Step("ثالثه ابتدائي", "رابعه ابتدائي"),
+                new Step("رابعه ابتدائي", "خامسه ابتدائي"), new Step("خامسه ابتدائي", "سادسه ابتدائي"),
+                new Step("سادسه ابتدائي", "اولى اعدادي"), new Step("اولى اعدادي", "تانيه اعدادي"),
+                new Step("اوله اعدادي", "تانيه اعدادي"), new Step("تانيه اعدادي", "تالته اعدادي"),
+                new Step("ثانيه اعدادي", "تالته اعدادي"), new Step("تالته اعدادي", "اولى ثانوي"),
+                new Step("ثالثه اعدادي", "اولى ثانوي"), new Step("اولى ثانوي", "تانيه ثانوي"),
+                new Step("اوله ثانوي", "تانيه ثانوي"), new Step("تانيه ثانوي", "تالته ثانوي"),
                 new Step("ثانيه ثانوي", "تالته ثانوي")
         );
-
-        for (Step s : map) {
-            if (current.equals(s.from)) return s.to;
-        }
-
-        // Digits-based fallback like "3 ابتدائي" or "3 ثانوي"
-        StringBuilder sbDigits = new StringBuilder();
-        String arNums = "٠١٢٣٤٥٦٧٨٩";
-        for (int i = 0; i < current.length(); i++) {
-            char ch = current.charAt(i);
-            int idx = arNums.indexOf(ch);
-            if (idx >= 0) sbDigits.append(idx);
-            else sbDigits.append(ch);
-        }
-        String digits = sbDigits.toString();
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("^(\\d+)\\s*(ابتدائي|اعدادي|ثانوي)$")
-                .matcher(digits);
-        if (m.find()) {
-            int year = Integer.parseInt(m.group(1));
-            String stage = m.group(2);
-            if ("ابتدائي".equals(stage) && year >= 1 && year <= 6) {
-                if (year < 6) return switch (year + 1) {
-                    case 2 -> "تانيه ابتدائي";
-                    case 3 -> "تالته ابتدائي";
-                    case 4 -> "رابعه ابتدائي";
-                    case 5 -> "خامسه ابتدائي";
-                    case 6 -> "سادسه ابتدائي";
-                    default -> null;
-                };
-                return "اولى اعدادي";
-            }
-            if ("اعدادي".equals(stage) && year >= 1 && year <= 3) {
-                if (year < 3) return (year + 1 == 2) ? "تانيه اعدادي" : "تالته اعدادي";
-                return "اولى ثانوي";
-            }
-            if ("ثانوي".equals(stage) && year >= 1 && year <= 3) {
-                if (year < 3) return (year + 1 == 2) ? "تانيه ثانوي" : "تالته ثانوي";
-                return "جامعة";
-            }
-        }
-
-        // If already third secondary in words
+        for (Step s : map) if (current.equals(s.from)) return s.to;
         if (current.equals("تالته ثانوي") || current.equals("ثالثه ثانوي")) return "جامعة";
-
         return null;
     }
 
     private static String normalizeStoredStudyYear(String raw) {
         String value = normAr(raw);
         if (value.isBlank()) return null;
-
         return switch (value) {
             case "grade1_primary" -> "اولى ابتدائي";
             case "grade2_primary" -> "تانيه ابتدائي";
@@ -309,30 +273,19 @@ private void ensureCanViewSheet(User me, String familyBase) {
         };
     }
 
-    // ----- Endpoints -----
-
-    // View/edit sheet for a family (servants & above)
     @GetMapping("/sheet")
-    public ResponseEntity<?> getSheet(@RequestParam String family, Authentication auth) {
+    public ResponseEntity<?> getSheet(@RequestParam String family, @RequestParam(required = false) String term, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User me = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String base = FamilyUtil.mainFamily(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
-
+        String selectedTerm = normalizeTerm(term);
         ensureCanViewSheet(me, base);
 
         GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
-        SheetPayload payload = parseOrEmpty(sheet);
-
-        // ensure at least one column exists so UI can start
-        List<Column> cols = payload.columns() == null ? new ArrayList<>() : new ArrayList<>(payload.columns());
-        if (cols.isEmpty()) {
-            cols.add(new Column(newColId(), "")); // empty title - editable
-        }
-
+        SheetPayload payload = parseTermPayload(sheet, selectedTerm);
+        List<Column> cols = normalizedColumns(payload, true);
         Map<String, Map<String, String>> rows = payload.rows() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload.rows());
 
         List<User> members = loadMakhdomMembers(base);
@@ -341,14 +294,8 @@ private void ensureCanViewSheet(User me, String familyBase) {
         List<Map<String, Object>> memberViews = new ArrayList<>();
         for (User u : members) {
             String uid = String.valueOf(u.getId());
-            Map<String, String> values = rows.getOrDefault(uid, new LinkedHashMap<>());
-            // ensure all columns exist
-            Map<String, String> normalized = new LinkedHashMap<>();
-            for (Column c : cols) {
-                normalized.put(c.id(), values.getOrDefault(c.id(), ""));
-            }
+            Map<String, String> normalized = alignValues(cols, rows.getOrDefault(uid, new LinkedHashMap<>()));
             rows.put(uid, normalized);
-
             memberViews.add(new LinkedHashMap<>() {{
                 put("id", u.getId());
                 put("fullName", u.getFullName());
@@ -356,52 +303,43 @@ private void ensureCanViewSheet(User me, String familyBase) {
             }});
         }
 
-        // persist normalization (keeps ids in sync)
         GradeSheet persisted = sheet;
-        if (persisted == null) {
-            persisted = GradeSheet.builder()
-                    .familyBase(base)
-                    .status("DRAFT")
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-        }
-        try {
-            persisted.setDataJson(mapper.writeValueAsString(new SheetPayload(cols, rows)));
-        } catch (Exception ignored) {}
+        if (persisted == null) persisted = GradeSheet.builder().familyBase(base).status("DRAFT").updatedAt(LocalDateTime.now()).build();
+        storeTermPayload(persisted, selectedTerm, new SheetPayload(cols, rows));
         persisted.setUpdatedAt(LocalDateTime.now());
         if (persisted.getStatus() == null) persisted.setStatus("DRAFT");
         gradeRepo.save(persisted);
 
         return ResponseEntity.ok(new SheetView(
                 base,
+                selectedTerm,
                 persisted.getStatus(),
                 persisted.getUpdatedAt(),
-                persisted.getPublishedAt(),
+                publishedAtForTerm(persisted, selectedTerm),
+                persisted.getFirstPublishedAt(),
+                persisted.getSecondPublishedAt(),
                 cols,
                 memberViews
         ));
     }
 
-    // Save draft sheet (servants & above)
     @PutMapping("/sheet")
-    public ResponseEntity<?> saveSheet(@RequestParam String family, @RequestBody SheetPayload body, Authentication auth) {
+    public ResponseEntity<?> saveSheet(@RequestParam String family, @RequestParam(required = false) String term, @RequestBody SheetPayload body, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        User me = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String base = FamilyUtil.mainFamily(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
-
+        String selectedTerm = normalizeTerm(term);
         ensureCanEditSheet(me, base);
 
         GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
-        SheetPayload existing = parseOrEmpty(sheet);
+        SheetPayload existing = parseTermPayload(sheet, selectedTerm);
 
         List<Column> cols = body != null && body.columns() != null ? new ArrayList<>(body.columns()) : new ArrayList<>();
         if (cols.isEmpty()) cols = existing.columns() == null ? new ArrayList<>() : new ArrayList<>(existing.columns());
         if (cols.isEmpty()) cols.add(new Column(newColId(), ""));
 
-        // sanitize columns (unique ids, non-null)
         List<Column> sanitizedCols = new ArrayList<>();
         Set<String> ids = new HashSet<>();
         for (Column c : cols) {
@@ -409,129 +347,118 @@ private void ensureCanViewSheet(User me, String familyBase) {
             String id = c.id() == null || c.id().isBlank() ? newColId() : c.id().trim();
             if (ids.contains(id)) continue;
             ids.add(id);
-            String title = c.title() == null ? "" : c.title();
-            sanitizedCols.add(new Column(id, title));
+            sanitizedCols.add(new Column(id, c.title() == null ? "" : c.title()));
         }
         if (sanitizedCols.isEmpty()) sanitizedCols.add(new Column(newColId(), ""));
 
-        // sanitize rows: only allow makhdom members in this base family
         List<User> members = loadMakhdomMembers(base);
         Set<String> allowedUserIds = new HashSet<>();
         for (User u : members) allowedUserIds.add(String.valueOf(u.getId()));
 
         Map<String, Map<String, String>> inRows = body != null && body.rows() != null ? body.rows() : new LinkedHashMap<>();
         Map<String, Map<String, String>> sanitizedRows = new LinkedHashMap<>();
-
         for (String uid : allowedUserIds) {
             Map<String, String> values = inRows.getOrDefault(uid, new LinkedHashMap<>());
             Map<String, String> normVals = new LinkedHashMap<>();
-            for (Column c : sanitizedCols) {
-                normVals.put(c.id(), values == null ? "" : String.valueOf(values.getOrDefault(c.id(), "")));
-            }
+            for (Column c : sanitizedCols) normVals.put(c.id(), values == null ? "" : String.valueOf(values.getOrDefault(c.id(), "")));
             sanitizedRows.put(uid, normVals);
         }
 
         GradeSheet toSave = sheet;
-        if (toSave == null) {
-            toSave = GradeSheet.builder()
-                    .familyBase(base)
-                    .status("DRAFT")
-                    .build();
-        }
-        try {
-            toSave.setDataJson(mapper.writeValueAsString(new SheetPayload(sanitizedCols, sanitizedRows)));
-        } catch (Exception e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid sheet payload");
-        }
+        if (toSave == null) toSave = GradeSheet.builder().familyBase(base).status("DRAFT").build();
+        storeTermPayload(toSave, selectedTerm, new SheetPayload(sanitizedCols, sanitizedRows));
         toSave.setUpdatedAt(LocalDateTime.now());
         if (toSave.getStatus() == null) toSave.setStatus("DRAFT");
         gradeRepo.save(toSave);
 
-        return ResponseEntity.ok(Map.of("message", "saved", "familyBase", base, "status", toSave.getStatus(), "updatedAt", toSave.getUpdatedAt()));
+        return ResponseEntity.ok(Map.of("message", "saved", "familyBase", base, "selectedTerm", selectedTerm, "status", toSave.getStatus(), "updatedAt", toSave.getUpdatedAt()));
     }
 
-    // Publish sheet (Amin Osra scoped, Amin Khedma, Dev)
     @PostMapping("/sheet/publish")
-    public ResponseEntity<?> publishSheet(@RequestParam String family, Authentication auth) {
+    public ResponseEntity<?> publishSheet(@RequestParam String family, @RequestBody(required = false) PublishSheetRequest body, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        User me = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String base = FamilyUtil.mainFamily(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
-
         ensureCanPublish(me, base);
 
+        String resultTerm = normalizeTerm(body == null ? null : body.resultTerm());
         GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
-        if (sheet == null) {
-            // create empty and publish
-            sheet = GradeSheet.builder()
-                    .familyBase(base)
-                    .status("PUBLISHED")
-                    .updatedAt(LocalDateTime.now())
-                    .publishedAt(LocalDateTime.now())
-                    .publishedByUserId(me.getId())
-                    .dataJson("{\"columns\":[],\"rows\":{}}")
-                    .build();
+        if (sheet == null) sheet = GradeSheet.builder().familyBase(base).status("PUBLISHED").updatedAt(LocalDateTime.now()).build();
+
+        if (sheet.getFirstTermDataJson() == null && sheet.getSecondTermDataJson() == null && sheet.getDataJson() != null) sheet.setFirstTermDataJson(sheet.getDataJson());
+        if ("FIRST".equals(resultTerm) && (sheet.getFirstTermDataJson() == null || sheet.getFirstTermDataJson().isBlank())) storeTermPayload(sheet, "FIRST", emptyPayload());
+        if ("SECOND".equals(resultTerm) && (sheet.getSecondTermDataJson() == null || sheet.getSecondTermDataJson().isBlank())) storeTermPayload(sheet, "SECOND", emptyPayload());
+
+        LocalDateTime now = LocalDateTime.now();
+        sheet.setStatus("PUBLISHED");
+        sheet.setPublishedAt(now);
+        sheet.setResultTerm(resultTerm);
+        sheet.setPublishedByUserId(me.getId());
+        if ("SECOND".equals(resultTerm)) {
+            sheet.setSecondPublishedAt(now);
+            sheet.setSecondPublishedByUserId(me.getId());
         } else {
-            sheet.setStatus("PUBLISHED");
-            sheet.setPublishedAt(LocalDateTime.now());
-            sheet.setPublishedByUserId(me.getId());
+            sheet.setFirstPublishedAt(now);
+            sheet.setFirstPublishedByUserId(me.getId());
         }
         gradeRepo.save(sheet);
 
-        return ResponseEntity.ok(Map.of("message", "published", "familyBase", base, "publishedAt", sheet.getPublishedAt()));
+        return ResponseEntity.ok(Map.of(
+                "message", "published",
+                "familyBase", base,
+                "publishedAt", now,
+                "resultTerm", resultTerm,
+                "firstPublishedAt", sheet.getFirstPublishedAt(),
+                "secondPublishedAt", sheet.getSecondPublishedAt()
+        ));
     }
 
-    // Makhdom view (only own row) - must be published
     @GetMapping("/me")
     public ResponseEntity<?> myGrades(@RequestParam(required = false) String family, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        User me = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String base = FamilyUtil.mainFamily(family != null && !family.isBlank() ? family : me.getDeaconFamily());
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
 
         GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
-        if (sheet == null || !"PUBLISHED".equalsIgnoreCase(String.valueOf(sheet.getStatus()))) {
-            // not published yet
-            return ResponseEntity.ok(new MyGradesView(base, null, List.of(), new LinkedHashMap<>()));
+        if (sheet == null) {
+            return ResponseEntity.ok(new MyGradesView(base, null, null, List.of(), new LinkedHashMap<>(), List.of(), new LinkedHashMap<>()));
         }
 
-        SheetPayload payload = parseOrEmpty(sheet);
-        List<Column> cols = payload.columns() == null ? List.of() : payload.columns();
-        Map<String, Map<String, String>> rows = payload.rows() == null ? Map.of() : payload.rows();
+        SheetPayload firstPayload = parseTermPayload(sheet, "FIRST");
+        SheetPayload secondPayload = parseTermPayload(sheet, "SECOND");
+        List<Column> firstCols = normalizedColumns(firstPayload, false);
+        List<Column> secondCols = normalizedColumns(secondPayload, false);
+        Map<String, Map<String, String>> firstRows = firstPayload.rows() == null ? Map.of() : firstPayload.rows();
+        Map<String, Map<String, String>> secondRows = secondPayload.rows() == null ? Map.of() : secondPayload.rows();
+        Map<String, String> firstValues = alignValues(firstCols, firstRows.get(String.valueOf(me.getId())));
+        Map<String, String> secondValues = alignValues(secondCols, secondRows.get(String.valueOf(me.getId())));
 
-        Map<String, String> values = rows.getOrDefault(String.valueOf(me.getId()), new LinkedHashMap<>());
-        // ensure keys align
-        Map<String, String> aligned = new LinkedHashMap<>();
-        for (Column c : cols) {
-            aligned.put(c.id(), values.getOrDefault(c.id(), ""));
+        if (sheet.getFirstPublishedAt() == null) {
+            firstCols = List.of();
+            firstValues = new LinkedHashMap<>();
+        }
+        if (sheet.getSecondPublishedAt() == null) {
+            secondCols = List.of();
+            secondValues = new LinkedHashMap<>();
         }
 
-        return ResponseEntity.ok(new MyGradesView(base, sheet.getPublishedAt(), cols, aligned));
+        return ResponseEntity.ok(new MyGradesView(base, sheet.getFirstPublishedAt(), sheet.getSecondPublishedAt(), firstCols, firstValues, secondCols, secondValues));
     }
 
-    // Makhdom confirms school result after publish (PASS advances grade / transitions to university)
     @PostMapping("/confirm-school-result")
-    public ResponseEntity<?> confirmSchoolResult(
-            @RequestParam(required = false) String family,
-            @RequestBody(required = false) ConfirmSchoolResultRequest body,
-            Authentication auth
-    ) {
+    public ResponseEntity<?> confirmSchoolResult(@RequestParam(required = false) String family, @RequestBody(required = false) ConfirmSchoolResultRequest body, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User me = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String base = FamilyUtil.mainFamily(family != null && !family.isBlank() ? family : me.getDeaconFamily());
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
 
         GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
-        if (sheet == null || !"PUBLISHED".equalsIgnoreCase(String.valueOf(sheet.getStatus())) || sheet.getPublishedAt() == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Grades are not published");
-        }
+        if (sheet == null || sheet.getSecondPublishedAt() == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Second term grades are not published");
 
         String status = normAr(me.getStatus());
         String studyType = normAr(me.getStudyType());
@@ -541,9 +468,7 @@ private void ensureCanViewSheet(User me, String familyBase) {
         if ("graduate".equalsIgnoreCase(status) || "خريج".equals(status)) {
             result = "GRADUATE";
         } else if ("university".equalsIgnoreCase(studyType) || "جامعه".equals(studyType) || "جامعة".equals(studyType)) {
-            if (studyYear.isBlank()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "studyYear is required");
-            }
+            if (studyYear.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "studyYear is required");
             me.setUniversityGrade(studyYear);
             result = "UNIVERSITY";
         } else {
@@ -551,10 +476,7 @@ private void ensureCanViewSheet(User me, String familyBase) {
                 me.setSchoolGrade(studyYear);
                 result = "PASS";
             } else {
-                if (!("PASS".equals(result) || "FAIL".equals(result))) {
-                    throw new ApiException(HttpStatus.BAD_REQUEST, "result must be PASS or FAIL");
-                }
-
+                if (!("PASS".equals(result) || "FAIL".equals(result))) throw new ApiException(HttpStatus.BAD_REQUEST, "result must be PASS or FAIL");
                 if ("PASS".equals(result)) {
                     String normalizedCurrent = normalizeStoredStudyYear(me.getSchoolGrade());
                     String next = advanceSchoolGradeString(normalizedCurrent);
@@ -571,14 +493,12 @@ private void ensureCanViewSheet(User me, String familyBase) {
             }
         }
 
-        // mark confirmation (always)
         me.setLastSchoolResultFamilyBase(base);
-        me.setLastSchoolResultPublishedAt(sheet.getPublishedAt());
+        me.setLastSchoolResultPublishedAt(sheet.getSecondPublishedAt());
         me.setLastSchoolResultStatus(result);
 
         userRepo.save(me);
         me.setPassword(null);
-
         return ResponseEntity.ok(me);
     }
 }

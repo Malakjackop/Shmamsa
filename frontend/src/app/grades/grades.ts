@@ -1,14 +1,17 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { MessageService } from 'primeng/api';
+import { forkJoin } from 'rxjs';
 import { AuthService } from '../services/auth.service';
-import { GradesService, GradeColumn, SheetView, MyGradesView, SheetPayload } from '../services/grades.service';
+import { GradesService, GradeColumn, SheetView, MyGradesView, SheetPayload, ResultTerm } from '../services/grades.service';
 import { FamilyService } from '../services/family.service';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   selector: 'app-grades',
   templateUrl: './grades.html',
   styleUrls: ['./grades.css'],
-  standalone:false,
+  standalone: false,
   providers: [MessageService]
 })
 export class GradesComponent implements OnInit {
@@ -18,17 +21,25 @@ export class GradesComponent implements OnInit {
   private msg = inject(MessageService);
 
   me: any = null;
-
   viewMode: 'SERVANT' | 'MAKHDOM' = 'MAKHDOM';
 
-  // servant mode
   familyChoices: string[] = [];
-  selectedFamilyBase: string = '';
+  selectedFamilyBase = '';
+  selectedTerm: ResultTerm = 'FIRST';
+
   sheet: SheetView | null = null;
   columns: GradeColumn[] = [];
   columnMeta: Record<string, { title: string; max: string }> = {};
-  members: Array<{ id: number; fullName: string; values: Record<string,string> }> = [];
-  rankedMembers: Array<{ id: number; fullName: string; values: Record<string,string> }> = [];
+  members: Array<{ id: number; fullName: string; values: Record<string, string> }> = [];
+  rankedMembers: Array<{ id: number; fullName: string; values: Record<string, string> }> = [];
+
+  bothFirstSheet: SheetView | null = null;
+  bothSecondSheet: SheetView | null = null;
+  bothFirstColumns: GradeColumn[] = [];
+  bothFirstMembers: Array<{ id: number; fullName: string; values: Record<string, string> }> = [];
+  bothSecondColumns: GradeColumn[] = [];
+  bothSecondMembers: Array<{ id: number; fullName: string; values: Record<string, string> }> = [];
+
   rankViewEnabled = false;
   topThreeMemberIds = new Set<number>();
   rankByMemberId = new Map<number, number>();
@@ -38,10 +49,7 @@ export class GradesComponent implements OnInit {
   publishing = false;
   private readonly titleMetaSeparator = '::max::';
 
-  // makhdom mode
   my: MyGradesView | null = null;
-
-  // confirmation modal (makhdom)
   showSchoolResultDialog = false;
   confirmingSchoolResult = false;
   selectedStudyYear = '';
@@ -62,7 +70,6 @@ export class GradesComponent implements OnInit {
   private mainFamily(name: string): string {
     if (!name) return '';
     const f = String(name).trim();
-    // نفس منطق backend: يشيل ( أ / ب )
     if (f.endsWith(' أ')) return f.slice(0, -2).trim();
     if (f.endsWith(' ب')) return f.slice(0, -2).trim();
     return f;
@@ -72,33 +79,9 @@ export class GradesComponent implements OnInit {
     const raw = String(v ?? '').trim();
     if (!raw) return '';
     const upper = raw.toUpperCase();
-
-    // Arabic variants
     const ar = raw.replace(/\s+/g, ' ').trim();
-    if (
-      [
-        'امين اسرة',
-        'امين الاسرة',
-        'أمين أسرة',
-        'أمين الاسرة',
-        'امين الأسرة',
-        'أمين الأسرة',
-        'امين اسرة'
-      ].includes(ar)
-    )
-      return 'AMIN_OSRA';
-    if (
-      [
-        'امين الخدمة',
-        'امين الخدمه',
-        'أمين الخدمة',
-        'أمين الخدمه',
-        'امين خدمه',
-        'أمين خدمه'
-      ].includes(ar)
-    )
-      return 'AMIN_KHEDMA';
-
+    if (['امين اسرة', 'امين الاسرة', 'أمين أسرة', 'أمين الاسرة', 'امين الأسرة', 'أمين الأسرة'].includes(ar)) return 'AMIN_OSRA';
+    if (['امين الخدمة', 'امين الخدمه', 'أمين الخدمة', 'أمين الخدمه', 'امين خدمه', 'أمين خدمه'].includes(ar)) return 'AMIN_KHEDMA';
     if (upper.startsWith('ROLE_')) return upper.substring(5);
     return upper;
   }
@@ -117,21 +100,17 @@ export class GradesComponent implements OnInit {
   }
 
   private hasAnyAminOsraScope(): boolean {
-    const roles = [
-      this.me?.deaconFamilyRole,
-      this.me?.deaconFamilyRole2,
-      this.me?.deaconFamilyRole3,
-      this.me?.deaconFamilyRole4
-    ].map((x: any) => this.normRole(x));
+    const roles = [this.me?.deaconFamilyRole, this.me?.deaconFamilyRole2, this.me?.deaconFamilyRole3, this.me?.deaconFamilyRole4].map((x: any) => this.normRole(x));
     return roles.includes('AMIN_OSRA');
   }
+
   private hasAminOsraScopeForBase(base: string): boolean {
     const b = this.mainFamily(String(base || '').trim()).toUpperCase();
     const fams = [
       { fam: this.me?.deaconFamily, role: this.me?.deaconFamilyRole },
       { fam: this.me?.deaconFamily2, role: this.me?.deaconFamilyRole2 },
       { fam: this.me?.deaconFamily3, role: this.me?.deaconFamilyRole3 },
-      { fam: this.me?.deaconFamily4, role: this.me?.deaconFamilyRole4 },
+      { fam: this.me?.deaconFamily4, role: this.me?.deaconFamilyRole4 }
     ];
     for (const x of fams) {
       const fb = this.mainFamily(String(x.fam || '').trim()).toUpperCase();
@@ -141,11 +120,9 @@ export class GradesComponent implements OnInit {
     return false;
   }
 
-
-
   private initMode() {
     const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
-    const servantOrAbove = ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
+    const servantOrAbove = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
     this.viewMode = servantOrAbove ? 'SERVANT' : 'MAKHDOM';
 
     if (this.viewMode === 'MAKHDOM') {
@@ -153,88 +130,105 @@ export class GradesComponent implements OnInit {
       return;
     }
 
-    // SERVANT
     const bases = this.servantBasesFromMe();
-    // AMIN_KHEDMA / DEV ممكن يكون SYSTEM -> نجيب قائمة الأسر من endpoint families (لو متاحة)
-    if (['AMIN_KHEDMA','DEVELOPER'].includes(role)) {
+    if (['AMIN_KHEDMA', 'DEVELOPER'].includes(role)) {
       this.familySvc.families().subscribe({
         next: (f) => {
-          const list = (f || []).map((x) => this.mainFamily(x)).filter(Boolean);
+          const list = (f || []).map((x: any) => this.mainFamily(x)).filter(Boolean);
           this.familyChoices = Array.from(new Set(list));
           this.selectedFamilyBase = this.familyChoices[0] || '';
           this.refreshPerms();
-          if (this.selectedFamilyBase) this.loadSheet();
+          if (this.selectedFamilyBase) this.loadServantView();
         },
         error: () => {
           this.familyChoices = bases;
           this.selectedFamilyBase = bases[0] || '';
           this.refreshPerms();
-          if (this.selectedFamilyBase) this.loadSheet();
+          if (this.selectedFamilyBase) this.loadServantView();
         }
       });
     } else {
-      this.familyChoices = bases.length ? bases : [this.mainFamily(this.me?.deaconFamily)];
-      this.familyChoices = this.familyChoices.filter(Boolean);
+      this.familyChoices = (bases.length ? bases : [this.mainFamily(this.me?.deaconFamily)]).filter(Boolean);
       this.selectedFamilyBase = this.familyChoices[0] || '';
       this.refreshPerms();
-      if (this.selectedFamilyBase) this.loadSheet();
+      if (this.selectedFamilyBase) this.loadServantView();
     }
   }
 
   private refreshPerms() {
     const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
-    // edit: khadim+ in general (backend will enforce scope)
-    this.canEdit = ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
-    // publish: amin osra (scoped for selected family) or above
-    this.canPublish = ['AMIN_KHEDMA','DEVELOPER'].includes(role) || (role === 'AMIN_OSRA' && this.mainFamily(this.me?.deaconFamily) === this.selectedFamilyBase) || this.hasAminOsraScopeForBase(this.selectedFamilyBase);
-}
+    this.canEdit = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
+    this.canPublish = ['AMIN_KHEDMA', 'DEVELOPER'].includes(role) || (role === 'AMIN_OSRA' && this.mainFamily(this.me?.deaconFamily) === this.selectedFamilyBase) || this.hasAminOsraScopeForBase(this.selectedFamilyBase);
+  }
 
-  loadSheet() {
+  onServantTermChange(): void {
+    this.loadServantView();
+  }
+
+  loadServantView(): void {
     if (!this.selectedFamilyBase) return;
     this.refreshPerms();
-    this.gradesSvc.getSheet(this.selectedFamilyBase).subscribe({
+
+    if (this.selectedTerm === 'BOTH') {
+      forkJoin({
+        first: this.gradesSvc.getSheet(this.selectedFamilyBase, 'FIRST'),
+        second: this.gradesSvc.getSheet(this.selectedFamilyBase, 'SECOND')
+      }).subscribe({
+        next: ({ first, second }) => {
+          this.sheet = null;
+          this.bothFirstSheet = first;
+          this.bothSecondSheet = second;
+          this.bothFirstColumns = (first.columns || []).map((c) => ({ ...c }));
+          this.bothSecondColumns = (second.columns || []).map((c) => ({ ...c }));
+          this.bothFirstMembers = (first.members || []).map((m) => ({ id: m.id, fullName: m.fullName, values: { ...(m.values || {}) } }));
+          this.bothSecondMembers = (second.members || []).map((m) => ({ id: m.id, fullName: m.fullName, values: { ...(m.values || {}) } }));
+          this.columns = [];
+          this.members = [];
+          this.rankedMembers = [];
+        },
+        error: () => this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الدرجات' })
+      });
+      return;
+    }
+
+    this.bothFirstSheet = null;
+    this.bothSecondSheet = null;
+    this.bothFirstColumns = [];
+    this.bothSecondColumns = [];
+    this.bothFirstMembers = [];
+    this.bothSecondMembers = [];
+
+    this.gradesSvc.getSheet(this.selectedFamilyBase, this.selectedTerm).subscribe({
       next: (s) => {
         this.sheet = s;
         this.columns = (s.columns || []).map((c) => ({ id: c.id, title: c.title }));
         this.columnMeta = {};
-        for (const c of this.columns) {
-          this.columnMeta[c.id] = this.parseColumnTitle(c.title);
-        }
-        this.members = (s.members || []).map((m) => ({
-          id: m.id,
-          fullName: m.fullName,
-          values: { ...(m.values || {}) }
-        }));
+        for (const c of this.columns) this.columnMeta[c.id] = this.parseColumnTitle(c.title);
+        this.members = (s.members || []).map((m) => ({ id: m.id, fullName: m.fullName, values: { ...(m.values || {}) } }));
         this.rankViewEnabled = false;
         this.rebuildMembersView();
       },
-      error: (err: any) => {
+      error: () => {
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الدرجات' });
         this.sheet = null;
         this.columns = [];
         this.members = [];
         this.rankedMembers = [];
-        this.topThreeMemberIds.clear();
-        this.rankByMemberId.clear();
       }
     });
   }
 
   addColumn() {
-    if (!this.canEdit) return;
+    if (!this.canEdit || this.selectedTerm === 'BOTH') return;
     const id = 'c_' + Math.random().toString(16).slice(2, 10);
     this.columns.push({ id, title: '' });
     this.columnMeta[id] = { title: '', max: '' };
-    // add empty values for all members
-    this.members = this.members.map((m) => {
-      m.values[id] = '';
-      return m;
-    });
+    this.members = this.members.map((m) => ({ ...m, values: { ...(m.values || {}), [id]: '' } }));
     this.rebuildMembersView();
   }
 
   removeColumn(colId: string): void {
-    if (!this.canEdit) return;
+    if (!this.canEdit || this.selectedTerm === 'BOTH') return;
     if (this.columns.length <= 1) {
       this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن حذف آخر عمود' });
       return;
@@ -250,6 +244,7 @@ export class GradesComponent implements OnInit {
   }
 
   toggleTopRanksView(): void {
+    if (this.selectedTerm === 'BOTH') return;
     this.rankViewEnabled = !this.rankViewEnabled;
     this.rebuildMembersView();
   }
@@ -259,13 +254,11 @@ export class GradesComponent implements OnInit {
   }
 
   isTopThreeMember(memberId: number): boolean {
-    if (!this.rankViewEnabled) return false;
-    return this.topThreeMemberIds.has(memberId);
+    return this.rankViewEnabled && this.topThreeMemberIds.has(memberId);
   }
 
   getDisplayedRank(memberId: number, fallbackRank: number): number {
-    if (!this.rankViewEnabled) return fallbackRank;
-    return this.rankByMemberId.get(memberId) ?? fallbackRank;
+    return this.rankViewEnabled ? (this.rankByMemberId.get(memberId) ?? fallbackRank) : fallbackRank;
   }
 
   setColumnTitle(colId: string, title: string): void {
@@ -287,11 +280,8 @@ export class GradesComponent implements OnInit {
     });
     const rows: Record<string, Record<string, string>> = {};
     for (const m of this.members) {
-      const uid = String(m.id);
-      rows[uid] = {};
-      for (const c of cols) {
-        rows[uid][c.id] = String(m.values?.[c.id] ?? '');
-      }
+      rows[String(m.id)] = {};
+      for (const c of cols) rows[String(m.id)][c.id] = String(m.values?.[c.id] ?? '');
     }
     return { columns: cols, rows };
   }
@@ -305,58 +295,60 @@ export class GradesComponent implements OnInit {
   }
 
   rowTotal(values: Record<string, string> | undefined): number {
-    if (!values) return 0;
-    let total = 0;
-    for (const c of this.columns) {
-      total += this.parseNumber(values[c.id]);
-    }
-    return total;
+    return this.rowTotalForColumns(values, this.columns);
   }
 
   rowTotalForColumns(values: Record<string, string> | undefined, cols: GradeColumn[] | undefined): number {
     if (!values || !cols?.length) return 0;
     let total = 0;
-    for (const c of cols) {
-      total += this.parseNumber(values[c.id]);
-    }
+    for (const c of cols) total += this.parseNumber(values[c.id]);
     return total;
   }
 
   columnsMaxTotal(): number {
     let total = 0;
-    for (const c of this.columns) {
-      const maxVal = this.columnMeta[c.id]?.max || '';
-      total += this.parseNumber(maxVal);
-    }
+    for (const c of this.columns) total += this.parseNumber(this.columnMeta[c.id]?.max || '');
     return total;
   }
 
   columnsMaxTotalForColumns(cols: GradeColumn[] | undefined): number {
     if (!cols?.length) return 0;
     let total = 0;
-    for (const c of cols) {
-      total += this.parseNumber(this.parseColumnTitle(c.title).max);
-    }
+    for (const c of cols) total += this.parseNumber(this.parseColumnTitle(c.title).max);
     return total;
+  }
+
+  combinedServantMembers(): Array<{ id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }> {
+    const map = new Map<number, { id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }>();
+    for (const m of this.bothFirstMembers) {
+      map.set(m.id, {
+        id: m.id,
+        fullName: m.fullName,
+        firstTotal: this.rowTotalForColumns(m.values, this.bothFirstColumns),
+        secondTotal: 0,
+        allTotal: this.rowTotalForColumns(m.values, this.bothFirstColumns)
+      });
+    }
+    for (const m of this.bothSecondMembers) {
+      const current = map.get(m.id) || { id: m.id, fullName: m.fullName, firstTotal: 0, secondTotal: 0, allTotal: 0 };
+      current.secondTotal = this.rowTotalForColumns(m.values, this.bothSecondColumns);
+      current.allTotal = current.firstTotal + current.secondTotal;
+      map.set(m.id, current);
+    }
+    return Array.from(map.values()).sort((a, b) => b.allTotal - a.allTotal || a.fullName.localeCompare(b.fullName, 'ar'));
   }
 
   private parseColumnTitle(rawTitle: string): { title: string; max: string } {
     const raw = String(rawTitle ?? '');
     const parts = raw.split(this.titleMetaSeparator);
-    if (parts.length < 2) {
-      return { title: raw, max: '' };
-    }
-    return {
-      title: parts[0] ?? '',
-      max: parts.slice(1).join(this.titleMetaSeparator)
-    };
+    if (parts.length < 2) return { title: raw, max: '' };
+    return { title: parts[0] ?? '', max: parts.slice(1).join(this.titleMetaSeparator) };
   }
 
   private composeColumnTitle(title: string, max: string): string {
     const cleanTitle = String(title ?? '').trim();
     const cleanMax = String(max ?? '').trim();
-    if (!cleanMax) return cleanTitle;
-    return `${cleanTitle}${this.titleMetaSeparator}${cleanMax}`;
+    return cleanMax ? `${cleanTitle}${this.titleMetaSeparator}${cleanMax}` : cleanTitle;
   }
 
   private parseNumber(input: string | null | undefined): number {
@@ -374,12 +366,10 @@ export class GradesComponent implements OnInit {
       if (totalDiff !== 0) return totalDiff;
       return a.fullName.localeCompare(b.fullName, 'ar');
     });
-
     const rankMap = new Map<number, number>();
     const highlightedIds = new Set<number>();
     let lastTotal: number | null = null;
     let currentRank = 0;
-
     for (const m of ranked) {
       const total = this.rowTotal(m.values);
       if (lastTotal === null || total !== lastTotal) {
@@ -387,26 +377,88 @@ export class GradesComponent implements OnInit {
         lastTotal = total;
       }
       rankMap.set(m.id, currentRank);
-      if (currentRank <= 3) {
-        highlightedIds.add(m.id);
-      }
+      if (currentRank <= 3) highlightedIds.add(m.id);
     }
-
     this.rankByMemberId = rankMap;
     this.topThreeMemberIds = highlightedIds;
     this.rankedMembers = this.rankViewEnabled ? ranked : [...this.members];
   }
+
+  exportServantSheetPdf(): void {
+    if (this.viewMode !== 'SERVANT') return;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+    if (this.selectedTerm === 'BOTH') {
+      doc.setFontSize(16);
+      doc.text(`Grades - ${this.selectedFamilyBase || ''}`, 40, 40);
+      doc.setFontSize(11);
+      doc.text('First term', 40, 70);
+      autoTable(doc, {
+        startY: 80,
+        head: [['م', 'الاسم', ...(this.bothFirstColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'المجموع']],
+        body: (this.bothFirstMembers || []).map((m, i) => [String(i + 1), m.fullName, ...(this.bothFirstColumns || []).map((c) => m.values?.[c.id] || '-'), String(this.rowTotalForColumns(m.values, this.bothFirstColumns))]),
+        styles: { fontSize: 9, halign: 'center' },
+        headStyles: { halign: 'center' }
+      });
+      let y = (doc as any).lastAutoTable.finalY + 20;
+      doc.text('Second term', 40, y);
+      autoTable(doc, {
+        startY: y + 10,
+        head: [['م', 'الاسم', ...(this.bothSecondColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'المجموع']],
+        body: (this.bothSecondMembers || []).map((m, i) => [String(i + 1), m.fullName, ...(this.bothSecondColumns || []).map((c) => m.values?.[c.id] || '-'), String(this.rowTotalForColumns(m.values, this.bothSecondColumns))]),
+        styles: { fontSize: 9, halign: 'center' },
+        headStyles: { halign: 'center' }
+      });
+      doc.save(`grades-${this.selectedFamilyBase || 'family'}-both.pdf`);
+      return;
+    }
+
+    if (!this.sheet) return;
+    autoTable(doc, {
+      startY: 100,
+      head: [['م', 'الاسم', ...(this.columns || []).map((c) => this.formatColumnTitleForView(c.title)), 'المجموع']],
+      body: (this.rankedMembers?.length ? this.rankedMembers : this.members).map((m, i) => [String(i + 1), m.fullName, ...(this.columns || []).map((c) => m.values?.[c.id] || '-'), String(this.rowTotal(m.values))]),
+      styles: { fontSize: 9, halign: 'center' },
+      headStyles: { halign: 'center' }
+    });
+    doc.save(`grades-${this.selectedFamilyBase || 'family'}-${this.selectedTerm.toLowerCase()}.pdf`);
+  }
+
+  exportMyResultPdf(): void {
+    if (this.viewMode !== 'MAKHDOM' || !this.my) return;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    doc.setFontSize(16);
+    doc.text(`Grades - ${this.me?.fullName || ''}`, 40, 40);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [['الاسم', ...(this.my.firstColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'مجموع الترم الأول']],
+      body: [[this.me?.fullName || 'أنا', ...(this.my.firstColumns || []).map((c) => this.my?.firstValues?.[c.id] || '-'), String(this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns))]],
+      styles: { fontSize: 10, halign: 'center' },
+      headStyles: { halign: 'center' }
+    });
+
+    let y = (doc as any).lastAutoTable.finalY + 20;
+    autoTable(doc, {
+      startY: y,
+      head: [['الاسم', ...(this.my.secondColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'مجموع الترم الثاني']],
+      body: [[this.me?.fullName || 'أنا', ...(this.my.secondColumns || []).map((c) => this.my?.secondValues?.[c.id] || '-'), String(this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns))]],
+      styles: { fontSize: 10, halign: 'center' },
+      headStyles: { halign: 'center' }
+    });
+    doc.save(`grades-${this.me?.fullName || 'result'}.pdf`);
+  }
+
   save() {
-    if (!this.canEdit || !this.selectedFamilyBase) return;
+    if (!this.canEdit || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
     this.saving = true;
-    const payload = this.buildPayload();
-    this.gradesSvc.saveSheet(this.selectedFamilyBase, payload).subscribe({
+    this.gradesSvc.saveSheet(this.selectedFamilyBase, this.selectedTerm, this.buildPayload()).subscribe({
       next: () => {
         this.saving = false;
         this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ' });
-        this.loadSheet();
+        this.loadServantView();
       },
-      error: (err: any) => {
+      error: () => {
         this.saving = false;
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل الحفظ' });
       }
@@ -414,17 +466,17 @@ export class GradesComponent implements OnInit {
   }
 
   publish() {
-    if (!this.canPublish || !this.selectedFamilyBase) return;
+    if (!this.canPublish || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
     this.publishing = true;
-    this.gradesSvc.publishSheet(this.selectedFamilyBase).subscribe({
+    this.gradesSvc.publishSheet(this.selectedFamilyBase, this.selectedTerm).subscribe({
       next: () => {
         this.publishing = false;
         this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم النشر' });
-        this.loadSheet();
+        this.loadServantView();
       },
-      error: (err: any) => {
+      error: () => {
         this.publishing = false;
-        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل النشر (تأكد أن الحساب أمين أسرة على هذه الأسرة)' });
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل النشر' });
       }
     });
   }
@@ -435,146 +487,63 @@ export class GradesComponent implements OnInit {
         this.my = v;
         this.maybeAskForSchoolResult();
       },
-      error: () => this.my = { familyBase: this.mainFamily(this.me?.deaconFamily), columns: [], values: {}, publishedAt: null }
+      error: () => {
+        this.my = {
+          familyBase: this.mainFamily(this.me?.deaconFamily),
+          firstPublishedAt: null,
+          secondPublishedAt: null,
+          firstColumns: [],
+          firstValues: {},
+          secondColumns: [],
+          secondValues: {}
+        };
+      }
     });
   }
 
   private maybeAskForSchoolResult(): void {
     if (this.viewMode !== 'MAKHDOM') return;
-    if (!this.my?.publishedAt || this.isGraduate()) {
+    if (!this.my?.secondPublishedAt || this.isGraduate()) {
       this.showSchoolResultDialog = false;
       return;
     }
-
     const base = String(this.my?.familyBase || '').trim();
-    const pub = String(this.my?.publishedAt || '').trim();
-
+    const pub = String(this.my?.secondPublishedAt || '').trim();
     const lastBase = String(this.me?.lastSchoolResultFamilyBase || '').trim();
     const lastPub = String(this.me?.lastSchoolResultPublishedAt || '').trim();
-
     this.selectedStudyYear = this.currentStudyYear();
     this.showSchoolResultDialog = !(lastBase === base && lastPub === pub);
   }
 
   private normalizeArabicText(value: any): string {
-    return String(value ?? '')
-      .trim()
-      .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
-      .replace(/[أإآ]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/ى/g, 'ي')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
+    return String(value ?? '').trim().replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').toLowerCase();
   }
 
   private canonicalSchoolGrade(raw: string): string {
     const value = this.normalizeArabicText(raw);
     const aliases: Record<string, string> = {
-      'grade1_primary': 'اولى ابتدائي',
-      'اولى ابتدائي': 'اولى ابتدائي',
-      'اولي ابتدائي': 'اولى ابتدائي',
-      'اوله ابتدائي': 'اولى ابتدائي',
-      'اول ابتدائي': 'اولى ابتدائي',
-
-      'grade2_primary': 'تانيه ابتدائي',
-      'تانيه ابتدائي': 'تانيه ابتدائي',
-      'ثانيه ابتدائي': 'تانيه ابتدائي',
-      'ثاني ابتدائي': 'تانيه ابتدائي',
-      'ثانيه ابتدائية': 'تانيه ابتدائي',
-      'تانيه ابتدائية': 'تانيه ابتدائي',
-
-      'grade3_primary': 'تالته ابتدائي',
-      'تالته ابتدائي': 'تالته ابتدائي',
-      'ثالثه ابتدائي': 'تالته ابتدائي',
-      'ثالث ابتدائي': 'تالته ابتدائي',
-      'ثالثه ابتدائية': 'تالته ابتدائي',
-      'تالته ابتدائية': 'تالته ابتدائي',
-
-      'grade4_primary': 'رابعه ابتدائي',
-      'رابعه ابتدائي': 'رابعه ابتدائي',
-      'رابع ابتدائي': 'رابعه ابتدائي',
-      'رابعه ابتدائية': 'رابعه ابتدائي',
-
-      'grade5_primary': 'خامسه ابتدائي',
-      'خامسه ابتدائي': 'خامسه ابتدائي',
-      'خامس ابتدائي': 'خامسه ابتدائي',
-      'خامسه ابتدائية': 'خامسه ابتدائي',
-
-      'grade6_primary': 'سادسه ابتدائي',
-      'سادسه ابتدائي': 'سادسه ابتدائي',
-      'سادس ابتدائي': 'سادسه ابتدائي',
-      'سادسه ابتدائية': 'سادسه ابتدائي',
-
-      'grade1_prep': 'اولى اعدادي',
-      'اولى اعدادي': 'اولى اعدادي',
-      'اولي اعدادي': 'اولى اعدادي',
-      'اوله اعدادي': 'اولى اعدادي',
-      'اول اعدادي': 'اولى اعدادي',
-      'اولى اعدادية': 'اولى اعدادي',
-
-      'grade2_prep': 'تانيه اعدادي',
-      'تانيه اعدادي': 'تانيه اعدادي',
-      'ثانيه اعدادي': 'تانيه اعدادي',
-      'ثاني اعدادي': 'تانيه اعدادي',
-      'ثانيه اعدادية': 'تانيه اعدادي',
-      'تانيه اعدادية': 'تانيه اعدادي',
-
-      'grade3_prep': 'تالته اعدادي',
-      'تالته اعدادي': 'تالته اعدادي',
-      'ثالثه اعدادي': 'تالته اعدادي',
-      'ثالث اعدادي': 'تالته اعدادي',
-      'ثالثه اعدادية': 'تالته اعدادي',
-      'تالته اعدادية': 'تالته اعدادي',
-
-      'grade1_secondary': 'اولى ثانوي',
-      'اولى ثانوي': 'اولى ثانوي',
-      'اولي ثانوي': 'اولى ثانوي',
-      'اوله ثانوي': 'اولى ثانوي',
-      'اول ثانوي': 'اولى ثانوي',
-      'اولى ثانويه': 'اولى ثانوي',
-
-      'grade2_secondary': 'تانيه ثانوي',
-      'تانيه ثانوي': 'تانيه ثانوي',
-      'ثانيه ثانوي': 'تانيه ثانوي',
-      'ثاني ثانوي': 'تانيه ثانوي',
-      'ثانيه ثانويه': 'تانيه ثانوي',
-      'تانيه ثانويه': 'تانيه ثانوي',
-
-      'grade3_secondary': 'تالته ثانوي',
-      'تالته ثانوي': 'تالته ثانوي',
-      'ثالثه ثانوي': 'تالته ثانوي',
-      'ثالث ثانوي': 'تالته ثانوي',
-      'ثالثه ثانويه': 'تالته ثانوي',
-      'تالته ثانويه': 'تالته ثانوي'
+      'grade1_primary': 'اولى ابتدائي', 'اولى ابتدائي': 'اولى ابتدائي', 'اولي ابتدائي': 'اولى ابتدائي', 'اوله ابتدائي': 'اولى ابتدائي',
+      'grade2_primary': 'تانيه ابتدائي', 'تانيه ابتدائي': 'تانيه ابتدائي', 'ثانيه ابتدائي': 'تانيه ابتدائي',
+      'grade3_primary': 'تالته ابتدائي', 'تالته ابتدائي': 'تالته ابتدائي', 'ثالثه ابتدائي': 'تالته ابتدائي',
+      'grade4_primary': 'رابعه ابتدائي', 'رابعه ابتدائي': 'رابعه ابتدائي',
+      'grade5_primary': 'خامسه ابتدائي', 'خامسه ابتدائي': 'خامسه ابتدائي',
+      'grade6_primary': 'سادسه ابتدائي', 'سادسه ابتدائي': 'سادسه ابتدائي',
+      'grade1_prep': 'اولى اعدادي', 'اولى اعدادي': 'اولى اعدادي', 'اولي اعدادي': 'اولى اعدادي',
+      'grade2_prep': 'تانيه اعدادي', 'تانيه اعدادي': 'تانيه اعدادي', 'ثانيه اعدادي': 'تانيه اعدادي',
+      'grade3_prep': 'تالته اعدادي', 'تالته اعدادي': 'تالته اعدادي', 'ثالثه اعدادي': 'تالته اعدادي',
+      'grade1_secondary': 'اولى ثانوي', 'اولى ثانوي': 'اولى ثانوي',
+      'grade2_secondary': 'تانيه ثانوي', 'تانيه ثانوي': 'تانيه ثانوي', 'ثانيه ثانوي': 'تانيه ثانوي',
+      'grade3_secondary': 'تالته ثانوي', 'تالته ثانوي': 'تالته ثانوي', 'ثالثه ثانوي': 'تالته ثانوي'
     };
     return aliases[value] || String(raw || '').trim();
   }
 
-  private schoolGradeMap(raw: string): string {
-    return this.canonicalSchoolGrade(raw);
-  }
-
   private nextSchoolGrade(raw: string): string {
-    const orderedGrades = [
-      'اولى ابتدائي',
-      'تانيه ابتدائي',
-      'تالته ابتدائي',
-      'رابعه ابتدائي',
-      'خامسه ابتدائي',
-      'سادسه ابتدائي',
-      'اولى اعدادي',
-      'تانيه اعدادي',
-      'تالته اعدادي',
-      'اولى ثانوي',
-      'تانيه ثانوي',
-      'تالته ثانوي'
-    ];
-
+    const orderedGrades = ['اولى ابتدائي', 'تانيه ابتدائي', 'تالته ابتدائي', 'رابعه ابتدائي', 'خامسه ابتدائي', 'سادسه ابتدائي', 'اولى اعدادي', 'تانيه اعدادي', 'تالته اعدادي', 'اولى ثانوي', 'تانيه ثانوي', 'تالته ثانوي'];
     const current = this.canonicalSchoolGrade(raw);
     const normalizedCurrent = this.normalizeArabicText(current);
     const index = orderedGrades.findIndex((g) => this.normalizeArabicText(g) === normalizedCurrent);
-    if (index === -1) return current;
-    if (index >= orderedGrades.length - 1) return orderedGrades[index];
+    if (index === -1 || index >= orderedGrades.length - 1) return current;
     return orderedGrades[index + 1];
   }
 
@@ -594,7 +563,7 @@ export class GradesComponent implements OnInit {
 
   currentStudyYear(): string {
     if (this.isUniversityStudent()) return String(this.me?.universityGrade || '').trim();
-    return this.schoolGradeMap(String(this.me?.schoolGrade || '').trim());
+    return this.canonicalSchoolGrade(String(this.me?.schoolGrade || '').trim());
   }
 
   nextSchoolStudyYear(): string {
@@ -607,8 +576,7 @@ export class GradesComponent implements OnInit {
 
   saveStudyYear(year: string): void {
     const selected = String(year || '').trim();
-    if (!selected || this.confirmingSchoolResult || !this.my?.publishedAt) return;
-
+    if (!selected || this.confirmingSchoolResult || !this.my?.secondPublishedAt) return;
     this.confirmingSchoolResult = true;
     this.gradesSvc.confirmSchoolResult('PASS', this.my?.familyBase, selected).subscribe({
       next: () => {
@@ -631,12 +599,20 @@ export class GradesComponent implements OnInit {
       }
     });
   }
+
+  hasFirstPublished(): boolean {
+    return !!this.my?.firstPublishedAt;
+  }
+
+  hasSecondPublished(): boolean {
+    return !!this.my?.secondPublishedAt;
+  }
+
+  canShowSecondResult(): boolean {
+    return this.hasSecondPublished() && !this.showSchoolResultDialog;
+  }
+
+  combinedMyTotal(): number {
+    return this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns) + this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns);
+  }
 }
-
-
-
-
-
-
-
-
