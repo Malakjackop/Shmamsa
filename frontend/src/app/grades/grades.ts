@@ -360,6 +360,45 @@ export class GradesComponent implements OnInit {
     return Number.isFinite(val) ? val : 0;
   }
 
+  private async ensureDejaVuFont(doc: any): Promise<void> {
+    try {
+      if (typeof doc.setR2L === 'function') doc.setR2L(false);
+      if (doc.__hasDejaVu) {
+        doc.setFont('DejaVu', 'normal');
+        return;
+      }
+
+      const res = await fetch('assets/fonts/DejaVuSans.ttf');
+      const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      doc.addFileToVFS('DejaVuSans.ttf', base64);
+      doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
+      doc.__hasDejaVu = true;
+      doc.setFont('DejaVu', 'normal');
+    } catch {
+      // keep export working even if font loading fails
+    }
+  }
+
+  private pdfText(doc: any, value: any): string {
+    const s = String(value ?? '');
+    if (!s) return '';
+    const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
+    if (!hasArabic) return s;
+
+    const processArabic =
+      doc?.processArabic ||
+      ((jsPDF as any)?.API?.processArabic
+        ? (text: string) => (jsPDF as any).API.processArabic(text)
+        : null);
+
+    return typeof processArabic === 'function' ? processArabic(s) : s;
+  }
+
   private rebuildMembersView(): void {
     const ranked = [...this.members].sort((a, b) => {
       const totalDiff = this.rowTotal(b.values) - this.rowTotal(a.values);
@@ -384,68 +423,124 @@ export class GradesComponent implements OnInit {
     this.rankedMembers = this.rankViewEnabled ? ranked : [...this.members];
   }
 
-  exportServantSheetPdf(): void {
+  async exportServantSheetPdf(): Promise<void> {
     if (this.viewMode !== 'SERVANT') return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    await this.ensureDejaVuFont(doc);
 
     if (this.selectedTerm === 'BOTH') {
       doc.setFontSize(16);
-      doc.text(`Grades - ${this.selectedFamilyBase || ''}`, 40, 40);
+      doc.text(this.pdfText(doc, `الدرجات - ${this.selectedFamilyBase || ''}`), 40, 40);
       doc.setFontSize(11);
-      doc.text('First term', 40, 70);
+      doc.text(this.pdfText(doc, 'الترم الأول'), 40, 70);
+
       autoTable(doc, {
         startY: 80,
-        head: [['م', 'الاسم', ...(this.bothFirstColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'المجموع']],
-        body: (this.bothFirstMembers || []).map((m, i) => [String(i + 1), m.fullName, ...(this.bothFirstColumns || []).map((c) => m.values?.[c.id] || '-'), String(this.rowTotalForColumns(m.values, this.bothFirstColumns))]),
-        styles: { fontSize: 9, halign: 'center' },
-        headStyles: { halign: 'center' }
+        head: [[
+          this.pdfText(doc, 'م'),
+          this.pdfText(doc, 'الاسم'),
+          ...(this.bothFirstColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
+          this.pdfText(doc, 'المجموع')
+        ]],
+        body: (this.bothFirstMembers || []).map((m, i) => [
+          String(i + 1),
+          this.pdfText(doc, m.fullName),
+          ...(this.bothFirstColumns || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
+          String(this.rowTotalForColumns(m.values, this.bothFirstColumns))
+        ]),
+        styles: { fontSize: 9, halign: 'center', font: 'DejaVu' },
+        headStyles: { halign: 'center', font: 'DejaVu' }
       });
-      let y = (doc as any).lastAutoTable.finalY + 20;
-      doc.text('Second term', 40, y);
+
+      const y = (doc as any).lastAutoTable.finalY + 20;
+      doc.text(this.pdfText(doc, 'الترم الثاني'), 40, y);
+
       autoTable(doc, {
         startY: y + 10,
-        head: [['م', 'الاسم', ...(this.bothSecondColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'المجموع']],
-        body: (this.bothSecondMembers || []).map((m, i) => [String(i + 1), m.fullName, ...(this.bothSecondColumns || []).map((c) => m.values?.[c.id] || '-'), String(this.rowTotalForColumns(m.values, this.bothSecondColumns))]),
-        styles: { fontSize: 9, halign: 'center' },
-        headStyles: { halign: 'center' }
+        head: [[
+          this.pdfText(doc, 'م'),
+          this.pdfText(doc, 'الاسم'),
+          ...(this.bothSecondColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
+          this.pdfText(doc, 'المجموع')
+        ]],
+        body: (this.bothSecondMembers || []).map((m, i) => [
+          String(i + 1),
+          this.pdfText(doc, m.fullName),
+          ...(this.bothSecondColumns || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
+          String(this.rowTotalForColumns(m.values, this.bothSecondColumns))
+        ]),
+        styles: { fontSize: 9, halign: 'center', font: 'DejaVu' },
+        headStyles: { halign: 'center', font: 'DejaVu' }
       });
+
       doc.save(`grades-${this.selectedFamilyBase || 'family'}-both.pdf`);
       return;
     }
 
     if (!this.sheet) return;
+
     autoTable(doc, {
       startY: 100,
-      head: [['م', 'الاسم', ...(this.columns || []).map((c) => this.formatColumnTitleForView(c.title)), 'المجموع']],
-      body: (this.rankedMembers?.length ? this.rankedMembers : this.members).map((m, i) => [String(i + 1), m.fullName, ...(this.columns || []).map((c) => m.values?.[c.id] || '-'), String(this.rowTotal(m.values))]),
-      styles: { fontSize: 9, halign: 'center' },
-      headStyles: { halign: 'center' }
+      head: [[
+        this.pdfText(doc, 'م'),
+        this.pdfText(doc, 'الاسم'),
+        ...(this.columns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
+        this.pdfText(doc, 'المجموع')
+      ]],
+      body: (this.rankedMembers?.length ? this.rankedMembers : this.members).map((m, i) => [
+        String(i + 1),
+        this.pdfText(doc, m.fullName),
+        ...(this.columns || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
+        String(this.rowTotal(m.values))
+      ]),
+      styles: { fontSize: 9, halign: 'center', font: 'DejaVu' },
+      headStyles: { halign: 'center', font: 'DejaVu' }
     });
+
     doc.save(`grades-${this.selectedFamilyBase || 'family'}-${this.selectedTerm.toLowerCase()}.pdf`);
   }
 
-  exportMyResultPdf(): void {
+  async exportMyResultPdf(): Promise<void> {
     if (this.viewMode !== 'MAKHDOM' || !this.my) return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    await this.ensureDejaVuFont(doc);
+
     doc.setFontSize(16);
-    doc.text(`Grades - ${this.me?.fullName || ''}`, 40, 40);
+    doc.text(this.pdfText(doc, `الدرجات - ${this.me?.fullName || ''}`), 40, 40);
 
     autoTable(doc, {
       startY: 80,
-      head: [['الاسم', ...(this.my.firstColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'مجموع الترم الأول']],
-      body: [[this.me?.fullName || 'أنا', ...(this.my.firstColumns || []).map((c) => this.my?.firstValues?.[c.id] || '-'), String(this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns))]],
-      styles: { fontSize: 10, halign: 'center' },
-      headStyles: { halign: 'center' }
+      head: [[
+        this.pdfText(doc, 'الاسم'),
+        ...(this.my.firstColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
+        this.pdfText(doc, 'مجموع الترم الأول')
+      ]],
+      body: [[
+        this.pdfText(doc, this.me?.fullName || 'أنا'),
+        ...(this.my.firstColumns || []).map((c) => this.pdfText(doc, this.my?.firstValues?.[c.id] || '-')),
+        String(this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns))
+      ]],
+      styles: { fontSize: 10, halign: 'center', font: 'DejaVu' },
+      headStyles: { halign: 'center', font: 'DejaVu' }
     });
 
-    let y = (doc as any).lastAutoTable.finalY + 20;
+    const y = (doc as any).lastAutoTable.finalY + 20;
     autoTable(doc, {
       startY: y,
-      head: [['الاسم', ...(this.my.secondColumns || []).map((c) => this.formatColumnTitleForView(c.title)), 'مجموع الترم الثاني']],
-      body: [[this.me?.fullName || 'أنا', ...(this.my.secondColumns || []).map((c) => this.my?.secondValues?.[c.id] || '-'), String(this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns))]],
-      styles: { fontSize: 10, halign: 'center' },
-      headStyles: { halign: 'center' }
+      head: [[
+        this.pdfText(doc, 'الاسم'),
+        ...(this.my.secondColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
+        this.pdfText(doc, 'مجموع الترم الثاني')
+      ]],
+      body: [[
+        this.pdfText(doc, this.me?.fullName || 'أنا'),
+        ...(this.my.secondColumns || []).map((c) => this.pdfText(doc, this.my?.secondValues?.[c.id] || '-')),
+        String(this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns))
+      ]],
+      styles: { fontSize: 10, halign: 'center', font: 'DejaVu' },
+      headStyles: { halign: 'center', font: 'DejaVu' }
     });
+
     doc.save(`grades-${this.me?.fullName || 'result'}.pdf`);
   }
 
@@ -616,3 +711,5 @@ export class GradesComponent implements OnInit {
     return this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns) + this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns);
   }
 }
+
+

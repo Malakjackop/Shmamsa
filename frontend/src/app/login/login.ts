@@ -35,7 +35,7 @@ export class LoginComponent {
       this.messageService.add({
         severity: 'warn',
         summary: 'Validation Error',
-        detail: 'Please fill in all required fields.',
+        detail: 'برجاء ملئ البيانات المطلوبه',
       });
       return;
     }
@@ -52,7 +52,7 @@ this.authService.login(username, password).subscribe({
     setTimeout(() => this.router.navigate(['/dashboard']), 500);
   },
   error: (err) => {
-    this.loginError = err.error?.error || 'Invalid username or password';
+    this.loginError = err.error?.error || 'اسم المستخدم او كلمة المرور خطأ';
   }
 });
 
