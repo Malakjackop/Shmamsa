@@ -1,9 +1,27 @@
-/* Make toast message text readable */
+@font-face {
+  font-family: "Somar Sans";
+  src: url("/assets/fonts/SomarSans-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 .p-toast .p-toast-message .p-toast-detail,
 .p-toast .p-toast-message .p-toast-summary {
   color: #00abfa !important;
 }
-html, body {
+
+html,
+body {
   overflow-y: auto;
   overflow-x: hidden;
+  font-family: "Somar Sans", sans-serif;
 }
+
+button,
+input,
+select,
+textarea {
+  font-family: "Somar Sans", sans-serif;
+}
+

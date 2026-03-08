@@ -17,40 +17,83 @@ export class ForgotPasswordComponent {
   messageService = inject(MessageService);
   router = inject(Router);
 
-  forgotForm = this.fb.group({
-    email: ['', [Validators.required, Validators.email]]
+  showPassword = false;
+  isSendingCode = false;
+  codeSent = false;
+
+  resetForm = this.fb.group({
+    email: ['', [Validators.required, Validators.email]],
+    token: ['', Validators.required],
+    newPassword: ['', Validators.required]
   });
 
-  onSubmit() {
-    if (this.forgotForm.invalid) {
-      this.messageService.add({
-        severity: 'warn',
-        summary: 'Missing Field',
-        detail: 'Please enter a valid email.'
-      });
+  get emailControl() {
+    return this.resetForm.get('email');
+  }
+
+  sendCode() {
+    const email = this.emailControl?.value;
+    if (this.emailControl?.invalid || !email || this.isSendingCode) {
       return;
     }
 
-    const { email } = this.forgotForm.value;
-
-    this.authService.forgotPassword(email!).subscribe({
+    this.isSendingCode = true;
+    this.authService.forgotPassword(email).subscribe({
       next: () => {
+        this.codeSent = true;
         this.messageService.add({
           severity: 'success',
-          summary: 'Code Sent',
-          detail: 'A 5-digit reset code has been sent to your email.',
+          detail: 'تم ارسال الكود بنجاح',
           life: 2500
         });
-
-        setTimeout(() => {
-          this.router.navigate(['/reset-password']);
-        }, 1200);
       },
       error: (err: any) => {
         this.messageService.add({
           severity: 'error',
-          summary: 'Error',
-          detail: err.error?.error || 'Something went wrong.'
+          detail: err.error?.error || 'حدث شئ خطأ.'
+        });
+      },
+      complete: () => {
+        this.isSendingCode = false;
+      }
+    });
+  }
+
+  onSubmit() {
+    if (this.resetForm.invalid) {
+      this.messageService.add({
+        severity: 'warn',
+        detail: 'برجاء ادخال البيانات المطلوبة'
+      });
+      return;
+    }
+
+    if (!this.codeSent) {
+      this.messageService.add({
+        severity: 'warn',
+        detail: 'برجاء ارسال الكود على الإيميل اولا'
+      });
+      return;
+    }
+
+    const { token, newPassword } = this.resetForm.value;
+
+    this.authService.resetPassword(token!, newPassword!).subscribe({
+      next: () => {
+        this.messageService.add({
+          severity: 'success',
+          detail: 'تم تحديث كلمة المرور بنجاح',
+          life: 2500
+        });
+
+        setTimeout(() => {
+          this.router.navigate(['/login']);
+        }, 1000);
+      },
+      error: (err: any) => {
+        this.messageService.add({
+          severity: 'error',
+          detail: err.error?.error || 'الكود غير صحيح أو منتهي الصلاحية'
         });
       }
     });

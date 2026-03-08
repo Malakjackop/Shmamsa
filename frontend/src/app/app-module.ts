@@ -1,4 +1,4 @@
-import { NgModule ,  LOCALE_ID } from '@angular/core';
+﻿import { NgModule ,  LOCALE_ID } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
@@ -14,7 +14,6 @@ import { LoginComponent } from './login/login';
 import { RegisterComponent } from './register/register';
 import { DashBoard } from './dash-board/dash-board';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password';
-import { ResetPasswordComponent } from './reset-password/reset-password';
 import { ProfileComponent } from './profile/profile';
 import { RegisterServantComponent } from './register-servant/register-servant';
 import { AboutComponent } from './about/about';
@@ -58,7 +57,6 @@ import { TableModule } from 'primeng/table';
     LoginComponent,
     DashBoard,
     ForgotPasswordComponent,
-    ResetPasswordComponent,
     ProfileComponent,
     AboutComponent,
     FamilyComponent,
@@ -114,3 +112,4 @@ import { TableModule } from 'primeng/table';
   bootstrap: [App]
 })
 export class AppModule {}
+

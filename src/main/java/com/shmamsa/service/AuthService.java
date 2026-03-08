@@ -240,7 +240,7 @@ public class AuthService {
         user.setNationalId(nid);
 
         if ("KHORS_ONLY".equals(scope)) {
-    String kTmp = normalizeKhors(request.getKhors(), true); // allow BOTH
+    String kTmp = normalizeKhors(request.getKhors(), true);
     if ("NONE".equals(kTmp) || kTmp.isBlank()) {
         throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
     }
@@ -273,7 +273,7 @@ public class AuthService {
         if ("FAMILY_ONLY".equals(scope)) {
             user.setKhors("NONE");
         } else {
-            String k = normalizeKhors(request.getKhors(), true); // allow BOTH
+            String k = normalizeKhors(request.getKhors(), true);
             if ("NONE".equals(k)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
             }
@@ -285,7 +285,7 @@ public class AuthService {
         if ("FAMILY_ONLY".equals(scope)) {
             String attend = normalizeAttendKhors(request.getAttendKhors());
             if (attend.isBlank()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "ATTEND_KHORS_REQUIRED", "Attend khors is required");
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ATTEND_KHORS_REQUIRED", "حضور الخورس مطلوب");
             }
 
             requestedAttendKhors = attend;
@@ -345,10 +345,10 @@ public class AuthService {
 
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid username or password"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "اسم المستخدم أو كلمة المرور غير صحيحة"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid username or password");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
         return jwtUtils.generateToken(user.getUsername(), user.getRole());
@@ -358,21 +358,21 @@ public class AuthService {
     public User getUserFromToken(String token) {
         String username = jwtUtils.extractUsername(token);
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "المستخدم غير موجود", "المستخدم غير موجود"));
     }
 
 
     public Map<String, Object> generateResetTokenByEmail(String email) {
         if (email == null || email.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMAIL_REQUIRED", "Email is required");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "الايميل مطلوب ", "الايميل مطلوب");
         }
 
         User user = userRepository.findByEmail(email.trim())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "EMAIL_NOT_FOUND", "No user found with this email"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "الايميل غير موجود", "لا يوجود مستخدم بهاذا الايميل "));
 
         sendOtpForUserByEmail(user);
 
-        return Map.of("message", "OTP sent successfully to your email");
+        return Map.of("message", "تم اسرال الرمز بنجاح");
     }
 
 
@@ -383,7 +383,7 @@ public class AuthService {
         if (otpTimestamps.containsKey(username)) {
             long lastSent = otpTimestamps.get(username);
             if (now - lastSent < COOLDOWN_MS) {
-                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_COOLDOWN", "Wait 45 seconds before requesting another code.");
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_COOLDOWN", "انتظر 45 ثانية قبل طلب رمز آخر.");
             }
         }
 
@@ -394,7 +394,7 @@ public class AuthService {
         }
 
         if (window.count >= HOURLY_LIMIT) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT", "Too many OTP requests. Try again in 1 hour.");
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT", "طلبات رمز التحقق كثيرة جدًا. حاول مرة أخرى بعد ساعة.");
         }
 
         window.count += 1;
@@ -410,21 +410,21 @@ public class AuthService {
 
 
     public void resetPassword(String otp, String newPassword) {
-        if (otp == null || otp.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "OTP_REQUIRED", "OTP is required");
-        if (newPassword == null || newPassword.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_REQUIRED", "New password is required");
+        if (otp == null || otp.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "يلزم رمز التحقق", "يلزم رمز التحقق");
+        if (newPassword == null || newPassword.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "يلزم كلمة المرور", "يلزم كلمة المرور الجديدة ");
 
         OtpData data = otpStore.get(otp);
-        if (data == null) throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_OTP", "Invalid or expired OTP");
+        if (data == null) throw new ApiException(HttpStatus.BAD_REQUEST, "رمز التحق خطأ", "رمز التحقق خطأ او منتهش الصلاحية");
 
         if (System.currentTimeMillis() > data.expiresAt) {
             otpStore.remove(otp);
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EXPIRED_OTP", "OTP expired");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "تم انتهاء مدء رمز التحقق", "تم انتهاء مدء رمز التحقق");
         }
 
         String username = data.username;
 
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "المستخدم غير موجود", "المستخدم غير موجود"));
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);

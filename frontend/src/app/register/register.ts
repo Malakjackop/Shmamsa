@@ -98,10 +98,10 @@ export class RegisterComponent implements OnInit {
     const minAge = this.isServant ? 16 : 6;
 
     this.registerForm = this.fb.group({
-      fullName: ['', Validators.required],
+      fullName: ['', [Validators.required, this.arabicTextOnly()]],
       username: ['', Validators.required],
       phoneNumber: ['', [this.optionalPhone11()]],
-      address: ['',Validators.required],
+      address: ['', [Validators.required, this.arabicTextOnly(true)]],
       email: ['', [Validators.required, Validators.email]],
 
       nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
@@ -163,6 +163,18 @@ export class RegisterComponent implements OnInit {
     }
   }
 
+  private arabicTextOnly(allowNumbers = false): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = String(control.value ?? '').trim();
+      if (!value) return null;
+
+      const pattern = allowNumbers
+        ? /^[\u0600-\u06FF\s0-9٠-٩.,،\-\/]+$/
+        : /^[\u0600-\u06FF\s]+$/;
+
+      return pattern.test(value) ? null : { arabicOnly: true };
+    };
+  }
   private optionalPhone11(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const v = String(control.value ?? '').trim();
@@ -455,17 +467,18 @@ onServingWhereChange() {
   getErrorMessage(controlName: string, label?: string): string | null {
     const c = this.registerForm.get(controlName);
     if (!c || !c.errors) return null;
-    
+
     const e: any = c.errors;
-    if (e['required']) return `${label || 'هذا الحقل '} يلزم`;
-    if (e['email']) return `الايميل غير صحيح`;
+    if (e['required']) return (label || 'هذا الحقل ') + ' يلزم';
+    if (e['email']) return 'الايميل غير صحيح';
+    if (e['arabicOnly']) return 'هذا الحقل لازم يتكتب بالعربي';
     if (e['nationalIdFormat']) return 'الرقم القومي لازم يكون 14 رقم ';
-    if (e['nationalIdMinAge']) return `السن لازم يكون   ${e['nationalIdMinAge']?.minAge} سنين او اكثر`;
+    if (e['nationalIdMinAge']) return 'السن لازم يكون   ' + e['nationalIdMinAge']?.minAge + ' سنين او اكثر';
     if (e['mismatch']) return 'كلية السر او تاكيد كلمة السر غير مطابقين';
     if (e['phone11']) return 'رقم الهاتف يجب أن يكون 11 رقم';
     if (e['guardianSameAsPhone']) return 'ممنوع تكرار نفس رقم ولي الأمر بالرقم الشخصي';
     if (e['api']) return String(e['api']);
-    return label ? `القيمه ${label} غير صحيحه` : ' القيمة غير صحيحه ';
+    return label ? 'القيمه ' + label + ' غير صحيحه' : ' القيمة غير صحيحه ';
   }
 
   togglePassword() { this.showPassword = !this.showPassword; }

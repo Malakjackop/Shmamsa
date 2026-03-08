@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -24,12 +25,17 @@ export class LoginComponent {
 
   loginError: string | null = null;
   showPassword = false;
+  isLoading = false;
 
   toggleShowPassword(): void {
     this.showPassword = !this.showPassword;
   }
 
   onSubmit(): void {
+    if (this.isLoading) {
+      return;
+    }
+
     if (this.loginForm.invalid) {
       this.loginForm.markAllAsTouched();
       this.messageService.add({
@@ -41,20 +47,24 @@ export class LoginComponent {
     }
 
     const { username, password } = this.loginForm.value;
+    this.loginError = null;
+    this.isLoading = true;
 
-this.authService.login(username, password).subscribe({
-  next: (user) => {
-    this.messageService.add({
-      severity: 'success',
-      summary: 'تسجيل دخول ناجح',
-      detail: `اهلا بعودتك،  ${user?.username ?? username}!`
-    });
-    setTimeout(() => this.router.navigate(['/dashboard']), 500);
-  },
-  error: (err) => {
-    this.loginError = err.error?.error || 'اسم المستخدم او كلمة المرور خطأ';
-  }
-});
-
+    this.authService
+      .login(username, password)
+      .pipe(finalize(() => (this.isLoading = false)))
+      .subscribe({
+        next: (user) => {
+          this.messageService.add({
+            severity: 'success',
+            summary: 'تسجيل دخول ناجح',
+            detail: `اهلا بعودتك،  ${user?.username ?? username}!`
+          });
+          setTimeout(() => this.router.navigate(['/dashboard']), 500);
+        },
+        error: (err) => {
+          this.loginError = err.error?.error || 'اسم المستخدم او كلمة المرور خطأ';
+        }
+      });
   }
 }

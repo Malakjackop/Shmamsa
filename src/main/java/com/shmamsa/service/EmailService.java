@@ -27,10 +27,10 @@ public class EmailService {
             helper.setSubject("Password Reset Code");
 
             String body =
-                    "👋 Hello " + fullName + "!\n\n" +
-                            "Your account (" + username + ") password reset code is: " + otpCode + "\n" +
-                            "It’s valid for 5 minutes.\n\n" +
-                            "Sent from St. Mary Church – Omrania ❤";
+                    " اهلا " + fullName + "\n\n" +
+                            "حسابك (" + username + ") رمز اعادة تعين كلمة المرور : " + otpCode + "\n" +
+                            "الكود صالح لمدة 5 دقائق\n\n" +
+                            "كنيسة السيدة العذاراء مريم - اسرة الشمامسة ";
 
             helper.setText(body, false);
 
@@ -50,10 +50,10 @@ public class EmailService {
             helper.setSubject("Servant Registration Secret (24h)");
 
             String body =
-                    "🛡️ Servant registration secret:\n\n" +
+                    " Servant registration secret:\n\n" +
                             secret + "\n\n" +
-                            "Valid until: " + validToText + "\n\n" +
-                            "St. Mary Church – Omrania ❤";
+                            "صالح حتي: " + validToText + "\n\n" +
+                            "كنيسة السيدة العذاراء مريم - اسرة الشمامسة ";
 
             helper.setText(body, false);
             mailSender.send(message);

@@ -30,13 +30,20 @@
       </p>
 
       <!-- Login button -->
-      <button type="submit" class="login-btn">تسجيل الدخول</button>
+      <button type="submit" class="login-btn" [disabled]="isLoading">
+        <span class="btn-spinner" *ngIf="isLoading" aria-hidden="true"></span>
+        {{ isLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول' }}
+      </button>
 
       <div class="links">
         <a routerLink="/forgot-password">نسيت اسم المستخدم/كلمة المرور؟</a><br>
         <a routerLink="/register">إنشاء حساب</a><br>
       </div>
     </form>
+
+    <div class="loading-overlay" *ngIf="isLoading">
+      <span class="circle-loader" aria-hidden="true"></span>
+    </div>
 
     <p *ngIf="loginError" class="error-message error-center">{{ loginError }}</p>
   </div>

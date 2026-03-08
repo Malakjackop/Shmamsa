@@ -5,7 +5,6 @@ import { LoginComponent } from './login/login';
 import { RegisterComponent } from './register/register';
 import { RegisterServantComponent } from './register-servant/register-servant';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password';
-import { ResetPasswordComponent } from './reset-password/reset-password';
 import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 
@@ -32,7 +31,7 @@ const routes: Routes = [
   { path: 'register', component: RegisterComponent },
   { path: 'register-servant', component: RegisterServantComponent },
   { path: 'forgot-password', component: ForgotPasswordComponent },
-  { path: 'reset-password', component: ResetPasswordComponent },
+  { path: 'reset-password', redirectTo: 'forgot-password', pathMatch: 'full' },
 
   {
     path: '',
