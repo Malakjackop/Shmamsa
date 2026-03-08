@@ -18,21 +18,21 @@ public class Announcement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Title shown outside
     @Column(nullable = false, length = 200)
     private String title;
 
-    // Details shown only in "تفاصيل"
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    // Target family: "ALL" OR "اسم الأسرة" (بدون أ/ب)
     @Column(nullable = false, length = 120)
     private String targetFamily;
 
+    @Column(length = 30)
+    private String targetAudience;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private EventStatus status;   // PENDING / PUBLISHED
+    private EventStatus status;
 
     private LocalDateTime publishedAt;
 
@@ -46,13 +46,15 @@ public class Announcement {
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
-        if (status == null) status = EventStatus.PENDING;  // ✅ افتراضي pending
+        if (status == null) status = EventStatus.PENDING;
+        if (targetAudience == null || targetAudience.isBlank()) targetAudience = "EVERYONE";
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     public void preUpdate() {
+        if (targetAudience == null || targetAudience.isBlank()) targetAudience = "EVERYONE";
         updatedAt = LocalDateTime.now();
     }
 }

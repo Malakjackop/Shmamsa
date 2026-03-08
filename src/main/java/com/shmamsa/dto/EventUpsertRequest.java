@@ -21,10 +21,10 @@ public class EventUpsertRequest {
     @NotNull
     private LocalDate eventAt;
 
-    // "ALL" OR family variants
     @NotBlank
     private String targetFamily;
 
-    // optional
+    private String targetAudience;
+
     private LocalDate publishAt;
 }

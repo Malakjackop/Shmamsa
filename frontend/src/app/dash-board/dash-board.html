@@ -40,16 +40,13 @@
 
   <section class="panels">
 
-    <!-- تظهر فقط لأمين خدمة/Developer -->
-    <div class="boards-scope" *ngIf="isAtLeast('AMIN_KHEDMA')">
-      <div class="boards-scope__label"><strong>عرض / نشر على:</strong></div>
-
+    <div class="boards-scope" *ngIf="showScopeSelector">
       <p-select
-        [options]="familyDropdown"
+        [options]="scopeOptions"
         [(ngModel)]="scopeFamily"
         optionLabel="label"
         optionValue="value"
-        placeholder="اختار الأسرة"
+        placeholder="اختار النطاق"
         (onChange)="onScopeChange()"
         class="boards-scope__select"
       ></p-select>
@@ -83,7 +80,7 @@
               <p-tag *ngIf="e.status==='PUBLISHED'" severity="success" value="Published"></p-tag>
 
               <small style="opacity:.85;">• {{ formatDateTime(e.eventAt) }}</small>
-              <small>• {{ e.targetFamily === 'ALL' ? 'الجميع' : e.targetFamily }}</small>
+              <small>• {{ targetLabel(e) }}</small>
               <small style="opacity:.75;">• {{ e.joinCount }} منضم</small>
             </div>
           </div>
@@ -183,7 +180,7 @@
             <p-tag *ngIf="a.status==='PENDING'" severity="warn" value="Pending"></p-tag>
             <p-tag *ngIf="a.status==='PUBLISHED'" severity="success" value="Published"></p-tag>
             <span style="opacity:.75;">({{ annDaysLabel(a) }})</span>
-            <small style="opacity:.65;"> • {{ a.targetFamily === 'ALL' ? 'الجميع' : a.targetFamily }}</small>
+            <small style="opacity:.65;"> • {{ targetLabel(a) }}</small>
           </div>
 
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -248,7 +245,7 @@
 
       <label>هينزل لمين؟</label>
       <div style="padding:10px; border:1px solid #ddd; border-radius:8px; opacity:.9;">
-        {{ eventForm.targetFamily === 'ALL' ? 'كل الأسر (الجميع)' : eventForm.targetFamily }}
+        {{ targetLabelFromData(eventForm.targetFamily, eventForm.targetAudience) }}
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
@@ -317,7 +314,7 @@
 
       <label>هينزل لمين؟</label>
       <div style="padding:10px; border:1px solid #ddd; border-radius:8px; opacity:.9;">
-        {{ annForm.targetFamily === 'ALL' ? 'كل الأسر (الجميع)' : annForm.targetFamily }}
+        {{ targetLabelFromData(annForm.targetFamily, annForm.targetAudience) }}
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
@@ -331,7 +328,7 @@
   <p-dialog [(visible)]="showAnnDetailsDialog" [modal]="true" [style]="{width:'520px'}" header="تفاصيل التنبيه">
     <div *ngIf="selectedAnn">
       <h3 style="margin-top:0;">{{ selectedAnn.title }}</h3>
-      <div style="opacity:.8; margin-bottom:8px;">{{ daysAgo(selectedAnn.createdAt) }} • {{ selectedAnn.targetFamily }}</div>
+      <div style="opacity:.8; margin-bottom:8px;">{{ daysAgo(selectedAnn.createdAt) }} • {{ targetLabel(selectedAnn) }}</div>
 
       <div *ngIf="selectedAnn.description && selectedAnn.description.trim().length > 0; else noAnnDesc"
            style="padding:10px; border:1px solid #ddd; border-radius:8px;">

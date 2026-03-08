@@ -25,19 +25,19 @@ public class Event {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    // Date/time of the event (what users see)
     @Column(nullable = false)
     private LocalDate eventAt;
 
-    // Target family: "ALL" OR "اسم الأسرة" OR "اسم الأسرة أ" OR "اسم الأسرة ب"
     @Column(nullable = false, length = 120)
     private String targetFamily;
+
+    @Column(length = 30)
+    private String targetAudience;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EventStatus status;
 
-    // Optional: auto publish date/time
     private LocalDate publishAt;
 
     private LocalDateTime publishedAt;
@@ -53,12 +53,14 @@ public class Event {
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
         if (status == null) status = EventStatus.PENDING;
+        if (targetAudience == null || targetAudience.isBlank()) targetAudience = "EVERYONE";
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     public void preUpdate() {
+        if (targetAudience == null || targetAudience.isBlank()) targetAudience = "EVERYONE";
         updatedAt = LocalDateTime.now();
     }
 }

@@ -25,12 +25,16 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnnouncementController {
 
+    private static final String AUDIENCE_EVERYONE = "EVERYONE";
+    private static final String AUDIENCE_SERVANTS_ONLY = "SERVANTS_ONLY";
+
     private final AnnouncementRepository announcementRepo;
     private final UserRepository userRepo;
 
     private User requireUser(Authentication auth) {
-        if (auth == null || !auth.isAuthenticated())
+        if (auth == null || !auth.isAuthenticated()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        }
         return userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
     }
@@ -43,10 +47,117 @@ public class AnnouncementController {
         return FamilyUtil.mainFamily(u == null ? null : u.getDeaconFamily());
     }
 
-    // - KHADIM: family only (no ALL)
-    // - AMIN_KHEDMA/DEVELOPER: any family or ALL
-    private void validateTargetFamily(User me, String role, String targetFamily) {
-        String tf = (targetFamily == null) ? "" : targetFamily.trim();
+    private List<String> allBaseFamilies(User u) {
+        if (u == null) return List.of();
+
+        List<String> out = new ArrayList<>();
+        List<String> raw = Arrays.asList(
+                u.getDeaconFamily(),
+                u.getDeaconFamily2(),
+                u.getDeaconFamily3(),
+                u.getDeaconFamily4()
+        );
+
+        for (String item : raw) {
+            String base = FamilyUtil.mainFamily(item);
+            if (base == null || base.isBlank()) continue;
+            if (!out.contains(base)) out.add(base);
+        }
+        return out;
+    }
+
+    private boolean belongsToFamily(User user, String familyBase) {
+        String base = String.valueOf(familyBase == null ? "" : familyBase).trim();
+        if (base.isBlank() || "ALL".equalsIgnoreCase(base)) return true;
+        for (String x : allBaseFamilies(user)) {
+            if (base.equalsIgnoreCase(x)) return true;
+        }
+        return false;
+    }
+
+    private String normalizeAudience(String audience) {
+        String x = String.valueOf(audience == null ? "" : audience).trim().toUpperCase();
+        return AUDIENCE_SERVANTS_ONLY.equals(x) ? AUDIENCE_SERVANTS_ONLY : AUDIENCE_EVERYONE;
+    }
+
+    private boolean isServantGlobal(String role) {
+        return RoleUtil.isAtLeast(role, "KHADIM");
+    }
+
+    private boolean isServantInFamily(User user, String familyBase) {
+        if (user == null) return false;
+        String base = String.valueOf(familyBase == null ? "" : familyBase).trim();
+        if (base.isBlank() || "ALL".equalsIgnoreCase(base)) {
+            return isServantGlobal(user.getRole());
+        }
+
+        String scopedRole = user.roleForFamilyBase(base);
+        if (scopedRole != null && !scopedRole.isBlank()) {
+            return RoleUtil.isAtLeast(scopedRole, "KHADIM");
+        }
+
+        String myBase = baseFamily(user);
+        return myBase != null && myBase.equalsIgnoreCase(base) && isServantGlobal(user.getRole());
+    }
+
+    private boolean matchesFamily(User me, String targetFamily) {
+        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+        if (tf.isBlank() || "ALL".equalsIgnoreCase(tf)) return true;
+        return belongsToFamily(me, tf);
+    }
+
+    private boolean matchesAudience(User me, String role, String targetFamily, String targetAudience) {
+        String audience = normalizeAudience(targetAudience);
+        if (!AUDIENCE_SERVANTS_ONLY.equals(audience)) return true;
+
+        if ("ALL".equalsIgnoreCase(String.valueOf(targetFamily).trim())) {
+            return isServantGlobal(role);
+        }
+        return isServantInFamily(me, targetFamily);
+    }
+
+    private boolean isVisibleToUser(User me, String role, Announcement a) {
+        return matchesFamily(me, a.getTargetFamily())
+                && matchesAudience(me, role, a.getTargetFamily(), a.getTargetAudience());
+    }
+
+    private boolean matchesScopeSelection(Announcement a, String role, String family, String audience) {
+        String fam = String.valueOf(family == null ? "" : family).trim();
+        String rawAudience = String.valueOf(audience == null ? "" : audience).trim();
+        String reqAudience = normalizeAudience(audience);
+        String itemAudience = normalizeAudience(a.getTargetAudience());
+        String itemFamily = String.valueOf(a.getTargetFamily() == null ? "" : a.getTargetFamily()).trim();
+
+        if (fam.isBlank() && rawAudience.isBlank()) {
+            return true;
+        }
+
+        if (rawAudience.isBlank()) {
+            if (fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
+                return true;
+            }
+            return "ALL".equalsIgnoreCase(itemFamily) || fam.equalsIgnoreCase(itemFamily);
+        }
+
+        if (AUDIENCE_SERVANTS_ONLY.equals(reqAudience)) {
+            if (fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
+                return AUDIENCE_SERVANTS_ONLY.equals(itemAudience) && "ALL".equalsIgnoreCase(itemFamily);
+            }
+            return AUDIENCE_SERVANTS_ONLY.equals(itemAudience) && fam.equalsIgnoreCase(itemFamily);
+        }
+
+        if (fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
+            return AUDIENCE_EVERYONE.equals(itemAudience) && "ALL".equalsIgnoreCase(itemFamily);
+        }
+
+        return AUDIENCE_EVERYONE.equals(itemAudience)
+                && ("ALL".equalsIgnoreCase(itemFamily) || fam.equalsIgnoreCase(itemFamily));
+    }
+
+    private void validateTarget(User me, String role, String targetFamily, String targetAudience) {
+        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+        String ta = normalizeAudience(targetAudience);
+
         if (tf.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "targetFamily is required");
 
         if (isAdmin(role)) return;
@@ -56,21 +167,53 @@ public class AnnouncementController {
         }
 
         String myBase = baseFamily(me);
-        if (myBase == null || myBase.isBlank()) throw new ApiException(HttpStatus.FORBIDDEN, "No family");
+        if (myBase == null || myBase.isBlank()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "No family");
+        }
 
-        if ("ALL".equalsIgnoreCase(tf) || !tf.equals(myBase)) {
+        if (!myBase.equalsIgnoreCase(tf) || "ALL".equalsIgnoreCase(tf)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
         }
+
+        if (!RoleUtil.isAtLeast(role, "AMIN_OSRA") && AUDIENCE_SERVANTS_ONLY.equals(ta)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Target audience not allowed");
+        }
+    }
+
+    private boolean isFamilyScopedTarget(String targetFamily) {
+        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+        return !tf.isBlank() && !"ALL".equalsIgnoreCase(tf);
+    }
+
+    private String scopedRole(User user, String familyBase) {
+        if (user == null) return null;
+
+        String scoped = user.roleForFamilyBase(familyBase);
+        if (scoped != null && !scoped.isBlank()) {
+            return scoped.trim().toUpperCase();
+        }
+
+        return String.valueOf(user.getRole()).trim().toUpperCase();
+    }
+
+    private boolean canFamilyLeaderManage(User me, String role, Announcement a) {
+        if (!RoleUtil.isAtLeast(role, "AMIN_OSRA") || isAdmin(role)) return false;
+        if (a == null || !isFamilyScopedTarget(a.getTargetFamily())) return false;
+        if (!belongsToFamily(me, a.getTargetFamily())) return false;
+
+        User creator = a.getCreatedBy();
+        if (creator == null) {
+            return true; // legacy records without createdBy
+        }
+
+        String creatorRole = scopedRole(creator, a.getTargetFamily());
+        return RoleUtil.isAtLeast(creatorRole, "KHADIM")
+                && !RoleUtil.isAtLeast(creatorRole, "AMIN_OSRA");
     }
 
     private boolean canManage(User me, String role, Announcement a) {
         if (isAdmin(role)) return true;
-
-        if (RoleUtil.isAtLeast(role, "KHADIM")) {
-            String myBase = baseFamily(me);
-            return myBase != null && myBase.equals(a.getTargetFamily());
-        }
-        return false;
+        return canFamilyLeaderManage(me, role, a);
     }
 
     private boolean isCreator(User me, Announcement a) {
@@ -82,57 +225,32 @@ public class AnnouncementController {
 
     @GetMapping
     @Transactional(readOnly = true)
-    public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
+    public ResponseEntity<?> list(
+            @RequestParam(required = false) String family,
+            @RequestParam(required = false) String audience,
+            Authentication auth
+    ) {
         User me = requireUser(auth);
         String role = me.getRole();
 
-        String fam = (family == null) ? null : family.trim();
-
-        List<Announcement> list;
-
-        if (isAdmin(role)) {
-            if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
-                list = announcementRepo.findAllByOrderByCreatedAtDesc();
-            } else {
-                list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(Arrays.asList("ALL", fam));
-            }
-        } else {
-            String myBase = baseFamily(me);
-            List<String> fams = new ArrayList<>();
-            fams.add("ALL");
-            if (myBase != null && !myBase.isBlank()) fams.add(myBase);
-            list = announcementRepo.findByTargetFamilyInOrderByCreatedAtDesc(fams);
-        }
-
+        List<Announcement> list = announcementRepo.findAllByOrderByCreatedAtDesc();
         List<AnnouncementView> out = new ArrayList<>();
 
         for (Announcement a : list) {
             EventStatus st = (a.getStatus() == null) ? EventStatus.PENDING : a.getStatus();
-
-            boolean matchesScope;
-            if (isAdmin(role)) {
-                if (fam == null || fam.isBlank() || "ALL".equalsIgnoreCase(fam)) {
-                    matchesScope = true;
-                } else {
-                    matchesScope = "ALL".equalsIgnoreCase(a.getTargetFamily()) || fam.equals(a.getTargetFamily());
-                }
-            } else {
-                String myBase = baseFamily(me);
-                matchesScope = "ALL".equalsIgnoreCase(a.getTargetFamily())
-                        || (myBase != null && myBase.equals(a.getTargetFamily()));
-            }
-
-            if (!matchesScope) continue;
+            boolean scopeMatch = matchesScopeSelection(a, role, family, audience);
+            if (!scopeMatch) continue;
 
             boolean can = canManage(me, role, a);
             boolean creator = isCreator(me, a);
 
             if (st == EventStatus.PUBLISHED) {
-                out.add(toView(a, st, can, creator));
+                if (isVisibleToUser(me, role, a) || can || creator) {
+                    out.add(toView(a, st, can, creator));
+                }
                 continue;
             }
 
-            // ✅ Pending: للـ canManage أو creator
             if (st == EventStatus.PENDING && (can || creator)) {
                 out.add(toView(a, st, can, creator));
             }
@@ -150,12 +268,13 @@ public class AnnouncementController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        validateTargetFamily(me, role, req.getTargetFamily());
+        validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
 
         Announcement a = Announcement.builder()
                 .title(req.getTitle().trim())
                 .description(req.getDescription())
                 .targetFamily(req.getTargetFamily().trim())
+                .targetAudience(normalizeAudience(req.getTargetAudience()))
                 .status(EventStatus.PENDING)
                 .publishedAt(null)
                 .createdBy(me)
@@ -174,20 +293,17 @@ public class AnnouncementController {
         Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Announcement not found"));
 
-        // NOTE:
-        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
-        // Without a transaction, accessing a.getCreatedBy() may throw LazyInitializationException
-        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean can = canManage(me, role, a);
         boolean creator = isCreator(me, a);
 
         if (!(can || creator)) throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
 
-        validateTargetFamily(me, role, req.getTargetFamily());
+        validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
 
         a.setTitle(req.getTitle().trim());
         a.setDescription(req.getDescription());
         a.setTargetFamily(req.getTargetFamily().trim());
+        a.setTargetAudience(normalizeAudience(req.getTargetAudience()));
 
         announcementRepo.save(a);
         return ResponseEntity.ok(Map.of("ok", true));
@@ -221,10 +337,6 @@ public class AnnouncementController {
         Announcement a = announcementRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Announcement not found"));
 
-        // NOTE:
-        // open-in-view is disabled (spring.jpa.open-in-view=false) and createdBy is LAZY.
-        // Without a transaction, accessing a.getCreatedBy() may throw LazyInitializationException
-        // which becomes a generic 500. Keep this method transactional so creator checks work.
         boolean can = canManage(me, role, a);
         boolean creator = isCreator(me, a);
 
@@ -244,6 +356,7 @@ public class AnnouncementController {
                 .title(a.getTitle())
                 .description(a.getDescription())
                 .targetFamily(a.getTargetFamily())
+                .targetAudience(normalizeAudience(a.getTargetAudience()))
                 .status(st.name())
                 .publishedAt(a.getPublishedAt())
                 .createdAt(a.getCreatedAt())
@@ -254,13 +367,18 @@ public class AnnouncementController {
                 .build();
     }
 
-    @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class AnnouncementView {
         private Long id;
         private String title;
         private String description;
         private String targetFamily;
-        private String status; // PENDING/PUBLISHED
+        private String targetAudience;
+        private String status;
         private LocalDateTime publishedAt;
         private LocalDateTime createdAt;
         private String createdByUsername;

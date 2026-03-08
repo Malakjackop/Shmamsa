@@ -9,7 +9,8 @@ public class RoleUtil {
             "KHADIM",
             "AMIN_OSRA",
             "AMIN_KHEDMA",
-            "DEVELOPER"
+            "DEVELOPER",
+            "ADMIN"
     );
 
     // ✅ Normalize role (حل مشكلة developer / Developer / developer)
@@ -27,20 +28,21 @@ public class RoleUtil {
     }
 
     public static boolean isDeveloper(String role) {
-        return "DEVELOPER".equals(String.valueOf(role).trim().toUpperCase());
+        String r = String.valueOf(role).trim().toUpperCase();
+        return "DEVELOPER".equals(r) || "ADMIN".equals(r);
     }
 
     public static boolean canChangeRoles(String actorRole) {
         String r = String.valueOf(actorRole).trim().toUpperCase();
-        return "AMIN_KHEDMA".equals(r) || "DEVELOPER".equals(r);
+        return "AMIN_KHEDMA".equals(r) || "DEVELOPER".equals(r) || "ADMIN".equals(r);
     }
 
     public static boolean canAssign(String actorRole, String targetRole) {
         String a = String.valueOf(actorRole).trim().toUpperCase();
         String t = String.valueOf(targetRole).trim().toUpperCase();
 
-        if ("DEVELOPER".equals(a)) return true;
-        if ("AMIN_KHEDMA".equals(a)) return !"DEVELOPER".equals(t);
+        if ("ADMIN".equals(a) || "DEVELOPER".equals(a)) return true;
+        if ("AMIN_KHEDMA".equals(a)) return !"DEVELOPER".equals(t) && !"ADMIN".equals(t);
         return false;
     }
 }

@@ -73,8 +73,8 @@ export class DashBoard implements OnInit {
   }
 
   // ===== UI State =====
-  familyDropdown: Array<{ label: string; value: string }> = [];
-  scopeFamily: string = 'ALL';
+  scopeOptions: Array<{ label: string; value: string }> = [];
+  scopeFamily: string = 'FAMILY_ALL';
   scopeLocked: boolean = true;
 
   monthCursor: Date = new Date();
@@ -97,14 +97,16 @@ export class DashBoard implements OnInit {
     description: '',
     eventAt: null,
     publishAt: null,
-    targetFamily: 'ALL'
+    targetFamily: 'ALL',
+    targetAudience: 'EVERYONE'
   };
 
   annForm: any = {
     id: null,
     title: '',
     description: '',
-    targetFamily: 'ALL'
+    targetFamily: 'ALL',
+    targetAudience: 'EVERYONE'
   };
 
   stats: {
@@ -154,6 +156,161 @@ export class DashBoard implements OnInit {
     if (f.endsWith(' أ')) return f.slice(0, -2).trim();
     if (f.endsWith(' ب')) return f.slice(0, -2).trim();
     return f;
+  }
+
+
+  get showScopeSelector(): boolean {
+    return this.isAtLeast('AMIN_OSRA');
+  }
+
+  private currentBaseFamily(): string {
+    const fam = this.mainFamily(this.user?.deaconFamily || '');
+    return fam && fam.toUpperCase() !== 'SYSTEM' ? fam : '';
+  }
+
+  private currentScopeConfig(scopeValue?: string): { targetFamily: string; targetAudience: string; requestFamily?: string; requestAudience?: string } {
+    const scope = String(scopeValue || this.scopeFamily || '').trim();
+    const myFamily = this.currentBaseFamily();
+
+    if (this.isAtLeast('AMIN_KHEDMA')) {
+      if (scope === 'ALL_SERVANTS') {
+        return {
+          targetFamily: 'ALL',
+          targetAudience: 'SERVANTS_ONLY',
+          requestFamily: 'ALL',
+          requestAudience: 'SERVANTS_ONLY'
+        };
+      }
+
+      if (scope.startsWith('FAMILY::')) {
+        const fam = scope.substring('FAMILY::'.length).trim();
+        return {
+          targetFamily: fam || 'ALL',
+          targetAudience: 'EVERYONE',
+          requestFamily: fam || undefined,
+          requestAudience: undefined
+        };
+      }
+
+      return {
+        targetFamily: 'ALL',
+        targetAudience: 'EVERYONE',
+        requestFamily: undefined,
+        requestAudience: undefined
+      };
+    }
+
+    if (this.isAtLeast('AMIN_OSRA')) {
+      if (scope === 'FAMILY_SERVANTS') {
+        return {
+          targetFamily: myFamily || 'ALL',
+          targetAudience: 'SERVANTS_ONLY',
+          requestFamily: myFamily || 'ALL',
+          requestAudience: 'SERVANTS_ONLY'
+        };
+      }
+
+      if (scope === 'FAMILY_MEMBERS') {
+        return {
+          targetFamily: myFamily || 'ALL',
+          targetAudience: 'EVERYONE',
+          requestFamily: myFamily || 'ALL',
+          requestAudience: 'EVERYONE'
+        };
+      }
+
+      return {
+        targetFamily: myFamily || 'ALL',
+        targetAudience: 'EVERYONE',
+        requestFamily: myFamily || 'ALL',
+        requestAudience: undefined
+      };
+    }
+
+    return {
+      targetFamily: myFamily || 'ALL',
+      targetAudience: 'EVERYONE',
+      requestFamily: myFamily || 'ALL'
+    };
+  }
+
+  private syncFormsWithScope(): void {
+    const cfg = this.currentScopeConfig();
+
+    this.eventForm = {
+      ...this.eventForm,
+      targetFamily: cfg.targetFamily,
+      targetAudience: cfg.targetAudience
+    };
+
+    this.annForm = {
+      ...this.annForm,
+      targetFamily: cfg.targetFamily,
+      targetAudience: cfg.targetAudience
+    };
+  }
+
+  private ensureScopeValue(): void {
+    if (!this.scopeOptions.some(x => x.value === this.scopeFamily)) {
+      this.scopeFamily = this.scopeOptions[0]?.value || 'FAMILY_ALL';
+    }
+    this.syncFormsWithScope();
+  }
+
+  private loadScopeOptions(): void {
+    if (this.isAtLeast('AMIN_KHEDMA')) {
+      this.familyService.families().subscribe({
+        next: (families: any) => {
+          const familyOptions = (families || [])
+            .filter((x: any) => !!x)
+            .map((x: any) => ({ label: x, value: `FAMILY::${x}` }));
+
+          this.scopeOptions = [
+            { label: 'كل الأسر (الجميع)', value: 'ALL_USERS' },
+            { label: 'الخدام فقط', value: 'ALL_SERVANTS' },
+            ...familyOptions
+          ];
+
+          this.ensureScopeValue();
+        },
+        error: () => {
+          this.scopeOptions = [
+            { label: 'كل الأسر (الجميع)', value: 'ALL_USERS' },
+            { label: 'الخدام فقط', value: 'ALL_SERVANTS' }
+          ];
+          this.ensureScopeValue();
+        }
+      });
+      return;
+    }
+
+    if (this.isAtLeast('AMIN_OSRA')) {
+      this.scopeOptions = [
+        { label: 'الكل', value: 'FAMILY_ALL' },
+        { label: 'المخدومين', value: 'FAMILY_MEMBERS' },
+        { label: 'الخدام', value: 'FAMILY_SERVANTS' }
+      ];
+      this.ensureScopeValue();
+      return;
+    }
+
+    this.scopeOptions = [];
+    this.syncFormsWithScope();
+  }
+
+  targetLabel(item: any): string {
+    return this.targetLabelFromData(item?.targetFamily, item?.targetAudience);
+  }
+
+  targetLabelFromData(targetFamily: any, targetAudience: any): string {
+    const family = String(targetFamily || '').trim();
+    const audience = String(targetAudience || 'EVERYONE').trim().toUpperCase();
+
+    if (audience === 'SERVANTS_ONLY') {
+      return family === 'ALL' ? 'كل الخدام' : `خدام ${family}`;
+    }
+
+    return family === 'ALL' ? 'كل الأسر (الجميع)' : family;
   }
 
   private isChoirBucket(f: string): boolean {
@@ -258,7 +415,6 @@ export class DashBoard implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
     this.loadUserData();
     this.loadMyStats();
-    this.loadFamilyDropdown();
   }
 
   loadUserData(): void {
@@ -270,18 +426,18 @@ export class DashBoard implements OnInit {
         }
         this.user = data;
 
-        this.scopeLocked = !this.isAtLeast('AMIN_KHEDMA');
+        this.scopeLocked = !this.showScopeSelector;
 
-        if (this.scopeLocked) {
-          const fam = this.mainFamily(this.user?.deaconFamily || '');
-          this.scopeFamily = fam && fam.toUpperCase() !== 'SYSTEM' ? fam : 'ALL';
+        if (this.isAtLeast('AMIN_KHEDMA')) {
+          this.scopeFamily = 'ALL_USERS';
+        } else if (this.isAtLeast('AMIN_OSRA')) {
+          this.scopeFamily = 'FAMILY_ALL';
         } else {
-          this.scopeFamily = 'ALL';
+          this.scopeFamily = 'FAMILY_MEMBERS';
         }
 
-        this.eventForm.targetFamily = this.scopeFamily;
-        this.annForm.targetFamily = this.scopeFamily;
-
+        this.loadScopeOptions();
+        this.syncFormsWithScope();
         this.loadMonthBoards();
         this.loadAnnouncements();
       },
@@ -314,24 +470,13 @@ this.familyMeetingCards = fams.map(f => ({
     });
   }
 
-  private loadFamilyDropdown(): void {
-    this.familyService.families().subscribe({
-      next: (families: any) => {
-        const opts = (families || []).filter((x: any) => !!x).map((x: any) => ({ label: x, value: x }));
-        this.familyDropdown = [{ label: 'كل الأسر (الجميع)', value: 'ALL' }, ...opts];
-      },
-      error: () => {
-        this.familyDropdown = [{ label: 'كل الأسر (الجميع)', value: 'ALL' }];
-      }
-    });
-  }
-
   private loadMonthBoards(): void {
     const month = this.monthParam(this.monthCursor);
-    const family = (this.scopeFamily && this.scopeFamily !== 'ALL') ? this.scopeFamily : '';
+    const scope = this.currentScopeConfig();
 
     let params = new HttpParams().set('month', month);
-    if (family) params = params.set('family', family);
+    if (scope.requestFamily) params = params.set('family', scope.requestFamily);
+    if (scope.requestAudience) params = params.set('audience', scope.requestAudience);
 
     this.http.get<any[]>('/api/events', { params, withCredentials: true }).subscribe({
       next: (rows: any) => this.events = rows || [],
@@ -343,8 +488,11 @@ this.familyMeetingCards = fams.map(f => ({
   }
 
   private loadAnnouncements(): void {
-    const family = (this.scopeFamily && this.scopeFamily !== 'ALL') ? this.scopeFamily : 'ALL';
-    const params = new HttpParams().set('family', family);
+    const scope = this.currentScopeConfig();
+    let params = new HttpParams();
+
+    if (scope.requestFamily) params = params.set('family', scope.requestFamily);
+    if (scope.requestAudience) params = params.set('audience', scope.requestAudience);
 
     this.http.get<any[]>('/api/announcements', { params, withCredentials: true }).subscribe({
       next: (rows: any) => this.announcements = rows || [],
@@ -356,10 +504,7 @@ this.familyMeetingCards = fams.map(f => ({
   }
 
   onScopeChange(): void {
-    const target = this.scopeFamily || 'ALL';
-    this.eventForm.targetFamily = target;
-    this.annForm.targetFamily = target;
-
+    this.syncFormsWithScope();
     this.loadMonthBoards();
     this.loadAnnouncements();
   }
@@ -372,36 +517,42 @@ this.familyMeetingCards = fams.map(f => ({
   }
 
   openCreateEvent(): void {
+    const cfg = this.currentScopeConfig();
     this.eventForm = {
       id: null,
       title: '',
       description: '',
       eventAt: null,
       publishAt: null,
-      targetFamily: this.scopeFamily || 'ALL'
+      targetFamily: cfg.targetFamily,
+      targetAudience: cfg.targetAudience
     };
     this.showEventDialog = true;
   }
 
   openEditEvent(e: any): void {
+    const cfg = this.currentScopeConfig();
     this.eventForm = {
       id: e?.id ?? null,
       title: e?.title || '',
       description: e?.description || '',
       eventAt: e?.eventAt ? new Date(e.eventAt) : null,
       publishAt: e?.publishAt ? new Date(e.publishAt) : null,
-      targetFamily: e?.targetFamily || this.scopeFamily || 'ALL'
+      targetFamily: e?.targetFamily || cfg.targetFamily,
+      targetAudience: e?.targetAudience || cfg.targetAudience
     };
     this.showEventDialog = true;
   }
 
   saveEvent(): void {
+    const cfg = this.currentScopeConfig();
     const payload = {
       title: String(this.eventForm?.title || '').trim(),
       description: this.eventForm?.description || null,
       eventAt: this.toYmd(this.eventForm?.eventAt),
       publishAt: this.eventForm?.publishAt ? this.toYmd(this.eventForm?.publishAt) : null,
-      targetFamily: String(this.eventForm?.targetFamily || this.scopeFamily || 'ALL').trim()
+      targetFamily: String(this.eventForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
+      targetAudience: String(this.eventForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
     };
 
     if (!payload.title) {
@@ -502,20 +653,36 @@ this.familyMeetingCards = fams.map(f => ({
   }
 
   openCreateAnnouncement(): void {
-    this.annForm = { id: null, title: '', description: '', targetFamily: this.scopeFamily || 'ALL' };
+    const cfg = this.currentScopeConfig();
+    this.annForm = {
+      id: null,
+      title: '',
+      description: '',
+      targetFamily: cfg.targetFamily,
+      targetAudience: cfg.targetAudience
+    };
     this.showAnnDialog = true;
   }
 
   openEditAnnouncement(a: any): void {
-    this.annForm = { id: a?.id ?? null, title: a?.title || '', description: a?.description || '', targetFamily: a?.targetFamily || this.scopeFamily || 'ALL' };
+    const cfg = this.currentScopeConfig();
+    this.annForm = {
+      id: a?.id ?? null,
+      title: a?.title || '',
+      description: a?.description || '',
+      targetFamily: a?.targetFamily || cfg.targetFamily,
+      targetAudience: a?.targetAudience || cfg.targetAudience
+    };
     this.showAnnDialog = true;
   }
 
   saveAnnouncement(): void {
+    const cfg = this.currentScopeConfig();
     const payload = {
       title: String(this.annForm?.title || '').trim(),
       description: this.annForm?.description || null,
-      targetFamily: String(this.annForm?.targetFamily || this.scopeFamily || 'ALL').trim()
+      targetFamily: String(this.annForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
+      targetAudience: String(this.annForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
     };
 
     if (!payload.title) {
