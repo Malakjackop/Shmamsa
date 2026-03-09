@@ -44,18 +44,14 @@ export class FamilyInfoComponent implements OnInit {
 
   selectAll = false;
 
-  /** When true, the page shows selection checkboxes and waits for confirm export. */
   exportMode = false;
-  /** Which export action is pending confirmation while in exportMode. */
   pendingExport: 'pdf' | null = null;
 
-  // (legacy) profile modal state kept for backward-compat, not used now
   profileFor: Member | null = null;
   profile: any = null;
 
   allRoles: string[] = [];
 
-  // ===== Khors join requests (notifications) =====
   pendingRequestsCount = 0;
   requestsOpen = false;
   requestsLoading = false;
@@ -103,8 +99,7 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   canSeeKhorsRequests(): boolean {
-    // ✅ Show only in KHORS view for moderators:
-    // AMIN_KHEDMA/DEV and KHADIM.
+
     if (!this.isKhorsFamilySelected()) return false;
     return this.canDecideKhorsRequests();
   }
@@ -169,10 +164,8 @@ export class FamilyInfoComponent implements OnInit {
     if (!req?.requestId) return;
     this.khorsReq.decide(req.requestId, approved).subscribe({
       next: () => {
-        // remove from list and update badge
         this.requests = (this.requests || []).filter((x) => x.requestId !== req.requestId);
         this.pendingRequestsCount = this.requests.length;
-        // Keep members table in sync immediately after accepting a request.
         if (approved && this.isKhorsFamilySelected()) {
           this.loadMembers();
         }
@@ -200,7 +193,6 @@ export class FamilyInfoComponent implements OnInit {
     return this.me?.role === 'AMIN_OSRA' || this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
   }
 
-  /** Hide delete button for self and (extra safety) for DEVELOPER accounts. */
   canDeleteMember(m: Member): boolean {
     if (!this.canDeleteAccounts()) return false;
     if (!m) return false;
@@ -219,7 +211,6 @@ export class FamilyInfoComponent implements OnInit {
         next: (f) => {
           this.families = this.sortFamiliesByPreferredOrder(f || []);
           if (this.families.length) {
-            // ✅ default to first family (for KHADIM: one of his served families)
             this.selectedFamily = this.families[0];
             this.loadMembers();
             this.loadPendingRequestsCount();
@@ -305,7 +296,7 @@ export class FamilyInfoComponent implements OnInit {
       next: (m) => {
         this.members = ((m as any) || []).map((x: any) => ({ ...x, selected: false }));
         this.selectAll = false;
-        // ✅ old UX: basic fields visible, full profile only via button
+        //  old UX: basic fields visible, full profile only via button
         // we still need school grade, so fetch minimal fields once.
         this.loadBasicFieldsForAllMembers(famParam);
       },
@@ -402,11 +393,11 @@ export class FamilyInfoComponent implements OnInit {
 
     this.adminSvc.changeRole(member.id, newRole).subscribe({
       next: () => {
-        this.message.add({ severity: 'success', summary: 'Updated', detail: 'Role updated' });
+        this.message.add({ severity: 'success', summary: 'تحديث', detail: 'تم تحديث الدور' });
         member.role = newRole;
       },
       error: (err) => {
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
+        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'خطاء' });
       }
     });
   }
@@ -415,16 +406,16 @@ export class FamilyInfoComponent implements OnInit {
     if (!this.canDeleteMember(member)) return;
 
     this.confirm.confirm({
-      header: 'Confirm Delete',
+      header: 'تاكيد الحذف',
       icon: 'pi pi-exclamation-triangle',
-      message: `Delete account for ${member.fullName}? This cannot be undone.`,
-      acceptLabel: 'Delete',
-      rejectLabel: 'Cancel',
+      message: `هل تريد مسح اكونت ${member.fullName} ؟  `,
+      acceptLabel: 'حذف',
+      rejectLabel: 'الغاء',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.familySvc.deleteMember(member.id).subscribe({
           next: () => {
-            this.message.add({ severity: 'success', summary: 'Deleted', detail: 'Account deleted' });
+            this.message.add({ severity: 'success', summary: 'حذف', detail: 'تم حذف الاكونت' });
             this.members = (this.members || []).filter((m) => m.id !== member.id);
             if (this.profileFor?.id === member.id) {
               this.closeProfile();
@@ -432,9 +423,9 @@ export class FamilyInfoComponent implements OnInit {
           },
           error: (err) => {
             this.message.add({
-              severity: 'error',
-              summary: 'Error',
-              detail: err?.error?.error || 'Failed to delete'
+              severity: 'خطاء',
+              summary: 'خطاء',
+              detail: err?.error?.error || 'خطاء في مسح الاكونت'
             });
           }
         });
@@ -447,14 +438,14 @@ export class FamilyInfoComponent implements OnInit {
     if (!this.exportMode) {
       this.exportMode = true;
       this.pendingExport = 'pdf';
-      this.message.add({ severity: 'info', summary: 'Select members', detail: 'Choose members then press Export PDF again' });
+      this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
       return;
     }
 
     // in selection mode but another export is pending
     if (this.pendingExport && this.pendingExport !== 'pdf') {
       this.pendingExport = 'pdf';
-      this.message.add({ severity: 'info', summary: 'Select members', detail: 'Choose members then press Export PDF again' });
+      this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
       return;
     }
 
@@ -464,7 +455,7 @@ export class FamilyInfoComponent implements OnInit {
 
       const selected = this.getSelectedMembers();
       if (!selected.length) {
-        this.message.add({ severity: 'warn', summary: 'Select members', detail: 'Please select at least one member' });
+        this.message.add({ severity: 'warn', summary: 'حدد الاعضاء', detail: 'برجاء اختيار عضو واحد علي الاقل' });
         return;
       }
 
@@ -474,8 +465,6 @@ export class FamilyInfoComponent implements OnInit {
       // Use landscape layout and avoid a super-wide table (which breaks rendering).
       const doc = new jsPDF({ orientation: 'landscape' });
 
-      // Load Arabic-capable font (DejaVuSans) so Arabic text doesn't become garbled.
-      // IMPORTANT: keep PDF direction LTR to avoid mirrored/reversed Latin text.
       const ensureDejaVu = async (d: any) => {
         try {
           if (typeof d.setR2L === 'function') d.setR2L(false);

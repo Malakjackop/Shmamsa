@@ -15,25 +15,25 @@
     <ng-container *ngIf="showFamilyMeetingCard">
       <p-card *ngFor="let c of familyMeetingCards" class="stat-card credits">
         <h3>حضور اجتماع {{ c.family }}</h3>
-        <h1>{{ c.count }}</h1>
+        <h1>{{ attendanceLabel(c.present, c.total) }}</h1>
       </p-card>
     </ng-container>
 
     <p-card class="stat-card assignments">
       <h3>حضور قداس الجمعة</h3>
-      <h1>{{ stats.FRIDAY_LITURGY }}</h1>
+      <h1>{{ attendanceLabel(stats.FRIDAY_LITURGY, statsTotal.FRIDAY_LITURGY) }}</h1>
     </p-card>
 
     <p-card class="stat-card classes">
       <h3>حضور التسبحة</h3>
-      <h1>{{ stats.TASBEEHA }}</h1>
+      <h1>{{ attendanceLabel(stats.TASBEEHA, statsTotal.TASBEEHA) }}</h1>
     </p-card>
 
     <!-- كل خورس يظهر في Card لوحده (بدل ما يتجمعوا داخل Card واحدة) -->
     <ng-container *ngIf="showAnyKhorsCards">
       <p-card *ngFor="let c of khorsCards" class="stat-card credits">
         <h3>حضور {{ c.label }}</h3>
-        <h1>{{ c.count }}</h1>
+        <h1>{{ attendanceLabel(c.count, c.total) }}</h1>
       </p-card>
     </ng-container>
   </section>
@@ -342,3 +342,4 @@
   </p-dialog>
 
 </main>
+

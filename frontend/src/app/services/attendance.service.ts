@@ -91,7 +91,13 @@ export class AttendanceService {
     ATHANASIUS_KHORS?: number;
     TASBEEHA: number;
     FAMILY_MEETING: number;
+    FRIDAY_LITURGY_TOTAL?: number;
+    MARMARKOS_KHORS_TOTAL?: number;
+    ATHANASIUS_KHORS_TOTAL?: number;
+    TASBEEHA_TOTAL?: number;
+    FAMILY_MEETING_TOTAL?: number;
     FAMILY_MEETING_BY_FAMILY?: Record<string, number>;
+    FAMILY_MEETING_TOTAL_BY_FAMILY?: Record<string, number>;
   }> {
     return this.http.get<{
       FRIDAY_LITURGY: number;
@@ -99,7 +105,13 @@ export class AttendanceService {
       ATHANASIUS_KHORS?: number;
       TASBEEHA: number;
       FAMILY_MEETING: number;
+      FRIDAY_LITURGY_TOTAL?: number;
+      MARMARKOS_KHORS_TOTAL?: number;
+      ATHANASIUS_KHORS_TOTAL?: number;
+      TASBEEHA_TOTAL?: number;
+      FAMILY_MEETING_TOTAL?: number;
       FAMILY_MEETING_BY_FAMILY?: Record<string, number>;
+      FAMILY_MEETING_TOTAL_BY_FAMILY?: Record<string, number>;
     }>(
       `${this.baseUrl}/my-stats-v2`,
       { withCredentials: true }

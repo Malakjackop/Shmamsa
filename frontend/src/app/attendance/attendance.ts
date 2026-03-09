@@ -30,6 +30,17 @@ export class AttendanceComponent implements OnInit {
   maxDate!: Date;
   disabledDays: number[] = [0, 1, 2, 3];
   firstDayOfWeek = 1; // Monday
+  arDateLocale = {
+    firstDayOfWeek: 6,
+    dayNames: ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'],
+    dayNamesShort: ['أحد','اثن','ثلا','أرب','خم','جم','سبت'],
+    dayNamesMin: ['ح','ن','ث','ر','خ','ج','س'],
+    monthNames: ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
+    monthNamesShort: ['ينا','فبر','مار','أبر','ماي','يون','يول','أغس','سبت','أكت','نوف','ديس'],
+    today: 'اليوم',
+    clear: 'مسح'
+  };
+
 
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
 
@@ -175,7 +186,6 @@ export class AttendanceComponent implements OnInit {
     d.setHours(0, 0, 0, 0);
     const dow = d.getDay();
 
-    // الأيام المفتوحة: الخميس/الجمعة/السبت
     if (!(dow === 4 || dow === 5 || dow === 6)) {
       this.typeOptions = [];
       return;
@@ -187,7 +197,6 @@ export class AttendanceComponent implements OnInit {
       .replace(/[-\s]+/g, '_');
     const myKhors = String(this.me?.khors || '').trim().toUpperCase();
 
-    // المطلوب: النوع يبقى مفتوح (قداس/تسبحة/اجتماع أسرة) على كل الأيام المفتوحة
     const opts: { value: AttendanceType; label: string }[] = [
       { value: 'FRIDAY_LITURGY', label: 'قداس' },
       { value: 'TASBEEHA', label: 'تسبحة' },
@@ -217,7 +226,6 @@ if (canChoir) {
 
     this.typeOptions = opts;
 
-    // حافظ على الاختيار لو لسه موجود، وإلا اختار أول نوع
     const exists = opts.some((o) => o.value === this.selectedType);
     this.selectedType = (exists ? this.selectedType : (opts[0]?.value || 'FRIDAY_LITURGY')) as AttendanceType;
 
@@ -232,7 +240,6 @@ if (canChoir) {
     if (!this.selectedDate) return;
     const d = new Date(this.selectedDate);
     d.setHours(0, 0, 0, 0);
-    // ربط نوع الخورس بالأسرة المختارة (بدون ربط بيوم معين)
 
     if (this.selectedType === 'MARMARKOS_KHORS') {
       this.selectedFamily = 'خورس مارمرقس';
@@ -377,7 +384,6 @@ if (canChoir) {
   }
 
   canSelectFamily(): boolean {
-    // attendance page: allow family switching for AMIN_KHEDMA/DEV and KHADIM
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER' || this.isKhadim();
   }
 
@@ -449,7 +455,6 @@ onCodeResult(resultString: string) {
       const pu = this.toPickUser(u);
       if (!pu?.id) return;
 
-      // لو متسجل بالفعل في نفس اليوم ونفس النوع
       if (u?.alreadyPresent) {
         this.message.add({
           severity: 'warn',
@@ -460,7 +465,6 @@ onCodeResult(resultString: string) {
         return;
       }
 
-      // لو موجود بالفعل في القائمة الحالية
       if (this.isSelected(pu.id)) {
         this.message.add({
           severity: 'warn',
@@ -473,7 +477,6 @@ onCodeResult(resultString: string) {
 
       this.selected = [...this.selected, pu];
 
-      // لو كان غياب قبل كده
       if (u?.alreadyRecorded && u?.existingStatus === 'ABSENT') {
         this.message.add({
           severity: 'info',
@@ -517,13 +520,11 @@ onCodeResult(resultString: string) {
     const canOverrideWeekClose =
       ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV'].includes(roleNorm);
 
-    // السماح لأمين أسرة/أمين خدمة/Developer بتسجيل الغياب حتى لو مفيش حد حاضر (قائمة فاضية)
     if (users.length === 0 && !canOverrideWeekClose) {
       this.message.add({ severity: 'warn', summary: 'No users', detail: 'اختار اسم واحد على الأقل أو اعمل Scan للـ QR' });
       return;
     }
 
-    // في حالة اجتماع الأسرة (الخميس) لازم تختار الأسرة عشان نعرف مين نطاق التسجيل
     if (this.selectedType === 'FAMILY_MEETING' && !this.selectedFamily) {
       this.message.add({ severity: 'warn', summary: 'No family', detail: 'اختار الأسرة قبل التسجيل' });
       return;
@@ -575,4 +576,5 @@ onCodeResult(resultString: string) {
     });
   }
 }
+
 

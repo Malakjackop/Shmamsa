@@ -55,7 +55,7 @@
           <th>الدور</th>
           <th>العنوان</th>
           <th>الهاتف</th>
-          <th>رقم تليفون الأب</th>
+          <th>رقم تليفون ولي الامر</th>
           <th>السن الدراسي</th>
           <th>الملف</th>
           <th *ngIf="canDeleteAccounts()">حذف</th>
@@ -110,13 +110,7 @@
           <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
         <div class="modalActions">
-          <button
-            *ngIf="canDeleteMember(profileFor)"
-            pButton
-            type="button"
-            class="p-button-danger"
-            (click)="deleteMember(profileFor)"
-          >🗑️</button>
+
           <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
         </div>
       </div>

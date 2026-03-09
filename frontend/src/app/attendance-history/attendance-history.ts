@@ -9,13 +9,14 @@ type HistoryItem = {
   date: string;
   time: string;
   type: string;
+  status?: 'PRESENT' | 'ABSENT' | string;
   takenBy?: string | null;
 };
 
 @Component({
   selector: 'app-attendance-history',
   standalone: true,
-  imports: [CommonModule,FormsModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './attendance-history.html',
   styleUrls: ['./attendance-history.css'],
   providers: [MessageService]
@@ -28,7 +29,7 @@ export class AttendanceHistoryComponent implements OnInit {
   items: HistoryItem[] = [];
 
   filterType = '';
-filteredItems: HistoryItem[] = [];
+  filteredItems: HistoryItem[] = [];
 
   ngOnInit(): void {
     this.load();
@@ -36,37 +37,65 @@ filteredItems: HistoryItem[] = [];
 
   labelType(t: string): string {
     switch (t) {
-      case 'FRIDAY_LITURGY': return 'قداس الجمعة';
-      case 'TASBEEHA': return 'تسبحة';
-      case 'FAMILY_MEETING': return 'أسرة';
-      default: return t;
+      case 'FRIDAY_LITURGY':
+        return 'قداس الجمعة';
+      case 'TASBEEHA':
+        return 'تسبحة';
+      case 'FAMILY_MEETING':
+        return 'أسرة';
+      case 'MARMARKOS_KHORS':
+        return 'خورس مارمرقس';
+      case 'ATHANASIUS_KHORS':
+        return 'خورس البابا أثناسيوس';
+      default:
+        return t;
     }
   }
 
   applyFilter() {
-  if (!this.filterType) {
-    this.filteredItems = [...this.items];
-    return;
-  }
-  this.filteredItems = this.items.filter(x => x.type === this.filterType);
-}
-
-
-load() {
-  this.loading = true;
-  this.attendanceSvc.history().subscribe({
-    next: (data) => {
-      this.items = (data as any) || [];
-      this.applyFilter();
-      this.loading = false;
-    },
-    error: (err) => {
-      this.loading = false;
-      this.items = [];
-      this.filteredItems = [];
-      this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load history' });
+    if (!this.filterType) {
+      this.filteredItems = [...this.items];
+      return;
     }
-  });
-}
+    this.filteredItems = this.items.filter((x) => x.type === this.filterType);
+  }
 
+  private mapHistoryItem = (x: any): HistoryItem => ({
+    id: Number(x?.id ?? x?.attendanceId ?? 0),
+    date: String(x?.date ?? x?.attendanceDate ?? x?.day ?? '-'),
+    time: String(x?.time ?? x?.attendanceTime ?? x?.createdAt ?? '-'),
+    type: String(x?.type ?? x?.attendanceType ?? '-'),
+    status: x?.status,
+    takenBy: x?.takenBy ?? x?.takenByName ?? x?.servantName ?? null
+  });
+
+  private extractHistoryRows(payload: any): any[] {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== 'object') return [];
+
+    const candidates = ['items', 'history', 'records', 'rows', 'data'];
+    for (const key of candidates) {
+      const value = (payload as any)[key];
+      if (Array.isArray(value)) return value;
+    }
+    return [];
+  }
+
+  load() {
+    this.loading = true;
+    this.attendanceSvc.history().subscribe({
+      next: (data) => {
+        const rows = this.extractHistoryRows(data);
+        this.items = rows.map(this.mapHistoryItem);
+        this.applyFilter();
+        this.loading = false;
+      },
+      error: (err) => {
+        this.loading = false;
+        this.items = [];
+        this.filteredItems = [];
+        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load history' });
+      }
+    });
+  }
 }

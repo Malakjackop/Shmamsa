@@ -2,8 +2,10 @@
 
 <div class="dashboard">
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <img src="assets/images/church-logo.png" class="logo" />
+    <div class="sidebar-header" (click)="goHome()">
+      <a class="logoLink">
+        <img src="assets/images/church-logo.png" class="logo" alt="شعار الكنيسة" />
+      </a>
       <h2>أسرة الشمامسة</h2>
       <p>كنيسة السيدة العذراء – العمرانية</p>
     </div>
@@ -44,3 +46,8 @@
     <router-outlet></router-outlet>
   </main>
 </div>
+
+
+
+
+

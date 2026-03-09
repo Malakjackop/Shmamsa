@@ -93,6 +93,11 @@ ngOnInit(): void {
     return ['AMIN_KHEDMA', 'DEVELOPER'].includes(r);
   }
 
+
+  goHome(): void {
+    this.router.navigate(['/dashboard']);
+  }
+
 logout() {
   this.auth.logout().subscribe({
     next: () => this.router.navigate(['/login']),
@@ -100,4 +105,6 @@ logout() {
   });
 }
 }
+
+
 

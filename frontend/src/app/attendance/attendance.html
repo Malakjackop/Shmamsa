@@ -4,7 +4,6 @@
   <h1>الحضور</h1>
 
   <div class="layout">
-    <!-- Sidebar: Families display list -->
     <aside class="sidebar">
       <div class="side-title">اختار الأسرة</div>
 
@@ -13,13 +12,8 @@
        <option *ngFor="let f of families" [value]="f">{{ f }}</option>
       </select>
 
-
-      <div class="side-hint">
-        لو مختارتش أسرة: البحث هيكون في كل الأسر.
-      </div>
     </aside>
 
-    <!-- Main -->
     <section class="content">
       <div class="controls">
         <label>اليوم</label>
@@ -49,7 +43,6 @@
         <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
       </div>
 
-      <!-- Search (قبل وبعد اختيار الأسرة) -->
       <div class="searchWrap">
         <span class="search">
           <i class="pi pi-search"></i>
@@ -63,7 +56,6 @@
         </span>
 
         <div class="scope">
-          <span *ngIf="selectedFamily; else allScope">البحث داخل: <b>{{ selectedFamily }}</b></span>
           <ng-template #allScope>
             البحث في: <b>كل الأسر</b>
             <span class="loading" *ngIf="searching">(بيبحث...)</span>
@@ -127,3 +119,7 @@
     </section>
   </div>
 </div>
+
+
+
+

@@ -99,7 +99,7 @@ export class ResourcesComponent implements OnInit {
   upload() {
     if (!this.isUploader()) return;
     if (!this.pickedFile) {
-      this.msg.add({ severity: 'warn', summary: 'Pick file', detail: 'Please choose a file first' });
+      this.msg.add({ severity: 'warn', summary: 'اختر ملف ', detail: 'من فضلك اختر ملف اولا' });
       return;
     }
 
@@ -114,14 +114,14 @@ export class ResourcesComponent implements OnInit {
 
     this.resService.upload(fd).subscribe({
       next: () => {
-        this.msg.add({ severity: 'success', summary: 'Uploaded', detail: 'File uploaded successfully' });
+        this.msg.add({ severity: 'success', summary: 'رفع', detail: 'تم رفع الملف بنجاح' });
         this.title = '';
         this.description = '';
         this.pickedFile = null;
         this.loadResources();
       },
       error: (err) => {
-        this.msg.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Upload failed' });
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'رفع فاشل' });
       }
     });
   }
@@ -148,12 +148,12 @@ export class ResourcesComponent implements OnInit {
 
     this.resService.update(this.editing.id, fd).subscribe({
       next: () => {
-        this.msg.add({ severity: 'success', summary: 'Updated', detail: 'Resource updated' });
+        this.msg.add({ severity: 'success', summary: 'تحديث', detail: 'تم تحديث المصادر' });
         this.editing = null;
         this.loadResources();
       },
       error: (err) => {
-        this.msg.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Update failed' });
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'تحديث فاشل' });
       }
     });
   }
@@ -164,19 +164,19 @@ export class ResourcesComponent implements OnInit {
 
 remove(r: any) {
   this.confirmService.confirm({
-    message: 'Delete this resource?',
-    header: 'Confirm Delete',
+    message: 'هل ترغب في حذف هذا الملف ؟',
+    header: 'تأكيد الحذف',
     icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'Delete',
-    rejectLabel: 'Cancel',
+    acceptLabel: 'حذف',
+    rejectLabel: 'الغاء',
     accept: () => {
       this.resService.delete(r.id).subscribe({
         next: () => {
-          this.msg.add({ severity: 'success', summary: 'Deleted', detail: 'Resource deleted' });
+          this.msg.add({ severity: 'success', summary: 'حذف', detail: ' تم حذف الملف بنجاح' });
           this.loadResources();
         },
         error: (err) => {
-          this.msg.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Delete failed' });
+          this.msg.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل الحذف' });
         }
       });
     }

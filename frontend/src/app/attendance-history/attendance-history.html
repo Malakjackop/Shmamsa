@@ -3,11 +3,11 @@
 
   <div *ngIf="loading" class="about-subtitle">جاري التحميل...</div>
 
-  <div *ngIf="!loading && items.length === 0" class="about-subtitle">
+  <div *ngIf="!loading && filteredItems.length === 0" class="about-subtitle">
     لا يوجد سجل حضور حتى الآن.
   </div>
 
-  <table *ngIf="!loading && items.length > 0" class="history-table">
+  <table *ngIf="!loading && filteredItems.length > 0" class="history-table">
     <thead>
       <tr>
         <th>التاريخ</th>
@@ -18,7 +18,7 @@
     </thead>
 
     <tbody>
-      <tr *ngFor="let it of items">
+      <tr *ngFor="let it of filteredItems">
         <td>{{ it.date }}</td>
         <td>{{ it.time }}</td>
         <td>{{ labelType(it.type) }}</td>
@@ -27,3 +27,4 @@
     </tbody>
   </table>
 </div>
+

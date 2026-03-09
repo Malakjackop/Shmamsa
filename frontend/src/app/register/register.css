@@ -276,3 +276,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 
+
+/* Register page: normalize field sizes + header spacing */
+.login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.logo {
+  margin-bottom: 0;
+}
+
+.input-group input,
+.input-group select {
+  height: 46px;
+  padding: 0 15px;
+}
+
+.input-group input[type="date"] {
+  height: 46px;
+  padding: 0 15px;
+}

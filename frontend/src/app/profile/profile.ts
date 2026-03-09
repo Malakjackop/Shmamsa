@@ -227,7 +227,6 @@ export class ProfileComponent implements OnInit {
 
     if (type === 'school') {
       this.profileForm.get('schoolName')?.enable({ emitEvent: false });
-      // الصف الدراسي مطلوب يفضل ثابت
       this.profileForm.get('schoolGrade')?.disable({ emitEvent: false });
     }
 
@@ -303,8 +302,8 @@ export class ProfileComponent implements OnInit {
       next: () => {
         this.messageService.add({
           severity: 'success',
-          summary: 'Saved',
-          detail: 'Profile updated successfully!'
+          summary: 'حفظ',
+          detail: 'تم تحديث الملف الشخصي بنجاح'
         });
         this.profileForm.disable({ emitEvent: false });
         this.editMode = false;
@@ -313,8 +312,8 @@ export class ProfileComponent implements OnInit {
       error: (err) =>
         this.messageService.add({
           severity: 'error',
-          summary: 'Error',
-          detail: err.error?.error || 'Update failed.'
+          summary: 'خطأ',
+          detail: err.error?.error || 'تحديث فاشل'
         })
     });
   }

@@ -9,10 +9,6 @@
     <select [(ngModel)]="selectedFamily" (change)="loadResources()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
     </select>
-
-    <small class="hint" *ngIf="selectedFamily === 'ALL'">
-      اختيار ALL لن يعرض قائمة، لكن الملفات التي ترفعها ستكون متاحة لكل الأسر.
-    </small>
   </div>
 
   <div class="upload" *ngIf="isUploader()">

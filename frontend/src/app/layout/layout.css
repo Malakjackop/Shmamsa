@@ -61,6 +61,7 @@ p-card, p-panel {
 }
 
 .sidebar-header .logo {
+  cursor: pointer;
   width: 80px;
   height: 80px;
   border-radius: 50%;
@@ -261,3 +262,17 @@ p-card, p-panel {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+
+
+.logoLink{
+  display:inline-block;
+  line-height:0;
+  cursor:pointer;
+}
+
+
+.sidebar-header{
+  cursor:pointer;
+}
+

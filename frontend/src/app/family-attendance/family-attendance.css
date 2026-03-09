@@ -1,4 +1,14 @@
-.page{padding:16px;max-width:1100px;margin:0 auto;color:black;max-height:calc(100vh - 32px);overflow-y:auto;}
+.page{
+  padding:16px;
+  max-width:1100px;
+  margin:0 auto;
+  color:black;
+  max-height:calc(100vh - 32px);
+  overflow-y:auto;
+  -ms-overflow-style:none;
+  scrollbar-width:none;
+}
+.page::-webkit-scrollbar{display:none;}
 .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
@@ -271,4 +281,5 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 @media (max-width:700px){
   .dailyBoxes{grid-template-columns:1fr;}
 }
+
 

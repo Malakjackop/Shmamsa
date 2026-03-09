@@ -39,9 +39,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AttendanceController {
 
-    // OpenHTMLToPDF uses java.util.logging (JUL) internally.
-    // Spring Boot's logging.level.* does NOT reliably control JUL packages unless you bridge JUL -> SLF4J.
-    // We silence noisy INFO/WARN logs for this library here to keep the terminal clean.
+
     private static volatile boolean OPENHTMLTOPDF_LOGS_SILENCED = false;
 
     private final AttendanceRepository attendanceRepo;
@@ -57,7 +55,6 @@ public class AttendanceController {
         User servant = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        // ✅ Only servants can take attendance
         Set<String> allowed = Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER");
         if (servant.getRole() == null || !allowed.contains(servant.getRole())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
@@ -68,7 +65,7 @@ public class AttendanceController {
         Object dateObj = body.get("date");
         Object familyObj = body.get("family");
         if (typeObj == null || usersObj == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Missing users/type"));
+            return ResponseEntity.badRequest().body(Map.of("خطأ", "برجاء اختيار النوع"));
         }
 
         AttendanceType type = AttendanceType.valueOf(typeObj.toString());
@@ -82,18 +79,15 @@ public class AttendanceController {
             try {
                 selectedDate = LocalDate.parse(dateObj.toString());
             } catch (Exception e) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Invalid date"));
+                return ResponseEntity.badRequest().body(Map.of("خطأ", "بيانات خطأ"));
             }
         }
 
         // ممنوع المستقبل
         if (selectedDate.isAfter(today)) {
-            return ResponseEntity.status(400).body(Map.of("error", "Cannot take attendance in the future"));
+            return ResponseEntity.status(400).body(Map.of("خطأ", "مافيش حضور ليوم لسا مجاش"));
         }
 
-        // ممنوع أي يوم قبل Monday بتاع الأسبوع الحالي
-        // (الأسبوع بيتقفل يوم الاتنين)
-        // لكن: AMIN_OSRA / AMIN_KHEDMA / DEVELOPER يقدروا يسجلوا لأي يوم فات
         LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         String roleNorm = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase().replaceAll("[-\\s]+", "_");
         boolean canOverrideWeekClose = roleNorm.equals("AMIN_OSRA")
@@ -102,7 +96,7 @@ public class AttendanceController {
                 || roleNorm.equals("DEV");
 
         if (selectedDate.isBefore(monday) && !canOverrideWeekClose) {
-            return ResponseEntity.status(400).body(Map.of("error", "Week is closed (cannot edit previous week)"));
+            return ResponseEntity.status(400).body(Map.of("خطأ", "الاسبوع قفل خلاص يلا من هنا"));
         }
 
         // Enforce day-of-week per type
@@ -111,16 +105,16 @@ public class AttendanceController {
                 && dow != DayOfWeek.THURSDAY
                 && dow != DayOfWeek.FRIDAY
                 && dow != DayOfWeek.SATURDAY) {
-            return ResponseEntity.status(400).body(Map.of("error", "Family meeting must be on Thursday, Friday, or Saturday"));
+            return ResponseEntity.status(400).body(Map.of("خطأ", "اجتماع الاسره لازم يتاخد يوم الخميس او الجمعه "));
         }
         if ((type == AttendanceType.FRIDAY_LITURGY
                 || type == AttendanceType.MARMARKOS_KHORS
                 || type == AttendanceType.ATHANASIUS_KHORS)
                 && dow != DayOfWeek.FRIDAY) {
-            return ResponseEntity.status(400).body(Map.of("error", "Friday liturgy must be on Friday"));
+            return ResponseEntity.status(400).body(Map.of("خطأ", "القداس لازم يكون يوم الجمعة"));
         }
         if (type == AttendanceType.TASBEEHA && dow != DayOfWeek.SATURDAY) {
-            return ResponseEntity.status(400).body(Map.of("error", "Tasbeeha must be on Saturday"));
+            return ResponseEntity.status(400).body(Map.of("خطأ", "التسبحة لازم تكون يوم السبت"));
         }
         LocalTime now = LocalTime.now();
 
@@ -130,7 +124,6 @@ public class AttendanceController {
         int createdAbsent = 0;
         int skipped = 0;
 
-        // Present set (exclude DEVELOPER completely)
         Set<Long> presentIds = new LinkedHashSet<>();
 
         for (Map<String, Object> u : users) {
@@ -147,8 +140,7 @@ public class AttendanceController {
             presentIds.add(id);
         }
 
-        // ✅ For FAMILY_MEETING we separate attendance per family (multi-family servants)
-        // Compute the base family AFTER we have presentIds ready.
+
         String meetingBase = null;
         if (type == AttendanceType.FAMILY_MEETING) {
             if (familyObj != null && !familyObj.toString().isBlank()) {
@@ -160,40 +152,32 @@ public class AttendanceController {
             }
         }
 
-        // Determine scope accounts for auto-absence
         List<User> scope;
 
         if (type == AttendanceType.FAMILY_MEETING) {
-            // Thursday: only selected family, but support users serving in multiple families.
             String base = null;
 
-            // Prefer the explicit family parameter (required for correct multi-family separation)
             if (familyObj != null && !familyObj.toString().isBlank()) {
                 base = FamilyUtil.mainFamily(familyObj.toString());
             }
 
-            // Backward compatibility: if family is missing, infer from the first selected member
             if ((base == null || base.isBlank()) && !presentIds.isEmpty()) {
                 User first = userRepo.findById(presentIds.iterator().next()).orElse(null);
                 base = first == null ? null : FamilyUtil.mainFamily(first.getDeaconFamily());
             }
 
             if (base == null || base.isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Family meeting needs a selected family"));
+                return ResponseEntity.badRequest().body(Map.of("خطأ", "حضور الاسره لازم تختار اسره"));
             }
 
-            // Scope: anyone who belongs to this family in ANY family slot
             scope = userRepo.findByAnyFamilyStartingWithAndRoleIn(
                     base,
                     List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
             );
         } else if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
-            // ✅ Choir: only members in that choir
-            // Authorization: only choir servants of that choir (or Amin/Dev)
             String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
             boolean isAminOrDev = role.equals("AMIN_KHEDMA") || role.equals("DEVELOPER") || role.equals("DEV");
             if (!isAminOrDev) {
-                // KHADIM must have servingScope allowing choir, and serve this choir
                 if (!role.equals("KHADIM")) {
                     throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
                 }
@@ -214,7 +198,6 @@ public class AttendanceController {
                     List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA")
             );
         } else {
-            // Friday/Sat: whole service (all non-dev accounts)
             scope = new ArrayList<>();
             for (User u : userRepo.findAll()) {
                 if (u == null) continue;
@@ -224,7 +207,6 @@ public class AttendanceController {
         }
 
 
-        // 1) Upsert PRESENT for selected
         for (Long id : presentIds) {
             AttendanceRecord existing;
             if (type == AttendanceType.FAMILY_MEETING) {
@@ -233,7 +215,6 @@ public class AttendanceController {
                 existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
             }
             if (existing != null) {
-                // If it was ABSENT, flip to PRESENT
                 if (existing.getStatus() == AttendanceStatus.ABSENT) {
                     existing.setStatus(AttendanceStatus.PRESENT);
                     existing.setTime(now);
@@ -407,29 +388,43 @@ public class AttendanceController {
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        long f = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
-        long mk = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
-        long ak = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
-        long t = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
+        long fPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long mkPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.MARMARKOS_KHORS);
+        long akPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.ATHANASIUS_KHORS);
+        long tPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.TASBEEHA);
+        long mPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.FAMILY_MEETING);
+
+        long fTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long mkTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
+        long akTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
+        long tTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
         long mTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
 
         // FAMILY_MEETING broken down by familyBase (multi-family)
         Map<String, Long> familyMeetingByFamily = new LinkedHashMap<>();
+        Map<String, Long> familyMeetingTotalByFamily = new LinkedHashMap<>();
         for (AttendanceRecord r : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), AttendanceType.FAMILY_MEETING)) {
             String fb = r.getFamilyBase() == null ? "" : r.getFamilyBase().trim();
             if (fb.isBlank()) continue;
+            familyMeetingTotalByFamily.put(fb, familyMeetingTotalByFamily.getOrDefault(fb, 0L) + 1L);
             // count only PRESENT (or null treated as present for legacy)
             if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
             familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
         }
 
-        return ResponseEntity.ok(Map.of(
-                "FRIDAY_LITURGY", f,
-                "MARMARKOS_KHORS", mk,
-                "ATHANASIUS_KHORS", ak,
-                "TASBEEHA", t,
-                "FAMILY_MEETING", mTotal,
-                "FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily
+        return ResponseEntity.ok(Map.ofEntries(
+                Map.entry("FRIDAY_LITURGY", fPresent),
+                Map.entry("MARMARKOS_KHORS", mkPresent),
+                Map.entry("ATHANASIUS_KHORS", akPresent),
+                Map.entry("TASBEEHA", tPresent),
+                Map.entry("FAMILY_MEETING", mPresent),
+                Map.entry("FRIDAY_LITURGY_TOTAL", fTotal),
+                Map.entry("MARMARKOS_KHORS_TOTAL", mkTotal),
+                Map.entry("ATHANASIUS_KHORS_TOTAL", akTotal),
+                Map.entry("TASBEEHA_TOTAL", tTotal),
+                Map.entry("FAMILY_MEETING_TOTAL", mTotal),
+                Map.entry("FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily),
+                Map.entry("FAMILY_MEETING_TOTAL_BY_FAMILY", familyMeetingTotalByFamily)
         ));
     }
 
@@ -1379,10 +1374,8 @@ public class AttendanceController {
 
     private static String buildContentDisposition(String filename) {
         if (filename == null || filename.isBlank()) filename = "archive.pdf";
-        // ASCII fallback for legacy filename="..."
         String fallback = filename.replaceAll("[^A-Za-z0-9._-]", "_");
         if (fallback.isBlank()) fallback = "archive.pdf";
-        // RFC 5987 for UTF-8 filenames
         String utf8 = java.net.URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8)
                 .replace("+", "%20");
         return "attachment; filename=\"" + fallback + "\"; filename*=UTF-8''" + utf8;

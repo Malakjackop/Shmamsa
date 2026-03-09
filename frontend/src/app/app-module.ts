@@ -1,4 +1,4 @@
-﻿import { NgModule ,  LOCALE_ID } from '@angular/core';
+import { NgModule ,  LOCALE_ID } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
@@ -106,10 +106,26 @@ import { TableModule } from 'primeng/table';
     providePrimeNG({
       theme: {
         preset: Aura
+      },
+      translation: {
+        dayNames: ['الحد','الاتنين','التلات','الأربع','الخميس','الجمعة','السبت'],
+        dayNamesShort: ['أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'],
+        dayNamesMin: ['أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'],
+        monthNames: ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
+        monthNamesShort: ['ينا','فبر','مار','أبر','ماي','يون','يول','أغس','سبت','أكت','نوف','ديس'],
+        today: 'النهاردة',
+        clear: 'امسح'
       }
     })
   ],
   bootstrap: [App]
 })
 export class AppModule {}
+
+
+
+
+
+
+
 

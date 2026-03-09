@@ -1026,13 +1026,13 @@ export class FamilyAttendanceComponent implements OnInit {
     if (!this.exportMode) {
       this.exportMode = true;
       this.pendingExport = 'pdf';
-      this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export PDF مرة أخرى' });
+      this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
       return;
     }
 
     if (this.pendingExport && this.pendingExport !== 'pdf') {
       this.pendingExport = 'pdf';
-      this.message.add({ severity: 'info', summary: 'Select members', detail: 'اختر الأكونتات ثم اضغط Export PDF مرة أخرى' });
+      this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
       return;
     }
 
@@ -1068,7 +1068,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
       const selected = this.getSelectedMembers();
       if (!selected.length) {
-        this.message.add({ severity: 'warn', summary: 'Select members', detail: 'اختر على الأقل عضو واحد' });
+        this.message.add({ severity: 'warn', summary: 'حدد الاعضاء', detail: ' اختر عضو واحد علي الافل' });
         return;
       }
 
@@ -1200,13 +1200,20 @@ export class FamilyAttendanceComponent implements OnInit {
 
       doc.save('members_attendance.pdf');
 
-      this.exportMode = false;
-      this.pendingExport = '';
-      this.selectAll = false;
-      this.members.forEach((m) => (m.selected = false));
+      this.exitExportMode();
     } catch {
       this.message.add({ severity: 'error', summary: 'Export failed', detail: 'PDF export failed' });
     }
+  }
+  cancelExport() {
+    this.exitExportMode();
+  }
+
+  private exitExportMode() {
+    this.exportMode = false;
+    this.pendingExport = '';
+    this.selectAll = false;
+    this.members.forEach((m) => (m.selected = false));
   }
 }
 

@@ -16,6 +16,14 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   font-family: "Somar Sans", sans-serif;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 button,
@@ -24,4 +32,5 @@ select,
 textarea {
   font-family: "Somar Sans", sans-serif;
 }
+
 

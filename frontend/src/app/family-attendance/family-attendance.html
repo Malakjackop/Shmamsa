@@ -11,17 +11,32 @@
   </div>
 
   <div class="actions">
-    <button pButton type="button" icon="pi pi-file-pdf" label="تحميل PDF" (click)="exportPdf()" class="pdfBtn"></button>
-    <button
-      pButton
-      type="button"
-      icon="pi pi-calendar"
-      label="حضور اليوم"
-      (click)="openDailyAttendance()"
-      class="todayAttendanceBtn"
-      *ngIf="canEditDailyAttendance()"
-    ></button>
-  </div>
+  <button
+    pButton
+    type="button"
+    icon="pi pi-file-pdf"
+    [label]="exportMode && pendingExport === 'pdf' ? 'تصدير PDF (تأكيد)' : 'تحميل PDF'"
+    (click)="exportPdf()"
+    class="pdfBtn"
+  ></button>
+  <button
+    *ngIf="exportMode"
+    pButton
+    type="button"
+    class="p-button-secondary"
+    label="إلغاء"
+    (click)="cancelExport()"
+  ></button>
+  <button
+    pButton
+    type="button"
+    icon="pi pi-calendar"
+    label="حضور اليوم"
+    (click)="openDailyAttendance()"
+    class="todayAttendanceBtn"
+    *ngIf="canEditDailyAttendance()"
+  ></button>
+</div>
 
   <div *ngIf="loading" class="hint">جاري التحميل...</div>
 
@@ -437,5 +452,4 @@
     </div>
   </div>
 </div>
-
 

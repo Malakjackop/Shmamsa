@@ -123,7 +123,23 @@ export class DashBoard implements OnInit {
     ATHANASIUS_KHORS: 0
   };
 
-  familyMeetingCards: Array<{ family: string; count: number }> = [];
+  statsTotal: {
+    FRIDAY_LITURGY: number | null;
+    TASBEEHA: number | null;
+    FAMILY_MEETING: number | null;
+    MARMARKOS_KHORS: number | null;
+    ATHANASIUS_KHORS: number | null;
+  } = {
+    FRIDAY_LITURGY: null,
+    TASBEEHA: null,
+    FAMILY_MEETING: null,
+    MARMARKOS_KHORS: null,
+    ATHANASIUS_KHORS: null
+  };
+
+  private familyMeetingByFamily: Record<string, number> = {};
+  private familyMeetingTotalByFamily: Record<string, number> = {};
+  familyMeetingCards: Array<{ family: string; present: number; total: number | null }> = [];
 
 
   // ===== Helpers =====
@@ -131,6 +147,28 @@ export class DashBoard implements OnInit {
 
   private errMsg(err: any, fallback: string): string {
     return err?.error?.message || err?.error?.error || err?.message || fallback;
+  }
+
+  private toNumOrNull(v: any): number | null {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  attendanceLabel(present: number, total: number | null): string {
+    if (total == null) return `${present ?? 0}`;
+    return `${present ?? 0}/${total}`;
+  }
+
+  private rebuildFamilyMeetingCards(): void {
+    const fams = this.userFamilies();
+    this.familyMeetingCards = fams.map((f) => {
+      const base = this.mainFamily(f);
+      const present = this.familyMeetingByFamily[base] ?? this.familyMeetingByFamily[f] ?? (fams.length === 1 ? (this.stats.FAMILY_MEETING || 0) : 0);
+      const totalByFamily = this.toNumOrNull(this.familyMeetingTotalByFamily[base] ?? this.familyMeetingTotalByFamily[f]);
+      const total = totalByFamily ?? (fams.length === 1 ? this.statsTotal.FAMILY_MEETING : null);
+      return { family: f, present, total };
+    });
   }
 
   // ✅ دي اللي كانت ناقصة عندك (LocalDate => YYYY-MM-DD)
@@ -383,8 +421,8 @@ export class DashBoard implements OnInit {
     return labels.join(' + ');
   }
 
-  get khorsCards(): Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number }> {
-    const out: Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number }> = [];
+  get khorsCards(): Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number; total: number | null }> {
+    const out: Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number; total: number | null }> = [];
     const year = this.arYearLabel(this.user?.khorsYear);
 
     const servedK = String(this.user?.khors || '').trim().toUpperCase();
@@ -394,7 +432,8 @@ export class DashBoard implements OnInit {
       const name = this.arKhorsName(code);
       const label = withYear && year && code !== 'ATHANASIUS' ? `${name} (${year})` : name;
       const count = code === 'MARMARKOS' ? (this.stats.MARMARKOS_KHORS || 0) : (this.stats.ATHANASIUS_KHORS || 0);
-      if (!out.some(x => x.code === code)) out.push({ code, label, count });
+      const total = code === 'MARMARKOS' ? this.statsTotal.MARMARKOS_KHORS : this.statsTotal.ATHANASIUS_KHORS;
+      if (!out.some(x => x.code === code)) out.push({ code, label, count, total });
     };
 
     if (servedK === 'MARMARKOS') add('MARMARKOS', true);
@@ -438,6 +477,7 @@ export class DashBoard implements OnInit {
 
         this.loadScopeOptions();
         this.syncFormsWithScope();
+        this.rebuildFamilyMeetingCards();
         this.loadMonthBoards();
         this.loadAnnouncements();
       },
@@ -449,26 +489,30 @@ export class DashBoard implements OnInit {
     this.attendanceService.getMyStats().subscribe({
       next: (data: any) => {
         this.stats = {
-  ...this.stats,
-  FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
-  TASBEEHA: data?.TASBEEHA ?? 0,
-  FAMILY_MEETING: data?.FAMILY_MEETING ?? 0,
-  MARMARKOS_KHORS: data?.MARMARKOS_KHORS ?? 0,
-  ATHANASIUS_KHORS: data?.ATHANASIUS_KHORS ?? 0
-};
+          ...this.stats,
+          FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
+          TASBEEHA: data?.TASBEEHA ?? 0,
+          FAMILY_MEETING: data?.FAMILY_MEETING ?? 0,
+          MARMARKOS_KHORS: data?.MARMARKOS_KHORS ?? 0,
+          ATHANASIUS_KHORS: data?.ATHANASIUS_KHORS ?? 0
+        };
 
-// ✅ If user serves in multiple families, show a separate card (and separate count) per family
-const byFam: Record<string, number> = data?.FAMILY_MEETING_BY_FAMILY || {};
-const fams = this.userFamilies();
-this.familyMeetingCards = fams.map(f => ({
-  family: f,
-  count: byFam[this.mainFamily(f)] ?? byFam[f] ?? 0
-}));
+        this.statsTotal = {
+          FRIDAY_LITURGY: this.toNumOrNull(data?.FRIDAY_LITURGY_TOTAL),
+          TASBEEHA: this.toNumOrNull(data?.TASBEEHA_TOTAL),
+          FAMILY_MEETING: this.toNumOrNull(data?.FAMILY_MEETING_TOTAL),
+          MARMARKOS_KHORS: this.toNumOrNull(data?.MARMARKOS_KHORS_TOTAL),
+          ATHANASIUS_KHORS: this.toNumOrNull(data?.ATHANASIUS_KHORS_TOTAL)
+        };
 
+        this.familyMeetingByFamily = data?.FAMILY_MEETING_BY_FAMILY || {};
+        this.familyMeetingTotalByFamily = data?.FAMILY_MEETING_TOTAL_BY_FAMILY || {};
+        this.rebuildFamilyMeetingCards();
       },
       error: () => {}
     });
   }
+
 
   private loadMonthBoards(): void {
     const month = this.monthParam(this.monthCursor);
