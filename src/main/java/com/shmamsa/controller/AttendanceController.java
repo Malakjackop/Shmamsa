@@ -679,7 +679,7 @@ public class AttendanceController {
                 || roleNorm.equals("DEV");
 
         if (selectedDate.isBefore(monday) && !canOverrideWeekClose) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Week is closed (cannot edit previous week)");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "الاسبوع اتقفل (مش هينفع تعدل حاجه من الاسبوع اللي فات)");
         }
     }
 
@@ -690,16 +690,16 @@ public class AttendanceController {
                 && dow != DayOfWeek.THURSDAY
                 && dow != DayOfWeek.FRIDAY
                 && dow != DayOfWeek.SATURDAY) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting must be on Thursday, Friday, or Saturday");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "الاسرة لازم تكون يوم خميس او جمعة");
         }
         if ((type == AttendanceType.FRIDAY_LITURGY
                 || type == AttendanceType.MARMARKOS_KHORS
                 || type == AttendanceType.ATHANASIUS_KHORS)
                 && dow != DayOfWeek.FRIDAY) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "This type must be on Friday");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "القداس لازم يكون يوم الجمعة ");
         }
         if (type == AttendanceType.TASBEEHA && dow != DayOfWeek.SATURDAY) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Tasbeeha must be on Saturday");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "التسبحة لازم تكون يوم السبت");
         }
     }
 

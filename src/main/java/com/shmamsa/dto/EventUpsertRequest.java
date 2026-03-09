@@ -26,5 +26,5 @@ public class EventUpsertRequest {
 
     private String targetAudience;
 
-    private LocalDate publishAt;
+    private LocalDate removeAt;
 }

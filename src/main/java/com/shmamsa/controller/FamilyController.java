@@ -387,6 +387,8 @@ if (servantsBucket) {
         dto.put("graduateJob", u.getGraduateJob());
         dto.put("isWorking", u.getIsWorking());
         dto.put("workDetails", u.getWorkDetails());
+        dto.put("khors", u.getKhors());
+        dto.put("khorsYear", u.getKhorsYear());
         return ResponseEntity.ok(dto);
     }
 

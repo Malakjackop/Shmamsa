@@ -96,7 +96,7 @@ export class DashBoard implements OnInit {
     title: '',
     description: '',
     eventAt: null,
-    publishAt: null,
+    removeAt: null,
     targetFamily: 'ALL',
     targetAudience: 'EVERYONE'
   };
@@ -147,6 +147,10 @@ export class DashBoard implements OnInit {
 
   private errMsg(err: any, fallback: string): string {
     return err?.error?.message || err?.error?.error || err?.message || fallback;
+  }
+
+  private hasText(value: any): boolean {
+    return String(value || '').trim().length > 0;
   }
 
   private toNumOrNull(v: any): number | null {
@@ -567,7 +571,7 @@ export class DashBoard implements OnInit {
       title: '',
       description: '',
       eventAt: null,
-      publishAt: null,
+      removeAt: null,
       targetFamily: cfg.targetFamily,
       targetAudience: cfg.targetAudience
     };
@@ -581,7 +585,7 @@ export class DashBoard implements OnInit {
       title: e?.title || '',
       description: e?.description || '',
       eventAt: e?.eventAt ? new Date(e.eventAt) : null,
-      publishAt: e?.publishAt ? new Date(e.publishAt) : null,
+      removeAt: e?.removeAt ? new Date(e.removeAt) : null,
       targetFamily: e?.targetFamily || cfg.targetFamily,
       targetAudience: e?.targetAudience || cfg.targetAudience
     };
@@ -594,17 +598,21 @@ export class DashBoard implements OnInit {
       title: String(this.eventForm?.title || '').trim(),
       description: this.eventForm?.description || null,
       eventAt: this.toYmd(this.eventForm?.eventAt),
-      publishAt: this.eventForm?.publishAt ? this.toYmd(this.eventForm?.publishAt) : null,
+      removeAt: this.eventForm?.removeAt ? this.toYmd(this.eventForm?.removeAt) : null,
       targetFamily: String(this.eventForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
       targetAudience: String(this.eventForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
     };
 
+    if (!payload.title && !this.hasText(payload.description)) {
+      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اكتب عنوان أو وصف للموعد قبل الحفظ.' });
+      return;
+    }
     if (!payload.title) {
-      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'اكتب عنوان الموعد.' });
+      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اكتب عنوان الموعد.' });
       return;
     }
     if (!payload.eventAt) {
-      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار تاريخ الموعد.' });
+      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اختار تاريخ الموعد.' });
       return;
     }
 
@@ -626,7 +634,10 @@ export class DashBoard implements OnInit {
   }
 
   publishEvent(e: any): void {
-    if (!e?.id) return;
+    if (!e?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن نشر الموعد حالياً.' });
+      return;
+    }
     this.http.post(`/api/events/${e.id}/publish`, {}, { withCredentials: true }).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر الموعد.' });
@@ -639,7 +650,10 @@ export class DashBoard implements OnInit {
   }
 
   deleteEvent(e: any): void {
-    if (!e?.id) return;
+    if (!e?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن مسح الموعد حالياً.' });
+      return;
+    }
     this.http.delete(`/api/events/${e.id}`, { withCredentials: true }).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الموعد.' });
@@ -657,7 +671,10 @@ export class DashBoard implements OnInit {
   }
 
   confirmJoin(): void {
-    if (!this.selectedJoinEvent?.id) return;
+    if (!this.selectedJoinEvent?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'الموعد غير متاح للانضمام الآن.' });
+      return;
+    }
     this.http.post(`/api/events/${this.selectedJoinEvent.id}/join`, {}, { withCredentials: true }).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الانضمام.' });
@@ -671,7 +688,10 @@ export class DashBoard implements OnInit {
   }
 
   unjoin(e: any): void {
-    if (!e?.id) return;
+    if (!e?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن إلغاء الانضمام الآن.' });
+      return;
+    }
     this.http.delete(`/api/events/${e.id}/join`, { withCredentials: true }).subscribe({
       next: () => {
         this.messageService.add({ severity: 'info', summary: 'تم', detail: 'تم إلغاء الانضمام.' });
@@ -729,8 +749,12 @@ export class DashBoard implements OnInit {
       targetAudience: String(this.annForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
     };
 
+    if (!payload.title && !this.hasText(payload.description)) {
+      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اكتب عنوان أو وصف للتنبيه قبل الحفظ.' });
+      return;
+    }
     if (!payload.title) {
-      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'اكتب عنوان التنبيه.' });
+      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اكتب عنوان التنبيه.' });
       return;
     }
 
@@ -752,7 +776,10 @@ export class DashBoard implements OnInit {
   }
 
   publishAnnouncement(a: any): void {
-    if (!a?.id) return;
+    if (!a?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن نشر التنبيه حالياً.' });
+      return;
+    }
     this.http.post(`/api/announcements/${a.id}/publish`, {}, { withCredentials: true }).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر التنبيه.' });
@@ -765,7 +792,10 @@ export class DashBoard implements OnInit {
   }
 
   deleteAnnouncement(a: any): void {
-    if (!a?.id) return;
+    if (!a?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن مسح التنبيه حالياً.' });
+      return;
+    }
     this.http.delete(`/api/announcements/${a.id}`, { withCredentials: true }).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح التنبيه.' });
@@ -780,6 +810,24 @@ export class DashBoard implements OnInit {
   openAnnDetails(a: any): void {
     this.selectedAnn = a;
     this.showAnnDetailsDialog = true;
+  }
+
+  pendingEventAlarmLabel(e: any): string {
+    if (!e || e.status !== 'PENDING') return '';
+
+    const eventDate = e?.eventAt ? new Date(e.eventAt) : null;
+    if (eventDate && !Number.isNaN(eventDate.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      eventDate.setHours(0, 0, 0, 0);
+      const diff = Math.round((eventDate.getTime() - today.getTime()) / 86400000);
+
+      if (diff < 0) return 'الموعد انتهى ولم يتم نشره';
+      if (diff === 0) return 'تنبيه: الموعد اليوم ولم يتم نشره';
+      if (diff <= 3) return `تنبيه: باقي ${diff} يوم ولم يتم نشره`;
+    }
+
+    return 'تنبيه: الموعد ما زال Pending ولم يتم نشره';
   }
 
   formatDateTime(value: any): string {

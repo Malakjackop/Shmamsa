@@ -273,7 +273,7 @@ public class EventController {
                     .targetFamily(e.getTargetFamily())
                     .targetAudience(normalizeAudience(e.getTargetAudience()))
                     .status(st.name())
-                    .publishAt(e.getPublishAt())
+                    .removeAt(e.getRemoveAt())
                     .publishedAt(e.getPublishedAt())
                     .createdByUsername(e.getCreatedBy() != null ? e.getCreatedBy().getUsername() : null)
                     .joined(joined)
@@ -300,10 +300,6 @@ public class EventController {
 
         validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
 
-        if (req.getPublishAt() != null && req.getPublishAt().isAfter(req.getEventAt())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "publishAt must be before eventAt");
-        }
-
         Event e = Event.builder()
                 .title(req.getTitle().trim())
                 .description(req.getDescription())
@@ -311,7 +307,7 @@ public class EventController {
                 .targetFamily(req.getTargetFamily().trim())
                 .targetAudience(normalizeAudience(req.getTargetAudience()))
                 .status(EventStatus.PENDING)
-                .publishAt(req.getPublishAt())
+                .removeAt(req.getRemoveAt())
                 .createdBy(me)
                 .build();
 
@@ -337,16 +333,12 @@ public class EventController {
 
         validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
 
-        if (req.getPublishAt() != null && req.getPublishAt().isAfter(req.getEventAt())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "publishAt must be before eventAt");
-        }
-
         e.setTitle(req.getTitle().trim());
         e.setDescription(req.getDescription());
         e.setEventAt(req.getEventAt());
         e.setTargetFamily(req.getTargetFamily().trim());
         e.setTargetAudience(normalizeAudience(req.getTargetAudience()));
-        e.setPublishAt(req.getPublishAt());
+        e.setRemoveAt(req.getRemoveAt());
 
         eventRepo.save(e);
         return ResponseEntity.ok(Map.of("ok", true));
@@ -482,7 +474,7 @@ public class EventController {
         private String targetFamily;
         private String targetAudience;
         private String status;
-        private LocalDate publishAt;
+        private LocalDate removeAt;
         private LocalDateTime publishedAt;
         private String createdByUsername;
         private boolean joined;

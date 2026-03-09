@@ -38,7 +38,7 @@ public class Event {
     @Column(nullable = false, length = 20)
     private EventStatus status;
 
-    private LocalDate publishAt;
+    private LocalDate removeAt;
 
     private LocalDateTime publishedAt;
 

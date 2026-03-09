@@ -1,4 +1,4 @@
-<p-toast position="top-left"></p-toast>
+﻿<p-toast position="top-left"></p-toast>
 
 <div class="page">
   <h1>حضور الأعضاء</h1>
@@ -104,22 +104,29 @@
       <div class="dailyControls">
         <div class="dailyField">
           <label>اليوم</label>
-          <input
-            type="date"
+          <p-datepicker
             [(ngModel)]="dailyDate"
-            (change)="onDailyDateChange()"
+            (ngModelChange)="onDailyDateChange()"
             [ngModelOptions]="{ standalone: true }"
-          />
+            [showIcon]="true"
+            [readonlyInput]="true"
+            [showButtonBar]="true"
+            [maxDate]="dailyMaxDate"
+            [disabledDays]="dailyDisabledWeekDays"
+            dateFormat="yy-mm-dd"
+            placeholder="اختر اليوم"
+            appendTo="body"
+          ></p-datepicker>
         </div>
 
         <div class="dailyField">
-          <label>نوع الغياب/الحضور</label>
+          <label>النوع</label>
           <select
             [(ngModel)]="dailyType"
             (change)="onDailyTypeChange()"
             [ngModelOptions]="{ standalone: true }"
           >
-            <option [ngValue]="null">اختار النوع</option>
+            <option [ngValue]="null" disabled [hidden]="!!dailyType">اختار النوع</option>
             <option *ngFor="let t of dailyTypeOptions()" [ngValue]="t">{{ dailyTypeLabel(t) }}</option>
           </select>
         </div>
@@ -314,25 +321,15 @@
       </div>
 
       <div *ngIf="profile; else loadingProfile" class="profileGrid">
-        <div><b>اسم المستخدم:</b> {{ profile.username }}</div>
-        <div><b>البريد الإلكتروني:</b> {{ profile.email }}</div>
-        <div><b>الأسرة:</b> {{ profile.deaconFamily }}</div>
-        <div><b>الرتبة:</b> {{ profile.deaconDegree }}</div>
-        <div><b>الرقم القومي:</b> {{ profile.nationalId }}</div>
-        <div><b>الهاتف:</b> {{ profile.phoneNumber }}</div>
-        <div><b>العنوان:</b> {{ profile.address }}</div>
-        <div><b>هاتف ولي الأمر:</b> {{ profile.guardiansPhone }}</div>
-        <div><b>صلة القرابة:</b> {{ profile.guardianRelation }}</div>
-        <div><b>تاريخ الميلاد:</b> {{ profile.dateOfBirth }}</div>
-        <div><b>النوع:</b> {{ profile.gender }}</div>
-        <div><b>الحالة:</b> {{ profile.status }}</div>
-        <div><b>نوع الدراسة:</b> {{ profile.studyType }}</div>
-        <div><b>المدرسة:</b> {{ profile.schoolName }} {{ profile.schoolGrade }}</div>
-        <div><b>الجامعة:</b> {{ profile.universityName }} {{ profile.faculty }} {{ profile.universityGrade }}</div>
-        <div><b>تخرج من:</b> {{ profile.graduatedFrom }}</div>
-        <div><b>الوظيفة:</b> {{ profile.graduateJob }}</div>
-        <div><b>يعمل:</b> {{ profile.isWorking }}</div>
-        <div><b>تفاصيل العمل:</b> {{ profile.workDetails }}</div>
+        <ng-container *ngIf="profileEntries() as entries">
+          <div *ngFor="let item of entries">
+            <b>{{ item.label }}:</b> {{ item.value }}
+          </div>
+
+          <div class="hint" *ngIf="entries.length === 0">
+            لا توجد بيانات متاحة.
+          </div>
+        </ng-container>
       </div>
 
       <ng-template #loadingProfile>
@@ -356,7 +353,6 @@
         <div class="iftekadField">
           <label>التاريخ</label>
           <input type="date" [(ngModel)]="iftekadDate" [ngModelOptions]="{ standalone: true }" />
-          <button pButton type="button" class="todayBtn" label="تاريخ اليوم" (click)="setIftekadToday()"></button>
         </div>
 
         <div class="iftekadField">

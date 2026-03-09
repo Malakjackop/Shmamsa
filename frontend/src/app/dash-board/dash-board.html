@@ -1,3 +1,5 @@
+<p-toast position="top-left"></p-toast>
+
 <main class="main">
   <header class="header">
     <div>
@@ -77,6 +79,7 @@
               <strong>{{ e.title }}</strong>
 
               <p-tag *ngIf="e.status==='PENDING'" severity="warn" value="Pending"></p-tag>
+              <p-tag *ngIf="e.status==='PENDING'" severity="danger" [value]="pendingEventAlarmLabel(e)"></p-tag>
               <p-tag *ngIf="e.status==='PUBLISHED'" severity="success" value="Published"></p-tag>
 
               <small style="opacity:.85;">• {{ formatDateTime(e.eventAt) }}</small>
@@ -232,13 +235,13 @@
         appendTo="body"
       ></p-datepicker>
 
-      <label>وقت النشر (اختياري)</label>
+      <label>وقت الإزالة (اختياري)</label>
       <p-datepicker
-        [(ngModel)]="eventForm.publishAt"
+        [(ngModel)]="eventForm.removeAt"
         [showIcon]="true"
         [showTime]="false"
         dateFormat="yy-mm-dd"
-        placeholder="اختياري: تاريخ نشر تلقائي"
+        placeholder="اختياري: تاريخ إزالة تلقائي"
         [showButtonBar]="true"
         appendTo="body"
       ></p-datepicker>
@@ -342,4 +345,3 @@
   </p-dialog>
 
 </main>
-

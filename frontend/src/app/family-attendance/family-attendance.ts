@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+﻿import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
@@ -14,6 +14,7 @@ type Member = {
   // choir membership (used to hide choir sections inside details)
   attendKhors?: string; // MARMARKOS / ATHANASIUS / NONE / BOTH
   khors?: string; // MARMARKOS / ATHANASIUS / BOTH
+  khorsYear?: number | null;
   servingScope?: string;
 
   // iftekad
@@ -117,7 +118,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   // ===== Daily attendance (حضور اليوم) =====
   showDaily = false;
-  dailyDate = '';
+  dailyDate: Date | null = null;
   dailyType: AttendanceType | null = null;
   dailyLoading = false;
   dailyTotal = 0;
@@ -126,6 +127,19 @@ export class FamilyAttendanceComponent implements OnInit {
   dailyRecordsCount = 0;
   dailyPresent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string }> = [];
   dailyAbsent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string }> = [];
+  dailyMaxDate: Date = this.buildDailyMaxDate();
+  dailyDisabledWeekDays: number[] = [0, 1, 2, 3]; // الأحد - الاثنين - الثلاثاء - الأربعاء
+
+  arDatePickerLocale = {
+    firstDayOfWeek: 6,
+    dayNames: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+    dayNamesShort: ['أحد', 'اثن', 'ثلا', 'أرب', 'خم', 'جم', 'سبت'],
+    dayNamesMin: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'],
+    monthNames: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
+    monthNamesShort: ['ينا', 'فبر', 'مار', 'أبر', 'ماي', 'يون', 'يول', 'أغس', 'سبت', 'أكت', 'نوف', 'ديس'],
+    today: 'اليوم',
+    clear: 'مسح'
+  };
 
   // confirm remove (mark absent)
   showDailyRemoveConfirm = false;
@@ -284,7 +298,7 @@ export class FamilyAttendanceComponent implements OnInit {
       },
       error: (err) => {
         this.loading = false;
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load' });
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في التحميل' });
       }
     });
   }
@@ -519,6 +533,106 @@ export class FamilyAttendanceComponent implements OnInit {
     this.profile = null;
   }
 
+  private hasDisplayValue(v: any): boolean {
+    if (v === false || v === 0) return true;
+    return String(v ?? '').trim() !== '';
+  }
+
+  private yesNoAr(v: any): string {
+    if (v === true) return 'نعم';
+    if (v === false) return 'لا';
+    return String(v ?? '').trim();
+  }
+
+  private khorsYearAr(year: any): string {
+    const y = Number(year || 0);
+    if (y === 1) return 'سنة أولى';
+    if (y === 2) return 'سنة ثانية';
+    if (y === 3) return 'سنة ثالثة';
+    if (y === 4) return 'سنة رابعة';
+    if (y === 5) return 'سنة خامسة';
+    return '';
+  }
+
+  private memberKhorsLabel(khors: any, khorsYear?: any): string {
+    const k = String(khors || '').trim().toUpperCase();
+
+    if (!k || k === 'NONE') return '';
+
+    if (k === 'MARMARKOS') {
+      const yearLabel = this.khorsYearAr(khorsYear);
+      return yearLabel ? `خورس مارمرقس - ${yearLabel}` : 'خورس مارمرقس';
+    }
+
+    if (k === 'ATHANASIUS') {
+      return 'خورس البابا اثناسيوس';
+    }
+
+    if (k === 'BOTH') {
+      return 'خورس مارمرقس + خورس البابا اثناسيوس';
+    }
+
+    return String(khors || '').trim();
+  }
+
+  profileEntries(): Array<{ label: string; value: string }> {
+    if (!this.profile) return [];
+
+    const p = this.profile;
+
+    const schoolValue = [p.schoolName, p.schoolGrade]
+      .filter((x) => this.hasDisplayValue(x))
+      .join(' - ');
+
+    const universityValue = [p.universityName, p.faculty, p.universityGrade]
+      .filter((x) => this.hasDisplayValue(x))
+      .join(' - ');
+
+    const rows = [
+      { label: 'اسم المستخدم', value: String(p.username ?? '').trim() },
+      { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim() },
+      { label: 'الأسرة', value: String(p.deaconFamily ?? '').trim() },
+      { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear) },
+      { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim() },
+      { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim() },
+      { label: 'الهاتف', value: String(p.phoneNumber ?? '').trim() },
+      { label: 'العنوان', value: String(p.address ?? '').trim() },
+      { label: 'هاتف ولي الأمر', value: String(p.guardiansPhone ?? '').trim() },
+      { label: 'صلة القرابة', value: String(p.guardianRelation ?? '').trim() },
+      { label: 'تاريخ الميلاد', value: String(p.dateOfBirth ?? '').trim() },
+      { label: 'النوع', value: String(p.gender ?? '').trim() },
+      { label: 'الحالة', value: String(p.status ?? '').trim() },
+      { label: 'نوع الدراسة', value: String(p.studyType ?? '').trim() },
+      { label: 'المدرسة', value: schoolValue },
+      { label: 'الجامعة', value: universityValue },
+      { label: 'تخرج من', value: String(p.graduatedFrom ?? '').trim() },
+      { label: 'الوظيفة', value: String(p.graduateJob ?? '').trim() },
+      {
+        label: 'يعمل',
+        value:
+          p.isWorking === null || p.isWorking === undefined || String(p.isWorking).trim() === ''
+            ? ''
+            : this.yesNoAr(p.isWorking)
+      },
+      { label: 'تفاصيل العمل', value: String(p.workDetails ?? '').trim() }
+    ];
+
+    return rows.filter((row) => this.hasDisplayValue(row.value));
+  }
+
+  private clearDailyAttendanceData(): void {
+    this.dailyLoading = false;
+    this.dailyPresent = [];
+    this.dailyAbsent = [];
+    this.dailyTotal = 0;
+    this.dailyPresentCount = 0;
+    this.dailyAbsentCount = 0;
+    this.dailyRecordsCount = 0;
+    this.showDailyRemoveConfirm = false;
+    this.dailyRemoveTarget = null;
+    this.dailyRemoveSaving = false;
+  }
+
   // ===== Daily attendance (حضور اليوم) =====
 
   canEditDailyAttendance(): boolean {
@@ -526,35 +640,65 @@ export class FamilyAttendanceComponent implements OnInit {
     return r === 'KHADIM' || r === 'AMIN_OSRA' || r === 'AMIN_KHEDMA' || r === 'DEVELOPER' || r === 'DEV';
   }
 
+  private buildDailyMaxDate(): Date {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  private toIsoDateOnly(value: Date | null): string {
+    if (!value) return '';
+
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private isAllowedDailyDate(value: Date | null): boolean {
+    if (!value) return false;
+
+    const d = value instanceof Date ? new Date(value) : new Date(value);
+    if (isNaN(d.getTime())) return false;
+
+    d.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // يمنع الأيام المستقبلية
+    if (d.getTime() > today.getTime()) return false;
+
+    // يسمح فقط بالخميس والجمعة والسبت
+    const day = d.getDay(); // 4 الخميس - 5 الجمعة - 6 السبت
+    return day === 4 || day === 5 || day === 6;
+  }
+
   openDailyAttendance() {
     this.showDaily = true;
-    this.setDailyToday();
-    this.dailyType = this.defaultDailyTypeForDate(this.dailyDate);
-    this.reloadDaily();
+    this.dailyDate = null;
+    this.dailyType = null;
+    this.dailyMaxDate = this.buildDailyMaxDate();
+    this.clearDailyAttendanceData();
   }
 
   closeDailyAttendance() {
     this.showDaily = false;
-    this.dailyLoading = false;
-    this.dailyDate = '';
+    this.dailyDate = null;
     this.dailyType = null;
-    this.dailyTotal = 0;
-    this.dailyPresentCount = 0;
-    this.dailyAbsentCount = 0;
-    this.dailyRecordsCount = 0;
-    this.dailyPresent = [];
-    this.dailyAbsent = [];
-    this.showDailyRemoveConfirm = false;
-    this.dailyRemoveTarget = null;
-    this.dailyRemoveSaving = false;
+    this.clearDailyAttendanceData();
   }
 
   setDailyToday() {
     const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    this.dailyDate = `${yyyy}-${mm}-${dd}`;
+    if (this.isAllowedDailyDate(d)) {
+      this.dailyDate = d;
+    } else {
+      this.dailyDate = null;
+    }
   }
 
   private dailyFamilyParam(): string | undefined {
@@ -614,9 +758,6 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   onDailyDateChange() {
-    if (!this.dailyType) {
-      this.dailyType = this.defaultDailyTypeForDate(this.dailyDate);
-    }
     this.reloadDaily();
   }
 
@@ -626,32 +767,28 @@ export class FamilyAttendanceComponent implements OnInit {
 
   reloadDaily() {
     if (!this.showDaily) return;
-    if (!this.dailyDate) {
-      this.dailyType = null;
-      this.dailyPresent = [];
-      this.dailyAbsent = [];
-      this.dailyTotal = 0;
-      this.dailyPresentCount = 0;
-      this.dailyAbsentCount = 0;
-      this.dailyRecordsCount = 0;
+
+    const isoDate = this.toIsoDateOnly(this.dailyDate);
+
+    if (!this.dailyDate || !this.dailyType || !isoDate) {
+      this.clearDailyAttendanceData();
       return;
     }
 
-    const t = this.dailyType;
-    if (!t) {
-      this.dailyPresent = [];
-      this.dailyAbsent = [];
-      this.dailyTotal = 0;
-      this.dailyPresentCount = 0;
-      this.dailyAbsentCount = 0;
-      this.dailyRecordsCount = 0;
-      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار نوع الحضور' });
+    if (!this.isAllowedDailyDate(this.dailyDate)) {
+      this.clearDailyAttendanceData();
+      this.message.add({
+        severity: 'warn',
+        summary: 'تنبيه',
+        detail: 'مسموح فقط بالخميس والجمعة والسبت من الأيام السابقة أو اليوم.'
+      });
       return;
     }
 
     this.dailyLoading = true;
     const fam = this.dailyFamilyParam();
-    this.attendanceSvc.daily(this.dailyDate, t, fam).subscribe({
+
+    this.attendanceSvc.daily(isoDate, this.dailyType, fam).subscribe({
       next: (res: any) => {
         const familyTotal = Number(this.members?.length || 0);
 
@@ -661,10 +798,8 @@ export class FamilyAttendanceComponent implements OnInit {
         this.dailyPresent = (res?.present || []) as any;
         this.dailyAbsent = (res?.absent || []) as any;
 
-        // المجموع = إجمالي أفراد الأسرة المعروضة
         this.dailyTotal = familyTotal > 0 ? familyTotal : Number(res?.total || 0);
 
-        // لو لا يوجد أي تسجيلات في اليوم ده، لا نعرض غياب (غالبًا مفيش اجتماع)
         if (this.dailyRecordsCount === 0) {
           this.dailyAbsent = [];
           this.dailyAbsentCount = 0;
@@ -673,20 +808,19 @@ export class FamilyAttendanceComponent implements OnInit {
         this.dailyLoading = false;
       },
       error: (err: any) => {
-        this.dailyLoading = false;
-        this.dailyPresent = [];
-        this.dailyAbsent = [];
-        this.dailyTotal = 0;
-        this.dailyPresentCount = 0;
-        this.dailyAbsentCount = 0;
-        this.dailyRecordsCount = 0;
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load' });
+        this.clearDailyAttendanceData();
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'خطأ في التحميل'
+        });
       }
     });
   }
 
   askDailyMarkAbsent(p: { id: number; fullName: string }) {
-    if (!this.dailyType || !this.dailyDate) return;
+    const isoDate = this.toIsoDateOnly(this.dailyDate);
+    if (!this.dailyType || !isoDate) return;
     if (!this.canEditDailyAttendance()) return;
     this.dailyRemoveTarget = { id: p.id, fullName: p.fullName };
     this.showDailyRemoveConfirm = true;
@@ -699,10 +833,11 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   confirmDailyRemove() {
-    if (!this.dailyType || !this.dailyDate || !this.dailyRemoveTarget) return;
+    const isoDate = this.toIsoDateOnly(this.dailyDate);
+    if (!this.dailyType || !isoDate || !this.dailyRemoveTarget) return;
     const fam = this.dailyFamilyParam();
     this.dailyRemoveSaving = true;
-    this.attendanceSvc.markAbsent(this.dailyRemoveTarget.id, this.dailyDate, this.dailyType, fam).subscribe({
+    this.attendanceSvc.markAbsent(this.dailyRemoveTarget.id, isoDate, this.dailyType, fam).subscribe({
       next: () => {
         this.dailyRemoveSaving = false;
         this.cancelDailyRemove();
@@ -711,7 +846,7 @@ export class FamilyAttendanceComponent implements OnInit {
       },
       error: (err: any) => {
         this.dailyRemoveSaving = false;
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في التحميل' });
       }
     });
   }
@@ -843,7 +978,7 @@ export class FamilyAttendanceComponent implements OnInit {
         },
         error: (err: any) => {
           this.iftekadSaving = false;
-          this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to save' });
+          this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في الحفظ' });
         }
       });
   }
@@ -906,7 +1041,7 @@ export class FamilyAttendanceComponent implements OnInit {
 ) {
   if (!this.iftekadFor) {
     this.editSaving = false;
-    this.message.add({ severity: 'error', summary: 'Error', detail: 'Failed to update' });
+    this.message.add({ severity: 'error', summary: 'خطأ', detail: 'خطأ في التحديث' });
     return;
   }
 
@@ -937,8 +1072,8 @@ export class FamilyAttendanceComponent implements OnInit {
         this.editSaving = false;
         this.message.add({
           severity: 'error',
-          summary: 'Error',
-          detail: originalErr?.error?.error || originalErr?.message || 'Failed to update'
+          summary: 'خطأ',
+          detail: originalErr?.error?.error || originalErr?.message || 'خطأ في التحديث'
         });
       }
     },
@@ -946,8 +1081,8 @@ export class FamilyAttendanceComponent implements OnInit {
       this.editSaving = false;
       this.message.add({
         severity: 'error',
-        summary: 'Error',
-        detail: originalErr?.error?.error || originalErr?.message || 'Failed to update'
+        summary: 'خطأ',
+        detail: originalErr?.error?.error || originalErr?.message || 'خطأ في التحديث'
       });
     }
   });
@@ -990,7 +1125,7 @@ export class FamilyAttendanceComponent implements OnInit {
         }
 
         this.deleteSaving = false;
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to delete' });
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في الحذف' });
       }
     });
   }
@@ -1202,7 +1337,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
       this.exitExportMode();
     } catch {
-      this.message.add({ severity: 'error', summary: 'Export failed', detail: 'PDF export failed' });
+      this.message.add({ severity: 'error', summary: 'خطأ ', detail: 'فشل في تحميل PDF' });
     }
   }
   cancelExport() {

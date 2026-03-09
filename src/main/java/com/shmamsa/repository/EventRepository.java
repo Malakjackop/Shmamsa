@@ -12,4 +12,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByEventAtGreaterThanEqualAndEventAtLessThan(LocalDate start, LocalDate end);
 
     List<Event> findByStatus(EventStatus status);
+
+    List<Event> findByRemoveAtLessThanEqual(LocalDate date);
+
+    List<Event> findByStatusAndEventAtBefore(EventStatus status, LocalDate date);
 }

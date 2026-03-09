@@ -2,52 +2,49 @@ package com.shmamsa.service;
 
 import com.shmamsa.model.Event;
 import com.shmamsa.model.EventStatus;
+import com.shmamsa.repository.EventParticipantRepository;
 import com.shmamsa.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 public class EventPublishScheduler {
 
     private final EventRepository eventRepo;
+    private final EventParticipantRepository participantRepo;
 
     // كل 10 دقائق
     @Scheduled(cron = "0 */10 * * * *")
-    public void autoPublish() {
+    @Transactional
+    public void autoCleanup() {
+        LocalDate today = LocalDate.now();
 
-        LocalDateTime now = LocalDateTime.now();
-        LocalDate today = now.toLocalDate();
-        List<Event> pending = eventRepo.findByStatus(EventStatus.PENDING);
+        Set<Long> idsToDelete = new LinkedHashSet<>();
 
-        for (Event e : pending) {
-            if (e.getEventAt() == null) continue;
+        List<Event> removeAtReached = eventRepo.findByRemoveAtLessThanEqual(today);
+        for (Event e : removeAtReached) {
+            if (e.getId() != null) idsToDelete.add(e.getId());
+        }
 
-            boolean shouldPublish = false;
+        List<Event> pendingExpired = eventRepo.findByStatusAndEventAtBefore(EventStatus.PENDING, today);
+        for (Event e : pendingExpired) {
+            if (e.getId() != null) idsToDelete.add(e.getId());
+        }
 
-            // 1) لو publishAt محدد واتعدّى => publish
-            if (e.getPublishAt() != null && !e.getPublishAt().isAfter(today)) {
-                shouldPublish = true;
-            }
+        if (idsToDelete.isEmpty()) return;
 
-            // 2) لو مفيش publishAt => قبل الإيفنت بـ 4 أيام publish تلقائي
-            if (e.getPublishAt() == null) {
-                // eventAt <= today + 4 days
-                if (!e.getEventAt().isAfter(today.plusDays(4))) {
-                    shouldPublish = true;
-                }
-            }
-
-            if (shouldPublish) {
-                e.setStatus(EventStatus.PUBLISHED);
-                e.setPublishedAt(now);
-                eventRepo.save(e);
-            }
+        for (Long id : new ArrayList<>(idsToDelete)) {
+            participantRepo.deleteByEvent_Id(id);
+            eventRepo.deleteById(id);
         }
     }
 }
