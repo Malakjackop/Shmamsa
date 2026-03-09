@@ -22,10 +22,15 @@
 .history-table th,
 .history-table td {
   padding: 12px 10px;
-  text-align: left;
+  text-align: right;
   border-bottom: 1px solid rgba(0,0,0,0.15);
 }
 
 .history-table thead th {
   font-weight: 700;
+}
+
+.time-cell {
+  direction: ltr;
+  text-align: right;
 }

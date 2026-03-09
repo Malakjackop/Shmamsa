@@ -13,15 +13,17 @@
         <th>التاريخ</th>
         <th>الوقت</th>
         <th>النوع</th>
-        <th>الخادم</th>
+        <th>الحالة</th>
+        <th>الخادم الي سجلك الغياب</th>
       </tr>
     </thead>
 
     <tbody>
       <tr *ngFor="let it of filteredItems">
         <td>{{ it.date }}</td>
-        <td>{{ it.time }}</td>
+        <td class="time-cell">{{ formatTime12h(it.time) }}</td>
         <td>{{ labelType(it.type) }}</td>
+        <td>{{ labelStatus(it.status) }}</td>
         <td>{{ it.takenBy || '-' }}</td>
       </tr>
     </tbody>

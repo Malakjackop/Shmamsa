@@ -43,6 +43,9 @@ export class GradesComponent implements OnInit {
   rankViewEnabled = false;
   topThreeMemberIds = new Set<number>();
   rankByMemberId = new Map<number, number>();
+  combinedTopThreeMemberIds = new Set<number>();
+  combinedRankByMemberId = new Map<number, number>();
+  combinedMembers: Array<{ id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }> = [];
   canEdit = false;
   canPublish = false;
   saving = false;
@@ -185,6 +188,7 @@ export class GradesComponent implements OnInit {
           this.columns = [];
           this.members = [];
           this.rankedMembers = [];
+          this.rebuildCombinedMembersView();
         },
         error: () => this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الدرجات' })
       });
@@ -244,9 +248,12 @@ export class GradesComponent implements OnInit {
   }
 
   toggleTopRanksView(): void {
-    if (this.selectedTerm === 'BOTH') return;
     this.rankViewEnabled = !this.rankViewEnabled;
-    this.rebuildMembersView();
+    if (this.selectedTerm === 'BOTH') {
+      this.rebuildCombinedMembersView();
+    } else {
+      this.rebuildMembersView();
+    }
   }
 
   onMemberValueChange(): void {
@@ -318,7 +325,7 @@ export class GradesComponent implements OnInit {
     return total;
   }
 
-  combinedServantMembers(): Array<{ id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }> {
+  private buildCombinedServantMembers(): Array<{ id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }> {
     const map = new Map<number, { id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }>();
     for (const m of this.bothFirstMembers) {
       map.set(m.id, {
@@ -336,6 +343,18 @@ export class GradesComponent implements OnInit {
       map.set(m.id, current);
     }
     return Array.from(map.values()).sort((a, b) => b.allTotal - a.allTotal || a.fullName.localeCompare(b.fullName, 'ar'));
+  }
+
+  combinedServantMembers(): Array<{ id: number; fullName: string; firstTotal: number; secondTotal: number; allTotal: number }> {
+    return this.combinedMembers;
+  }
+
+  isCombinedTopThreeMember(memberId: number): boolean {
+    return this.rankViewEnabled && this.combinedTopThreeMemberIds.has(memberId);
+  }
+
+  getCombinedDisplayedRank(memberId: number, fallbackRank: number): number {
+    return this.rankViewEnabled ? (this.combinedRankByMemberId.get(memberId) ?? fallbackRank) : fallbackRank;
   }
 
   private parseColumnTitle(rawTitle: string): { title: string; max: string } {
@@ -421,6 +440,26 @@ export class GradesComponent implements OnInit {
     this.rankByMemberId = rankMap;
     this.topThreeMemberIds = highlightedIds;
     this.rankedMembers = this.rankViewEnabled ? ranked : [...this.members];
+  }
+
+  private rebuildCombinedMembersView(): void {
+    const combined = this.buildCombinedServantMembers();
+    const rankMap = new Map<number, number>();
+    const highlightedIds = new Set<number>();
+    let lastTotal: number | null = null;
+    let currentRank = 0;
+    for (const m of combined) {
+      const total = m.allTotal;
+      if (lastTotal === null || total !== lastTotal) {
+        currentRank += 1;
+        lastTotal = total;
+      }
+      rankMap.set(m.id, currentRank);
+      if (currentRank <= 3) highlightedIds.add(m.id);
+    }
+    this.combinedRankByMemberId = rankMap;
+    this.combinedTopThreeMemberIds = highlightedIds;
+    this.combinedMembers = combined;
   }
 
   async exportServantSheetPdf(): Promise<void> {
@@ -560,18 +599,65 @@ export class GradesComponent implements OnInit {
     });
   }
 
+  isSelectedTermPublished(): boolean {
+    if (!this.sheet) return false;
+    return this.selectedTerm === 'SECOND'
+      ? !!this.sheet.secondPublishedAt
+      : !!this.sheet.firstPublishedAt;
+  }
+
+  selectedTermPublishStatus(): 'Publish' | 'Draft' {
+    return this.isSelectedTermPublished() ? 'Publish' : 'Draft';
+  }
+
+  publishButtonLabel(): string {
+    return this.isSelectedTermPublished() ? 'إلغاء النشر' : 'نشر';
+  }
+
   publish() {
     if (!this.canPublish || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    const wasPublished = this.isSelectedTermPublished();
+    const nowIso = new Date().toISOString();
     this.publishing = true;
-    this.gradesSvc.publishSheet(this.selectedFamilyBase, this.selectedTerm).subscribe({
+    const req$ = wasPublished
+      ? this.gradesSvc.unpublishSheet(this.selectedFamilyBase, this.selectedTerm)
+      : this.gradesSvc.publishSheet(this.selectedFamilyBase, this.selectedTerm);
+    req$.subscribe({
       next: () => {
         this.publishing = false;
-        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم النشر' });
+        if (this.sheet) {
+          if (this.selectedTerm === 'SECOND') {
+            this.sheet.secondPublishedAt = wasPublished ? null : nowIso;
+          } else {
+            this.sheet.firstPublishedAt = wasPublished ? null : nowIso;
+          }
+          this.sheet.publishedAt = this.selectedTerm === 'SECOND'
+            ? (this.sheet.secondPublishedAt || this.sheet.firstPublishedAt || null)
+            : (this.sheet.firstPublishedAt || this.sheet.secondPublishedAt || null);
+          this.sheet.status = (this.sheet.firstPublishedAt || this.sheet.secondPublishedAt) ? 'PUBLISHED' : 'DRAFT';
+        }
+        this.msg.add({
+          severity: 'success',
+          summary: 'تم',
+          detail: wasPublished ? 'تم إلغاء النشر' : 'تم النشر'
+        });
         this.loadServantView();
       },
-      error: () => {
+      error: (err) => {
         this.publishing = false;
-        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل النشر' });
+        const backendDetail = err?.error?.error || err?.error?.message || '';
+        const status = Number(err?.status || 0);
+        let detail = backendDetail || (wasPublished ? 'فشل إلغاء النشر' : 'فشل النشر');
+        if (status === 404 && wasPublished) {
+          detail = 'Endpoint إلغاء النشر غير متاح على السيرفر الحالي. اعمل Restart للـ backend.';
+        } else if (status > 0 && !backendDetail) {
+          detail = `${detail} (HTTP ${status})`;
+        }
+        this.msg.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail
+        });
       }
     });
   }

@@ -58,6 +58,11 @@ export class GradesService {
     return this.http.post(`${this.baseUrl}/sheet/publish`, { resultTerm }, { params, withCredentials: true });
   }
 
+  unpublishSheet(family: string, resultTerm: 'FIRST' | 'SECOND'): Observable<any> {
+    const params = new HttpParams().set('family', family);
+    return this.http.post(`${this.baseUrl}/sheet/unpublish`, { resultTerm }, { params, withCredentials: true });
+  }
+
   myGrades(family?: string): Observable<MyGradesView> {
     let params = new HttpParams();
     if (family) params = params.set('family', family);

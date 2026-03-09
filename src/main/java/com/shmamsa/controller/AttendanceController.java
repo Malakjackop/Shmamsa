@@ -441,14 +441,15 @@ public class AttendanceController {
 
         List<Map<String, Object>> out = new ArrayList<>();
         for (AttendanceRecord r : list) {
-            out.add(Map.of(
-                    "id", r.getId(),
-                    "date", r.getDate() == null ? null : r.getDate().toString(),
-                    "time", r.getTime() == null ? null : r.getTime().toString(),
-                    "type", r.getType() == null ? null : r.getType().name(),
-                    "takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName(),
-                    "familyBase", r.getFamilyBase()
-            ));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", r.getId());
+            row.put("date", r.getDate() == null ? null : r.getDate().toString());
+            row.put("time", r.getTime() == null ? null : r.getTime().toString());
+            row.put("type", r.getType() == null ? null : r.getType().name());
+            row.put("status", r.getStatus() == null ? null : r.getStatus().name());
+            row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
+            row.put("familyBase", r.getFamilyBase());
+            out.add(row);
         }
         return ResponseEntity.ok(out);
     }

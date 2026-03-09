@@ -153,7 +153,8 @@ public class GradesController {
         if (scoped != null && "AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) return;
 
         String eff = effectiveRoleIn(me, base);
-        if ("AMIN_OSRA".equals(eff) && FamilyUtil.mainFamily(me.getDeaconFamily()).equalsIgnoreCase(base)) return;
+        String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
+        if ("AMIN_OSRA".equals(eff) && myBase != null && myBase.equalsIgnoreCase(base)) return;
 
         throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
     }
@@ -200,6 +201,31 @@ public class GradesController {
     private LocalDateTime publishedAtForTerm(GradeSheet sheet, String term) {
         if (sheet == null) return null;
         return "SECOND".equals(normalizeTerm(term)) ? sheet.getSecondPublishedAt() : sheet.getFirstPublishedAt();
+    }
+
+    private void refreshPublishMeta(GradeSheet sheet) {
+        if (sheet == null) return;
+        LocalDateTime first = sheet.getFirstPublishedAt();
+        LocalDateTime second = sheet.getSecondPublishedAt();
+
+        if (first == null && second == null) {
+            sheet.setStatus("DRAFT");
+            sheet.setPublishedAt(null);
+            sheet.setResultTerm(null);
+            sheet.setPublishedByUserId(null);
+            return;
+        }
+
+        sheet.setStatus("PUBLISHED");
+        if (second != null && (first == null || !second.isBefore(first))) {
+            sheet.setPublishedAt(second);
+            sheet.setResultTerm("SECOND");
+            sheet.setPublishedByUserId(sheet.getSecondPublishedByUserId());
+        } else {
+            sheet.setPublishedAt(first);
+            sheet.setResultTerm("FIRST");
+            sheet.setPublishedByUserId(sheet.getFirstPublishedByUserId());
+        }
     }
 
     private String newColId() {
@@ -405,14 +431,50 @@ public class GradesController {
         }
         gradeRepo.save(sheet);
 
-        return ResponseEntity.ok(Map.of(
-                "message", "published",
-                "familyBase", base,
-                "publishedAt", now,
-                "resultTerm", resultTerm,
-                "firstPublishedAt", sheet.getFirstPublishedAt(),
-                "secondPublishedAt", sheet.getSecondPublishedAt()
-        ));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("message", "published");
+        out.put("familyBase", base);
+        out.put("publishedAt", now);
+        out.put("resultTerm", resultTerm);
+        out.put("firstPublishedAt", sheet.getFirstPublishedAt());
+        out.put("secondPublishedAt", sheet.getSecondPublishedAt());
+        return ResponseEntity.ok(out);
+    }
+
+    @PostMapping("/sheet/unpublish")
+    public ResponseEntity<?> unpublishSheet(@RequestParam String family, @RequestBody(required = false) PublishSheetRequest body, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String base = FamilyUtil.mainFamily(family);
+        if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
+        ensureCanPublish(me, base);
+
+        String resultTerm = normalizeTerm(body == null ? null : body.resultTerm());
+        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        if (sheet == null) throw new ApiException(HttpStatus.BAD_REQUEST, "No sheet to unpublish");
+
+        if ("SECOND".equals(resultTerm)) {
+            sheet.setSecondPublishedAt(null);
+            sheet.setSecondPublishedByUserId(null);
+        } else {
+            sheet.setFirstPublishedAt(null);
+            sheet.setFirstPublishedByUserId(null);
+        }
+
+        refreshPublishMeta(sheet);
+        sheet.setUpdatedAt(LocalDateTime.now());
+        gradeRepo.save(sheet);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("message", "unpublished");
+        out.put("familyBase", base);
+        out.put("resultTerm", resultTerm);
+        out.put("status", sheet.getStatus());
+        out.put("publishedAt", publishedAtForTerm(sheet, resultTerm));
+        out.put("firstPublishedAt", sheet.getFirstPublishedAt());
+        out.put("secondPublishedAt", sheet.getSecondPublishedAt());
+        return ResponseEntity.ok(out);
     }
 
     @GetMapping("/me")

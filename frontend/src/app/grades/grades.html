@@ -6,6 +6,7 @@
       <div><b>الدرجات</b></div>
       <div class="status" *ngIf="viewMode==='SERVANT' && selectedTerm!=='BOTH'">
         الأسرة: {{ selectedFamilyBase || '-' }}
+        <span> • الحالة: {{ selectedTermPublishStatus() }}</span>
         <span *ngIf="sheet?.publishedAt"> • نُشرت: {{ sheet?.publishedAt | date:'short' }}</span>
       </div>
       <div class="status" *ngIf="viewMode==='SERVANT' && selectedTerm==='BOTH'">
@@ -34,9 +35,9 @@
     </div>
 
     <button class="btn" *ngIf="viewMode==='SERVANT' && canEdit && selectedTerm!=='BOTH'" (click)="addColumn()">+ عمود جديد</button>
-    <button class="btn rankBtn" *ngIf="viewMode==='SERVANT' && selectedTerm!=='BOTH'" (click)="toggleTopRanksView()">{{ rankViewEnabled ? 'إلغاء ترتيب الأوائل' : 'الأوائل' }}</button>
+    <button class="btn rankBtn" *ngIf="viewMode==='SERVANT'" (click)="toggleTopRanksView()">{{ rankViewEnabled ? 'إلغاء ترتيب الأوائل' : 'الأوائل' }}</button>
     <button class="btn primary" *ngIf="viewMode==='SERVANT' && canEdit && selectedTerm!=='BOTH'" (click)="save()" [disabled]="saving">حفظ</button>
-    <button class="btn danger" *ngIf="viewMode==='SERVANT' && canPublish && selectedTerm!=='BOTH'" (click)="publish()" [disabled]="publishing">نشر</button>
+    <button class="btn danger" *ngIf="viewMode==='SERVANT' && canPublish && selectedTerm!=='BOTH'" (click)="publish()" [disabled]="publishing">{{ publishButtonLabel() }}</button>
     <button class="btn pdfBtn" *ngIf="viewMode==='SERVANT'" (click)="exportServantSheetPdf()">تصدير PDF</button>
   </div>
 
@@ -132,8 +133,8 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let m of combinedServantMembers(); let ri = index">
-          <td class="stickyIndex indexCell">{{ ri + 1 }}</td>
+        <tr *ngFor="let m of combinedServantMembers(); let ri = index" [class.topThreeRow]="isCombinedTopThreeMember(m.id)">
+          <td class="stickyIndex indexCell">{{ getCombinedDisplayedRank(m.id, ri + 1) }}</td>
           <td class="nameCell stickyName">{{ m.fullName }}</td>
           <td>{{ m.firstTotal }}</td>
           <td>{{ m.secondTotal }}</td>

@@ -52,6 +52,40 @@ export class AttendanceHistoryComponent implements OnInit {
     }
   }
 
+  labelStatus(s?: string): string {
+    if (s === 'PRESENT') return 'حاضر';
+    if (s === 'ABSENT') return 'غائب';
+    return '-';
+  }
+
+  formatTime12h(value?: string): string {
+    if (!value || value === '-') return '-';
+
+    const raw = value.trim();
+
+    // Handles plain time from backend like HH:mm[:ss[.SSS]]
+    const timeMatch = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
+    if (timeMatch) {
+      let hours = Number(timeMatch[1]);
+      const minutes = timeMatch[2];
+      const period = hours >= 12 ? 'pm' : 'am';
+      hours = hours % 12 || 12;
+      return `${hours}:${minutes} ${period}`;
+    }
+
+    // Fallback for datetime values like ISO strings
+    const date = new Date(raw);
+    if (!Number.isNaN(date.getTime())) {
+      const hours24 = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const period = hours24 >= 12 ? 'pm' : 'am';
+      const hours12 = (hours24 % 12) || 12;
+      return `${hours12}:${minutes} ${period}`;
+    }
+
+    return raw;
+  }
+
   applyFilter() {
     if (!this.filterType) {
       this.filteredItems = [...this.items];
