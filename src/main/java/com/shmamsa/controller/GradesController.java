@@ -46,6 +46,9 @@ public class GradesController {
             String familyBase,
             LocalDateTime firstPublishedAt,
             LocalDateTime secondPublishedAt,
+            Integer firstRank,
+            Integer secondRank,
+            Integer combinedRank,
             List<Column> firstColumns,
             Map<String, String> firstValues,
             List<Column> secondColumns,
@@ -249,6 +252,52 @@ public class GradesController {
         Map<String, String> safe = values == null ? Map.of() : values;
         for (Column c : cols) aligned.put(c.id(), safe.getOrDefault(c.id(), ""));
         return aligned;
+    }
+
+    private double parseNumber(String raw) {
+        if (raw == null) return 0;
+        String normalizedDigits = raw.trim()
+                .replace('٠', '0').replace('١', '1').replace('٢', '2').replace('٣', '3').replace('٤', '4')
+                .replace('٥', '5').replace('٦', '6').replace('٧', '7').replace('٨', '8').replace('٩', '9');
+        String cleaned = normalizedDigits.replace(",", ".").replaceAll("[^\\d.\\-]", "");
+        if (cleaned.isBlank()) return 0;
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    private double totalForColumns(List<Column> cols, Map<String, String> values) {
+        if (cols == null || cols.isEmpty() || values == null) return 0;
+        double total = 0;
+        for (Column c : cols) total += parseNumber(values.get(c.id()));
+        return total;
+    }
+
+    private Integer rankForUser(List<User> members, Map<Long, Double> totals, Long userId) {
+        if (userId == null || members == null || members.isEmpty()) return null;
+        List<User> ranked = new ArrayList<>(members);
+        ranked.sort((a, b) -> {
+            double totalDiff = totals.getOrDefault(b.getId(), 0d) - totals.getOrDefault(a.getId(), 0d);
+            if (totalDiff > 0) return 1;
+            if (totalDiff < 0) return -1;
+            String an = String.valueOf(a.getFullName());
+            String bn = String.valueOf(b.getFullName());
+            return an.compareToIgnoreCase(bn);
+        });
+
+        Double lastTotal = null;
+        int currentRank = 0;
+        for (User member : ranked) {
+            double total = totals.getOrDefault(member.getId(), 0d);
+            if (lastTotal == null || Double.compare(total, lastTotal) != 0) {
+                currentRank += 1;
+                lastTotal = total;
+            }
+            if (Objects.equals(member.getId(), userId)) return currentRank;
+        }
+        return null;
     }
 
     private static String normAr(String s) {
@@ -487,7 +536,7 @@ public class GradesController {
 
         GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
         if (sheet == null) {
-            return ResponseEntity.ok(new MyGradesView(base, null, null, List.of(), new LinkedHashMap<>(), List.of(), new LinkedHashMap<>()));
+            return ResponseEntity.ok(new MyGradesView(base, null, null, null, null, null, List.of(), new LinkedHashMap<>(), List.of(), new LinkedHashMap<>()));
         }
 
         SheetPayload firstPayload = parseTermPayload(sheet, "FIRST");
@@ -498,6 +547,24 @@ public class GradesController {
         Map<String, Map<String, String>> secondRows = secondPayload.rows() == null ? Map.of() : secondPayload.rows();
         Map<String, String> firstValues = alignValues(firstCols, firstRows.get(String.valueOf(me.getId())));
         Map<String, String> secondValues = alignValues(secondCols, secondRows.get(String.valueOf(me.getId())));
+        List<User> members = loadMakhdomMembers(base);
+
+        Map<Long, Double> firstTotals = new HashMap<>();
+        Map<Long, Double> secondTotals = new HashMap<>();
+        Map<Long, Double> combinedTotals = new HashMap<>();
+        for (User member : members) {
+            Map<String, String> memberFirstValues = alignValues(firstCols, firstRows.get(String.valueOf(member.getId())));
+            Map<String, String> memberSecondValues = alignValues(secondCols, secondRows.get(String.valueOf(member.getId())));
+            double firstTotal = totalForColumns(firstCols, memberFirstValues);
+            double secondTotal = totalForColumns(secondCols, memberSecondValues);
+            firstTotals.put(member.getId(), firstTotal);
+            secondTotals.put(member.getId(), secondTotal);
+            combinedTotals.put(member.getId(), firstTotal + secondTotal);
+        }
+
+        Integer firstRank = sheet.getFirstPublishedAt() == null ? null : rankForUser(members, firstTotals, me.getId());
+        Integer secondRank = sheet.getSecondPublishedAt() == null ? null : rankForUser(members, secondTotals, me.getId());
+        Integer combinedRank = sheet.getSecondPublishedAt() == null ? null : rankForUser(members, combinedTotals, me.getId());
 
         if (sheet.getFirstPublishedAt() == null) {
             firstCols = List.of();
@@ -508,7 +575,7 @@ public class GradesController {
             secondValues = new LinkedHashMap<>();
         }
 
-        return ResponseEntity.ok(new MyGradesView(base, sheet.getFirstPublishedAt(), sheet.getSecondPublishedAt(), firstCols, firstValues, secondCols, secondValues));
+        return ResponseEntity.ok(new MyGradesView(base, sheet.getFirstPublishedAt(), sheet.getSecondPublishedAt(), firstRank, secondRank, combinedRank, firstCols, firstValues, secondCols, secondValues));
     }
 
     @PostMapping("/confirm-school-result")

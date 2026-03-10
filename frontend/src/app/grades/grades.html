@@ -158,7 +158,7 @@
       </thead>
       <tbody>
         <tr>
-          <td class="stickyIndex indexCell">1</td>
+          <td class="stickyIndex indexCell">{{ my?.firstRank || '-' }}</td>
           <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
           <td *ngFor="let c of (my?.firstColumns || [])">{{ my?.firstValues?.[c.id] || '-' }}</td>
           <td class="totalCell">{{ rowTotalForColumns(my?.firstValues, my?.firstColumns) }}</td>
@@ -200,7 +200,7 @@
       </thead>
       <tbody>
         <tr>
-          <td class="stickyIndex indexCell">1</td>
+          <td class="stickyIndex indexCell">{{ my?.secondRank || '-' }}</td>
           <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
           <td *ngFor="let c of (my?.secondColumns || [])">{{ my?.secondValues?.[c.id] || '-' }}</td>
           <td class="totalCell">{{ rowTotalForColumns(my?.secondValues, my?.secondColumns) }}</td>
@@ -221,7 +221,7 @@
       </thead>
       <tbody>
         <tr>
-          <td class="stickyIndex indexCell">1</td>
+          <td class="stickyIndex indexCell">{{ my?.combinedRank || '-' }}</td>
           <td class="nameCell stickyName">{{ me?.fullName || 'أنا' }}</td>
           <td>{{ rowTotalForColumns(my?.firstValues, my?.firstColumns) }}</td>
           <td>{{ rowTotalForColumns(my?.secondValues, my?.secondColumns) }}</td>

@@ -5,9 +5,11 @@ import com.shmamsa.model.AttendanceArchive;
 import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
+import com.shmamsa.model.GradeSheet;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.AttendanceArchiveRepository;
+import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.QrTokenService;
 import com.shmamsa.util.FamilyUtil;
@@ -31,6 +33,7 @@ import java.util.logging.Logger;
 
 import java.time.LocalDate;
 import java.time.DayOfWeek;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 
@@ -45,8 +48,26 @@ public class AttendanceController {
     private final AttendanceRepository attendanceRepo;
     private final AttendanceArchiveRepository archiveRepo;
     private final UserRepository userRepo;
+    private final GradeSheetRepository gradeRepo;
     private final QrTokenService qrTokenService;
     private final ObjectMapper objectMapper;
+
+    private static final String TITLE_META_SEPARATOR = "::max::";
+    private static final List<String> PREFERRED_FAMILY_ORDER = List.of(
+            "اسرة السمائين",
+            "اسرة القديس ابانوب",
+            "اسرة القديس ديسقورس",
+            "اسرة القديس سيدهم بشاي",
+            "اسرة القديس اسكلابيوس",
+            "اسرة القديس البابا كيرلس",
+            "اسرة القديس الانبا ابرام",
+            "اسرة القديس اسطفانوس",
+            "خورس مارمرقس",
+            "خورس البابا اثناسيوس"
+    );
+
+    private record GradeColumn(String id, String title) {}
+    private record SheetPayload(List<GradeColumn> columns, Map<String, Map<String, String>> rows) {}
 
     private String normRole(String raw) {
         if (raw == null) return "";
@@ -847,40 +868,47 @@ public class AttendanceController {
         List<Map<String, Object>> usersSnap = new ArrayList<>();
         for (User u : targets) {
             if (u == null) continue;
-            usersSnap.add(new LinkedHashMap<>(Map.of(
-                    "id", u.getId(),
-                    "fullName", u.getFullName(),
-                    "username", u.getUsername(),
-                    "role", u.getRole(),
-                    "email", u.getEmail(),
-                    "deaconFamily", u.getDeaconFamily(),
-                    "phoneNumber", u.getPhoneNumber(),
-                    "guardiansPhone", u.getGuardiansPhone(),
-                    "address", u.getAddress()
-            )));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", u.getId());
+            row.put("fullName", u.getFullName());
+            row.put("username", u.getUsername());
+            row.put("role", u.getRole());
+            row.put("email", u.getEmail());
+            row.put("deaconFamily", u.getDeaconFamily());
+            row.put("deaconFamily2", u.getDeaconFamily2());
+            row.put("deaconFamily3", u.getDeaconFamily3());
+            row.put("deaconFamily4", u.getDeaconFamily4());
+            row.put("phoneNumber", u.getPhoneNumber());
+            row.put("guardiansPhone", u.getGuardiansPhone());
+            row.put("address", u.getAddress());
+            usersSnap.add(row);
         }
+        usersSnap.sort(this::compareArchiveUsers);
 
         List<Map<String, Object>> recordsSnap = new ArrayList<>();
         for (AttendanceRecord r : records) {
             if (r == null) continue;
-            recordsSnap.add(new LinkedHashMap<>(Map.of(
-                    "id", r.getId(),
-                    "userId", r.getUser() == null ? null : r.getUser().getId(),
-                    "userFullName", r.getUser() == null ? null : r.getUser().getFullName(),
-                    "date", r.getDate() == null ? null : r.getDate().toString(),
-                    "time", r.getTime() == null ? null : r.getTime().toString(),
-                    "type", r.getType() == null ? null : r.getType().name(),
-                    "status", r.getStatus() == null ? null : r.getStatus().name(),
-                    "takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName(),
-                    "createdAt", r.getCreatedAt() == null ? null : r.getCreatedAt().toString()
-            )));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", r.getId());
+            row.put("userId", r.getUser() == null ? null : r.getUser().getId());
+            row.put("userFullName", r.getUser() == null ? null : r.getUser().getFullName());
+            row.put("date", r.getDate() == null ? null : r.getDate().toString());
+            row.put("time", r.getTime() == null ? null : r.getTime().toString());
+            row.put("type", r.getType() == null ? null : r.getType().name());
+            row.put("status", r.getStatus() == null ? null : r.getStatus().name());
+            row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
+            row.put("createdAt", r.getCreatedAt() == null ? null : r.getCreatedAt().toString());
+            recordsSnap.add(row);
         }
 
         String usersJson;
         String recordsJson;
+        String gradesJson;
         try {
+            List<Map<String, Object>> gradesSnap = buildGradesSnapshot(targets);
             usersJson = objectMapper.writeValueAsString(usersSnap);
             recordsJson = objectMapper.writeValueAsString(recordsSnap);
+            gradesJson = objectMapper.writeValueAsString(gradesSnap);
         } catch (Exception e) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to build archive json");
         }
@@ -893,8 +921,27 @@ public class AttendanceController {
         archive.setTotalRecords(records.size());
         archive.setUsersJson(usersJson);
         archive.setRecordsJson(recordsJson);
+        archive.setGradesJson(gradesJson);
 
         archive = archiveRepo.save(archive);
+
+        // Reset grades after archiving so the new year starts with empty sheets and no published results.
+        for (GradeSheet sheet : gradeRepo.findAll()) {
+            if (sheet == null) continue;
+            sheet.setDataJson(null);
+            sheet.setFirstTermDataJson(null);
+            sheet.setSecondTermDataJson(null);
+            sheet.setStatus("DRAFT");
+            sheet.setUpdatedAt(LocalDateTime.now());
+            sheet.setPublishedAt(null);
+            sheet.setFirstPublishedAt(null);
+            sheet.setSecondPublishedAt(null);
+            sheet.setResultTerm(null);
+            sheet.setPublishedByUserId(null);
+            sheet.setFirstPublishedByUserId(null);
+            sheet.setSecondPublishedByUserId(null);
+            gradeRepo.save(sheet);
+        }
 
         // Archive (update) all active attendance records instead of deleting
         int updated = 0;
@@ -996,6 +1043,7 @@ public class AttendanceController {
 
         List<Map<String, Object>> usersSnap = List.of();
         List<Map<String, Object>> recordsSnap = List.of();
+        List<Map<String, Object>> gradesSnap = List.of();
 
         try {
             if (archive.getUsersJson() != null && !archive.getUsersJson().isBlank()) {
@@ -1008,6 +1056,13 @@ public class AttendanceController {
             if (archive.getRecordsJson() != null && !archive.getRecordsJson().isBlank()) {
                 recordsSnap = objectMapper.readValue(
                         archive.getRecordsJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
+                        }
+                );
+            }
+            if (archive.getGradesJson() != null && !archive.getGradesJson().isBlank()) {
+                gradesSnap = objectMapper.readValue(
+                        archive.getGradesJson(),
                         new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
                         }
                 );
@@ -1025,8 +1080,17 @@ public class AttendanceController {
                     return Long.parseLong(v.toString());
                 }));
 
+        Map<Long, Map<String, Object>> gradesByUser = gradesSnap.stream()
+                .filter(g -> g.get("userId") != null)
+                .collect(Collectors.toMap(
+                        g -> asLong(g.get("userId")),
+                        g -> g,
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+
         // Build HTML (Arabic RTL)
-        String html = buildArchiveHtmlArabic(archive, usersSnap, recordsByUser);
+        String html = buildArchiveHtmlArabic(archive, usersSnap, recordsByUser, gradesByUser);
         html = html.replace("\uFEFF", "").trim(); // ✅ remove BOM + trim
         // Render to PDF
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -1070,7 +1134,8 @@ public class AttendanceController {
     private String buildArchiveHtmlArabic(
             AttendanceArchive archive,
             List<Map<String, Object>> usersSnap,
-            Map<Long, List<Map<String, Object>>> recordsByUser
+            Map<Long, List<Map<String, Object>>> recordsByUser,
+            Map<Long, Map<String, Object>> gradesByUser
     ) {
         String name = safeStr(archive.getName());
         String createdAt = archive.getCreatedAt() == null ? "" : archive.getCreatedAt().toString();
@@ -1116,7 +1181,10 @@ public class AttendanceController {
         sb.append("<div><b>عدد سجلات الحضور:</b> ").append(archive.getTotalRecords() == null ? 0 : archive.getTotalRecords()).append("</div>");
         sb.append("</div>");
 
-        // For each user in snapshot, show their data + full attendance history from snapshot records
+        usersSnap = new ArrayList<>(usersSnap);
+        usersSnap.sort(this::compareArchiveUsers);
+
+        // For each user in snapshot, show their data + full attendance history + grades
         for (int i = 0; i < usersSnap.size(); i++) {
             Map<String, Object> u = usersSnap.get(i);
             Long userId = asLong(u.get("id"));
@@ -1130,6 +1198,7 @@ public class AttendanceController {
             String email = safeStr(u.get("email"));
 
             List<Map<String, Object>> recs = userId == null ? List.of() : recordsByUser.getOrDefault(userId, List.of());
+            Map<String, Object> grades = userId == null ? null : gradesByUser.get(userId);
 
             // Count by type + status (present/absent)
             int friP = 0, friA = 0;
@@ -1183,7 +1252,7 @@ public class AttendanceController {
             sb.append("</div>");
 
             sb.append("<table><thead><tr>");
-            sb.append("<th>التاريخ</th><th>الوقت</th><th>النوع</th><th>الحالة</th><th>تم بواسطة</th>");
+            sb.append("<th>تم بواسطة</th><th>الحالة</th><th>النوع</th><th>الوقت</th><th>التاريخ</th>");
             sb.append("</tr></thead><tbody>");
 
             if (recs.isEmpty()) {
@@ -1223,8 +1292,8 @@ public class AttendanceController {
                         String takenBy = safeStr(r.get("takenBy"));
 
                         sb.append("<tr>")
-                                .append("<td>").append(esc(date)).append("</td>")
-                                .append("<td>").append(esc(time)).append("</td>");
+                                .append("<td>").append(esc(takenBy)).append("</td>")
+                                .append("<td>").append(esc(status)).append("</td>");
 
                         if (gi == 0) {
                             sb.append("<td rowspan=\"").append(rowspan).append("\">")
@@ -1232,14 +1301,15 @@ public class AttendanceController {
                                     .append("</td>");
                         }
 
-                        sb.append("<td>").append(esc(status)).append("</td>")
-                                .append("<td>").append(esc(takenBy)).append("</td>")
+                        sb.append("<td>").append(esc(time)).append("</td>")
+                                .append("<td>").append(esc(date)).append("</td>")
                                 .append("</tr>");
                     }
                 }
             }
 
             sb.append("</tbody></table>");
+            sb.append(buildArchivedGradesHtml(grades, fullName));
             sb.append("</div>");
 
             // optional page break every 3 users
@@ -1250,6 +1320,413 @@ public class AttendanceController {
 
         sb.append("</body></html>");
         return sb.toString();
+    }
+
+    private List<Map<String, Object>> buildGradesSnapshot(List<User> targets) {
+        Map<String, GradeSheet> sheetsByBase = gradeRepo.findAll().stream()
+                .filter(Objects::nonNull)
+                .filter(s -> s.getFamilyBase() != null && !s.getFamilyBase().isBlank())
+                .collect(Collectors.toMap(
+                        s -> FamilyUtil.mainFamily(s.getFamilyBase()),
+                        s -> s,
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+
+        Map<String, List<User>> membersByBase = new LinkedHashMap<>();
+        for (User target : targets) {
+            if (target == null || target.getId() == null) continue;
+            String base = FamilyUtil.mainFamily(target.getDeaconFamily());
+            if (base == null || base.isBlank()) continue;
+            membersByBase.computeIfAbsent(base, ignored -> new ArrayList<>()).add(target);
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (User target : targets) {
+            if (target == null || target.getId() == null) continue;
+            if (!shouldArchiveGradesFor(target)) continue;
+
+            String base = FamilyUtil.mainFamily(target.getDeaconFamily());
+            GradeSheet sheet = (base == null || base.isBlank()) ? null : sheetsByBase.get(base);
+
+            SheetPayload firstPayload = parseTermPayload(sheet, "FIRST");
+            SheetPayload secondPayload = parseTermPayload(sheet, "SECOND");
+            List<GradeColumn> firstCols = normalizedColumns(firstPayload);
+            List<GradeColumn> secondCols = normalizedColumns(secondPayload);
+            Map<String, Map<String, String>> firstRows = firstPayload.rows() == null ? Map.of() : firstPayload.rows();
+            Map<String, Map<String, String>> secondRows = secondPayload.rows() == null ? Map.of() : secondPayload.rows();
+            Map<String, String> firstValues = alignValues(firstCols, firstRows.get(String.valueOf(target.getId())));
+            Map<String, String> secondValues = alignValues(secondCols, secondRows.get(String.valueOf(target.getId())));
+
+            Integer firstRank = null;
+            Integer secondRank = null;
+            Integer combinedRank = null;
+
+            List<User> familyMembers = membersByBase.getOrDefault(base, List.of());
+            if (sheet != null && !familyMembers.isEmpty()) {
+                Map<Long, Double> firstTotals = new HashMap<>();
+                Map<Long, Double> secondTotals = new HashMap<>();
+                Map<Long, Double> combinedTotals = new HashMap<>();
+                for (User member : familyMembers) {
+                    Map<String, String> memberFirst = alignValues(firstCols, firstRows.get(String.valueOf(member.getId())));
+                    Map<String, String> memberSecond = alignValues(secondCols, secondRows.get(String.valueOf(member.getId())));
+                    double firstTotal = totalForColumns(firstCols, memberFirst);
+                    double secondTotal = totalForColumns(secondCols, memberSecond);
+                    firstTotals.put(member.getId(), firstTotal);
+                    secondTotals.put(member.getId(), secondTotal);
+                    combinedTotals.put(member.getId(), firstTotal + secondTotal);
+                }
+                if (sheet.getFirstPublishedAt() != null) firstRank = rankForUser(familyMembers, firstTotals, target.getId());
+                if (sheet.getSecondPublishedAt() != null) {
+                    secondRank = rankForUser(familyMembers, secondTotals, target.getId());
+                    combinedRank = rankForUser(familyMembers, combinedTotals, target.getId());
+                }
+            }
+
+            if (sheet == null || sheet.getFirstPublishedAt() == null) {
+                firstCols = List.of();
+                firstValues = new LinkedHashMap<>();
+            }
+            if (sheet == null || sheet.getSecondPublishedAt() == null) {
+                secondCols = List.of();
+                secondValues = new LinkedHashMap<>();
+            }
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("userId", target.getId());
+            row.put("familyBase", base);
+            row.put("firstPublishedAt", sheet == null || sheet.getFirstPublishedAt() == null ? null : sheet.getFirstPublishedAt().toString());
+            row.put("secondPublishedAt", sheet == null || sheet.getSecondPublishedAt() == null ? null : sheet.getSecondPublishedAt().toString());
+            row.put("firstRank", firstRank);
+            row.put("secondRank", secondRank);
+            row.put("combinedRank", combinedRank);
+            row.put("firstColumns", columnsToMaps(firstCols));
+            row.put("firstValues", firstValues);
+            row.put("firstCells", cellsToMaps(firstCols, firstValues));
+            row.put("secondColumns", columnsToMaps(secondCols));
+            row.put("secondValues", secondValues);
+            row.put("secondCells", cellsToMaps(secondCols, secondValues));
+            out.add(row);
+        }
+        return out;
+    }
+
+    private boolean shouldArchiveGradesFor(User target) {
+        if (target == null) return false;
+        String base = FamilyUtil.mainFamily(target.getDeaconFamily());
+        String role = safeStr(target.getRole()).trim().toUpperCase(Locale.ROOT);
+
+        if ("خورس مارمرقس".equals(base)) {
+            return !"KHADIM".equals(role) && !"AMIN_OSRA".equals(role) && !"AMIN_KHEDMA".equals(role)
+                    || !isDedicatedKhorsServant(target, "MARMARKOS");
+        }
+
+        return "MAKHDOM".equals(role);
+    }
+
+    private boolean isDedicatedKhorsServant(User target, String khorsCode) {
+        if (target == null) return false;
+        String role = safeStr(target.getRole()).trim().toUpperCase(Locale.ROOT);
+        if (!("KHADIM".equals(role) || "AMIN_OSRA".equals(role) || "AMIN_KHEDMA".equals(role))) return false;
+
+        String scope = safeStr(target.getServingScope()).trim().toUpperCase(Locale.ROOT);
+        if (!("KHORS_ONLY".equals(scope) || "BOTH".equals(scope))) return false;
+
+        String khors = safeStr(target.getKhors()).trim().toUpperCase(Locale.ROOT);
+        return "BOTH".equals(khors) || khors.equalsIgnoreCase(khorsCode);
+    }
+
+    private List<Map<String, Object>> columnsToMaps(List<GradeColumn> cols) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (cols == null) return out;
+        for (GradeColumn c : cols) {
+            if (c == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", c.id());
+            row.put("title", c.title());
+            out.add(row);
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> cellsToMaps(List<GradeColumn> cols, Map<String, String> values) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (cols == null) return out;
+        Map<String, String> safeValues = values == null ? Map.of() : values;
+        for (GradeColumn c : cols) {
+            if (c == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", c.id());
+            row.put("title", formatArchivedColumnTitle(c.title()));
+            row.put("max", formatArchivedColumnMax(c.title()));
+            String value = safeStr(safeValues.get(c.id())).trim();
+            row.put("value", value.isBlank() ? "-" : value);
+            out.add(row);
+        }
+        return out;
+    }
+
+    private SheetPayload emptyPayload() {
+        return new SheetPayload(new ArrayList<>(), new LinkedHashMap<>());
+    }
+
+    private SheetPayload parsePayloadJson(String json) {
+        if (json == null || json.isBlank()) return emptyPayload();
+        try {
+            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<SheetPayload>() {});
+        } catch (Exception e) {
+            return emptyPayload();
+        }
+    }
+
+    private SheetPayload parseTermPayload(GradeSheet sheet, String term) {
+        if (sheet == null) return emptyPayload();
+        String normalized = "SECOND".equalsIgnoreCase(term) ? "SECOND" : "FIRST";
+        String json = "SECOND".equals(normalized) ? sheet.getSecondTermDataJson() : sheet.getFirstTermDataJson();
+        if ((json == null || json.isBlank()) && "FIRST".equals(normalized)) json = sheet.getDataJson();
+        return parsePayloadJson(json);
+    }
+
+    private List<GradeColumn> normalizedColumns(SheetPayload payload) {
+        return payload == null || payload.columns() == null ? new ArrayList<>() : new ArrayList<>(payload.columns());
+    }
+
+    private Map<String, String> alignValues(List<GradeColumn> cols, Map<String, String> values) {
+        Map<String, String> aligned = new LinkedHashMap<>();
+        Map<String, String> safe = values == null ? Map.of() : values;
+        for (GradeColumn c : cols) aligned.put(c.id(), safe.getOrDefault(c.id(), ""));
+        return aligned;
+    }
+
+    private double parseGradeNumber(String raw) {
+        if (raw == null) return 0;
+        String normalizedDigits = raw.trim()
+                .replace('٠', '0').replace('١', '1').replace('٢', '2').replace('٣', '3').replace('٤', '4')
+                .replace('٥', '5').replace('٦', '6').replace('٧', '7').replace('٨', '8').replace('٩', '9');
+        String cleaned = normalizedDigits.replace(",", ".").replaceAll("[^\\d.\\-]", "");
+        if (cleaned.isBlank()) return 0;
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    private double totalForColumns(List<GradeColumn> cols, Map<String, String> values) {
+        if (cols == null || cols.isEmpty() || values == null) return 0;
+        double total = 0;
+        for (GradeColumn c : cols) total += parseGradeNumber(values.get(c.id()));
+        return total;
+    }
+
+    private Integer rankForUser(List<User> members, Map<Long, Double> totals, Long userId) {
+        if (userId == null || members == null || members.isEmpty()) return null;
+        List<User> ranked = new ArrayList<>(members);
+        ranked.sort((a, b) -> {
+            double totalDiff = totals.getOrDefault(b.getId(), 0d) - totals.getOrDefault(a.getId(), 0d);
+            if (totalDiff > 0) return 1;
+            if (totalDiff < 0) return -1;
+            return String.valueOf(a.getFullName()).compareToIgnoreCase(String.valueOf(b.getFullName()));
+        });
+
+        Double lastTotal = null;
+        int currentRank = 0;
+        for (User member : ranked) {
+            double total = totals.getOrDefault(member.getId(), 0d);
+            if (lastTotal == null || Double.compare(total, lastTotal) != 0) {
+                currentRank += 1;
+                lastTotal = total;
+            }
+            if (Objects.equals(member.getId(), userId)) return currentRank;
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String buildArchivedGradesHtml(Map<String, Object> grades, String fullName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div class=\"counts\" style=\"margin-top:14px\"><b>الدرجات المؤرشفة</b></div>");
+        if (grades == null || grades.isEmpty()) {
+            sb.append("<div class=\"row muted\">لا توجد درجات مؤرشفة</div>");
+            return sb.toString();
+        }
+
+        List<Map<String, Object>> firstColumns = toMapList(grades.get("firstColumns"));
+        List<Map<String, Object>> secondColumns = toMapList(grades.get("secondColumns"));
+        List<Map<String, Object>> firstCells = toMapList(grades.get("firstCells"));
+        List<Map<String, Object>> secondCells = toMapList(grades.get("secondCells"));
+        Map<String, String> firstValues = toStringMap(grades.get("firstValues"));
+        Map<String, String> secondValues = toStringMap(grades.get("secondValues"));
+        Integer firstRank = asInt(grades.get("firstRank"));
+        Integer secondRank = asInt(grades.get("secondRank"));
+        Integer combinedRank = asInt(grades.get("combinedRank"));
+
+        sb.append(buildGradesTableHtml("نتيجة الترم الأول", fullName, firstRank, firstCells, firstColumns, firstValues, "مجموع الترم الأول"));
+        sb.append(buildGradesTableHtml("نتيجة الترم الثاني", fullName, secondRank, secondCells, secondColumns, secondValues, "مجموع الترم الثاني"));
+
+        if (!secondColumns.isEmpty() || !secondValues.isEmpty() || combinedRank != null) {
+            double firstTotal = totalForArchivedColumns(firstColumns, firstValues);
+            double secondTotal = totalForArchivedColumns(secondColumns, secondValues);
+            sb.append("<div class=\"row\" style=\"margin-top:10px\"><span class=\"label\">نتيجة الترمين معًا</span></div>");
+            sb.append("<table><thead><tr><th>مجموع الترمين</th><th>مجموع الترم الثاني</th><th>مجموع الترم الأول</th><th>الاسم</th><th>م</th></tr></thead><tbody><tr>");
+            sb.append("<td>").append(formatGradeTotal(firstTotal + secondTotal)).append("</td>");
+            sb.append("<td>").append(formatGradeTotal(secondTotal)).append("</td>");
+            sb.append("<td>").append(formatGradeTotal(firstTotal)).append("</td>");
+            sb.append("<td>").append(esc(fullName)).append("</td>");
+            sb.append("<td>").append(combinedRank == null ? "-" : combinedRank).append("</td>");
+            sb.append("</tr></tbody></table>");
+        }
+
+        return sb.toString();
+    }
+
+    private String buildGradesTableHtml(String title,
+                                        String fullName,
+                                        Integer rank,
+                                        List<Map<String, Object>> cells,
+                                        List<Map<String, Object>> columns,
+                                        Map<String, String> values,
+                                        String totalTitle) {
+        if ((cells == null || cells.isEmpty()) && (columns == null || columns.isEmpty()) && (values == null || values.isEmpty()) && rank == null) return "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div class=\"row\" style=\"margin-top:10px\"><span class=\"label\">").append(esc(title)).append("</span></div>");
+        sb.append("<table><thead><tr><th>").append(esc(totalTitle)).append("</th>");
+        List<Map<String, Object>> displayCells = (cells == null || cells.isEmpty()) ? fallbackCellsFromColumns(columns, values) : cells;
+        for (Map<String, Object> c : displayCells) {
+            String display = safeStr(c.get("title"));
+            String max = safeStr(c.get("max"));
+            sb.append("<th>").append(esc(display));
+            if (!max.isBlank()) sb.append(" / ").append(esc(max));
+            sb.append("</th>");
+        }
+        sb.append("<th>الاسم</th><th>م</th></tr></thead><tbody><tr>");
+        sb.append("<td>").append(formatGradeTotal(totalForArchivedColumns(columns, values))).append("</td>");
+        for (Map<String, Object> c : displayCells) {
+            sb.append("<td>").append(esc(safeStr(c.get("value")).isBlank() ? "-" : safeStr(c.get("value")))).append("</td>");
+        }
+        sb.append("<td>").append(esc(fullName)).append("</td>");
+        sb.append("<td>").append(rank == null ? "-" : rank).append("</td>");
+        sb.append("</tr></tbody></table>");
+        return sb.toString();
+    }
+
+    private List<Map<String, Object>> fallbackCellsFromColumns(List<Map<String, Object>> columns, Map<String, String> values) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (columns == null) return out;
+        Map<String, String> safeValues = values == null ? Map.of() : values;
+        for (Map<String, Object> c : columns) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("title", formatArchivedColumnTitle(safeStr(c.get("title"))));
+            row.put("max", formatArchivedColumnMax(safeStr(c.get("title"))));
+            String id = safeStr(c.get("id"));
+            String value = safeStr(safeValues.get(id)).trim();
+            row.put("value", value.isBlank() ? "-" : value);
+            out.add(row);
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> toMapList(Object value) {
+        if (!(value instanceof List<?> list)) return List.of();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) row.put(String.valueOf(entry.getKey()), entry.getValue());
+            out.add(row);
+        }
+        return out;
+    }
+
+    private Map<String, String> toStringMap(Object value) {
+        if (!(value instanceof Map<?, ?> map)) return new LinkedHashMap<>();
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) out.put(String.valueOf(entry.getKey()), safeStr(entry.getValue()));
+        return out;
+    }
+
+    private Integer asInt(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number number) return number.intValue();
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private double totalForArchivedColumns(List<Map<String, Object>> columns, Map<String, String> values) {
+        if (columns == null || values == null) return 0;
+        double total = 0;
+        for (Map<String, Object> c : columns) total += parseGradeNumber(values.get(safeStr(c.get("id"))));
+        return total;
+    }
+
+    private String formatArchivedColumnTitle(String rawTitle) {
+        if (rawTitle == null || rawTitle.isBlank()) return "-";
+        String[] parts = rawTitle.split(TITLE_META_SEPARATOR, -1);
+        return parts.length == 0 || parts[0].isBlank() ? "-" : parts[0];
+    }
+
+    private String formatArchivedColumnMax(String rawTitle) {
+        if (rawTitle == null || rawTitle.isBlank() || !rawTitle.contains(TITLE_META_SEPARATOR)) return "";
+        String[] parts = rawTitle.split(TITLE_META_SEPARATOR, -1);
+        if (parts.length < 2) return "";
+        return String.join(TITLE_META_SEPARATOR, Arrays.copyOfRange(parts, 1, parts.length));
+    }
+
+    private String formatGradeTotal(double value) {
+        if (Math.floor(value) == value) return String.valueOf((long) value);
+        return String.format(Locale.US, "%.2f", value).replaceAll("0+$", "").replaceAll("\\.$", "");
+    }
+
+    private String normalizeArabicText(String value) {
+        return String.valueOf(value == null ? "" : value)
+                .trim()
+                .replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "")
+                .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+                .replace('ة', 'ه').replace('ى', 'ي')
+                .replaceAll("\\s+", " ")
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private String canonicalFamilyName(Object value) {
+        String raw = safeStr(value).trim();
+        String normalized = normalizeArabicText(raw);
+        if (normalized.isBlank()) return "";
+        if (normalized.contains("خورس") && normalized.contains("مار") && normalized.contains("مرقس")) return "خورس مارمرقس";
+        if (normalized.contains("خورس") && normalized.contains("اثناسيوس")) return "خورس البابا اثناسيوس";
+        if (normalized.contains("سمائ")) return "اسرة السمائين";
+        if (normalized.contains("ابانوب")) return "اسرة القديس ابانوب";
+        if (normalized.contains("ديسقورس")) return "اسرة القديس ديسقورس";
+        if (normalized.contains("سيدهم") || normalized.contains("بشاي")) return "اسرة القديس سيدهم بشاي";
+        if (normalized.contains("اسكلابيوس")) return "اسرة القديس اسكلابيوس";
+        if (normalized.contains("كيرلس")) return raw.contains(" ب") ? "اسرة القديس البابا كيرلس ب" : raw.contains(" أ") ? "اسرة القديس البابا كيرلس أ" : "اسرة القديس البابا كيرلس";
+        if (normalized.contains("ابرام")) return raw.contains(" ب") ? "اسرة القديس الانبا ابرام ب" : raw.contains(" أ") ? "اسرة القديس الانبا ابرام أ" : "اسرة القديس الانبا ابرام";
+        if (normalized.contains("اسطفانوس") || normalized.contains("استفانوس")) return raw.contains(" ب") ? "اسرة القديس اسطفانوس ب" : raw.contains(" أ") ? "اسرة القديس اسطفانوس أ" : "اسرة القديس اسطفانوس";
+        return raw;
+    }
+
+    private int familyOrder(Object family) {
+        String base = FamilyUtil.mainFamily(canonicalFamilyName(family));
+        String normalized = normalizeArabicText(base);
+        for (int i = 0; i < PREFERRED_FAMILY_ORDER.size(); i++) {
+            if (normalizeArabicText(PREFERRED_FAMILY_ORDER.get(i)).equals(normalized)) return i;
+        }
+        return Integer.MAX_VALUE;
+    }
+
+    private int compareArchiveUsers(Map<String, Object> a, Map<String, Object> b) {
+        int familyOrderCompare = Integer.compare(familyOrder(a.get("deaconFamily")), familyOrder(b.get("deaconFamily")));
+        if (familyOrderCompare != 0) return familyOrderCompare;
+
+        String aCanonical = canonicalFamilyName(a.get("deaconFamily"));
+        String bCanonical = canonicalFamilyName(b.get("deaconFamily"));
+        int familyCompare = aCanonical.compareToIgnoreCase(bCanonical);
+        if (familyCompare != 0) return familyCompare;
+
+        return safeStr(a.get("fullName")).compareToIgnoreCase(safeStr(b.get("fullName")));
     }
 
     private static Long asLong(Object v) {

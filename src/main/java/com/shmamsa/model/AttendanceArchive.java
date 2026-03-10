@@ -42,6 +42,11 @@ public class AttendanceArchive {
     @Column(columnDefinition = "LONGTEXT")
     private String recordsJson;
 
+    // Snapshot لدرجات المستخدمين وقت الأرشفة (JSON)
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String gradesJson;
+
     @PrePersist
     public void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();

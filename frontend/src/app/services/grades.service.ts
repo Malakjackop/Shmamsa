@@ -30,6 +30,9 @@ export interface MyGradesView {
   familyBase: string;
   firstPublishedAt?: string | null;
   secondPublishedAt?: string | null;
+  firstRank?: number | null;
+  secondRank?: number | null;
+  combinedRank?: number | null;
   firstColumns: GradeColumn[];
   firstValues: Record<string, string>;
   secondColumns: GradeColumn[];
