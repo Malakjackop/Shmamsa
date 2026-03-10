@@ -23,7 +23,7 @@ export class LayoutComponent implements OnInit {
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
 ngOnInit(): void {
-  this.auth.getUserData().subscribe({
+  this.auth.getUserData(true).subscribe({
     next: (u) => this.user = u,
     error: () => this.user = null
   });

@@ -52,7 +52,7 @@
           <th *ngIf="showMarmarkosColumn">خورس مارمرقس</th>
           <th *ngIf="showAthanasiusColumn">خورس البابا اثناسيوس</th>
           <th>تسبحة</th>
-          <th>اجتماع الأسرة</th>
+          <th *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</th>
           <th>تفاصيل</th>
           <th>افتقاد</th>
           <th>الملف</th>
@@ -73,7 +73,7 @@
           <td *ngIf="showMarmarkosColumn">{{ countLabel(m, 'MARMARKOS_KHORS') }}</td>
           <td *ngIf="showAthanasiusColumn">{{ countLabel(m, 'ATHANASIUS_KHORS') }}</td>
           <td>{{ countLabel(m, 'TASBEEHA') }}</td>
-          <td>{{ countLabel(m, 'FAMILY_MEETING') }}</td>
+          <td *ngIf="showFamilyMeetingColumn">{{ countLabel(m, 'FAMILY_MEETING') }}</td>
           <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
 
           <td class="iftekadCell">
@@ -240,7 +240,7 @@
             خورس البابا اثناسيوس
           </option>
           <option value="TASBEEHA">تسبحة</option>
-          <option value="FAMILY_MEETING">اجتماع الأسرة</option>
+          <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
         </select>
       </div>
 

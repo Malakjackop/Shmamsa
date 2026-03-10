@@ -75,7 +75,7 @@ export class AttendanceComponent implements OnInit {
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.auth.getUserData().subscribe((u) => {
+    this.auth.getUserData(true).subscribe((u) => {
       this.me = u;
       this.initCalendarRules();
       this.loadFamilies();
@@ -101,6 +101,25 @@ export class AttendanceComponent implements OnInit {
     return roles.includes('AMIN_OSRA');
   }
 
+  private hasAnyAminPrivilegeScope(): boolean {
+    const norm = (v: any) => {
+      const raw = String(v || '').trim();
+      const up = raw.toUpperCase();
+      if (!up) return '';
+      if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
+      if (['امين خدمة','امين الخدمه','أمين خدمة','أمين الخدمه','امين الخدمة','أمين الخدمة'].includes(raw)) return 'AMIN_KHEDMA';
+      if (up.startsWith('ROLE_')) return up.substring(5);
+      return up;
+    };
+    const roles = [
+      this.me?.deaconFamilyRole,
+      this.me?.deaconFamilyRole2,
+      this.me?.deaconFamilyRole3,
+      this.me?.deaconFamilyRole4
+    ].map(norm);
+    return roles.includes('AMIN_OSRA') || roles.includes('AMIN_KHEDMA');
+  }
+
   private initCalendarRules() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -124,7 +143,7 @@ export class AttendanceComponent implements OnInit {
 
     const canOverrideWeekClose =
       ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_OSRA', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm) ||
-      ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسرة', 'امين الأسرة'].includes(roleArNorm) || this.hasAnyAminOsraScope();
+      ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسرة', 'امين الأسرة'].includes(roleArNorm) || this.hasAnyAminPrivilegeScope();
 
 
     if (canOverrideWeekClose) {
@@ -384,7 +403,7 @@ if (canChoir) {
   }
 
   canSelectFamily(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER' || this.isKhadim();
+    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER' || this.isKhadim() || this.hasAnyAminPrivilegeScope();
   }
 
   prettyRole(role?: string): string {
@@ -518,7 +537,7 @@ onCodeResult(resultString: string) {
       .replace(/[-\s]+/g, '_');
 
     const canOverrideWeekClose =
-      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV'].includes(roleNorm);
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV'].includes(roleNorm) || this.hasAnyAminPrivilegeScope();
 
     if (users.length === 0 && !canOverrideWeekClose) {
       this.message.add({ severity: 'warn', summary: 'No users', detail: 'اختار اسم واحد على الأقل أو اعمل Scan للـ QR' });

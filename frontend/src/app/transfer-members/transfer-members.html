@@ -44,6 +44,7 @@
 
   <ng-template #normalFamilies>
     <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
+    <option *ngFor="let t of familyRequestTargets" [value]="t.value">{{ t.label }}</option>
   </ng-template>
 </select>
 
@@ -51,8 +52,9 @@
           <option *ngFor="let f of servantFamilies" [value]="f">{{f}}</option>
         </select>
 
-        <select class="select" *ngIf="!isAminKhedmaOrDev()" [(ngModel)]="targetFamily">
+        <select class="select" *ngIf="!isAminKhedmaOrDev() && !isKhadim()" [(ngModel)]="targetFamily">
           <option *ngFor="let f of makhdomFamilies" [value]="f">{{f}}</option>
+          <option *ngFor="let t of familyRequestTargets" [value]="t.value">{{ t.label }}</option>
         </select>
       </div>
 
@@ -79,6 +81,7 @@
                 <option value="KHADIM">خادم</option>
                 <option value="AMIN_OSRA">امين اسرة</option>
                 <option value="AMIN_KHEDMA">امين خدمة</option>
+                <option value="MAKHDOM">مخدوم</option>
               </select>
               <button type="button" class="miniBtn" (click)="removeExtraFamily(i)" title="حذف">🗑️</button>
             </div>

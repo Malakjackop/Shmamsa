@@ -58,6 +58,17 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
 
     long countByUser_IdAndTypeAndFamilyBaseAndArchivedFalse(Long userId, AttendanceType type, String familyBase);
 
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and a.familyBase = :familyBase and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
+    long countPresentByUserAndTypeAndFamilyBaseActive(@Param("userId") Long userId,
+                                                      @Param("type") AttendanceType type,
+                                                      @Param("familyBase") String familyBase);
+
+    @Query("select distinct a.date from AttendanceRecord a where a.archived = false and a.type = :type and a.familyBase = :familyBase order by a.date asc")
+    List<LocalDate> findDistinctDatesByTypeAndFamilyBaseAndArchivedFalse(@Param("type") AttendanceType type, @Param("familyBase") String familyBase);
+
+    @Query("select distinct a.date from AttendanceRecord a where a.archived = false and a.type = :type order by a.date asc")
+    List<LocalDate> findDistinctDatesByTypeAndArchivedFalse(@Param("type") AttendanceType type);
+
 
     List<AttendanceRecord> findByUser_IdAndArchivedFalseOrderByCreatedAtDesc(Long userId);
 

@@ -4,7 +4,7 @@
 <div class="page">
   <h1>الموارد</h1>
 
-  <div class="top" *ngIf="isAminKhedmaOrDev()">
+  <div class="top" *ngIf="isUploader() && families.length">
     <label>الأسرة</label>
     <select [(ngModel)]="selectedFamily" (change)="loadResources()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>

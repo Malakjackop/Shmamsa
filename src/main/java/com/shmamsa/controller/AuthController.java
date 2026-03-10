@@ -8,6 +8,7 @@ import com.shmamsa.dto.RegisterRequest;
 import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.User;
+import com.shmamsa.service.AttendanceBackfillService;
 import com.shmamsa.service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final AttendanceBackfillService attendanceBackfillService;
 
 
     @PostMapping("/register")
@@ -73,6 +75,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             return ResponseEntity.ok(Map.of("authenticated", false));
         }
 
+        attendanceBackfillService.backfillForUser(user);
         user.setPassword(null);
 
         // Hide internal/system family label from responses (for all roles)

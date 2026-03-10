@@ -100,6 +100,10 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   { label: 'طلب نقل لخورس البابا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
 ];
 
+familyRequestTargets: { label: string; value: string }[] = [
+  { label: 'طلب نقل لخورس مارمرقس', value: 'KHORS_REQUEST:MARMARKOS' }
+];
+
   mode: TransferMode = 'MAKHDOM';
   selectedFamilyView = '';
   targetFamily = '';
@@ -107,7 +111,7 @@ marmarkosYearTargets: { label: string; value: string }[] = [
   targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'KHADIM';
 
   ngOnInit() {
-    this.auth.getUserData().subscribe({
+    this.auth.getUserData(true).subscribe({
       next: (u) => {
         this.me = u;
         this.bootstrapDefaults();
@@ -243,21 +247,12 @@ private normRole(v: any): string {
         } else if (this.hasAnyScopedAminOsra()) {
           this.viewFamilies = this.sortFamiliesByPreferredOrder(this.getAminOsraFamilies());
         } else if (this.isKhadim()) {
-          const mine = [
-            this.me?.deaconFamily,
-            this.me?.deaconFamily2,
-            this.me?.deaconFamily3,
-            this.me?.deaconFamily4,
-          ]
-            .map((x: any) => this.canonicalFamilyName(x))
-            .filter((x: string) => !!x);
-
-          this.viewFamilies = this.sortFamiliesByPreferredOrder(Array.from(new Set(mine)));
+          this.viewFamilies = this.sortFamiliesByPreferredOrder(this.getServedFamilies());
         } else {
           this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
         }
 
-        if (Array.isArray(list) && list.length) {
+        if (this.isAminKhedmaOrDev() && Array.isArray(list) && list.length) {
           this.viewFamilies = this.sortFamiliesByPreferredOrder([
             ...this.viewFamilies,
             ...(list as any[]).map((x) => this.canonicalFamilyName(x))
@@ -312,8 +307,7 @@ private normRole(v: any): string {
     const ok = new Set(['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA']);
     list = list.filter((x: any) => ok.has(String(x?.role || '').trim().toUpperCase()));
   }
-        } else if (this.isAminOsra()) {
-          // ✅ Amin Osra can transfer/view MAKHDOM only within his family
+        } else if (this.isKhadim()) {
           list = list.filter((x: any) => String(x?.role || '').trim().toUpperCase() === 'MAKHDOM');
         }
         this.members = list;
@@ -321,7 +315,7 @@ private normRole(v: any): string {
       },
       error: (err) => {
         this.loading = false;
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load members' });
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في تحميل الاعضاء' });
       }
     });
   }
@@ -345,7 +339,7 @@ private levelLabel(n?: number): string {
 
 
 private familyRoleFor(m: Member, fam: string): string {
-  const f = String(fam || '').trim();
+  const selected = this.canonicalFamilyName(fam);
   const slots: Array<[string | undefined, string | undefined]> = [
     [m.deaconFamily, (m as any).deaconFamilyRole],
     [m.deaconFamily2, (m as any).deaconFamilyRole2],
@@ -353,7 +347,7 @@ private familyRoleFor(m: Member, fam: string): string {
     [m.deaconFamily4, (m as any).deaconFamilyRole4],
   ];
   for (const [sf, sr] of slots) {
-    if (String(sf || '').trim() && String(sf || '').trim().toLowerCase() === f.toLowerCase()) {
+    if (this.canonicalFamilyName(sf) === selected) {
       return this.getRoleLabel(String(sr || '').trim().toUpperCase());
     }
   }
@@ -401,10 +395,7 @@ displayFamily(m: Member): string {
     const parts: string[] = [];
     parts.push(...families.map(f => this.familyWithRole(m, f)));
 
-    // show khors when:
-    // - servant is KHORS_ONLY
-    // - or he actually has a khors code
-    // - or his base family was a choir bucket
+
     const baseFamily = String(m.deaconFamily || '').trim();
     const shouldShowKhors = (scope === 'KHORS_ONLY' || scope === 'BOTH') && !!khLabel;
     if (shouldShowKhors && khLabel && !parts.includes(khLabel)) parts.push(khLabel);
@@ -475,7 +466,7 @@ removeFromChoir(m: Member) {
           this.loadMembers();
         },
         error: (err) => {
-          this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Delete failed' });
+          this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل في المسح' });
         }
       });
     }
@@ -526,17 +517,17 @@ removeFromChoir(m: Member) {
 
   doTransfer() {
     if (!this.targetFamily) {
-      this.message.add({ severity: 'warn', summary: 'Choose family', detail: 'Please choose the target family.' });
+      this.message.add({ severity: 'warn', summary: 'اختار اسره', detail: 'برجاء اختيار الاسره.' });
       return;
     }
 
     if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT' && !this.targetRole) {
-      this.message.add({ severity: 'warn', summary: 'Choose role', detail: 'Please choose the target role.' });
+      this.message.add({ severity: 'warn', summary: 'اختار الدور', detail: 'برجاء اختيار الدور ' });
       return;
     }
 
     if (!this.selectedIds.size) {
-      this.message.add({ severity: 'warn', summary: 'No selection', detail: 'Please select at least one member.' });
+      this.message.add({ severity: 'warn', summary: 'برجاء التحديد', detail: 'برجاء اختيار عضو واحد علي الاقل' });
       return;
     }
 
@@ -544,15 +535,15 @@ removeFromChoir(m: Member) {
     const roleLabel = this.getRoleLabel(this.targetRole);
 
     const msg = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
-      ? `Transfer ${ids.length} account(s) to "${this.targetFamily}" as "${roleLabel}"?`
-      : `Transfer ${ids.length} account(s) to "${this.targetFamily}"?`;
+      ? `تريد نقل  ${ids.length} مستخدم الي  "${this.targetFamily}" بدور  "${roleLabel}"؟`
+      : `نقل ${ids.length} مستخدم الي  "${this.targetFamily}"؟`;
 
     this.confirm.confirm({
-      header: 'Confirm transfer',
+      header: 'تأكيد التحويل',
       message: msg,
       icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Transfer',
-      rejectLabel: 'Cancel',
+      acceptLabel: 'نقل',
+      rejectLabel: 'الغاء',
       accept: () => {
         const roleToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') ? this.targetRole : undefined;
         const extraAssignmentsToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
@@ -560,15 +551,15 @@ removeFromChoir(m: Member) {
               .map(x => ({ family: String(x?.family || '').trim(), role: String(x?.role || 'KHADIM').trim().toUpperCase() }))
               .filter(x => !!x.family)
           : undefined;
-        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend, undefined, extraAssignmentsToSend).subscribe({
+        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend, undefined, extraAssignmentsToSend, this.selectedFamilyView).subscribe({
           next: (res) => {
             const updated = res?.updated ?? 0;
-            this.message.add({ severity: 'success', summary: 'Done', detail: `Transferred: ${updated}` });
+            this.message.add({ severity: 'success', summary: 'نجح', detail: `تم نقل: ${updated}` });
             this.cancelSelecting();
             this.loadMembers();
           },
           error: (err) => {
-            this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Transfer failed' });
+            this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل النقل' });
           }
         });
       }
@@ -580,7 +571,7 @@ removeFromChoir(m: Member) {
   }
 
   private myRoleForFamily(fam: string): string {
-  const f = String(fam || '').trim().toLowerCase();
+  const selected = this.canonicalFamilyName(fam);
   const slots: Array<[string | undefined, string | undefined]> = [
     [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
     [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
@@ -589,7 +580,7 @@ removeFromChoir(m: Member) {
   ];
 
   for (const [sf, sr] of slots) {
-    if (String(sf || '').trim().toLowerCase() === f) {
+    if (this.canonicalFamilyName(sf) === selected) {
       return this.normRole(sr);
     }
   }
@@ -625,6 +616,26 @@ private getAminOsraFamilies(): string[] {
 
 private hasAnyScopedAminOsra(): boolean {
   return this.getAminOsraFamilies().length > 0;
+}
+
+private getServedFamilies(): string[] {
+  const slots: Array<[string | undefined, string | undefined]> = [
+    [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
+    [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
+    [this.me?.deaconFamily3, this.me?.deaconFamilyRole3],
+    [this.me?.deaconFamily4, this.me?.deaconFamilyRole4],
+  ];
+
+  const res: string[] = [];
+  for (const [fam, role] of slots) {
+    const f = this.canonicalFamilyName(fam);
+    if (!f) continue;
+
+    const r = this.normRole(role);
+    if (!['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA'].includes(r)) continue;
+    if (!res.includes(f)) res.push(f);
+  }
+  return res;
 }
 
 

@@ -41,7 +41,7 @@ export class ResourcesComponent implements OnInit {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.auth.getUserData().subscribe({
+    this.auth.getUserData(true).subscribe({
       next: (u) => {
         this.user = u;
         this.initPage();
@@ -49,16 +49,45 @@ export class ResourcesComponent implements OnInit {
     });
   }
 
+  private normRole(v: any): string {
+    const raw = String(v || '').trim();
+    const up = raw.toUpperCase();
+    if (!up) return '';
+    if (['امين اسرة', 'امين الاسرة', 'أمين أسرة', 'أمين الاسرة', 'امين الأسرة', 'أمين الأسرة'].includes(raw)) return 'AMIN_OSRA';
+    if (['امين خدمة', 'امين الخدمه', 'أمين خدمة', 'أمين الخدمه', 'امين الخدمة', 'أمين الخدمة'].includes(raw)) return 'AMIN_KHEDMA';
+    if (up.startsWith('ROLE_')) return up.substring(5);
+    return up;
+  }
+
+  private getServedFamilies(): string[] {
+    const slots: Array<[string | undefined, string | undefined]> = [
+      [this.user?.deaconFamily, this.user?.deaconFamilyRole || this.user?.role],
+      [this.user?.deaconFamily2, this.user?.deaconFamilyRole2],
+      [this.user?.deaconFamily3, this.user?.deaconFamilyRole3],
+      [this.user?.deaconFamily4, this.user?.deaconFamilyRole4]
+    ];
+
+    const res: string[] = [];
+    for (const [fam, role] of slots) {
+      const f = String(fam || '').trim();
+      if (!f) continue;
+      const r = this.normRole(role);
+      if (!['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r)) continue;
+      if (!res.includes(f)) res.push(f);
+    }
+    return res;
+  }
+
   isMakhdom(): boolean {
-    return this.user?.role === 'MAKHDOM';
+    return this.normRole(this.user?.role) === 'MAKHDOM';
   }
 
   isUploader(): boolean {
-    return ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
+    return this.getServedFamilies().length > 0 || ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'].includes(this.normRole(this.user?.role));
   }
 
   isAminKhedmaOrDev(): boolean {
-    return ['AMIN_KHEDMA','DEVELOPER'].includes(this.user?.role);
+    return ['AMIN_KHEDMA','DEVELOPER'].includes(this.normRole(this.user?.role));
   }
 
   initPage() {
@@ -70,6 +99,10 @@ export class ResourcesComponent implements OnInit {
           this.loadResources();
         }
       });
+    } else if (this.isUploader()) {
+      this.families = this.getServedFamilies();
+      this.selectedFamily = this.families[0] || '';
+      this.loadResources();
     } else {
       this.loadResources();
     }
@@ -85,7 +118,7 @@ export class ResourcesComponent implements OnInit {
       return;
     }
 
-    this.resService.list().subscribe({
+    this.resService.list(this.selectedFamily || undefined).subscribe({
       next: (data) => (this.resources = data || []),
       error: () => (this.resources = [])
     });
@@ -108,7 +141,7 @@ export class ResourcesComponent implements OnInit {
     if (this.title) fd.append('title', this.title);
     if (this.description) fd.append('description', this.description);
 
-    if (this.isAminKhedmaOrDev()) {
+    if (this.selectedFamily) {
       fd.append('family', this.selectedFamily);
     }
 

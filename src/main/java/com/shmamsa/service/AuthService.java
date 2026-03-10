@@ -26,6 +26,7 @@ public class AuthService {
     private final EmailService emailService;
 
     private final KhorsJoinRequestService khorsJoinRequestService;
+    private final AttendanceBackfillService attendanceBackfillService;
 
     private final ServantSecretService servantSecretService;
 
@@ -182,6 +183,7 @@ public class AuthService {
         });
 
         userRepository.save(user);
+        attendanceBackfillService.backfillForUser(user);
 
         khorsJoinRequestService.createForUserIfNeeded(user, requestedKhors);
     }
@@ -336,6 +338,7 @@ public class AuthService {
 
 
         userRepository.save(user);
+        attendanceBackfillService.backfillForUser(user);
 
         khorsJoinRequestService.createForUserIfNeeded(user, requestedAttendKhors);
 

@@ -202,6 +202,10 @@ export class FamilyAttendanceComponent implements OnInit {
     return this.isAthanasiusChoir;
   }
 
+  get showFamilyMeetingColumn(): boolean {
+    return !this.isChoirSelected();
+  }
+
   isAminKhedmaOrDev(): boolean {
     return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
   }
@@ -502,8 +506,12 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   visibleAttendanceTypes(): AttendanceRow['type'][] {
-    if (!this.detailsFor) return this.allAttendanceTypes;
-    return this.allAttendanceTypes.filter((t) => this.isAttendanceTypeAllowedForMember(this.detailsFor!, t as any));
+    const baseTypes = this.showFamilyMeetingColumn
+      ? this.allAttendanceTypes
+      : this.allAttendanceTypes.filter((t) => t !== 'FAMILY_MEETING');
+
+    if (!this.detailsFor) return baseTypes;
+    return baseTypes.filter((t) => this.isAttendanceTypeAllowedForMember(this.detailsFor!, t as any));
   }
 
   filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
@@ -721,7 +729,9 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   dailyTypeOptions(): AttendanceType[] {
-    const base: AttendanceType[] = ['FRIDAY_LITURGY', 'TASBEEHA', 'FAMILY_MEETING'];
+    const base: AttendanceType[] = this.showFamilyMeetingColumn
+      ? ['FRIDAY_LITURGY', 'TASBEEHA', 'FAMILY_MEETING']
+      : ['FRIDAY_LITURGY', 'TASBEEHA'];
     if (this.canShowDailyKhorsTypes()) {
       base.push('MARMARKOS_KHORS', 'ATHANASIUS_KHORS');
     }
