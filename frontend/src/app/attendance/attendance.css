@@ -71,7 +71,3 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;min-width:200px;}
 /* allow long content to scroll inside main */
 .page{min-height: 100%;}
 
-/* PrimeNG datepicker arrows in RTL: keep header LTR so prev/next are not visually "reversed" */
-:host ::ng-deep .attendanceDatePanel .p-datepicker-header{
-  direction: ltr;
-}

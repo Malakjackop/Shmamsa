@@ -321,7 +321,14 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
   margin:0;
 }
 
-::ng-deep .attendanceCalendarPanel .p-datepicker-title{
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button{
+  grid-column:1;
+  justify-self:start;
+  margin:0;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-title,
+::ng-deep .iftekadCalendarPanel .p-datepicker-title{
   grid-column:2;
   display:flex;
   justify-content:center;
@@ -332,15 +339,18 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
   font-weight:700;
 }
 
-::ng-deep .attendanceCalendarPanel .p-datepicker-month{
+::ng-deep .attendanceCalendarPanel .p-datepicker-month,
+::ng-deep .iftekadCalendarPanel .p-datepicker-month{
   order:0;
 }
 
-::ng-deep .attendanceCalendarPanel .p-datepicker-year{
+::ng-deep .attendanceCalendarPanel .p-datepicker-year,
+::ng-deep .iftekadCalendarPanel .p-datepicker-year{
   order:1;
 }
 
-::ng-deep .attendanceCalendarPanel .p-datepicker-next-button{
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button{
   grid-column:3;
   justify-self:end;
   margin:0;

@@ -33,4 +33,78 @@ textarea {
   font-family: "Somar Sans", sans-serif;
 }
 
+.dashboardDatePanel .p-datepicker-header {
+  direction: rtl;
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+}
+
+.dashboardDatePanel .p-datepicker-prev-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.dashboardDatePanel .p-datepicker-title {
+  grid-column: 2;
+  direction: rtl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.dashboardDatePanel .p-datepicker-next-button {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.dashboardDatePanel .p-datepicker-prev-button .p-button-icon,
+.dashboardDatePanel .p-datepicker-prev-button .pi,
+.dashboardDatePanel .p-datepicker-prev-button .p-icon,
+.dashboardDatePanel .p-datepicker-prev-button svg,
+.dashboardDatePanel .p-datepicker-next-button .p-button-icon,
+.dashboardDatePanel .p-datepicker-next-button .pi,
+.dashboardDatePanel .p-datepicker-next-button .p-icon,
+.dashboardDatePanel .p-datepicker-next-button svg {
+  transform: scaleX(-1) !important;
+}
+
+.attendanceDatePanel .p-datepicker-header {
+  direction: rtl;
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+}
+
+.attendanceDatePanel .p-datepicker-prev-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.attendanceDatePanel .p-datepicker-title {
+  grid-column: 2;
+  direction: rtl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.attendanceDatePanel .p-datepicker-next-button {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.attendanceDatePanel .p-datepicker-prev-button .p-button-icon,
+.attendanceDatePanel .p-datepicker-prev-button .pi,
+.attendanceDatePanel .p-datepicker-prev-button .p-icon,
+.attendanceDatePanel .p-datepicker-prev-button svg,
+.attendanceDatePanel .p-datepicker-next-button .p-button-icon,
+.attendanceDatePanel .p-datepicker-next-button .pi,
+.attendanceDatePanel .p-datepicker-next-button .p-icon,
+.attendanceDatePanel .p-datepicker-next-button svg {
+  transform: scaleX(-1) !important;
+}
+
 

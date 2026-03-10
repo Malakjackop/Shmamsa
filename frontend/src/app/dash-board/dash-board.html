@@ -216,7 +216,7 @@
 
   <!-- Dialogs زي ما هم عندك (ما غيرتهمش) -->
   <!-- Event Dialog -->
-  <p-dialog [(visible)]="showEventDialog" [modal]="true" [style]="{width:'520px'}" header="إضافة/تعديل موعد">
+  <p-dialog [(visible)]="showEventDialog" [modal]="true" [draggable]="false" [style]="{width:'520px'}" header="إضافة/تعديل موعد">
     <div style="display:flex; flex-direction:column; gap:10px;">
       <label>العنوان (هيظهر من برّه)</label>
       <input pInputText [(ngModel)]="eventForm.title" />
@@ -232,6 +232,7 @@
         dateFormat="yy-mm-dd"
         placeholder="اختار اليوم"
         [showButtonBar]="true"
+        panelStyleClass="dashboardDatePanel"
         appendTo="body"
       ></p-datepicker>
 
@@ -243,6 +244,7 @@
         dateFormat="yy-mm-dd"
         placeholder="اختياري: تاريخ إزالة تلقائي"
         [showButtonBar]="true"
+        panelStyleClass="dashboardDatePanel"
         appendTo="body"
       ></p-datepicker>
 
@@ -259,7 +261,7 @@
   </p-dialog>
 
   <!-- Join Dialog -->
-  <p-dialog [(visible)]="showJoinDialog" [modal]="true" [style]="{width:'520px'}" header="تفاصيل الموعد">
+  <p-dialog [(visible)]="showJoinDialog" [modal]="true" [draggable]="false" [style]="{width:'520px'}" header="تفاصيل الموعد">
     <div *ngIf="selectedJoinEvent">
       <h3 style="margin-top:0;">{{ selectedJoinEvent.title }}</h3>
       <div style="opacity:.8; margin-bottom:10px;">{{ formatDateTime(selectedJoinEvent.eventAt) }}</div>
@@ -280,7 +282,7 @@
   </p-dialog>
 
   <!-- Participants Dialog -->
-  <p-dialog [(visible)]="showParticipantsDialog" [modal]="true" [style]="{width:'650px'}" header="تفاصيل المنضمين">
+  <p-dialog [(visible)]="showParticipantsDialog" [modal]="true" [draggable]="false" [style]="{width:'650px'}" header="تفاصيل المنضمين">
     <p-table [value]="participantsGroups" *ngIf="participantsGroups.length > 0; else noParts">
       <ng-template pTemplate="header">
         <tr>
@@ -307,7 +309,7 @@
   </p-dialog>
 
   <!-- Announcement Dialog -->
-  <p-dialog [(visible)]="showAnnDialog" [modal]="true" [style]="{width:'520px'}" header="إضافة/تعديل تنبيه">
+  <p-dialog [(visible)]="showAnnDialog" [modal]="true" [draggable]="false" [style]="{width:'520px'}" header="إضافة/تعديل تنبيه">
     <div style="display:flex; flex-direction:column; gap:10px;">
       <label>العنوان (هيظهر من برّه)</label>
       <input pInputText [(ngModel)]="annForm.title" />
@@ -328,7 +330,7 @@
   </p-dialog>
 
   <!-- Announcement Details -->
-  <p-dialog [(visible)]="showAnnDetailsDialog" [modal]="true" [style]="{width:'520px'}" header="تفاصيل التنبيه">
+  <p-dialog [(visible)]="showAnnDetailsDialog" [modal]="true" [draggable]="false" [style]="{width:'520px'}" header="تفاصيل التنبيه">
     <div *ngIf="selectedAnn">
       <h3 style="margin-top:0;">{{ selectedAnn.title }}</h3>
       <div style="opacity:.8; margin-bottom:8px;">{{ daysAgo(selectedAnn.createdAt) }} • {{ targetLabel(selectedAnn) }}</div>

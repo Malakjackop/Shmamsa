@@ -273,6 +273,7 @@ export class FamilyComponent implements OnInit {
     const currentRole = String(member?.role || '').toUpperCase();
     return (this.allRoles || []).filter((role) => {
       const candidate = String(role || '').toUpperCase();
+      if (candidate === 'ADMIN' || candidate === 'ROLE_ADMIN') return false;
       if (candidate === 'DEVELOPER' || candidate === 'DEV' || candidate === 'ROLE_DEVELOPER') return false;
       if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
       return true;
