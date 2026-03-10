@@ -69,7 +69,7 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .histRight{
   display:flex;
   align-items:center;
-  gap:10px;              /* ✅ space between text + icons */
+  gap:10px;
   flex-wrap:wrap;
 }
 .histBy{font-size:12px;color:#666;}
@@ -77,7 +77,7 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
   border:1px solid #ddd;
   background:#fff;
   border-radius:10px;
-  padding:6px 10px;      /* ✅ bigger clickable area */
+  padding:6px 10px;
   cursor:pointer;
   line-height:1;
 }
@@ -199,7 +199,6 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
   margin-top: 6px;
 }
 
-
 /* ===== Present / Absent Boxes like screenshot ===== */
 .dailyBoxes{
   display:grid;
@@ -282,4 +281,161 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
   .dailyBoxes{grid-template-columns:1fr;}
 }
 
+/* ===== Calendar input look ===== */
+.dailyField ::ng-deep .p-datepicker,
+.iftekadField ::ng-deep .p-datepicker,
+.editField ::ng-deep .p-datepicker{
+  width:100%;
+}
+
+.dailyField ::ng-deep .p-inputtext,
+.iftekadField ::ng-deep .p-inputtext,
+.editField ::ng-deep .p-inputtext{
+  width:100%;
+  padding:10px 42px 10px 12px;
+  border:1px solid #ddd;
+  font:inherit;
+}
+
+/* ===== Small Arabic calendar panel ===== */
+::ng-deep .attendanceCalendarPanel.p-datepicker{
+  width:360px !important;
+  max-width:95vw;
+  direction:rtl;
+  overflow:hidden;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-header,
+::ng-deep .iftekadCalendarPanel .p-datepicker-header{
+  direction:ltr;
+  display:grid;
+  grid-template-columns:24px 1fr 24px;
+  align-items:center;
+  padding:12px 14px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button{
+  grid-column:1;
+  justify-self:start;
+  margin:0;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-title{
+  grid-column:2;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:30px;
+  text-align:center;
+  direction:rtl;
+  font-weight:700;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-month{
+  order:0;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-year{
+  order:1;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button{
+  grid-column:3;
+  justify-self:end;
+  margin:0;
+}
+
+::ng-deep .attendanceCalendarPanel table{
+  width:100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 6px 0;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-calendar th{
+  text-align:center;
+  font-weight:700;
+  padding:.45rem .25rem;
+  white-space: nowrap;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-calendar td{
+  text-align:center;
+  padding:.2rem .15rem;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-calendar th > span,
+::ng-deep .attendanceCalendarPanel .p-datepicker-calendar td > span{
+  width:2.35rem;
+  height:2.35rem;
+  margin:auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-buttonbar{
+  padding:.8rem 1rem;
+}
+
+/* ===== Calendar arrows style fix ===== */
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button{
+  width:auto !important;
+  min-width:auto !important;
+  height:auto !important;
+  padding:0 !important;
+  margin:0 !important;
+  border:none !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  color:#f5f5f5 !important;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button:hover,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button:hover,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button:hover,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button:hover{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  color:#ffffff !important;
+}
+
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button:focus,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button:focus,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button:focus,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button:focus{
+  outline:none !important;
+  box-shadow:none !important;
+}
+
+/* يدعم كل أشكال الأيقونات حسب نسخة PrimeNG */
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button .p-button-icon,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button .p-button-icon,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button .p-button-icon,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button .p-button-icon,
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button .pi,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button .pi,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button .pi,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button .pi,
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button .p-icon,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button .p-icon,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button .p-icon,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button .p-icon,
+::ng-deep .attendanceCalendarPanel .p-datepicker-prev-button svg,
+::ng-deep .attendanceCalendarPanel .p-datepicker-next-button svg,
+::ng-deep .iftekadCalendarPanel .p-datepicker-prev-button svg,
+::ng-deep .iftekadCalendarPanel .p-datepicker-next-button svg{
+  font-size:14px !important;
+  width:14px !important;
+  height:14px !important;
+  color:#f5f5f5 !important;
+  stroke-width:2.2 !important;
+}
 

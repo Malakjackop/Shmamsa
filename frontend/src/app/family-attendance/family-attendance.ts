@@ -131,7 +131,7 @@ export class FamilyAttendanceComponent implements OnInit {
   dailyDisabledWeekDays: number[] = [0, 1, 2, 3]; // الأحد - الاثنين - الثلاثاء - الأربعاء
 
   arDatePickerLocale = {
-    firstDayOfWeek: 6,
+    firstDayOfWeek: 1,
     dayNames: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
     dayNamesShort: ['أحد', 'اثن', 'ثلا', 'أرب', 'خم', 'جم', 'سبت'],
     dayNamesMin: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'],
@@ -148,7 +148,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   // ===== Iftekad (visitation) =====
   iftekadFor: Member | null = null;
-  iftekadDate = '';
+  iftekadDate: Date | null = null;
   iftekadDesc = '';
   iftekadCompanions = '';
   iftekadSaving = false;
@@ -157,7 +157,7 @@ export class FamilyAttendanceComponent implements OnInit {
   iftekadHistoryLoading = false;
 
   editingVisitId: number | null = null;
-  editVisitDate = '';
+  editVisitDate: Date | null = null;
   editVisitDesc = '';
   editVisitCompanions = '';
   editSaving = false;
@@ -654,7 +654,7 @@ export class FamilyAttendanceComponent implements OnInit {
     return d;
   }
 
-  private toIsoDateOnly(value: Date | null): string {
+  private toIsoDateOnly(value: Date | string | null): string {
     if (!value) return '';
 
     const d = value instanceof Date ? value : new Date(value);
@@ -664,6 +664,16 @@ export class FamilyAttendanceComponent implements OnInit {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private toDateValue(value: Date | string | null): Date | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(`${value}T00:00:00`);
+  return isNaN(d.getTime()) ? null : d;
+  }
+
+  displayDateOnly(value: Date | string | null): string {
+    return this.toIsoDateOnly(value);
   }
 
   private isAllowedDailyDate(value: Date | null): boolean {
@@ -866,10 +876,10 @@ export class FamilyAttendanceComponent implements OnInit {
     this.iftekadFor = member;
     this.iftekadDesc = '';
     this.iftekadCompanions = '';
-    this.iftekadDate = '';
+    this.iftekadDate = null;
 
     this.editingVisitId = null;
-    this.editVisitDate = '';
+    this.editVisitDate = null;
     this.editVisitDesc = '';
     this.editVisitCompanions = '';
     this.editSaving = false;
@@ -881,14 +891,14 @@ export class FamilyAttendanceComponent implements OnInit {
     this.iftekadFor = null;
     this.iftekadDesc = '';
     this.iftekadCompanions = '';
-    this.iftekadDate = '';
+    this.iftekadDate = null;
     this.iftekadSaving = false;
 
     this.iftekadHistory = [];
     this.iftekadHistoryLoading = false;
 
     this.editingVisitId = null;
-    this.editVisitDate = '';
+    this.editVisitDate = null;
     this.editVisitDesc = '';
     this.editVisitCompanions = '';
     this.editSaving = false;
@@ -899,7 +909,7 @@ export class FamilyAttendanceComponent implements OnInit {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    this.iftekadDate = `${yyyy}-${mm}-${dd}`;
+    this.iftekadDate = new Date();
   }
 
   private loadIftekadHistory(memberId: number) {
@@ -943,7 +953,9 @@ export class FamilyAttendanceComponent implements OnInit {
 
   saveIftekad() {
     if (!this.iftekadFor) return;
-    if (!this.iftekadDate) {
+
+    const visitDate = this.toIsoDateOnly(this.iftekadDate);
+    if (!visitDate) {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار التاريخ أولاً' });
       return;
     }
@@ -952,18 +964,16 @@ export class FamilyAttendanceComponent implements OnInit {
     this.iftekadSvc
       .createVisit({
         memberId: this.iftekadFor.id,
-        date: this.iftekadDate,
+        date: visitDate,
         description: this.iftekadDesc || undefined,
         companions: this.iftekadCompanions || undefined
       })
       .subscribe({
         next: (created: any) => {
-          // update last date (for red dot)
-          (this.iftekadFor as any).lastIftekadDate = this.iftekadDate;
+          (this.iftekadFor as any).lastIftekadDate = visitDate;
           const idx = this.members.findIndex((x) => x.id === this.iftekadFor!.id);
-          if (idx >= 0) (this.members[idx] as any).lastIftekadDate = this.iftekadDate;
+          if (idx >= 0) (this.members[idx] as any).lastIftekadDate = visitDate;
 
-          // add to history instantly
           if (created) {
             const row: IftekadVisitView = {
               id: created.id,
@@ -982,7 +992,6 @@ export class FamilyAttendanceComponent implements OnInit {
           this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تسجيل الافتقاد' });
           this.iftekadSaving = false;
 
-          // clear optional fields after save
           this.iftekadDesc = '';
           this.iftekadCompanions = '';
         },
@@ -995,54 +1004,53 @@ export class FamilyAttendanceComponent implements OnInit {
 
   startEditVisit(v: IftekadVisitView) {
     this.editingVisitId = v.id;
-    this.editVisitDate = v.visitDate || '';
+    this.editVisitDate = this.toDateValue(v.visitDate);
     this.editVisitDesc = (v.description || '') as string;
     this.editVisitCompanions = (v.companions || '') as string;
   }
 
   cancelEditVisit() {
     this.editingVisitId = null;
-    this.editVisitDate = '';
+    this.editVisitDate = null;
     this.editVisitDesc = '';
     this.editVisitCompanions = '';
     this.editSaving = false;
   }
 
- saveEditVisit(v: IftekadVisitView) {
-  if (!this.iftekadFor) return;
-  if (!this.editVisitDate) {
-    this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار التاريخ أولاً' });
-    return;
-  }
+  saveEditVisit(v: IftekadVisitView) {
+    if (!this.iftekadFor) return;
 
-  this.editSaving = true;
+    const editDate = this.toIsoDateOnly(this.editVisitDate);
+    if (!editDate) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار التاريخ أولاً' });
+      return;
+    }
 
-  // ✅ القيم اللي المفروض تتسجل بعد التعديل
-  const expected = {
-    date: this.editVisitDate,
-    description: (this.editVisitDesc || '').trim(),
-    companions: (this.editVisitCompanions || '').trim()
-  };
+    this.editSaving = true;
 
-  this.iftekadSvc
-    .updateVisit(v.id, {
-      date: expected.date,
-      description: expected.description || undefined,
-      companions: expected.companions || undefined
-    })
-    .subscribe({
-      next: () => {
-        // ✅ نجاح طبيعي
-        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الافتقاد' });
-        this.editSaving = false;
-        this.cancelEditVisit();
-        this.loadIftekadHistory(this.iftekadFor!.id); // يحدّث السجل فوراً
-      },
-      error: (err: any) => {
-        // ✅ هنا بدل ما نطلع Error وخلاص.. نتأكد هل اتعدّل فعلاً
-        this.verifyVisitUpdatedAfterError(v.id, expected, err);
-      }
-    });
+    const expected = {
+      date: editDate,
+      description: (this.editVisitDesc || '').trim(),
+      companions: (this.editVisitCompanions || '').trim()
+    };
+
+    this.iftekadSvc
+      .updateVisit(v.id, {
+        date: expected.date,
+        description: expected.description || undefined,
+        companions: expected.companions || undefined
+      })
+      .subscribe({
+        next: () => {
+          this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الافتقاد' });
+          this.editSaving = false;
+          this.cancelEditVisit();
+          this.loadIftekadHistory(this.iftekadFor!.id);
+        },
+        error: (err: any) => {
+          this.verifyVisitUpdatedAfterError(v.id, expected, err);
+        }
+      });
   }
   private verifyVisitUpdatedAfterError(
   visitId: number,

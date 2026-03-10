@@ -109,11 +109,13 @@
             (ngModelChange)="onDailyDateChange()"
             [ngModelOptions]="{ standalone: true }"
             [showIcon]="true"
+            panelStyleClass="attendanceDatePanel"
             [readonlyInput]="true"
             [showButtonBar]="true"
             [maxDate]="dailyMaxDate"
             [disabledDays]="dailyDisabledWeekDays"
-            dateFormat="yy-mm-dd"
+            [firstDayOfWeek]="1"
+            dateFormat="سنة-شهر-يوم"
             placeholder="اختر اليوم"
             appendTo="body"
           ></p-datepicker>
@@ -202,7 +204,7 @@
         <div class="confirmBox">
           <div class="confirmTitle">تأكيد</div>
           <div class="confirmText">
-            هل تريد إلغاء حضور <b>{{ dailyRemoveTarget.fullName }}</b> يوم <b>{{ dailyDate }}</b> ؟
+            هل تريد إلغاء حضور <b>{{ dailyRemoveTarget.fullName }}</b> يوم <b>{{ displayDateOnly(dailyDate) }}</b> ؟
           </div>
           <div class="confirmActions">
             <button type="button" class="dangerBtn" [disabled]="dailyRemoveSaving" (click)="confirmDailyRemove()">تأكيد</button>
@@ -352,7 +354,19 @@
       <div class="iftekadForm">
         <div class="iftekadField">
           <label>التاريخ</label>
-          <input type="date" [(ngModel)]="iftekadDate" [ngModelOptions]="{ standalone: true }" />
+          <p-datepicker
+            [(ngModel)]="iftekadDate"
+            [ngModelOptions]="{ standalone: true }"
+            [showIcon]="true"
+            panelStyleClass="iftekadCalendarPanel"
+            [readonlyInput]="true"
+            [showButtonBar]="true"
+            [maxDate]="dailyMaxDate"
+            [firstDayOfWeek]="1"
+            dateFormat="yy-mm-dd"
+            placeholder="اختر التاريخ"
+            appendTo="body"
+          ></p-datepicker>
         </div>
 
         <div class="iftekadField">
@@ -411,8 +425,21 @@
               <div class="editGrid">
                 <div class="editField">
                   <label>التاريخ</label>
-                  <input type="date" [(ngModel)]="editVisitDate" [ngModelOptions]="{ standalone: true }" />
+                  <p-datepicker
+                    [(ngModel)]="editVisitDate"
+                    [ngModelOptions]="{ standalone: true }"
+                    [showIcon]="true"
+                    panelStyleClass="iftekadCalendarPanel"
+                    [readonlyInput]="true"
+                    [showButtonBar]="true"
+                    [maxDate]="dailyMaxDate"
+                    [firstDayOfWeek]="1"
+                    dateFormat="سنة-شهر-يوم"
+                    placeholder="اختر التاريخ"
+                    appendTo="body"
+                  ></p-datepicker>
                 </div>
+
                 <div class="editField">
                   <label>وصف</label>
                   <input type="text" [(ngModel)]="editVisitDesc" [ngModelOptions]="{ standalone: true }" />
