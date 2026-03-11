@@ -269,7 +269,9 @@ export class ProfileComponent implements OnInit {
     this.profileForm.get('guardiansPhone')?.enable({ emitEvent: false });
     this.profileForm.get('guardianRelation')?.enable({ emitEvent: false });
     this.profileForm.get('deaconDegree')?.enable({ emitEvent: false });
-    this.profileForm.get('workDetails')?.enable({ emitEvent: false });
+    if (!this.isGraduate()) {
+      this.profileForm.get('workDetails')?.enable({ emitEvent: false });
+    }
 
     if (this.showStatusField()) {
       this.profileForm.get('status')?.enable({ emitEvent: false });
@@ -325,4 +327,3 @@ export class ProfileComponent implements OnInit {
     });
   }
 }
-

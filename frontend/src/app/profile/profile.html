@@ -133,7 +133,7 @@
         <input formControlName="graduateJob" />
       </div>
 
-      <div class="wide">
+      <div *ngIf="!isGraduate()" class="wide">
         <label>تفاصيل العمل</label>
         <input formControlName="workDetails" />
       </div>
