@@ -398,6 +398,86 @@ export class FamilyInfoComponent implements OnInit {
     }
   }
 
+  private hasDisplayValue(v: any): boolean {
+    if (v === false || v === 0) return true;
+    return String(v ?? '').trim() !== '';
+  }
+
+  private yesNoAr(v: any): string {
+    if (v === true) return 'نعم';
+    if (v === false) return 'لا';
+    return String(v ?? '').trim();
+  }
+
+  private khorsYearAr(year: any): string {
+    const y = Number(year || 0);
+    if (y === 1) return 'سنة أولى';
+    if (y === 2) return 'سنة ثانية';
+    if (y === 3) return 'سنة ثالثة';
+    if (y === 4) return 'سنة رابعة';
+    if (y === 5) return 'سنة خامسة';
+    return '';
+  }
+
+  private memberKhorsLabel(khors: any, khorsYear?: any): string {
+    const k = String(khors || '').trim().toUpperCase();
+
+    if (!k || k === 'NONE') return '';
+    if (k === 'MARMARKOS') {
+      const yearLabel = this.khorsYearAr(khorsYear);
+      return yearLabel ? `خورس مارمرقس - ${yearLabel}` : 'خورس مارمرقس';
+    }
+    if (k === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
+    if (k === 'BOTH') return 'خورس مارمرقس + خورس البابا اثناسيوس';
+
+    return String(khors || '').trim();
+  }
+
+  profileEntries(): Array<{ label: string; value: string }> {
+    if (!this.profile) return [];
+
+    const p = this.profile;
+    const schoolValue = [p.schoolName, p.schoolGrade].filter((x) => this.hasDisplayValue(x)).join(' - ');
+    const universityValue = [p.universityName, p.faculty, p.universityGrade]
+      .filter((x) => this.hasDisplayValue(x))
+      .join(' - ');
+
+    const rows = [
+      { label: 'اسم المستخدم', value: String(p.username ?? '').trim() },
+      { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim() },
+      { label: 'الأسرة', value: String(p.deaconFamily ?? '').trim() },
+      { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear) },
+      { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim() },
+      { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim() },
+      { label: 'الهاتف', value: String(p.phoneNumber ?? '').trim() },
+      { label: 'العنوان', value: String(p.address ?? '').trim() },
+      { label: 'هاتف ولي الأمر', value: String(p.guardiansPhone ?? '').trim() },
+      { label: 'صلة القرابة', value: String(p.guardianRelation ?? '').trim() },
+      { label: 'تاريخ الميلاد', value: String(p.dateOfBirth ?? '').trim() },
+      { label: 'النوع', value: String(p.gender ?? '').trim() },
+      { label: 'الحالة', value: String(p.status ?? '').trim() },
+      { label: 'نوع الدراسة', value: String(p.studyType ?? '').trim() },
+      { label: 'المدرسة', value: schoolValue },
+      { label: 'الجامعة', value: universityValue },
+      { label: 'تخرج من', value: String(p.graduatedFrom ?? '').trim() },
+      { label: 'الوظيفة', value: String(p.graduateJob ?? '').trim() },
+      {
+        label: 'يعمل',
+        value:
+          p.isWorking === null || p.isWorking === undefined || String(p.isWorking).trim() === ''
+            ? ''
+            : this.yesNoAr(p.isWorking)
+      },
+      { label: 'تفاصيل العمل', value: String(p.workDetails ?? '').trim() }
+    ];
+
+    return rows.filter((row) => this.hasDisplayValue(row.value));
+  }
+
+  isPhoneLabel(label: string): boolean {
+    return label === 'الهاتف' || label === 'هاتف ولي الأمر';
+  }
+
   private loadRoles() {
     if (!this.canEditRoles()) return;
     this.adminSvc.roles().subscribe({ next: (r) => (this.allRoles = r || []) });
