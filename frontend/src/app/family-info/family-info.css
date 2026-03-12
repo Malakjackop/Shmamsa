@@ -48,6 +48,10 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .reqName{font-weight:700;}
 .reqMeta{display:flex;flex-wrap:wrap;gap:10px;opacity:0.9;font-size:13px;}
 .reqActions{display:flex;gap:8px;}
+.phoneInline{display:inline-flex;align-items:center;gap:6px;}
+.copyPhoneBtn{border:none;background:transparent;padding:0;cursor:pointer;color:#666;display:inline-flex;align-items:center;justify-content:center;}
+.copyPhoneBtn:hover{color:#111;}
+.copyPhoneBtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 @media (max-width:700px){
   .tbl{min-width:700px;}
   .profileGrid{grid-template-columns:1fr;}

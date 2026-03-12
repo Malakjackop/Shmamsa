@@ -32,6 +32,10 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 /* Profile modal cards (match family-info look) */
 .profileGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}
 .profileGrid div{border:1px solid #eee;border-radius:12px;padding:10px;background:#fff;}
+.phoneInline{display:inline-flex;align-items:center;gap:6px;}
+.copyPhoneBtn{border:none;background:transparent;padding:0;cursor:pointer;color:#666;display:inline-flex;align-items:center;justify-content:center;}
+.copyPhoneBtn:hover{color:#111;}
+.copyPhoneBtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 
 /* ===== Iftekad column ===== */
 .iftekadWrap{position:relative;display:inline-block;}
