@@ -264,6 +264,31 @@ export class FamilyComponent implements OnInit {
     this.profile = null;
   }
 
+  async copyPhone(value: any) {
+    const phone = String(value ?? '').trim();
+    if (!phone) return;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(phone);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = phone;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+
+      this.message.add({ severity: 'success', summary: 'تم', detail: 'تم نسخ الرقم' });
+    } catch {
+      this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل نسخ الرقم' });
+    }
+  }
+
   private loadRoles() {
     if (!this.canEditRoles()) return;
     this.adminSvc.roles().subscribe({ next: (r) => (this.allRoles = r || []) });

@@ -5,7 +5,6 @@
   <div class="pageHead">
     <h1>بيانات الأعضاء</h1>
 
-    <!-- 🔔 Khors join requests notifications -->
     <button
       *ngIf="canSeeKhorsRequests()"
       type="button"
@@ -65,13 +64,40 @@
       <tbody>
         <tr *ngFor="let m of members">
           <td class="chk" *ngIf="exportMode">
-            <input type="checkbox" [(ngModel)]="m.selected" (ngModelChange)="onMemberSelectionChange()" [ngModelOptions]="{ standalone: true }" />
+            <input
+              type="checkbox"
+              [(ngModel)]="m.selected"
+              (ngModelChange)="onMemberSelectionChange()"
+              [ngModelOptions]="{ standalone: true }"
+            />
           </td>
           <td>{{m.fullName}}</td>
           <td>{{ m.role | roleLabel }}</td>
           <td>{{m.address}}</td>
-          <td>{{m.phoneNumber}}</td>
-          <td>{{m.guardiansPhone}}</td>
+          <td>
+            <span class="phoneInline" *ngIf="m.phoneNumber; else emptyPhone">
+              <span>{{m.phoneNumber}}</span>
+              <button type="button" class="copyPhoneBtn" (click)="copyPhone(m.phoneNumber)" title="نسخ الرقم" aria-label="نسخ الرقم">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+                  <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </span>
+            <ng-template #emptyPhone></ng-template>
+          </td>
+          <td>
+            <span class="phoneInline" *ngIf="m.guardiansPhone; else emptyGuardianPhone">
+              <span>{{m.guardiansPhone}}</span>
+              <button type="button" class="copyPhoneBtn" (click)="copyPhone(m.guardiansPhone)" title="نسخ الرقم" aria-label="نسخ الرقم">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+                  <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </span>
+            <ng-template #emptyGuardianPhone></ng-template>
+          </td>
           <td>{{m.schoolGrade}}</td>
           <td><button pButton type="button" icon="pi pi-user" (click)="openProfile(m)">👤</button></td>
 
@@ -101,7 +127,6 @@
     </table>
   </div>
 
-  <!-- Profile modal -->
   <div class="modal" *ngIf="profileFor">
     <div class="modalCard">
       <div class="modalHead">
@@ -110,31 +135,32 @@
           <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
         <div class="modalActions">
-
           <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
         </div>
       </div>
 
       <div *ngIf="profile; else loadingProfile" class="profileGrid">
-        <div><b>اسم المستخدم:</b> {{profile.username}}</div>
-        <div><b>البريد الإلكتروني:</b> {{profile.email}}</div>
-        <div><b>الأسرة:</b> {{profile.deaconFamily}}</div>
-        <div><b>الرتبة:</b> {{profile.deaconDegree}}</div>
-        <div><b>الرقم القومي:</b> {{profile.nationalId}}</div>
-        <div><b>الهاتف:</b> {{profile.phoneNumber}}</div>
-        <div><b>العنوان:</b> {{profile.address}}</div>
-        <div><b>هاتف ولي الأمر:</b> {{profile.guardiansPhone}}</div>
-        <div><b>صلة القرابة:</b> {{profile.guardianRelation}}</div>
-        <div><b>تاريخ الميلاد:</b> {{profile.dateOfBirth}}</div>
-        <div><b>النوع:</b> {{profile.gender}}</div>
-        <div><b>الحالة:</b> {{profile.status}}</div>
-        <div><b>نوع الدراسة:</b> {{profile.studyType}}</div>
-        <div><b>المدرسة:</b> {{profile.schoolName}} {{profile.schoolGrade}}</div>
-        <div><b>الجامعة:</b> {{profile.universityName}} {{profile.faculty}} {{profile.universityGrade}}</div>
-        <div><b>تخرج من:</b> {{profile.graduatedFrom}}</div>
-        <div><b>الوظيفة:</b> {{profile.graduateJob}}</div>
-        <div><b>يعمل:</b> {{profile.isWorking}}</div>
-        <div><b>تفاصيل العمل:</b> {{profile.workDetails}}</div>
+        <ng-container *ngIf="profileEntries() as entries">
+          <div *ngFor="let item of entries">
+            <b>{{ item.label }}:</b>
+            <ng-container *ngIf="isPhoneLabel(item.label); else plainProfileValue">
+              <span class="phoneInline">
+                <span>{{ item.value }}</span>
+                <button type="button" class="copyPhoneBtn" (click)="copyPhone(item.value)" title="نسخ الرقم" aria-label="نسخ الرقم">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+                    <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+              </span>
+            </ng-container>
+            <ng-template #plainProfileValue>{{ item.value }}</ng-template>
+          </div>
+
+          <div class="hint" *ngIf="entries.length === 0">
+            لا توجد بيانات متاحة.
+          </div>
+        </ng-container>
       </div>
 
       <ng-template #loadingProfile>
@@ -143,7 +169,6 @@
     </div>
   </div>
 
-  <!-- Khors requests modal -->
   <div class="modal" *ngIf="requestsOpen">
     <div class="modalCard wide">
       <div class="modalHead">
