@@ -140,6 +140,7 @@ export class DashBoard implements OnInit {
   private familyMeetingByFamily: Record<string, number> = {};
   private familyMeetingTotalByFamily: Record<string, number> = {};
   familyMeetingCards: Array<{ family: string; present: number; total: number | null }> = [];
+  private familyCatalog: Array<{ id: number; nameAr: string; baseName?: string }> = [];
 
 
   // ===== Helpers =====
@@ -198,6 +199,29 @@ export class DashBoard implements OnInit {
     if (f.endsWith(' أ')) return f.slice(0, -2).trim();
     if (f.endsWith(' ب')) return f.slice(0, -2).trim();
     return f;
+  }
+
+  private loadFamilyCatalog(): void {
+    this.http.get<any[]>('/api/auth/family-options?audience=SERVANT', { withCredentials: true }).subscribe({
+      next: (rows: any) => {
+        this.familyCatalog = (rows || []).map((x: any) => ({
+          id: Number(x?.id || 0),
+          nameAr: String(x?.nameAr || '').trim(),
+          baseName: String(x?.baseName || '').trim() || undefined
+        })).filter((x: any) => !!x.id && !!x.nameAr);
+      },
+      error: () => {
+        this.familyCatalog = [];
+      }
+    });
+  }
+
+  private familyIdForTarget(targetFamily: any): number | null {
+    const raw = String(targetFamily || '').trim();
+    if (!raw || raw.toUpperCase() === 'ALL') return null;
+    const base = this.mainFamily(raw);
+    const match = this.familyCatalog.find((x) => String(x.baseName || x.nameAr).trim() === base || x.nameAr === raw);
+    return match?.id ?? null;
   }
 
 
@@ -456,6 +480,7 @@ export class DashBoard implements OnInit {
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
+    this.loadFamilyCatalog();
     this.loadUserData();
     this.loadMyStats();
   }
@@ -600,6 +625,7 @@ export class DashBoard implements OnInit {
       eventAt: this.toYmd(this.eventForm?.eventAt),
       removeAt: this.eventForm?.removeAt ? this.toYmd(this.eventForm?.removeAt) : null,
       targetFamily: String(this.eventForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
+      targetFamilyId: this.familyIdForTarget(this.eventForm?.targetFamily || cfg.targetFamily || 'ALL'),
       targetAudience: String(this.eventForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
     };
 
@@ -746,6 +772,7 @@ export class DashBoard implements OnInit {
       title: String(this.annForm?.title || '').trim(),
       description: this.annForm?.description || null,
       targetFamily: String(this.annForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
+      targetFamilyId: this.familyIdForTarget(this.annForm?.targetFamily || cfg.targetFamily || 'ALL'),
       targetAudience: String(this.annForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
     };
 

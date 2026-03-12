@@ -83,20 +83,7 @@
   <div class="input-group small">
     <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
       <option value="" disabled>اختار الأسرة</option>
-
-      <option value="اسرة السمائين">اسرة السمائين</option>
-      <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
-      <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
-      <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-      <option value="اسرة القديس اسكلابيوس">اسرة القديس اسكلابيوس</option>
-
-      <option value="اسرة القديس البابا كيرلس أ">اسرة القديس البابا كيرلس ( أ )</option>
-      <option value="اسرة القديس البابا كيرلس ب">اسرة القديس البابا كيرلس ( ب )</option>
-      <option value="اسرة القديس الانبا ابرام أ">اسرة القديس الانبا ابرام ( أ )</option>
-      <option value="اسرة القديس الانبا ابرام ب">اسرة القديس الانبا ابرام ( ب )</option>
-
-      <option value="اسرة القديس اسطفانوس أ">اسرة القديس اسطفانوس ( أ )</option>
-      <option value="اسرة القديس اسطفانوس ب">اسرة القديس اسطفانوس ( ب )</option>
+      <option *ngFor="let family of memberFamilyOptions" [ngValue]="familyOptionValue(family)">{{ family.nameAr }}</option>
     </select>
     <small class="error-text" *ngIf="shouldShowError('deaconFamily')">{{ errorText('deaconFamily','الأسرة') }}</small>
   </div>
@@ -125,20 +112,7 @@
       formControlName="servingWhere"
       (change)="onServingWhereChange(); markTouchedFromList('servingWhere')">
       <option value="" disabled>بتخدم فين؟</option>
-
-      <!-- Families -->
-      <option value="اسرة السمائين">اسرة السمائين</option>
-      <option value="اسرة القديس ابانوب">اسرة القديس ابانوب</option>
-      <option value="اسرة القديس ديسقورس">اسرة القديس ديسقورس</option>
-      <option value="اسرة القديس سيدهم بشاي">اسرة القديس سيدهم بشاي</option>
-      <option value="اسرة القديس اسكلابيوس">اسرة القديس اسكلابيوس</option>
-      <option value="اسرة القديس البابا كيرلس">اسرة القديس البابا كيرلس</option>
-      <option value="اسرة القديس الانبا ابرام">اسرة القديس الانبا ابرام</option>
-      <option value="اسرة القديس اسطفانوس">اسرة القديس اسطفانوس</option>
-
-      <!-- Choirs (treated like families) -->
-      <option value="خورس مارمرقس">خورس مارمرقس</option>
-      <option value="خورس البابا اثناسيوس">خورس البابا اثناسيوس</option>
+      <option *ngFor="let family of servantWhereOptions" [ngValue]="familyOptionValue(family)">{{ family.nameAr }}</option>
     </select>
     <small class="error-text" *ngIf="shouldShowError('servingWhere')">
       {{ errorText('servingWhere','بتخدم فين') }}

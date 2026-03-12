@@ -11,8 +11,8 @@ import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.AttendanceArchiveRepository;
 import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.QrTokenService;
-import com.shmamsa.util.FamilyUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.ibm.icu.text.ArabicShaping;
@@ -49,6 +49,7 @@ public class AttendanceController {
     private final AttendanceArchiveRepository archiveRepo;
     private final UserRepository userRepo;
     private final GradeSheetRepository gradeRepo;
+    private final FamilyAccessService familyAccessService;
     private final QrTokenService qrTokenService;
     private final ObjectMapper objectMapper;
 
@@ -192,11 +193,12 @@ public class AttendanceController {
         ScopeResult scopeResult = resolveScopeUsers(servant, type, selectedFamily);
         List<User> scope = scopeResult.users;
         String meetingBase = scopeResult.familyBase;
+        Long meetingFamilyId = scopeResult.familyId;
 
 
         for (Long id : presentIds) {
-            AttendanceRecord existing = (meetingBase != null && !meetingBase.isBlank())
-                    ? attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(id, selectedDate, type, meetingBase)
+            AttendanceRecord existing = (meetingFamilyId != null)
+                    ? attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(id, selectedDate, type, meetingFamilyId)
                     : attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
             if (existing != null) {
                 if (existing.getStatus() == AttendanceStatus.ABSENT) {
@@ -226,7 +228,8 @@ public class AttendanceController {
             r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-            if (meetingBase != null && !meetingBase.isBlank()) {
+            if (meetingFamilyId != null) {
+                r.setFamilyId(meetingFamilyId);
                 r.setFamilyBase(meetingBase);
             }
             r.setStatus(AttendanceStatus.PRESENT);
@@ -241,8 +244,8 @@ public class AttendanceController {
             if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
             if (presentIds.contains(target.getId())) continue;
 
-            AttendanceRecord existing = (meetingBase != null && !meetingBase.isBlank())
-                    ? attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(target.getId(), selectedDate, type, meetingBase)
+            AttendanceRecord existing = (meetingFamilyId != null)
+                    ? attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(target.getId(), selectedDate, type, meetingFamilyId)
                     : attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(target.getId(), selectedDate, type);
             if (existing != null) {
                 // keep as-is (if present, don't overwrite)
@@ -254,7 +257,8 @@ public class AttendanceController {
             r.setDate(selectedDate);
             r.setTime(now);
             r.setType(type);
-            if (meetingBase != null && !meetingBase.isBlank()) {
+            if (meetingFamilyId != null) {
+                r.setFamilyId(meetingFamilyId);
                 r.setFamilyBase(meetingBase);
             }
             r.setStatus(AttendanceStatus.ABSENT);
@@ -305,16 +309,18 @@ public class AttendanceController {
         }
 
         String familyBase = null;
+        Long familyId = null;
         String familyRaw = body.get("family");
         if (selectedType == AttendanceType.FAMILY_MEETING && familyRaw != null && !familyRaw.isBlank()) {
-            familyBase = FamilyUtil.mainFamily(familyRaw.trim());
+            familyBase = familyAccessService.baseNameForName(familyRaw.trim());
+            familyId = familyAccessService.familyIdForName(familyBase);
         }
 
         AttendanceRecord existing = null;
         if (selectedType != null && selectedDate != null) {
-            if (familyBase != null && !familyBase.isBlank()) {
-                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(
-                        u.getId(), selectedDate, selectedType, familyBase
+            if (familyId != null) {
+                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(
+                        u.getId(), selectedDate, selectedType, familyId
                 );
             } else if (selectedType != null) {
                 existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(
@@ -332,7 +338,7 @@ public class AttendanceController {
         out.put("username", u.getUsername());
         out.put("fullName", u.getFullName());
         out.put("role", u.getRole());
-        out.put("deaconFamily", ("DEVELOPER".equalsIgnoreCase(u.getRole()) && "SYSTEM".equalsIgnoreCase(u.getDeaconFamily())) ? null : u.getDeaconFamily());
+        out.put("deaconFamily", familyAccessService.primaryFamilyName(u));
         out.put("alreadyRecorded", alreadyRecorded);
         out.put("alreadyPresent", alreadyPresent);
         out.put("existingStatus", existingStatus);
@@ -385,7 +391,8 @@ public class AttendanceController {
         Map<String, Long> familyMeetingByFamily = new LinkedHashMap<>();
         Map<String, Long> familyMeetingTotalByFamily = new LinkedHashMap<>();
         for (AttendanceRecord r : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), AttendanceType.FAMILY_MEETING)) {
-            String fb = r.getFamilyBase() == null ? "" : r.getFamilyBase().trim();
+            String fb = familyAccessService.baseNameForId(r.getFamilyId(), r.getFamilyBase());
+            fb = fb == null ? "" : fb.trim();
             if (fb.isBlank()) continue;
             familyMeetingTotalByFamily.put(fb, familyMeetingTotalByFamily.getOrDefault(fb, 0L) + 1L);
             // count only PRESENT (or null treated as present for legacy)
@@ -429,7 +436,7 @@ public class AttendanceController {
             row.put("type", r.getType() == null ? null : r.getType().name());
             row.put("status", r.getStatus() == null ? null : r.getStatus().name());
             row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
-            row.put("familyBase", r.getFamilyBase());
+            row.put("familyBase", familyAccessService.baseNameForId(r.getFamilyId(), r.getFamilyBase()));
             out.add(row);
         }
         return ResponseEntity.ok(out);
@@ -478,10 +485,10 @@ public class AttendanceController {
                 .collect(Collectors.toList());
 
         List<AttendanceRecord> records;
-        if (scope.familyBase != null && !scope.familyBase.isBlank()) {
+        if (scope.familyId != null) {
             records = ids.isEmpty()
                     ? List.of()
-                    : attendanceRepo.findByDateAndTypeAndFamilyBaseAndArchivedFalseAndUser_IdIn(selectedDate, type, scope.familyBase, ids);
+                    : attendanceRepo.findByDateAndTypeAndFamilyIdAndArchivedFalseAndUser_IdIn(selectedDate, type, scope.familyId, ids);
         } else {
             records = ids.isEmpty()
                     ? List.of()
@@ -588,8 +595,8 @@ public class AttendanceController {
         }
 
         AttendanceRecord existing;
-        if (scope.familyBase != null && !scope.familyBase.isBlank()) {
-            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(userId, selectedDate, type, scope.familyBase);
+        if (scope.familyId != null) {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(userId, selectedDate, type, scope.familyId);
         } else {
             existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(userId, selectedDate, type);
         }
@@ -618,7 +625,8 @@ public class AttendanceController {
         r.setDate(selectedDate);
         r.setTime(now);
         r.setType(type);
-        if (scope.familyBase != null && !scope.familyBase.isBlank()) {
+        if (scope.familyId != null) {
+            r.setFamilyId(scope.familyId);
             r.setFamilyBase(scope.familyBase);
         }
         r.setStatus(AttendanceStatus.ABSENT);
@@ -722,10 +730,12 @@ public class AttendanceController {
     private static class ScopeResult {
         final List<User> users;
         final String familyBase;
+        final Long familyId;
 
-        ScopeResult(List<User> users, String familyBase) {
+        ScopeResult(List<User> users, String familyBase, Long familyId) {
             this.users = users == null ? List.of() : users;
             this.familyBase = familyBase;
+            this.familyId = familyId;
         }
     }
 
@@ -736,27 +746,29 @@ public class AttendanceController {
             assertChoirAuthorization(servant, type);
             String needed = (type == AttendanceType.MARMARKOS_KHORS) ? "MARMARKOS" : "ATHANASIUS";
             String familyBase = family != null && !family.isBlank() ? family.trim() : ("MARMARKOS".equals(needed) ? "خورس مارمرقس" : "خورس البابا اثناسيوس");
-            return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), familyBase);
+            return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), familyBase, familyAccessService.familyIdForName(familyBase));
         }
 
         if (type == AttendanceType.FAMILY_MEETING) {
-            String base = (family == null || family.isBlank()) ? null : FamilyUtil.mainFamily(family);
+            String base = (family == null || family.isBlank()) ? null : familyAccessService.baseNameForName(family);
             if (base == null || base.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting needs a selected family");
             }
-            return new ScopeResult(userRepo.findByAnyFamilyStartingWithAndRoleIn(base, roles), base);
+            List<Long> ids = familyAccessService.relatedIdsForSelection(base);
+            return new ScopeResult(userRepo.findByAnyFamilyIdInAndRoleIn(ids, roles), base, familyAccessService.familyIdForName(base));
         }
 
         // Friday / Saturday types: allow filtering by selected family or choir label
         if (family != null && !family.trim().isBlank()) {
             if (isChoirLabel(family)) {
                 String needed = choirKeyFromLabel(family);
-                return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), family.trim());
+                String familyBase = family.trim();
+                return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), familyBase, familyAccessService.familyIdForName(familyBase));
             }
         }
 
         // Friday liturgy / Tasbeeha are global across all families.
-        return new ScopeResult(userRepo.findByRoleIn(roles), null);
+        return new ScopeResult(userRepo.findByRoleIn(roles), null, null);
     }
 
     // Reset (delete) attendance history for selected users
@@ -802,7 +814,7 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
 
-        String myBase = FamilyUtil.mainFamily(actor.getDeaconFamily());
+        String myBase = familyAccessService.baseFamily(actor);
 
         List<Long> allowed = new ArrayList<>();
         for (Long id : ids) {
@@ -818,7 +830,7 @@ public class AttendanceController {
             }
 
             // KHADIM / AMIN_OSRA: only reset MAKHDOM inside their family
-            String uBase = FamilyUtil.mainFamily(u.getDeaconFamily());
+            String uBase = familyAccessService.baseFamily(u);
             if (myBase != null && myBase.equals(uBase) && "MAKHDOM".equals(u.getRole())) {
                 allowed.add(id);
             }
@@ -874,10 +886,10 @@ public class AttendanceController {
             row.put("username", u.getUsername());
             row.put("role", u.getRole());
             row.put("email", u.getEmail());
-            row.put("deaconFamily", u.getDeaconFamily());
-            row.put("deaconFamily2", u.getDeaconFamily2());
-            row.put("deaconFamily3", u.getDeaconFamily3());
-            row.put("deaconFamily4", u.getDeaconFamily4());
+            row.put("deaconFamily", familyAccessService.primaryFamilyName(u));
+            row.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
+            row.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
+            row.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
             row.put("phoneNumber", u.getPhoneNumber());
             row.put("guardiansPhone", u.getGuardiansPhone());
             row.put("address", u.getAddress());
@@ -1325,9 +1337,9 @@ public class AttendanceController {
     private List<Map<String, Object>> buildGradesSnapshot(List<User> targets) {
         Map<String, GradeSheet> sheetsByBase = gradeRepo.findAll().stream()
                 .filter(Objects::nonNull)
-                .filter(s -> s.getFamilyBase() != null && !s.getFamilyBase().isBlank())
+                .filter(s -> s.getFamilyId() != null || (s.getFamilyBase() != null && !s.getFamilyBase().isBlank()))
                 .collect(Collectors.toMap(
-                        s -> FamilyUtil.mainFamily(s.getFamilyBase()),
+                        s -> familyAccessService.baseNameForId(s.getFamilyId(), s.getFamilyBase()),
                         s -> s,
                         (a, b) -> a,
                         LinkedHashMap::new
@@ -1336,7 +1348,7 @@ public class AttendanceController {
         Map<String, List<User>> membersByBase = new LinkedHashMap<>();
         for (User target : targets) {
             if (target == null || target.getId() == null) continue;
-            String base = FamilyUtil.mainFamily(target.getDeaconFamily());
+            String base = familyAccessService.baseFamily(target);
             if (base == null || base.isBlank()) continue;
             membersByBase.computeIfAbsent(base, ignored -> new ArrayList<>()).add(target);
         }
@@ -1346,7 +1358,7 @@ public class AttendanceController {
             if (target == null || target.getId() == null) continue;
             if (!shouldArchiveGradesFor(target)) continue;
 
-            String base = FamilyUtil.mainFamily(target.getDeaconFamily());
+            String base = familyAccessService.baseFamily(target);
             GradeSheet sheet = (base == null || base.isBlank()) ? null : sheetsByBase.get(base);
 
             SheetPayload firstPayload = parseTermPayload(sheet, "FIRST");
@@ -1413,7 +1425,7 @@ public class AttendanceController {
 
     private boolean shouldArchiveGradesFor(User target) {
         if (target == null) return false;
-        String base = FamilyUtil.mainFamily(target.getDeaconFamily());
+        String base = familyAccessService.baseFamily(target);
         String role = safeStr(target.getRole()).trim().toUpperCase(Locale.ROOT);
 
         if ("خورس مارمرقس".equals(base)) {
@@ -1709,7 +1721,7 @@ public class AttendanceController {
     }
 
     private int familyOrder(Object family) {
-        String base = FamilyUtil.mainFamily(canonicalFamilyName(family));
+        String base = familyAccessService.baseNameForName(canonicalFamilyName(family));
         String normalized = normalizeArabicText(base);
         for (int i = 0; i < PREFERRED_FAMILY_ORDER.size(); i++) {
             if (normalizeArabicText(PREFERRED_FAMILY_ORDER.get(i)).equals(normalized)) return i;

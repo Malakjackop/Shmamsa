@@ -18,15 +18,15 @@
         <li routerLink="/attendance" routerLinkActive="active"><i class="pi pi-check-square"></i> تسجيل الحضور</li>
         <li routerLink="/family-attendance" routerLinkActive="active"><i class="pi pi-users"></i> حضور الأعضاء</li>
         <li routerLink="/family-info" routerLinkActive="active"><i class="pi pi-id-card"></i> بيانات الأعضاء</li>
-        <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> نقل الأعضاء</li>
+        <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active"><i class="pi pi-send"></i> الانتقلات</li>
       </ng-container>
 
         <li routerLink="/grades" routerLinkActive="active"><i class="pi pi-chart-bar"></i> الدرجات</li>
 
-      <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> الملف الشخصي</li>
+      <li routerLink="/profile" routerLinkActive="active"><i class="pi pi-user"></i> الصفحة الشخصية</li>
       <li routerLink="/resources" routerLinkActive="active">
-      <i class="pi pi-folder"></i> الموارد </li>
-      <li routerLink="/attendance-history">سجل حضوري</li>
+      <i class="pi pi-folder"></i> الملفات </li>
+      <li routerLink="/attendance-history"> حضوري</li>
       <li routerLink="/about" routerLinkActive="active"><i class="pi pi-info-circle"></i> من نحن</li>
 
       <ng-container *ngIf="isServantOrAbove(); ">

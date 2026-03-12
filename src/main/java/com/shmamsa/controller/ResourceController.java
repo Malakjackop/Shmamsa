@@ -5,8 +5,8 @@ import com.shmamsa.model.ResourceFile;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.ResourceFileRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.ResourceStorageService;
-import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -27,7 +27,13 @@ public class ResourceController {
 
     private final ResourceFileRepository resourceRepo;
     private final UserRepository userRepo;
+    private final FamilyAccessService familyAccessService;
     private final ResourceStorageService storage;
+
+    private String folderKey(Long familyId, String familyName) {
+        if ("ALL".equalsIgnoreCase(String.valueOf(familyName == null ? "" : familyName).trim())) return "ALL";
+        return familyId == null ? "ALL" : String.valueOf(familyId);
+    }
 
     @GetMapping
     public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
@@ -36,15 +42,15 @@ public class ResourceController {
         User me =userRepo.findByUsername(auth.getName()).orElse(null);
         if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        String target = (family != null && !family.isBlank()) ? family : me.getDeaconFamily();
+        String target = (family != null && !family.isBlank()) ? family : familyAccessService.baseFamily(me);
 
         if ("ALL".equalsIgnoreCase(target.trim())) {
             // Show everything when "ALL" is selected (admins want to review/edit global + family-specific uploads)
             return ResponseEntity.ok(resourceRepo.findAllByOrderByCreatedAtDesc());
         }
 
-        List<String> families = FamilyUtil.variantsPlusAll(target);
-        return ResponseEntity.ok(resourceRepo.findByFamilyInOrderByCreatedAtDesc(families));
+        List<Long> relatedIds = familyAccessService.relatedIdsForSelection(target);
+        return ResponseEntity.ok(resourceRepo.findByFamilyIdInOrFamilyOrderByCreatedAtDesc(relatedIds, "ALL"));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -60,15 +66,17 @@ public class ResourceController {
         User me = userRepo.findByUsername(auth.getName()).orElse(null);
         if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-        String targetFamily = (family == null || family.isBlank()) ? me.getDeaconFamily() : family;
+        String targetFamily = (family == null || family.isBlank()) ? familyAccessService.baseFamily(me) : family;
 
+        Long targetFamilyId = null;
         if (!"ALL".equalsIgnoreCase(targetFamily.trim())) {
-            targetFamily = FamilyUtil.mainFamily(targetFamily);
+            targetFamily = familyAccessService.baseNameForName(targetFamily);
+            targetFamilyId = familyAccessService.familyIdForName(targetFamily);
         } else {
             targetFamily = "ALL";
         }
 
-        var stored = storage.store(file, targetFamily);
+        var stored = storage.store(file, folderKey(targetFamilyId, targetFamily));
 
         ResourceFile rf = ResourceFile.builder()
                 .title(title)
@@ -78,6 +86,7 @@ public class ResourceController {
                 .contentType(stored.contentType)
                 .size(stored.size)
                 .family(targetFamily)
+                .familyId(targetFamilyId)
                 .uploadedByUsername(me.getUsername())
                 .build();
 
@@ -103,15 +112,20 @@ public class ResourceController {
         if (description != null) existing.setDescription(description);
 
         if (family != null && !family.isBlank()) {
-            if ("ALL".equalsIgnoreCase(family.trim())) existing.setFamily("ALL");
-            else existing.setFamily(FamilyUtil.mainFamily(family));
+            if ("ALL".equalsIgnoreCase(family.trim())) {
+                existing.setFamily("ALL");
+                existing.setFamilyId(null);
+            } else {
+                String base = familyAccessService.baseNameForName(family);
+                existing.setFamily(base);
+                existing.setFamilyId(familyAccessService.familyIdForName(base));
+            }
         }
 
         if (file != null && !file.isEmpty()) {
-            storage.deletePhysical(existing.getFamily(), existing.getStoredName());
+            storage.deletePhysical(folderKey(existing.getFamilyId(), existing.getFamily()), existing.getStoredName());
 
-            String fam = existing.getFamily() == null ? "ALL" : existing.getFamily();
-            var stored = storage.store(file, fam);
+            var stored = storage.store(file, folderKey(existing.getFamilyId(), existing.getFamily()));
 
             existing.setOriginalName(stored.originalName);
             existing.setStoredName(stored.storedName);
@@ -129,7 +143,7 @@ public class ResourceController {
         ResourceFile existing = resourceRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
 
-        storage.deletePhysical(existing.getFamily(), existing.getStoredName());
+        storage.deletePhysical(folderKey(existing.getFamilyId(), existing.getFamily()), existing.getStoredName());
 
         resourceRepo.delete(existing);
         return ResponseEntity.ok(Map.of("ok", true));
@@ -141,7 +155,7 @@ public class ResourceController {
         ResourceFile existing = resourceRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
 
-        var path = storage.resolvePath(existing.getFamily(), existing.getStoredName());
+        var path = storage.resolvePath(folderKey(existing.getFamilyId(), existing.getFamily()), existing.getStoredName());
         if (!Files.exists(path)) throw new ApiException(HttpStatus.NOT_FOUND, "Stored file missing");
 
         var bytes = Files.readAllBytes(path);

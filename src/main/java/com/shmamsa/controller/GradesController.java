@@ -8,7 +8,7 @@ import com.shmamsa.model.User;
 import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
-import com.shmamsa.util.FamilyUtil;
+import com.shmamsa.service.FamilyAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +25,7 @@ public class GradesController {
 
     private final UserRepository userRepo;
     private final GradeSheetRepository gradeRepo;
+    private final FamilyAccessService familyAccessService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public record Column(String id, String title) {}
@@ -76,25 +77,15 @@ public class GradesController {
     }
 
     private List<String> servingBasesOf(User u) {
-        if (u == null) return List.of();
-        Set<String> set = new LinkedHashSet<>();
-        String b1 = FamilyUtil.mainFamily(u.getDeaconFamily());
-        if (b1 != null && !b1.isBlank() && !"SYSTEM".equalsIgnoreCase(b1)) set.add(b1);
-        String b2 = FamilyUtil.mainFamily(u.getDeaconFamily2());
-        if (b2 != null && !b2.isBlank() && !"SYSTEM".equalsIgnoreCase(b2)) set.add(b2);
-        String b3 = FamilyUtil.mainFamily(u.getDeaconFamily3());
-        if (b3 != null && !b3.isBlank() && !"SYSTEM".equalsIgnoreCase(b3)) set.add(b3);
-        String b4 = FamilyUtil.mainFamily(u.getDeaconFamily4());
-        if (b4 != null && !b4.isBlank() && !"SYSTEM".equalsIgnoreCase(b4)) set.add(b4);
-        return new ArrayList<>(set);
+        return familyAccessService.servingBasesOf(u);
     }
 
     private String effectiveRoleIn(User me, String familyBase) {
         if (me == null) return "MAKHDOM";
-        String base = FamilyUtil.mainFamily(familyBase);
+        String base = familyAccessService.baseNameForName(familyBase);
         if (base == null || base.isBlank()) return normRole(me.getRole());
 
-        String scoped = me.roleForFamilyBase(base);
+        String scoped = familyAccessService.scopedRole(me, base);
         if (scoped != null && !scoped.isBlank()) return normRole(scoped);
 
         String global = normRole(me.getRole());
@@ -109,7 +100,7 @@ public class GradesController {
         String global = normRole(me.getRole());
         if ("AMIN_KHEDMA".equals(global) || "DEVELOPER".equals(global)) return;
 
-        String base = FamilyUtil.mainFamily(familyBase);
+        String base = familyAccessService.baseNameForName(familyBase);
         if (base == null) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
         String eff = effectiveRoleIn(me, base);
 
@@ -119,7 +110,7 @@ public class GradesController {
             return;
         }
         if ("AMIN_OSRA".equals(eff)) {
-            String scoped = me.roleForFamilyBase(base);
+            String scoped = familyAccessService.scopedRole(me, base);
             if (scoped == null || !"AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
             return;
         }
@@ -130,7 +121,7 @@ public class GradesController {
         String global = normRole(me.getRole());
         if ("AMIN_KHEDMA".equals(global) || "DEVELOPER".equals(global)) return;
 
-        String base = FamilyUtil.mainFamily(familyBase);
+        String base = familyAccessService.baseNameForName(familyBase);
         if (base == null) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
         String eff = effectiveRoleIn(me, base);
         if (!RoleUtil.isAtLeast(eff, "KHADIM")) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
@@ -140,7 +131,7 @@ public class GradesController {
             if (my.stream().noneMatch(b -> b.equalsIgnoreCase(base))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
         if ("AMIN_OSRA".equals(eff)) {
-            String scoped = me.roleForFamilyBase(base);
+            String scoped = familyAccessService.scopedRole(me, base);
             if (scoped == null || !"AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
         }
     }
@@ -149,14 +140,14 @@ public class GradesController {
         String global = normRole(me.getRole());
         if ("AMIN_KHEDMA".equals(global) || "DEVELOPER".equals(global)) return;
 
-        String base = FamilyUtil.mainFamily(familyBase);
+        String base = familyAccessService.baseNameForName(familyBase);
         if (base == null) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
 
-        String scoped = me.roleForFamilyBase(base);
+        String scoped = familyAccessService.scopedRole(me, base);
         if (scoped != null && "AMIN_OSRA".equalsIgnoreCase(normRole(scoped))) return;
 
         String eff = effectiveRoleIn(me, base);
-        String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
+        String myBase = familyAccessService.baseFamily(me);
         if ("AMIN_OSRA".equals(eff) && myBase != null && myBase.equalsIgnoreCase(base)) return;
 
         throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
@@ -236,9 +227,17 @@ public class GradesController {
     }
 
     private List<User> loadMakhdomMembers(String familyBase) {
-        String base = FamilyUtil.mainFamily(familyBase);
+        String base = familyAccessService.baseNameForName(familyBase);
         if (base == null || base.isBlank()) return List.of();
-        return userRepo.findByDeaconFamilyStartingWithAndRoleIn(base, List.of("MAKHDOM"));
+        List<Long> ids = familyAccessService.relatedIdsForSelection(base);
+        return ids.isEmpty() ? List.of() : userRepo.findByAnyFamilyIdInAndRoleIn(ids, List.of("MAKHDOM"));
+    }
+
+    private Long requiredFamilyId(String familyBase) {
+        String base = familyAccessService.baseNameForName(familyBase);
+        Long familyId = familyAccessService.familyIdForName(base);
+        if (familyId == null) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
+        return familyId;
     }
 
     private List<Column> normalizedColumns(SheetPayload payload, boolean ensureOneColumn) {
@@ -353,12 +352,13 @@ public class GradesController {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        String base = FamilyUtil.mainFamily(family);
+        String base = familyAccessService.baseNameForName(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
         String selectedTerm = normalizeTerm(term);
         ensureCanViewSheet(me, base);
 
-        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        Long familyId = requiredFamilyId(base);
+        GradeSheet sheet = gradeRepo.findByFamilyId(familyId).orElse(null);
         SheetPayload payload = parseTermPayload(sheet, selectedTerm);
         List<Column> cols = normalizedColumns(payload, true);
         Map<String, Map<String, String>> rows = payload.rows() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload.rows());
@@ -379,7 +379,9 @@ public class GradesController {
         }
 
         GradeSheet persisted = sheet;
-        if (persisted == null) persisted = GradeSheet.builder().familyBase(base).status("DRAFT").updatedAt(LocalDateTime.now()).build();
+        if (persisted == null) persisted = GradeSheet.builder().familyId(familyId).familyBase(base).status("DRAFT").updatedAt(LocalDateTime.now()).build();
+        persisted.setFamilyId(familyId);
+        persisted.setFamilyBase(base);
         storeTermPayload(persisted, selectedTerm, new SheetPayload(cols, rows));
         persisted.setUpdatedAt(LocalDateTime.now());
         if (persisted.getStatus() == null) persisted.setStatus("DRAFT");
@@ -403,12 +405,13 @@ public class GradesController {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        String base = FamilyUtil.mainFamily(family);
+        String base = familyAccessService.baseNameForName(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
         String selectedTerm = normalizeTerm(term);
         ensureCanEditSheet(me, base);
 
-        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        Long familyId = requiredFamilyId(base);
+        GradeSheet sheet = gradeRepo.findByFamilyId(familyId).orElse(null);
         SheetPayload existing = parseTermPayload(sheet, selectedTerm);
 
         List<Column> cols = body != null && body.columns() != null ? new ArrayList<>(body.columns()) : new ArrayList<>();
@@ -440,7 +443,9 @@ public class GradesController {
         }
 
         GradeSheet toSave = sheet;
-        if (toSave == null) toSave = GradeSheet.builder().familyBase(base).status("DRAFT").build();
+        if (toSave == null) toSave = GradeSheet.builder().familyId(familyId).familyBase(base).status("DRAFT").build();
+        toSave.setFamilyId(familyId);
+        toSave.setFamilyBase(base);
         storeTermPayload(toSave, selectedTerm, new SheetPayload(sanitizedCols, sanitizedRows));
         toSave.setUpdatedAt(LocalDateTime.now());
         if (toSave.getStatus() == null) toSave.setStatus("DRAFT");
@@ -454,13 +459,16 @@ public class GradesController {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        String base = FamilyUtil.mainFamily(family);
+        String base = familyAccessService.baseNameForName(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
         ensureCanPublish(me, base);
 
         String resultTerm = normalizeTerm(body == null ? null : body.resultTerm());
-        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
-        if (sheet == null) sheet = GradeSheet.builder().familyBase(base).status("PUBLISHED").updatedAt(LocalDateTime.now()).build();
+        Long familyId = requiredFamilyId(base);
+        GradeSheet sheet = gradeRepo.findByFamilyId(familyId).orElse(null);
+        if (sheet == null) sheet = GradeSheet.builder().familyId(familyId).familyBase(base).status("PUBLISHED").updatedAt(LocalDateTime.now()).build();
+        sheet.setFamilyId(familyId);
+        sheet.setFamilyBase(base);
 
         if (sheet.getFirstTermDataJson() == null && sheet.getSecondTermDataJson() == null && sheet.getDataJson() != null) sheet.setFirstTermDataJson(sheet.getDataJson());
         if ("FIRST".equals(resultTerm) && (sheet.getFirstTermDataJson() == null || sheet.getFirstTermDataJson().isBlank())) storeTermPayload(sheet, "FIRST", emptyPayload());
@@ -495,12 +503,13 @@ public class GradesController {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        String base = FamilyUtil.mainFamily(family);
+        String base = familyAccessService.baseNameForName(family);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
         ensureCanPublish(me, base);
 
         String resultTerm = normalizeTerm(body == null ? null : body.resultTerm());
-        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        Long familyId = requiredFamilyId(base);
+        GradeSheet sheet = gradeRepo.findByFamilyId(familyId).orElse(null);
         if (sheet == null) throw new ApiException(HttpStatus.BAD_REQUEST, "No sheet to unpublish");
 
         if ("SECOND".equals(resultTerm)) {
@@ -531,10 +540,13 @@ public class GradesController {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        String base = FamilyUtil.mainFamily(family != null && !family.isBlank() ? family : me.getDeaconFamily());
+        String base = family != null && !family.isBlank()
+                ? familyAccessService.baseNameForName(family)
+                : familyAccessService.baseFamily(me);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
 
-        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        Long familyId = requiredFamilyId(base);
+        GradeSheet sheet = gradeRepo.findByFamilyId(familyId).orElse(null);
         if (sheet == null) {
             return ResponseEntity.ok(new MyGradesView(base, null, null, null, null, null, List.of(), new LinkedHashMap<>(), List.of(), new LinkedHashMap<>()));
         }
@@ -583,10 +595,13 @@ public class GradesController {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         User me = userRepo.findByUsername(auth.getName()).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        String base = FamilyUtil.mainFamily(family != null && !family.isBlank() ? family : me.getDeaconFamily());
+        String base = family != null && !family.isBlank()
+                ? familyAccessService.baseNameForName(family)
+                : familyAccessService.baseFamily(me);
         if (base == null || base.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
 
-        GradeSheet sheet = gradeRepo.findByFamilyBaseIgnoreCase(base).orElse(null);
+        Long familyId = requiredFamilyId(base);
+        GradeSheet sheet = gradeRepo.findByFamilyId(familyId).orElse(null);
         if (sheet == null || sheet.getSecondPublishedAt() == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Second term grades are not published");
 
         String status = normAr(me.getStatus());
@@ -628,6 +643,10 @@ public class GradesController {
 
         userRepo.save(me);
         me.setPassword(null);
+        me.setDeaconFamily(familyAccessService.primaryFamilyName(me));
+        me.setDeaconFamily2(familyAccessService.secondaryFamilyName(me));
+        me.setDeaconFamily3(familyAccessService.thirdFamilyName(me));
+        me.setDeaconFamily4(familyAccessService.fourthFamilyName(me));
         return ResponseEntity.ok(me);
     }
 }

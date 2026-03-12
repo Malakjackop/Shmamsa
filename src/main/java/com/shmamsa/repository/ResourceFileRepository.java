@@ -6,10 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ResourceFileRepository extends JpaRepository<ResourceFile, Long> {
-
-    List<ResourceFile> findByFamilyInOrderByCreatedAtDesc(List<String> families);
-
-    List<ResourceFile> findByFamilyOrderByCreatedAtDesc(String family);
+    List<ResourceFile> findByFamilyIdInOrFamilyOrderByCreatedAtDesc(List<Long> familyIds, String family);
 
     List<ResourceFile> findAllByOrderByCreatedAtDesc();
 }

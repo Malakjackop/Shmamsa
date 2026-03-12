@@ -3,6 +3,7 @@ package com.shmamsa.service;
 import com.shmamsa.dto.RegisterRequest;
 import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.exception.ApiException;
+import com.shmamsa.model.FamilyCatalog;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
@@ -29,6 +30,7 @@ public class AuthService {
     private final AttendanceBackfillService attendanceBackfillService;
 
     private final ServantSecretService servantSecretService;
+    private final FamilyCatalogService familyCatalogService;
 
     private static class RateWindow {
         int count;
@@ -136,7 +138,9 @@ public class AuthService {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(request.getNationalId());
-        user.setDeaconFamily(request.getDeaconFamily());
+        FamilyCatalog memberFamily = familyCatalogService.resolveMemberFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
+        user.setDeaconFamily(memberFamily.getNameAr());
+        user.setDeaconFamilyId(memberFamily.getId());
         user.setDeaconDegree(request.getDeaconDegree());
 
         String requestedKhors = normalizeKhors(request.getKhors(), false);
@@ -242,30 +246,26 @@ public class AuthService {
         user.setNationalId(nid);
 
         if ("KHORS_ONLY".equals(scope)) {
-    String kTmp = normalizeKhors(request.getKhors(), true);
-    if ("NONE".equals(kTmp) || kTmp.isBlank()) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
-    }
-    if ("MARMARKOS".equalsIgnoreCase(kTmp)) {
-        user.setDeaconFamily("خورس مارمرقس");
-    } else if ("ATHANASIUS".equalsIgnoreCase(kTmp)) {
-        user.setDeaconFamily("خورس البابا اثناسيوس");
-    } else {
-        user.setDeaconFamily("خورس");
-    }
-} else {
-    if (request.getDeaconFamily() == null || request.getDeaconFamily().trim().isBlank()) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "DEACON_FAMILY_REQUIRED", "Deacon family is required");
-    }
-    user.setDeaconFamily(request.getDeaconFamily().trim());
+            String kTmp = normalizeKhors(request.getKhors(), true);
+            if ("NONE".equals(kTmp) || kTmp.isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
+            }
+            FamilyCatalog khorsFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
+            user.setDeaconFamily(khorsFamily.getNameAr());
+            user.setDeaconFamilyId(khorsFamily.getId());
+        } else {
+    FamilyCatalog servantFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
+    user.setDeaconFamily(servantFamily.getNameAr());
+    user.setDeaconFamilyId(servantFamily.getId());
 
-    if (request.getDeaconFamily2() != null && !request.getDeaconFamily2().trim().isBlank()) {
-        String f2 = request.getDeaconFamily2().trim();
-        if (!f2.equalsIgnoreCase(user.getDeaconFamily())) {
-            user.setDeaconFamily2(f2);
+    if (request.getDeaconFamily2Id() != null || (request.getDeaconFamily2() != null && !request.getDeaconFamily2().trim().isBlank())) {
+        FamilyCatalog extraFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamily2Id(), request.getDeaconFamily2());
+        if (!extraFamily.getNameAr().equalsIgnoreCase(user.getDeaconFamily())) {
+            user.setDeaconFamily2(extraFamily.getNameAr());
+            user.setDeaconFamily2Id(extraFamily.getId());
         }
     }
-}
+        }
 
         user.setDeaconDegree(request.getDeaconDegree());
         user.setRole("KHADIM");

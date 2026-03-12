@@ -2,13 +2,15 @@ package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AttendanceType;
+import com.shmamsa.model.FamilyCatalog;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.AttendanceBackfillService;
+import com.shmamsa.service.FamilyAccessService;
+import com.shmamsa.service.FamilyCatalogService;
 import com.shmamsa.service.KhorsJoinRequestService;
-import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,9 +28,11 @@ public class FamilyController {
     private final AttendanceRepository attendanceRepo;
     private final KhorsJoinRequestService khorsReqService;
     private final AttendanceBackfillService attendanceBackfillService;
+    private final FamilyAccessService familyAccessService;
+    private final FamilyCatalogService familyCatalogService;
 
     private String baseFamilyOf(User u) {
-        return u == null ? null : FamilyUtil.mainFamily(u.getDeaconFamily());
+        return familyAccessService.baseFamily(u);
     }
 
     private static String normRole(String raw) {
@@ -78,31 +82,11 @@ public class FamilyController {
         return new ArrayList<>(out);
     }
     private List<String> servingBasesOf(User u) {
-        if (u == null) return List.of();
-        Set<String> set = new LinkedHashSet<>();
-        addServingBase(set, u.getDeaconFamily(), u.getDeaconFamilyRole() == null ? u.getRole() : u.getDeaconFamilyRole());
-        addServingBase(set, u.getDeaconFamily2(), u.getDeaconFamilyRole2());
-        addServingBase(set, u.getDeaconFamily3(), u.getDeaconFamilyRole3());
-        addServingBase(set, u.getDeaconFamily4(), u.getDeaconFamilyRole4());
-
-        String role = normRole(u.getRole());
-        if ("KHADIM".equals(role)) {
-            String scope = u.getServingScope() == null ? "" : u.getServingScope().trim().toUpperCase();
-            if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
-                String k = u.getKhors() == null ? "" : u.getKhors().trim().toUpperCase();
-                if ("MARMARKOS".equals(k) || "BOTH".equals(k)) set.add("خورس مارمرقس");
-                if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) set.add("خورس البابا اثناسيوس");
-            }
-        }
-        return new ArrayList<>(set);
+        return familyAccessService.servingBasesOf(u);
     }
 
-    private void addServingBase(Set<String> set, String family, String role) {
-        String base = FamilyUtil.mainFamily(family);
-        String normalizedRole = normRole(role);
-        if (base == null || base.isBlank() || "SYSTEM".equalsIgnoreCase(base)) return;
-        if (!RoleUtil.isAtLeast(normalizedRole, "KHADIM")) return;
-        set.add(base);
+    private List<Long> relatedFamilyIds(String familyName) {
+        return familyCatalogService.relatedIdsForSelection(familyCatalogService.baseNameForName(familyName));
     }
 
     private static boolean isChoirBucket(String base) {
@@ -142,25 +126,7 @@ public ResponseEntity<?> families(
     }
 
 
-    Set<String> set = new HashSet<>();
-    for (User u : userRepo.findAll()) {
-        if (u.getDeaconFamily() == null) continue;
-        if ("DEVELOPER".equalsIgnoreCase(u.getRole())) continue;
-
-        String base = FamilyUtil.mainFamily(u.getDeaconFamily());
-        if (base == null || base.isBlank()) continue;
-        if ("SYSTEM".equalsIgnoreCase(base)) continue;
-
-        set.add(base);
-    }
-
-    set.add("خورس مارمرقس");
-    // ✅ keep both labels (some UIs show "الانبا" وبعضها "البابا")
-    set.add("خورس البابا اثناسيوس");
-    
-    List<String> out = new ArrayList<>(set);
-    out.sort(String::compareTo);
-    return ResponseEntity.ok(out);
+    return ResponseEntity.ok(familyCatalogService.listSelectableBaseNames());
 }
 
 
@@ -194,7 +160,7 @@ boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(con
 boolean aminOsraAttendanceContext = effIsAminOsra && hasFamilySelection && attendanceContext;
 
 if (isKhadim && hasFamilySelection && !attendanceContext) {
-    String selectedBase = FamilyUtil.mainFamily(family);
+    String selectedBase = familyCatalogService.baseNameForName(family);
     List<String> myBases = servingBasesOf(me);
     if (selectedBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(selectedBase))) {
         throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
@@ -207,8 +173,8 @@ if (isKhadim && hasFamilySelection && !attendanceContext) {
 
     String target = (canSelectFamily && hasFamilySelection)
             ? family
-            : me.getDeaconFamily();
-    String base = servantsBucket ? null : FamilyUtil.mainFamily(target);
+            : baseFamilyOf(me);
+    String base = servantsBucket ? null : familyCatalogService.baseNameForName(target);
 
     if (base != null) base = base.trim();
     List<String> rolesToShow;
@@ -239,7 +205,8 @@ if (servantsBucket) {
     List<String> myBases = servingBasesOf(me);
     Map<Long, User> uniq = new LinkedHashMap<>();
     for (String b : myBases) {
-        for (User u : userRepo.findByDeaconFamilyStartingWithAndRoleIn(b, rolesToShow)) {
+        List<Long> ids = relatedFamilyIds(b);
+        for (User u : userRepo.findByAnyFamilyIdInAndRoleIn(ids, rolesToShow)) {
             if (u.getId() != null) uniq.put(u.getId(), u);
         }
     }
@@ -257,7 +224,8 @@ if (servantsBucket) {
 
         members = new ArrayList<>(map.values());
     } else {
-        members = userRepo.findByAnyFamilyStartingWithAndRoleIn(base, rolesToShow);
+        List<Long> ids = relatedFamilyIds(base);
+        members = userRepo.findByAnyFamilyIdInAndRoleIn(ids, rolesToShow);
     }
 }
 
@@ -275,9 +243,10 @@ if (servantsBucket) {
 
             long fridayTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FRIDAY_LITURGY);
             long tasbeehaTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.TASBEEHA);
+            Long baseFamilyId = base == null || base.isBlank() || isChoirBucket(base) ? null : familyAccessService.familyIdForName(base);
             long meetingTotal = base == null || base.isBlank() || isChoirBucket(base)
                     ? attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING)
-                    : attendanceRepo.countByUser_IdAndTypeAndFamilyBaseAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING, base);
+                    : attendanceRepo.countByUser_IdAndTypeAndFamilyIdAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING, baseFamilyId);
 
             // ✅ Choir totals (only meaningful for choir members)
             long marmarkosTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.MARMARKOS_KHORS);
@@ -287,7 +256,7 @@ if (servantsBucket) {
             long tasbeehaPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.TASBEEHA);
             long meetingPresent = base == null || base.isBlank() || isChoirBucket(base)
                     ? attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FAMILY_MEETING)
-                    : attendanceRepo.countPresentByUserAndTypeAndFamilyBaseActive(u.getId(), AttendanceType.FAMILY_MEETING, base);
+                    : attendanceRepo.countPresentByUserAndTypeAndFamilyIdActive(u.getId(), AttendanceType.FAMILY_MEETING, baseFamilyId);
 
             long marmarkosPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.MARMARKOS_KHORS);
             long athanasiusPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.ATHANASIUS_KHORS);
@@ -296,10 +265,10 @@ if (servantsBucket) {
             row.put("id", u.getId());
             row.put("fullName", u.getFullName());
             row.put("role", u.getRole());
-            row.put("deaconFamily", u.getDeaconFamily());
-            row.put("deaconFamily2", u.getDeaconFamily2());
-            row.put("deaconFamily3", u.getDeaconFamily3());
-            row.put("deaconFamily4", u.getDeaconFamily4());
+            row.put("deaconFamily", familyAccessService.primaryFamilyName(u));
+            row.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
+            row.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
+            row.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
             row.put("deaconFamilyRole", u.getDeaconFamilyRole());
             row.put("deaconFamilyRole2", u.getDeaconFamilyRole2());
             row.put("deaconFamilyRole3", u.getDeaconFamilyRole3());
@@ -351,8 +320,8 @@ if (servantsBucket) {
 
         String target = ((isAminKhedmaOrDev || khadimSelectedContext) && hasFamilySelection)
                 ? family
-                : me.getDeaconFamily();
-        String base = FamilyUtil.mainFamily(target);
+                : baseFamilyOf(me);
+        String base = familyCatalogService.baseNameForName(target);
         String uBase = familyBaseMatch(u, base);
 
         if (!isAminKhedmaOrDev) {
@@ -374,10 +343,10 @@ if (servantsBucket) {
         dto.put("username", u.getUsername());
         dto.put("email", u.getEmail());
         dto.put("role", u.getRole());
-        dto.put("deaconFamily", u.getDeaconFamily());
-        dto.put("deaconFamily2", u.getDeaconFamily2());
-        dto.put("deaconFamily3", u.getDeaconFamily3());
-        dto.put("deaconFamily4", u.getDeaconFamily4());
+        dto.put("deaconFamily", familyAccessService.primaryFamilyName(u));
+        dto.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
+        dto.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
+        dto.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
         dto.put("deaconDegree", u.getDeaconDegree());
         dto.put("nationalId", u.getNationalId());
         dto.put("phoneNumber", u.getPhoneNumber());
@@ -538,7 +507,7 @@ if (servantsBucket) {
 
 
         String transferFamily = body.get("transferFamily") == null ? null : body.get("transferFamily").toString();
-        String transferFamilyBase = FamilyUtil.mainFamily(transferFamily);
+        String transferFamilyBase = familyCatalogService.baseNameForName(transferFamily);
         String effectiveActorRole = transferFamilyBase == null || transferFamilyBase.isBlank()
                 ? normRole(me.getRole())
                 : effectiveRoleIn(me, transferFamilyBase);
@@ -689,7 +658,7 @@ if (servantsBucket) {
         // (سيب هنا كود الأسر بتاعك زي ما هو تحت بدون تغيير)
         // -------------- START: your existing family-transfer block --------------
         List<String> specialKeywords = List.of("الانبا ابرام", "البابا كيرلس", "اسطفانوس");
-        String targetBase = FamilyUtil.mainFamily(newFamilyTrim);
+        String targetBase = familyCatalogService.baseNameForName(newFamilyTrim);
         boolean isSpecialTarget = (targetBase != null) && specialKeywords.stream().anyMatch(targetBase::contains);
 
         String effectiveFamily;
@@ -745,7 +714,7 @@ if (servantsBucket) {
             String raw = extra.get("family");
             if (raw == null || raw.isBlank()) continue;
             String secTrim = raw.trim();
-            String secBase = FamilyUtil.mainFamily(secTrim);
+            String secBase = familyCatalogService.baseNameForName(secTrim);
             boolean isSpecialSec = (secBase != null) && specialKeywords.stream().anyMatch(secBase::contains);
 
             String normalized;
@@ -776,7 +745,7 @@ if (servantsBucket) {
         for (Map<String, String> extra : effectiveExtras) {
             String ef = extra.get("family");
             if (ef == null || ef.isBlank()) continue;
-            String secBase = FamilyUtil.mainFamily(ef);
+            String secBase = familyCatalogService.baseNameForName(ef);
             if (secBase == null || secBase.isBlank() || "SYSTEM".equalsIgnoreCase(secBase)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid extra family");
             }
@@ -786,7 +755,7 @@ if (servantsBucket) {
             }
         }
 
-        String myBase = FamilyUtil.mainFamily(me.getDeaconFamily());
+        String myBase = familyAccessService.baseFamily(me);
         int updated = 0;
 
         for (Long id : ids) {
@@ -820,9 +789,10 @@ if (servantsBucket) {
             }
 
             u.setDeaconFamily(effectiveFamily.trim());
+            u.setDeaconFamilyId(familyIdByName(effectiveFamily.trim()));
             u.setDeaconFamilyRole(normalizedTargetRole != null ? normalizedTargetRole : normRole(u.getRole()));
 
-            String primBase = FamilyUtil.mainFamily(effectiveFamily);
+            String primBase = familyCatalogService.baseNameForName(effectiveFamily);
 
             List<Map<String, String>> cleanExtras = new ArrayList<>();
             Set<String> seenBases = new LinkedHashSet<>();
@@ -831,7 +801,7 @@ if (servantsBucket) {
             for (Map<String, String> extra : effectiveExtras) {
                 String ef = extra.get("family");
                 if (ef == null || ef.isBlank()) continue;
-                String eb = FamilyUtil.mainFamily(ef);
+                String eb = familyCatalogService.baseNameForName(ef);
                 if (eb == null || eb.isBlank()) continue;
                 if (seenBases.stream().anyMatch(x -> x.equalsIgnoreCase(eb))) continue;
                 seenBases.add(eb);
@@ -845,6 +815,9 @@ if (servantsBucket) {
             u.setDeaconFamily2(cleanExtras.size() >= 1 ? cleanExtras.get(0).get("family") : null);
             u.setDeaconFamily3(cleanExtras.size() >= 2 ? cleanExtras.get(1).get("family") : null);
             u.setDeaconFamily4(cleanExtras.size() >= 3 ? cleanExtras.get(2).get("family") : null);
+            u.setDeaconFamily2Id(cleanExtras.size() >= 1 ? familyIdByName(cleanExtras.get(0).get("family")) : null);
+            u.setDeaconFamily3Id(cleanExtras.size() >= 2 ? familyIdByName(cleanExtras.get(1).get("family")) : null);
+            u.setDeaconFamily4Id(cleanExtras.size() >= 3 ? familyIdByName(cleanExtras.get(2).get("family")) : null);
             u.setDeaconFamilyRole2(cleanExtras.size() >= 1 ? cleanExtras.get(0).get("role") : null);
             u.setDeaconFamilyRole3(cleanExtras.size() >= 2 ? cleanExtras.get(1).get("role") : null);
             u.setDeaconFamilyRole4(cleanExtras.size() >= 3 ? cleanExtras.get(2).get("role") : null);
@@ -917,21 +890,26 @@ if (servantsBucket) {
 
     private String effectiveRoleIn(User me, String family) {
         if (me == null) return "MAKHDOM";
-        String base = FamilyUtil.mainFamily(family);
+        String base = familyCatalogService.baseNameForName(family);
         if (base == null || base.isBlank()) return normRole(me.getRole());
-        String scoped = me.roleForFamilyBase(base);
+        String scoped = familyAccessService.scopedRole(me, base);
         if (scoped != null && !scoped.isBlank()) return normRole(scoped);
         return normRole(me.getRole());
     }
 
     private String familyBaseMatch(User user, String familyBase) {
         if (user == null || familyBase == null || familyBase.isBlank()) return null;
-        String[] families = new String[]{user.getDeaconFamily(), user.getDeaconFamily2(), user.getDeaconFamily3(), user.getDeaconFamily4()};
-        for (String family : families) {
-            String base = FamilyUtil.mainFamily(family);
-            if (base != null && base.equalsIgnoreCase(familyBase)) return base;
-        }
+        String base = familyCatalogService.baseNameForName(familyBase);
+        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamilyId(), user.getDeaconFamily()))) return base;
+        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamily2Id(), user.getDeaconFamily2()))) return base;
+        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamily3Id(), user.getDeaconFamily3()))) return base;
+        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamily4Id(), user.getDeaconFamily4()))) return base;
         return null;
+    }
+
+    private Long familyIdByName(String name) {
+        FamilyCatalog family = familyCatalogService.findByName(name);
+        return family == null ? null : family.getId();
     }
     
 }

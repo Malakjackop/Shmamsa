@@ -31,6 +31,9 @@ public class Event {
     @Column(nullable = false, length = 120)
     private String targetFamily;
 
+    @Column(name = "target_family_id")
+    private Long targetFamilyId;
+
     @Column(length = 30)
     private String targetAudience;
 

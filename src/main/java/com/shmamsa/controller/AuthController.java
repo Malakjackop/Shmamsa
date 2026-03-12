@@ -2,6 +2,7 @@ package com.shmamsa.controller;
 
 import com.shmamsa.dto.ProfileUpdateRequest;
 import com.shmamsa.dto.LoginRequest;
+import com.shmamsa.dto.FamilyOptionDto;
 import com.shmamsa.dto.ForgotPasswordRequest;
 import com.shmamsa.dto.ResetPasswordRequest;
 import com.shmamsa.dto.RegisterRequest;
@@ -10,6 +11,8 @@ import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.User;
 import com.shmamsa.service.AttendanceBackfillService;
 import com.shmamsa.service.AuthService;
+import com.shmamsa.service.FamilyAccessService;
+import com.shmamsa.service.FamilyCatalogService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final AttendanceBackfillService attendanceBackfillService;
+    private final FamilyCatalogService familyCatalogService;
+    private final FamilyAccessService familyAccessService;
 
 
     @PostMapping("/register")
@@ -43,6 +48,13 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
     authService.registerServant(request);
     return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
 }
+
+    @GetMapping("/family-options")
+    public ResponseEntity<java.util.List<FamilyOptionDto>> familyOptions(
+            @RequestParam(defaultValue = "MEMBER") String audience
+    ) {
+        return ResponseEntity.ok(familyCatalogService.listForAudience(audience));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
@@ -77,11 +89,10 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
         attendanceBackfillService.backfillForUser(user);
         user.setPassword(null);
-
-        // Hide internal/system family label from responses (for all roles)
-        if ("SYSTEM".equalsIgnoreCase(user.getDeaconFamily())) {
-            user.setDeaconFamily(null);
-        }
+        user.setDeaconFamily(familyAccessService.primaryFamilyName(user));
+        user.setDeaconFamily2(familyAccessService.secondaryFamilyName(user));
+        user.setDeaconFamily3(familyAccessService.thirdFamilyName(user));
+        user.setDeaconFamily4(familyAccessService.fourthFamilyName(user));
 
         return ResponseEntity.ok(user);
     }
@@ -159,6 +170,10 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             authService.saveUser(existingUser);
 
             existingUser.setPassword(null);
+            existingUser.setDeaconFamily(familyAccessService.primaryFamilyName(existingUser));
+            existingUser.setDeaconFamily2(familyAccessService.secondaryFamilyName(existingUser));
+            existingUser.setDeaconFamily3(familyAccessService.thirdFamilyName(existingUser));
+            existingUser.setDeaconFamily4(familyAccessService.fourthFamilyName(existingUser));
             return ResponseEntity.ok(existingUser);
     }
 }

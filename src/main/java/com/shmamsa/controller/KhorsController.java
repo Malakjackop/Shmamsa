@@ -3,6 +3,7 @@ package com.shmamsa.controller;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.FamilyAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public class KhorsController {
 
     private final UserRepository userRepo;
+    private final FamilyAccessService familyAccessService;
 
     private static String normRole(String raw) {
         if (raw == null) return "";
@@ -76,10 +78,10 @@ public class KhorsController {
             m.put("id", u.getId());
             m.put("fullName", u.getFullName());
             m.put("role", normRole(u.getRole()));
-            m.put("deaconFamily", u.getDeaconFamily());
-            m.put("deaconFamily2", u.getDeaconFamily2());
-            m.put("deaconFamily3", u.getDeaconFamily3());
-            m.put("deaconFamily4", u.getDeaconFamily4());
+            m.put("deaconFamily", familyAccessService.primaryFamilyName(u));
+            m.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
+            m.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
+            m.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
             m.put("khors", u.getKhors());
             m.put("khorsYear", u.getKhorsYear());
             m.put("attendKhors", u.getAttendKhors());

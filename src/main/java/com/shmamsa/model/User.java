@@ -95,18 +95,29 @@ public class User {
     @Column(length = 100)
     private String workDetails;
 
-    @NotBlank(message = "Deacon family is required")
     @Column(length = 100)
     private String deaconFamily;
+
+    @Column(name = "deacon_family_id")
+    private Long deaconFamilyId;
 
     @Column(length = 100)
     private String deaconFamily2;
 
+    @Column(name = "deacon_family2_id")
+    private Long deaconFamily2Id;
+
     @Column(length = 100)
     private String deaconFamily3;
 
+    @Column(name = "deacon_family3_id")
+    private Long deaconFamily3Id;
+
     @Column(length = 100)
     private String deaconFamily4;
+
+    @Column(name = "deacon_family4_id")
+    private Long deaconFamily4Id;
 
     @Column(length = 30)
     private String deaconFamilyRole;
@@ -151,24 +162,4 @@ public class User {
 
     @Column(name = "last_school_result_status", length = 10)
     private String lastSchoolResultStatus; // PASS / FAIL
-
-    public String roleForFamilyBase(String familyBase) {
-        if (familyBase == null || familyBase.isBlank()) return null;
-        String base = familyBase.trim();
-
-        String f1 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily());
-        String f2 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily2());
-        String f3 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily3());
-        String f4 = com.shmamsa.util.FamilyUtil.mainFamily(getDeaconFamily4());
-
-        if (f1 != null && f1.equalsIgnoreCase(base)) {
-            return (getDeaconFamilyRole() != null && !getDeaconFamilyRole().isBlank())
-                    ? getDeaconFamilyRole().trim().toUpperCase()
-                    : String.valueOf(getRole()).trim().toUpperCase();
-        }
-        if (f2 != null && f2.equalsIgnoreCase(base)) return getDeaconFamilyRole2() == null ? null : getDeaconFamilyRole2().trim().toUpperCase();
-        if (f3 != null && f3.equalsIgnoreCase(base)) return getDeaconFamilyRole3() == null ? null : getDeaconFamilyRole3().trim().toUpperCase();
-        if (f4 != null && f4.equalsIgnoreCase(base)) return getDeaconFamilyRole4() == null ? null : getDeaconFamilyRole4().trim().toUpperCase();
-        return null;
-    }
 }

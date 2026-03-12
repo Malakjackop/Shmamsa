@@ -8,7 +8,7 @@ import com.shmamsa.model.User;
 import com.shmamsa.repository.AnnouncementRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
-import com.shmamsa.util.FamilyUtil;
+import com.shmamsa.service.FamilyAccessService;
 import jakarta.validation.Valid;
 import lombok.*;
 import org.springframework.http.HttpStatus;
@@ -30,6 +30,7 @@ public class AnnouncementController {
 
     private final AnnouncementRepository announcementRepo;
     private final UserRepository userRepo;
+    private final FamilyAccessService familyAccessService;
 
     private User requireUser(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) {
@@ -44,27 +45,26 @@ public class AnnouncementController {
     }
 
     private String baseFamily(User u) {
-        return FamilyUtil.mainFamily(u == null ? null : u.getDeaconFamily());
+        return familyAccessService.baseFamily(u);
     }
 
     private List<String> allBaseFamilies(User u) {
-        if (u == null) return List.of();
-
-        List<String> out = new ArrayList<>();
-        List<String> raw = Arrays.asList(
-                u.getDeaconFamily(),
-                u.getDeaconFamily2(),
-                u.getDeaconFamily3(),
-                u.getDeaconFamily4()
-        );
-
-        for (String item : raw) {
-            String base = FamilyUtil.mainFamily(item);
-            if (base == null || base.isBlank()) continue;
-            if (!out.contains(base)) out.add(base);
-        }
-        return out;
+        return familyAccessService.servingBasesOf(u);
     }
+
+    private String targetBase(Long familyId, String familyName) {
+        String raw = String.valueOf(familyName == null ? "" : familyName).trim();
+        if (raw.isBlank() || "ALL".equalsIgnoreCase(raw)) return "ALL";
+        return familyAccessService.baseNameForId(familyId, raw);
+    }
+
+    private Long targetFamilyId(String familyName) {
+        String raw = String.valueOf(familyName == null ? "" : familyName).trim();
+        if (raw.isBlank() || "ALL".equalsIgnoreCase(raw)) return null;
+        return familyAccessService.familyIdForName(familyAccessService.baseNameForName(raw));
+    }
+
+    private record TargetScope(String family, Long familyId, String audience) {}
 
     private boolean belongsToFamily(User user, String familyBase) {
         String base = String.valueOf(familyBase == null ? "" : familyBase).trim();
@@ -91,7 +91,7 @@ public class AnnouncementController {
             return isServantGlobal(user.getRole());
         }
 
-        String scopedRole = user.roleForFamilyBase(base);
+        String scopedRole = familyAccessService.scopedRole(user, base);
         if (scopedRole != null && !scopedRole.isBlank()) {
             return RoleUtil.isAtLeast(scopedRole, "KHADIM");
         }
@@ -100,25 +100,25 @@ public class AnnouncementController {
         return myBase != null && myBase.equalsIgnoreCase(base) && isServantGlobal(user.getRole());
     }
 
-    private boolean matchesFamily(User me, String targetFamily) {
-        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+    private boolean matchesFamily(User me, Long targetFamilyId, String targetFamily) {
+        String tf = targetBase(targetFamilyId, targetFamily);
         if (tf.isBlank() || "ALL".equalsIgnoreCase(tf)) return true;
         return belongsToFamily(me, tf);
     }
 
-    private boolean matchesAudience(User me, String role, String targetFamily, String targetAudience) {
+    private boolean matchesAudience(User me, String role, Long targetFamilyId, String targetFamily, String targetAudience) {
         String audience = normalizeAudience(targetAudience);
         if (!AUDIENCE_SERVANTS_ONLY.equals(audience)) return true;
 
-        if ("ALL".equalsIgnoreCase(String.valueOf(targetFamily).trim())) {
+        if ("ALL".equalsIgnoreCase(targetBase(targetFamilyId, targetFamily))) {
             return isServantGlobal(role);
         }
-        return isServantInFamily(me, targetFamily);
+        return isServantInFamily(me, targetBase(targetFamilyId, targetFamily));
     }
 
     private boolean isVisibleToUser(User me, String role, Announcement a) {
-        return matchesFamily(me, a.getTargetFamily())
-                && matchesAudience(me, role, a.getTargetFamily(), a.getTargetAudience());
+        return matchesFamily(me, a.getTargetFamilyId(), a.getTargetFamily())
+                && matchesAudience(me, role, a.getTargetFamilyId(), a.getTargetFamily(), a.getTargetAudience());
     }
 
     private boolean matchesScopeSelection(Announcement a, String role, String family, String audience) {
@@ -126,7 +126,7 @@ public class AnnouncementController {
         String rawAudience = String.valueOf(audience == null ? "" : audience).trim();
         String reqAudience = normalizeAudience(audience);
         String itemAudience = normalizeAudience(a.getTargetAudience());
-        String itemFamily = String.valueOf(a.getTargetFamily() == null ? "" : a.getTargetFamily()).trim();
+        String itemFamily = targetBase(a.getTargetFamilyId(), a.getTargetFamily());
 
         if (fam.isBlank() && rawAudience.isBlank()) {
             return true;
@@ -154,13 +154,15 @@ public class AnnouncementController {
                 && ("ALL".equalsIgnoreCase(itemFamily) || fam.equalsIgnoreCase(itemFamily));
     }
 
-    private void validateTarget(User me, String role, String targetFamily, String targetAudience) {
-        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+    private TargetScope validateTarget(User me, String role, Long targetFamilyId, String targetFamily, String targetAudience) {
+        String tf = targetBase(targetFamilyId, targetFamily);
         String ta = normalizeAudience(targetAudience);
 
         if (tf.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "targetFamily is required");
 
-        if (isAdmin(role)) return;
+        Long resolvedId = "ALL".equalsIgnoreCase(tf) ? null : targetFamilyId(tf);
+
+        if (isAdmin(role)) return new TargetScope(tf, resolvedId, ta);
 
         if (!RoleUtil.isAtLeast(role, "KHADIM")) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
@@ -178,17 +180,19 @@ public class AnnouncementController {
         if (!RoleUtil.isAtLeast(role, "AMIN_OSRA") && AUDIENCE_SERVANTS_ONLY.equals(ta)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Target audience not allowed");
         }
+
+        return new TargetScope(tf, resolvedId, ta);
     }
 
-    private boolean isFamilyScopedTarget(String targetFamily) {
-        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+    private boolean isFamilyScopedTarget(Long targetFamilyId, String targetFamily) {
+        String tf = targetBase(targetFamilyId, targetFamily);
         return !tf.isBlank() && !"ALL".equalsIgnoreCase(tf);
     }
 
     private String scopedRole(User user, String familyBase) {
         if (user == null) return null;
 
-        String scoped = user.roleForFamilyBase(familyBase);
+        String scoped = familyAccessService.scopedRole(user, familyBase);
         if (scoped != null && !scoped.isBlank()) {
             return scoped.trim().toUpperCase();
         }
@@ -198,15 +202,16 @@ public class AnnouncementController {
 
     private boolean canFamilyLeaderManage(User me, String role, Announcement a) {
         if (!RoleUtil.isAtLeast(role, "AMIN_OSRA") || isAdmin(role)) return false;
-        if (a == null || !isFamilyScopedTarget(a.getTargetFamily())) return false;
-        if (!belongsToFamily(me, a.getTargetFamily())) return false;
+        if (a == null || !isFamilyScopedTarget(a.getTargetFamilyId(), a.getTargetFamily())) return false;
+        String targetBase = targetBase(a.getTargetFamilyId(), a.getTargetFamily());
+        if (!belongsToFamily(me, targetBase)) return false;
 
         User creator = a.getCreatedBy();
         if (creator == null) {
             return true; // legacy records without createdBy
         }
 
-        String creatorRole = scopedRole(creator, a.getTargetFamily());
+        String creatorRole = scopedRole(creator, targetBase);
         return RoleUtil.isAtLeast(creatorRole, "KHADIM")
                 && !RoleUtil.isAtLeast(creatorRole, "AMIN_OSRA");
     }
@@ -268,13 +273,14 @@ public class AnnouncementController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
+        TargetScope scope = validateTarget(me, role, req.getTargetFamilyId(), req.getTargetFamily(), req.getTargetAudience());
 
         Announcement a = Announcement.builder()
                 .title(req.getTitle().trim())
                 .description(req.getDescription())
-                .targetFamily(req.getTargetFamily().trim())
-                .targetAudience(normalizeAudience(req.getTargetAudience()))
+                .targetFamily(scope.family())
+                .targetFamilyId(scope.familyId())
+                .targetAudience(scope.audience())
                 .status(EventStatus.PENDING)
                 .publishedAt(null)
                 .createdBy(me)
@@ -298,12 +304,13 @@ public class AnnouncementController {
 
         if (!(can || creator)) throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
 
-        validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
+        TargetScope scope = validateTarget(me, role, req.getTargetFamilyId(), req.getTargetFamily(), req.getTargetAudience());
 
         a.setTitle(req.getTitle().trim());
         a.setDescription(req.getDescription());
-        a.setTargetFamily(req.getTargetFamily().trim());
-        a.setTargetAudience(normalizeAudience(req.getTargetAudience()));
+        a.setTargetFamily(scope.family());
+        a.setTargetFamilyId(scope.familyId());
+        a.setTargetAudience(scope.audience());
 
         announcementRepo.save(a);
         return ResponseEntity.ok(Map.of("ok", true));
@@ -355,7 +362,7 @@ public class AnnouncementController {
                 .id(a.getId())
                 .title(a.getTitle())
                 .description(a.getDescription())
-                .targetFamily(a.getTargetFamily())
+                .targetFamily(targetBase(a.getTargetFamilyId(), a.getTargetFamily()))
                 .targetAudience(normalizeAudience(a.getTargetAudience()))
                 .status(st.name())
                 .publishedAt(a.getPublishedAt())

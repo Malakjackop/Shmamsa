@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface GradeSheetRepository extends JpaRepository<GradeSheet, Long> {
-    Optional<GradeSheet> findByFamilyBaseIgnoreCase(String familyBase);
+    Optional<GradeSheet> findByFamilyId(Long familyId);
 }

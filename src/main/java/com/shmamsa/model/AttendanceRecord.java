@@ -31,10 +31,13 @@ public class AttendanceRecord {
     @Enumerated(EnumType.STRING)
     @Column
     private AttendanceStatus status = AttendanceStatus.PRESENT;
-// ✅ For FAMILY_MEETING (and any future family-scoped types), we store which family this record belongs to
-// so that a user serving in multiple families has separate attendance per family.
-@Column(length = 120)
-private String familyBase;
+    // For family-scoped records we persist the canonical family id, and keep the
+    // base name only as a denormalized display value for legacy/API responses.
+    @Column(name = "family_id")
+    private Long familyId;
+
+    @Column(length = 120)
+    private String familyBase;
 
 
 

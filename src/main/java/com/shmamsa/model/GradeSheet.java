@@ -7,7 +7,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "grade_sheets", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"family_base"})
+        @UniqueConstraint(columnNames = {"family_base"}),
+        @UniqueConstraint(columnNames = {"family_id"})
 })
 @Getter
 @Setter
@@ -22,6 +23,9 @@ public class GradeSheet {
 
     @Column(name="family_base", nullable = false, length = 120)
     private String familyBase;
+
+    @Column(name = "family_id", nullable = false, unique = true)
+    private Long familyId;
 
     @Lob
     @Column(name="data_json", columnDefinition = "TEXT")

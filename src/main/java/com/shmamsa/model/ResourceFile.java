@@ -38,6 +38,9 @@ public class ResourceFile {
     @Column(length = 120)
     private String family;
 
+    @Column(name = "family_id")
+    private Long familyId;
+
     @Column(length = 50)
     private String uploadedByUsername;
 

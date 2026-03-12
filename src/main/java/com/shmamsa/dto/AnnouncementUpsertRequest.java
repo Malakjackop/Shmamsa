@@ -18,5 +18,7 @@ public class AnnouncementUpsertRequest {
     @NotBlank
     private String targetFamily;
 
+    private Long targetFamilyId;
+
     private String targetAudience;
 }

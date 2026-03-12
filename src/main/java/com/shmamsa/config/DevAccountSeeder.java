@@ -40,6 +40,7 @@ public class DevAccountSeeder implements CommandLineRunner {
                     // required fields on entity
                     dev.setNationalId("99999999999999");
                     dev.setDeaconFamily("SYSTEM");
+                    dev.setDeaconFamilyId(null);
                     dev.setDeaconDegree("SYSTEM");
 
                     dev.setRole("DEVELOPER");

@@ -18,9 +18,7 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     AttendanceRecord findFirstByUser_IdAndDateAndType(Long userId, LocalDate date, AttendanceType type);
     List<AttendanceRecord> findByUser_IdOrderByCreatedAtDesc(Long userId);
     List<AttendanceRecord> findByUser_IdAndTypeOrderByCreatedAtDesc(Long userId, AttendanceType type);
-    List<AttendanceRecord> findByUser_DeaconFamily(String deaconFamily);
     List<AttendanceRecord> findByDateAndType(LocalDate date, AttendanceType type);
-    List<AttendanceRecord> findByUser_DeaconFamilyStartingWith(String prefix);
 
     long countByUser_IdAndType(Long userId, AttendanceType type);
     long countByUser_IdAndTypeAndStatus(Long userId, AttendanceType type, AttendanceStatus status);
@@ -53,18 +51,17 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     AttendanceRecord findFirstByUser_IdAndDateAndTypeAndArchivedFalse(Long userId, LocalDate date, AttendanceType type);
 
 
-    // ✅ FAMILY_MEETING is scoped by familyBase (for multi-family servants)
-    AttendanceRecord findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(Long userId, LocalDate date, AttendanceType type, String familyBase);
+    AttendanceRecord findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(Long userId, LocalDate date, AttendanceType type, Long familyId);
 
-    long countByUser_IdAndTypeAndFamilyBaseAndArchivedFalse(Long userId, AttendanceType type, String familyBase);
+    long countByUser_IdAndTypeAndFamilyIdAndArchivedFalse(Long userId, AttendanceType type, Long familyId);
 
-    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and a.familyBase = :familyBase and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
-    long countPresentByUserAndTypeAndFamilyBaseActive(@Param("userId") Long userId,
-                                                      @Param("type") AttendanceType type,
-                                                      @Param("familyBase") String familyBase);
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and a.familyId = :familyId and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
+    long countPresentByUserAndTypeAndFamilyIdActive(@Param("userId") Long userId,
+                                                    @Param("type") AttendanceType type,
+                                                    @Param("familyId") Long familyId);
 
-    @Query("select distinct a.date from AttendanceRecord a where a.archived = false and a.type = :type and a.familyBase = :familyBase order by a.date asc")
-    List<LocalDate> findDistinctDatesByTypeAndFamilyBaseAndArchivedFalse(@Param("type") AttendanceType type, @Param("familyBase") String familyBase);
+    @Query("select distinct a.date from AttendanceRecord a where a.archived = false and a.type = :type and a.familyId = :familyId order by a.date asc")
+    List<LocalDate> findDistinctDatesByTypeAndFamilyIdAndArchivedFalse(@Param("type") AttendanceType type, @Param("familyId") Long familyId);
 
     @Query("select distinct a.date from AttendanceRecord a where a.archived = false and a.type = :type order by a.date asc")
     List<LocalDate> findDistinctDatesByTypeAndArchivedFalse(@Param("type") AttendanceType type);
@@ -74,17 +71,12 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
 
     List<AttendanceRecord> findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(Long userId, AttendanceType type);
 
-    List<AttendanceRecord> findByUser_DeaconFamilyAndArchivedFalse(String deaconFamily);
-
     List<AttendanceRecord> findByDateAndTypeAndArchivedFalse(LocalDate date, AttendanceType type);
 
     // ✅ Daily review for a specific scope (family/choir)
     List<AttendanceRecord> findByDateAndTypeAndArchivedFalseAndUser_IdIn(LocalDate date, AttendanceType type, List<Long> userIds);
 
-    // ✅ FAMILY_MEETING daily review is scoped by familyBase
-    List<AttendanceRecord> findByDateAndTypeAndFamilyBaseAndArchivedFalseAndUser_IdIn(LocalDate date, AttendanceType type, String familyBase, List<Long> userIds);
-
-    List<AttendanceRecord> findByUser_DeaconFamilyStartingWithAndArchivedFalse(String prefix);
+    List<AttendanceRecord> findByDateAndTypeAndFamilyIdAndArchivedFalseAndUser_IdIn(LocalDate date, AttendanceType type, Long familyId, List<Long> userIds);
 
     long countByUser_IdAndTypeAndArchivedFalse(Long userId, AttendanceType type);
 

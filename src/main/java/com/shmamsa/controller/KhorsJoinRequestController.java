@@ -6,6 +6,7 @@ import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.KhorsJoinRequest;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.KhorsJoinRequestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ public class KhorsJoinRequestController {
 
     private final UserRepository userRepo;
     private final KhorsJoinRequestService service;
+    private final FamilyAccessService familyAccessService;
 
     private User me(Authentication auth) {
         if (auth == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
@@ -60,7 +62,7 @@ public class KhorsJoinRequestController {
                         .requestId(r.getId())
                         .userId(u.getId())
                         .fullName(u.getFullName())
-                        .deaconFamily(u.getDeaconFamily())
+                        .deaconFamily(familyAccessService.primaryFamilyName(u))
                         .role(u.getRole())
                         .requestedKhors(r.getRequestedKhors())
                         .createdAt(r.getCreatedAt() == null ? null : r.getCreatedAt().toString())

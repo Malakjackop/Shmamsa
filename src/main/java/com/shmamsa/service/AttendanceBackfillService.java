@@ -5,7 +5,6 @@ import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.AttendanceRepository;
-import com.shmamsa.util.FamilyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +19,7 @@ import java.util.Set;
 public class AttendanceBackfillService {
 
     private final AttendanceRepository attendanceRepo;
+    private final FamilyAccessService familyAccessService;
 
     public void backfillForUser(User user) {
         if (user == null || user.getId() == null) return;
@@ -42,11 +42,13 @@ public class AttendanceBackfillService {
 
     private void backfillFamilyScoped(User user, String familyBase, AttendanceType type) {
         if (familyBase == null || familyBase.isBlank()) return;
+        Long familyId = familyAccessService.familyIdForName(familyBase);
+        if (familyId == null) return;
 
-        List<java.time.LocalDate> dates = attendanceRepo.findDistinctDatesByTypeAndFamilyBaseAndArchivedFalse(type, familyBase);
+        List<java.time.LocalDate> dates = attendanceRepo.findDistinctDatesByTypeAndFamilyIdAndArchivedFalse(type, familyId);
         for (java.time.LocalDate date : dates) {
-            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyBaseAndArchivedFalse(
-                    user.getId(), date, type, familyBase
+            AttendanceRecord existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(
+                    user.getId(), date, type, familyId
             );
             if (existing != null) continue;
 
@@ -55,6 +57,7 @@ public class AttendanceBackfillService {
             r.setDate(date);
             r.setTime(LocalTime.MIDNIGHT);
             r.setType(type);
+            r.setFamilyId(familyId);
             r.setFamilyBase(familyBase);
             r.setStatus(AttendanceStatus.ABSENT);
             attendanceRepo.save(r);
@@ -81,10 +84,10 @@ public class AttendanceBackfillService {
 
     private List<String> assignedFamilyBases(User user) {
         Set<String> set = new LinkedHashSet<>();
-        addFamilyBase(set, user.getDeaconFamily());
-        addFamilyBase(set, user.getDeaconFamily2());
-        addFamilyBase(set, user.getDeaconFamily3());
-        addFamilyBase(set, user.getDeaconFamily4());
+        addFamilyBase(set, user.getDeaconFamilyId(), user.getDeaconFamily());
+        addFamilyBase(set, user.getDeaconFamily2Id(), user.getDeaconFamily2());
+        addFamilyBase(set, user.getDeaconFamily3Id(), user.getDeaconFamily3());
+        addFamilyBase(set, user.getDeaconFamily4Id(), user.getDeaconFamily4());
         set.remove("خورس مارمرقس");
         set.remove("خورس البابا اثناسيوس");
         return new ArrayList<>(set);
@@ -92,24 +95,24 @@ public class AttendanceBackfillService {
 
     private List<String> assignedChoirBases(User user) {
         Set<String> set = new LinkedHashSet<>();
-        addChoirBase(set, user.getDeaconFamily());
-        addChoirBase(set, user.getDeaconFamily2());
-        addChoirBase(set, user.getDeaconFamily3());
-        addChoirBase(set, user.getDeaconFamily4());
+        addChoirBase(set, user.getDeaconFamilyId(), user.getDeaconFamily());
+        addChoirBase(set, user.getDeaconFamily2Id(), user.getDeaconFamily2());
+        addChoirBase(set, user.getDeaconFamily3Id(), user.getDeaconFamily3());
+        addChoirBase(set, user.getDeaconFamily4Id(), user.getDeaconFamily4());
 
         addChoirMembership(set, user.getKhors());
         addChoirMembership(set, user.getAttendKhors());
         return new ArrayList<>(set);
     }
 
-    private void addFamilyBase(Set<String> set, String family) {
-        String base = FamilyUtil.mainFamily(family);
+    private void addFamilyBase(Set<String> set, Long familyId, String family) {
+        String base = familyAccessService.baseNameForId(familyId, family);
         if (base == null || base.isBlank() || "SYSTEM".equalsIgnoreCase(base)) return;
         set.add(base);
     }
 
-    private void addChoirBase(Set<String> set, String family) {
-        String base = FamilyUtil.mainFamily(family);
+    private void addChoirBase(Set<String> set, Long familyId, String family) {
+        String base = familyAccessService.baseNameForId(familyId, family);
         if (base == null || base.isBlank()) return;
         if ("خورس مارمرقس".equals(base) || "خورس البابا اثناسيوس".equals(base)) {
             set.add(base);

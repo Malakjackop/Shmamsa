@@ -7,7 +7,7 @@ import com.shmamsa.model.IftekadVisit;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.IftekadVisitRepository;
 import com.shmamsa.repository.UserRepository;
-import com.shmamsa.util.FamilyUtil;
+import com.shmamsa.service.FamilyAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +24,7 @@ public class IftekadController {
 
     private final IftekadVisitRepository iftekadRepo;
     private final UserRepository userRepo;
+    private final FamilyAccessService familyAccessService;
 
     private static String normRole(String raw) {
         if (raw == null) return "";
@@ -42,33 +43,11 @@ public class IftekadController {
     }
 
     private String baseFamilyOf(User u) {
-        return u == null ? null : FamilyUtil.mainFamily(u.getDeaconFamily());
+        return familyAccessService.baseFamily(u);
     }
 
     private List<String> servingBasesOf(User u) {
-        if (u == null) return List.of();
-        Set<String> set = new LinkedHashSet<>();
-        String b1 = FamilyUtil.mainFamily(u.getDeaconFamily());
-        if (b1 != null && !b1.isBlank() && !"SYSTEM".equalsIgnoreCase(b1)) set.add(b1);
-        String b2 = FamilyUtil.mainFamily(u.getDeaconFamily2());
-        if (b2 != null && !b2.isBlank() && !"SYSTEM".equalsIgnoreCase(b2)) set.add(b2);
-        String b3 = FamilyUtil.mainFamily(u.getDeaconFamily3());
-        if (b3 != null && !b3.isBlank() && !"SYSTEM".equalsIgnoreCase(b3)) set.add(b3);
-        String b4 = FamilyUtil.mainFamily(u.getDeaconFamily4());
-        if (b4 != null && !b4.isBlank() && !"SYSTEM".equalsIgnoreCase(b4)) set.add(b4);
-
-        // If KHADIM serves choir, add choir bucket(s)
-        String role = normRole(u.getRole());
-        if ("KHADIM".equals(role)) {
-            String scope = u.getServingScope() == null ? "" : u.getServingScope().trim().toUpperCase(Locale.ROOT);
-            if ("KHORS_ONLY".equals(scope) || "BOTH".equals(scope)) {
-                String k = u.getKhors() == null ? "" : u.getKhors().trim().toUpperCase(Locale.ROOT);
-                if ("MARMARKOS".equals(k) || "BOTH".equals(k)) set.add("خورس مارمرقس");
-                if ("ATHANASIUS".equals(k) || "BOTH".equals(k)) set.add("خورس البابا اثناسيوس");
-            }
-        }
-
-        return new ArrayList<>(set);
+        return familyAccessService.servingBasesOf(u);
     }
 
     private boolean canAccessMember(User actor, User member) {

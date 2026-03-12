@@ -7,7 +7,7 @@ import com.shmamsa.repository.EventParticipantRepository;
 import com.shmamsa.repository.EventRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
-import com.shmamsa.util.FamilyUtil;
+import com.shmamsa.service.FamilyAccessService;
 import jakarta.validation.Valid;
 import lombok.*;
 import org.springframework.http.HttpStatus;
@@ -33,6 +33,7 @@ public class EventController {
     private final EventRepository eventRepo;
     private final EventParticipantRepository participantRepo;
     private final UserRepository userRepo;
+    private final FamilyAccessService familyAccessService;
 
     private User requireUser(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) {
@@ -43,27 +44,26 @@ public class EventController {
     }
 
     private String baseFamily(User u) {
-        return FamilyUtil.mainFamily(u == null ? null : u.getDeaconFamily());
+        return familyAccessService.baseFamily(u);
     }
 
     private List<String> allBaseFamilies(User u) {
-        if (u == null) return List.of();
-
-        List<String> out = new ArrayList<>();
-        List<String> raw = Arrays.asList(
-                u.getDeaconFamily(),
-                u.getDeaconFamily2(),
-                u.getDeaconFamily3(),
-                u.getDeaconFamily4()
-        );
-
-        for (String item : raw) {
-            String base = FamilyUtil.mainFamily(item);
-            if (base == null || base.isBlank()) continue;
-            if (!out.contains(base)) out.add(base);
-        }
-        return out;
+        return familyAccessService.servingBasesOf(u);
     }
+
+    private String targetBase(Long familyId, String familyName) {
+        String raw = String.valueOf(familyName == null ? "" : familyName).trim();
+        if (raw.isBlank() || "ALL".equalsIgnoreCase(raw)) return "ALL";
+        return familyAccessService.baseNameForId(familyId, raw);
+    }
+
+    private Long targetFamilyId(String familyName) {
+        String raw = String.valueOf(familyName == null ? "" : familyName).trim();
+        if (raw.isBlank() || "ALL".equalsIgnoreCase(raw)) return null;
+        return familyAccessService.familyIdForName(familyAccessService.baseNameForName(raw));
+    }
+
+    private record TargetScope(String family, Long familyId, String audience) {}
 
     private boolean belongsToFamily(User user, String familyBase) {
         String base = String.valueOf(familyBase == null ? "" : familyBase).trim();
@@ -94,7 +94,7 @@ public class EventController {
             return isServantGlobal(user.getRole());
         }
 
-        String scopedRole = user.roleForFamilyBase(base);
+        String scopedRole = familyAccessService.scopedRole(user, base);
         if (scopedRole != null && !scopedRole.isBlank()) {
             return RoleUtil.isAtLeast(scopedRole, "KHADIM");
         }
@@ -103,25 +103,25 @@ public class EventController {
         return myBase != null && myBase.equalsIgnoreCase(base) && isServantGlobal(user.getRole());
     }
 
-    private boolean matchesFamily(User me, String targetFamily) {
-        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+    private boolean matchesFamily(User me, Long targetFamilyId, String targetFamily) {
+        String tf = targetBase(targetFamilyId, targetFamily);
         if (tf.isBlank() || "ALL".equalsIgnoreCase(tf)) return true;
         return belongsToFamily(me, tf);
     }
 
-    private boolean matchesAudience(User me, String role, String targetFamily, String targetAudience) {
+    private boolean matchesAudience(User me, String role, Long targetFamilyId, String targetFamily, String targetAudience) {
         String audience = normalizeAudience(targetAudience);
         if (!AUDIENCE_SERVANTS_ONLY.equals(audience)) return true;
 
-        if ("ALL".equalsIgnoreCase(String.valueOf(targetFamily).trim())) {
+        if ("ALL".equalsIgnoreCase(targetBase(targetFamilyId, targetFamily))) {
             return isServantGlobal(role);
         }
-        return isServantInFamily(me, targetFamily);
+        return isServantInFamily(me, targetBase(targetFamilyId, targetFamily));
     }
 
     private boolean isVisibleToUser(User me, String role, Event e) {
-        return matchesFamily(me, e.getTargetFamily())
-                && matchesAudience(me, role, e.getTargetFamily(), e.getTargetAudience());
+        return matchesFamily(me, e.getTargetFamilyId(), e.getTargetFamily())
+                && matchesAudience(me, role, e.getTargetFamilyId(), e.getTargetFamily(), e.getTargetAudience());
     }
 
     private boolean matchesScopeSelection(Event e, String role, String family, String audience) {
@@ -129,7 +129,7 @@ public class EventController {
         String rawAudience = String.valueOf(audience == null ? "" : audience).trim();
         String reqAudience = normalizeAudience(audience);
         String itemAudience = normalizeAudience(e.getTargetAudience());
-        String itemFamily = String.valueOf(e.getTargetFamily() == null ? "" : e.getTargetFamily()).trim();
+        String itemFamily = targetBase(e.getTargetFamilyId(), e.getTargetFamily());
 
         if (fam.isBlank() && rawAudience.isBlank()) {
             return true;
@@ -157,13 +157,15 @@ public class EventController {
                 && ("ALL".equalsIgnoreCase(itemFamily) || fam.equalsIgnoreCase(itemFamily));
     }
 
-    private void validateTarget(User me, String role, String targetFamily, String targetAudience) {
-        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+    private TargetScope validateTarget(User me, String role, Long targetFamilyId, String targetFamily, String targetAudience) {
+        String tf = targetBase(targetFamilyId, targetFamily);
         String ta = normalizeAudience(targetAudience);
 
         if (tf.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "targetFamily is required");
 
-        if (isAdmin(role)) return;
+        Long resolvedId = "ALL".equalsIgnoreCase(tf) ? null : targetFamilyId(tf);
+
+        if (isAdmin(role)) return new TargetScope(tf, resolvedId, ta);
 
         if (!RoleUtil.isAtLeast(role, "AMIN_OSRA")) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
@@ -181,17 +183,19 @@ public class EventController {
         if (!(AUDIENCE_EVERYONE.equals(ta) || AUDIENCE_SERVANTS_ONLY.equals(ta))) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Target audience not allowed");
         }
+
+        return new TargetScope(tf, resolvedId, ta);
     }
 
-    private boolean isFamilyScopedTarget(String targetFamily) {
-        String tf = String.valueOf(targetFamily == null ? "" : targetFamily).trim();
+    private boolean isFamilyScopedTarget(Long targetFamilyId, String targetFamily) {
+        String tf = targetBase(targetFamilyId, targetFamily);
         return !tf.isBlank() && !"ALL".equalsIgnoreCase(tf);
     }
 
     private String scopedRole(User user, String familyBase) {
         if (user == null) return null;
 
-        String scoped = user.roleForFamilyBase(familyBase);
+        String scoped = familyAccessService.scopedRole(user, familyBase);
         if (scoped != null && !scoped.isBlank()) {
             return scoped.trim().toUpperCase();
         }
@@ -201,15 +205,16 @@ public class EventController {
 
     private boolean canFamilyLeaderManage(User me, String role, Event e) {
         if (!RoleUtil.isAtLeast(role, "AMIN_OSRA") || isAdmin(role)) return false;
-        if (e == null || !isFamilyScopedTarget(e.getTargetFamily())) return false;
-        if (!belongsToFamily(me, e.getTargetFamily())) return false;
+        if (e == null || !isFamilyScopedTarget(e.getTargetFamilyId(), e.getTargetFamily())) return false;
+        String targetBase = targetBase(e.getTargetFamilyId(), e.getTargetFamily());
+        if (!belongsToFamily(me, targetBase)) return false;
 
         User creator = e.getCreatedBy();
         if (creator == null) {
             return true; // legacy records without createdBy
         }
 
-        String creatorRole = scopedRole(creator, e.getTargetFamily());
+        String creatorRole = scopedRole(creator, targetBase);
         return RoleUtil.isAtLeast(creatorRole, "KHADIM")
                 && !RoleUtil.isAtLeast(creatorRole, "AMIN_OSRA");
     }
@@ -270,7 +275,7 @@ public class EventController {
                     .title(e.getTitle())
                     .description(e.getDescription())
                     .eventAt(e.getEventAt())
-                    .targetFamily(e.getTargetFamily())
+                    .targetFamily(targetBase(e.getTargetFamilyId(), e.getTargetFamily()))
                     .targetAudience(normalizeAudience(e.getTargetAudience()))
                     .status(st.name())
                     .removeAt(e.getRemoveAt())
@@ -298,14 +303,15 @@ public class EventController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
+        TargetScope scope = validateTarget(me, role, req.getTargetFamilyId(), req.getTargetFamily(), req.getTargetAudience());
 
         Event e = Event.builder()
                 .title(req.getTitle().trim())
                 .description(req.getDescription())
                 .eventAt(req.getEventAt())
-                .targetFamily(req.getTargetFamily().trim())
-                .targetAudience(normalizeAudience(req.getTargetAudience()))
+                .targetFamily(scope.family())
+                .targetFamilyId(scope.familyId())
+                .targetAudience(scope.audience())
                 .status(EventStatus.PENDING)
                 .removeAt(req.getRemoveAt())
                 .createdBy(me)
@@ -331,13 +337,14 @@ public class EventController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        validateTarget(me, role, req.getTargetFamily(), req.getTargetAudience());
+        TargetScope scope = validateTarget(me, role, req.getTargetFamilyId(), req.getTargetFamily(), req.getTargetAudience());
 
         e.setTitle(req.getTitle().trim());
         e.setDescription(req.getDescription());
         e.setEventAt(req.getEventAt());
-        e.setTargetFamily(req.getTargetFamily().trim());
-        e.setTargetAudience(normalizeAudience(req.getTargetAudience()));
+        e.setTargetFamily(scope.family());
+        e.setTargetFamilyId(scope.familyId());
+        e.setTargetAudience(scope.audience());
         e.setRemoveAt(req.getRemoveAt());
 
         eventRepo.save(e);
@@ -437,13 +444,13 @@ public class EventController {
             User u = ep.getUser();
             if (u == null) continue;
 
-            String fam = FamilyUtil.mainFamily(u.getDeaconFamily());
+            String fam = familyAccessService.baseFamily(u);
             if (fam == null) fam = "";
 
             grouped.computeIfAbsent(fam, k -> new ArrayList<>())
                     .add(ParticipantItem.builder()
                             .fullName(u.getFullName())
-                            .deaconFamily(u.getDeaconFamily())
+                            .deaconFamily(familyAccessService.primaryFamilyName(u))
                             .joinedAt(ep.getJoinedAt())
                             .build());
         }

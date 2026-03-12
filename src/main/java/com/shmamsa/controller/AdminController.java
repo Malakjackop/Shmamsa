@@ -61,9 +61,13 @@ public class AdminController {
         target.setRole(newRole);
         if ("AMIN_KHEDMA".equalsIgnoreCase(newRole)) {
             target.setDeaconFamily("SYSTEM");
+            target.setDeaconFamilyId(null);
             target.setDeaconFamily2(null);
+            target.setDeaconFamily2Id(null);
             target.setDeaconFamily3(null);
+            target.setDeaconFamily3Id(null);
             target.setDeaconFamily4(null);
+            target.setDeaconFamily4Id(null);
             target.setServingScope("KHORS_ONLY");
         }
         userRepo.save(target);

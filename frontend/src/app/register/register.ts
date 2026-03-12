@@ -1,5 +1,5 @@
-import { Component, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
@@ -9,6 +9,15 @@ import { ToastModule } from 'primeng/toast';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { InputIconModule } from 'primeng/inputicon';
+
+interface FamilyOption {
+  id?: number;
+  code?: string;
+  nameAr: string;
+  baseName?: string;
+  branch?: string | null;
+  category?: string;
+}
 
 @Component({
   selector: 'app-register',
@@ -27,6 +36,7 @@ import { InputIconModule } from 'primeng/inputicon';
   providers: [MessageService]
 })
 export class RegisterComponent implements OnInit {
+  private platformId = inject(PLATFORM_ID);
 
   @Input() isServant: boolean = false;
 
@@ -40,6 +50,8 @@ export class RegisterComponent implements OnInit {
   showPassword = false;
   showConfirmPassword = false;
   showOtherGrade = false;
+  memberFamilyOptions: FamilyOption[] = [];
+  servantWhereOptions: FamilyOption[] = [];
 
   constructor(
     private fb: FormBuilder,
@@ -50,6 +62,13 @@ export class RegisterComponent implements OnInit {
 
   ngOnInit(): void {
     this.buildForm();
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadFamilyOptions();
+    } else if (this.isServant) {
+      this.servantWhereOptions = this.fallbackServantWhereOptions();
+    } else {
+      this.memberFamilyOptions = this.fallbackMemberFamilyOptions();
+    }
 
     this.registerForm.get('status')?.valueChanges.subscribe(() => this.onStatusChange());
     this.registerForm.get('studyType')?.valueChanges.subscribe(() => this.onStudyTypeChange());
@@ -92,7 +111,7 @@ export class RegisterComponent implements OnInit {
 
 
   get servingWhereValue(): string {
-    return String(this.registerForm?.get('servingWhere')?.value || '');
+    return this.familyNameFromValue(this.registerForm?.get('servingWhere')?.value, this.servantWhereOptions);
   }
   private buildForm() {
     const minAge = this.isServant ? 16 : 6;
@@ -163,6 +182,59 @@ export class RegisterComponent implements OnInit {
     }
   }
 
+  private loadFamilyOptions() {
+    const audience = this.isServant ? 'SERVANT' : 'MEMBER';
+    this.http.get<FamilyOption[]>(`/api/auth/family-options?audience=${audience}`, { withCredentials: true })
+      .subscribe({
+        next: (options) => {
+          const safe = Array.isArray(options) ? options : [];
+          if (this.isServant) {
+            this.servantWhereOptions = safe.length ? safe : this.fallbackServantWhereOptions();
+          } else {
+            this.memberFamilyOptions = safe.length ? safe : this.fallbackMemberFamilyOptions();
+          }
+        },
+        error: () => {
+          if (this.isServant) {
+            this.servantWhereOptions = this.fallbackServantWhereOptions();
+          } else {
+            this.memberFamilyOptions = this.fallbackMemberFamilyOptions();
+          }
+        }
+      });
+  }
+
+  private fallbackMemberFamilyOptions(): FamilyOption[] {
+    return [
+      { nameAr: 'اسرة السمائين' },
+      { nameAr: 'اسرة القديس ابانوب' },
+      { nameAr: 'اسرة القديس ديسقورس' },
+      { nameAr: 'اسرة القديس سيدهم بشاي' },
+      { nameAr: 'اسرة القديس اسكلابيوس' },
+      { nameAr: 'اسرة القديس البابا كيرلس أ' },
+      { nameAr: 'اسرة القديس البابا كيرلس ب' },
+      { nameAr: 'اسرة القديس الانبا ابرام أ' },
+      { nameAr: 'اسرة القديس الانبا ابرام ب' },
+      { nameAr: 'اسرة القديس اسطفانوس أ' },
+      { nameAr: 'اسرة القديس اسطفانوس ب' }
+    ];
+  }
+
+  private fallbackServantWhereOptions(): FamilyOption[] {
+    return [
+      { nameAr: 'اسرة السمائين' },
+      { nameAr: 'اسرة القديس ابانوب' },
+      { nameAr: 'اسرة القديس ديسقورس' },
+      { nameAr: 'اسرة القديس سيدهم بشاي' },
+      { nameAr: 'اسرة القديس اسكلابيوس' },
+      { nameAr: 'اسرة القديس البابا كيرلس' },
+      { nameAr: 'اسرة القديس الانبا ابرام' },
+      { nameAr: 'اسرة القديس اسطفانوس' },
+      { nameAr: 'خورس مارمرقس' },
+      { nameAr: 'خورس البابا اثناسيوس' }
+    ];
+  }
+
   private arabicTextOnly(allowNumbers = false): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
       const value = String(control.value ?? '').trim();
@@ -176,17 +248,17 @@ export class RegisterComponent implements OnInit {
     };
   }
   private optionalPhone11(): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    const v = String(control.value ?? '').trim();
-    if (!v) return null; 
-    return /^\d{11}$/.test(v) ? null : { phone11: true };
-  };
-}
+    return (control: AbstractControl): ValidationErrors | null => {
+      const v = String(control.value ?? '').trim();
+      if (!v) return null;
+      return /^\d{11}$/.test(v) ? null : { phone11: true };
+    };
+  }
 
 onServingWhereChange() {
   if (!this.isServant) return;
 
-  const where = String(this.registerForm.get('servingWhere')?.value || '').trim();
+  const where = this.familyNameFromValue(this.registerForm.get('servingWhere')?.value, this.servantWhereOptions);
   if (!where) return;
 
   const scopeCtrl = this.registerForm.get('servingScope');
@@ -224,6 +296,33 @@ onServingWhereChange() {
   this.onServingScopeChange();
   this.onKhorsChanged();
 }
+
+  familyOptionValue(option: FamilyOption): number | string {
+    return option.id ?? option.nameAr;
+  }
+
+  private familyIdFromValue(value: unknown, options: FamilyOption[]): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber) && options.some(x => x.id === asNumber)) return asNumber;
+    const found = options.find(x => x.nameAr === raw);
+    return found?.id ?? null;
+  }
+
+  private familyNameFromValue(value: unknown, options: FamilyOption[]): string {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(options.find(x => x.id === value)?.nameAr || '').trim();
+    }
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber)) {
+      return String(options.find(x => x.id === asNumber)?.nameAr || raw).trim();
+    }
+    return raw;
+  }
 
   onServingScopeChange() {
     if (!this.isServant) return;
@@ -597,7 +696,8 @@ private guardianNotSameAsPhone(): ValidatorFn {
       password: formValue.password,
       confirmPassword: formValue.confirmPassword,
 
-      deaconFamily: formValue.deaconFamily,
+      deaconFamily: this.familyNameFromValue(formValue.deaconFamily, this.memberFamilyOptions),
+      deaconFamilyId: this.familyIdFromValue(formValue.deaconFamily, this.memberFamilyOptions),
       deaconDegree: formValue.deaconDegree,
 
       khors: khorsToSend,
@@ -629,8 +729,10 @@ private guardianNotSameAsPhone(): ValidatorFn {
     };
 
     if (this.isServant) {
-  payload.servingWhere = String(formValue.servingWhere || '').trim();
+  payload.servingWhere = this.familyNameFromValue(formValue.servingWhere, this.servantWhereOptions);
   payload.servingScope = String(formValue.servingScope || '').trim();
+  payload.deaconFamily = this.familyNameFromValue(formValue.deaconFamily, this.servantWhereOptions);
+  payload.deaconFamilyId = this.familyIdFromValue(formValue.deaconFamily, this.servantWhereOptions);
 
   if (!payload.servingWhere || !payload.servingScope) {
     this.messageService.add({ severity: 'warn', summary: 'Missing', detail: 'اختار بتخدم فين' });
