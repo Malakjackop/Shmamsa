@@ -1,3 +1,6 @@
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+@import 'primeicons/primeicons.css';
+
 @font-face {
   font-family: "Somar Sans";
   src: url("/assets/fonts/SomarSans-Medium.ttf") format("truetype");
@@ -106,5 +109,3 @@ textarea {
 .attendanceDatePanel .p-datepicker-next-button svg {
   transform: scaleX(-1) !important;
 }
-
-

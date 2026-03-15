@@ -90,6 +90,10 @@ export class ResourcesComponent implements OnInit {
     return ['AMIN_KHEDMA','DEVELOPER'].includes(this.normRole(this.user?.role));
   }
 
+  showFamilySelector(): boolean {
+    return this.isUploader() && this.families.length > 1;
+  }
+
   initPage() {
     if (this.isAminKhedmaOrDev()) {
       this.famService.families().subscribe({
@@ -109,7 +113,6 @@ export class ResourcesComponent implements OnInit {
   }
 
   loadResources() {
-
     if (this.isAminKhedmaOrDev()) {
       this.resService.list(this.selectedFamily).subscribe({
         next: (data) => (this.resources = data || []),
@@ -131,15 +134,21 @@ export class ResourcesComponent implements OnInit {
 
   upload() {
     if (!this.isUploader()) return;
+
+    const trimmedTitle = this.title.trim();
+    if (!trimmedTitle) {
+      this.msg.add({ severity: 'warn', summary: 'العنوان مطلوب', detail: 'من فضلك اكتب اسم الملف أولا' });
+      return;
+    }
+
     if (!this.pickedFile) {
-      this.msg.add({ severity: 'warn', summary: 'اختر ملف ', detail: 'من فضلك اختر ملف اولا' });
+      this.msg.add({ severity: 'warn', summary: 'اختر ملف', detail: 'من فضلك اختر ملف أولا' });
       return;
     }
 
     const fd = new FormData();
     fd.append('file', this.pickedFile);
-    if (this.title) fd.append('title', this.title);
-    if (this.description) fd.append('description', this.description);
+    fd.append('title', trimmedTitle);
 
     if (this.selectedFamily) {
       fd.append('family', this.selectedFamily);
@@ -174,8 +183,14 @@ export class ResourcesComponent implements OnInit {
   saveEdit() {
     if (!this.editing) return;
 
+    const trimmedTitle = this.editTitle.trim();
+    if (!trimmedTitle) {
+      this.msg.add({ severity: 'warn', summary: 'العنوان مطلوب', detail: 'من فضلك اكتب اسم الملف قبل الحفظ' });
+      return;
+    }
+
     const fd = new FormData();
-    fd.append('title', this.editTitle || '');
+    fd.append('title', trimmedTitle);
     fd.append('description', this.editDescription || '');
     if (this.editFile) fd.append('file', this.editFile);
 
@@ -195,27 +210,26 @@ export class ResourcesComponent implements OnInit {
     this.editing = null;
   }
 
-remove(r: any) {
-  this.confirmService.confirm({
-    message: 'هل ترغب في حذف هذا الملف ؟',
-    header: 'تأكيد الحذف',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: 'حذف',
-    rejectLabel: 'الغاء',
-    accept: () => {
-      this.resService.delete(r.id).subscribe({
-        next: () => {
-          this.msg.add({ severity: 'success', summary: 'حذف', detail: ' تم حذف الملف بنجاح' });
-          this.loadResources();
-        },
-        error: (err) => {
-          this.msg.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل الحذف' });
-        }
-      });
-    }
-  });
-}
-
+  remove(r: any) {
+    this.confirmService.confirm({
+      message: 'هل ترغب في حذف هذا الملف ؟',
+      header: 'تأكيد الحذف',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'حذف',
+      rejectLabel: 'الغاء',
+      accept: () => {
+        this.resService.delete(r.id).subscribe({
+          next: () => {
+            this.msg.add({ severity: 'success', summary: 'حذف', detail: ' تم حذف الملف بنجاح' });
+            this.loadResources();
+          },
+          error: (err) => {
+            this.msg.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل الحذف' });
+          }
+        });
+      }
+    });
+  }
 
   download(r: any) {
     window.open(this.resService.downloadUrl(r.id), '_blank');

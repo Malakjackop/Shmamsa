@@ -34,17 +34,17 @@ public class AttendanceArchive {
 
     // Snapshot لبيانات المستخدمين وقت الأرشفة (JSON)
     @Lob
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String usersJson;
 
     // Snapshot لسجل الحضور وقت الأرشفة (JSON)
     @Lob
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String recordsJson;
 
     // Snapshot لدرجات المستخدمين وقت الأرشفة (JSON)
     @Lob
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String gradesJson;
 
     @PrePersist
