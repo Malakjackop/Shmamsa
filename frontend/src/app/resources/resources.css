@@ -123,8 +123,7 @@
 }
 
 .upload-panel,
-.card,
-.edit {
+.card {
   margin-bottom: 22px;
   padding: 22px 24px;
   background: #fff;
@@ -132,13 +131,38 @@
 }
 
 .upload-panel h3,
-.files-heading,
-.edit h3 {
+.files-heading {
   margin: 0 0 18px;
   text-align: right;
   color: #763a2b;
   font-size: 1.5rem;
   font-weight: 800;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cancel-edit-button {
+  border: 0;
+  border-radius: 16px;
+  background: #f4e7df;
+  color: #7a3d2d;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.edit-note {
+  margin-bottom: 14px;
+  color: #9a5a48;
+  text-align: right;
+  font-size: 0.95rem;
 }
 
 .title-field,
@@ -278,16 +302,12 @@
   text-overflow: ellipsis;
 }
 
-.row {
-  display: flex;
-  gap: 10px;
-  margin: 10px 0;
-  flex-wrap: wrap;
-}
-
-.row input[type="text"],
-.row input[type="file"] {
-  padding: 12px 14px;
+.resource-meta {
+  margin-top: 4px;
+  color: #a78a7f;
+  font-size: 0.87rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .empty {
@@ -314,9 +334,13 @@
   }
 
   .upload-panel,
-  .card,
-  .edit {
+  .card {
     padding: 18px 16px;
+  }
+
+  .panel-head {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .upload-actions {

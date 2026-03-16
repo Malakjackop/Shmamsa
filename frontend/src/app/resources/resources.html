@@ -38,8 +38,15 @@
     </div>
   </div>
 
-  <div class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
-    <h3>رفع الملفات</h3>
+  <div #uploadPanel class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
+    <div class="panel-head">
+      <h3>{{ editing ? 'تعديل ملف' : 'رفع الملفات' }}</h3>
+      <button *ngIf="editing" class="cancel-edit-button" type="button" (click)="cancelEdit()">إلغاء التعديل</button>
+    </div>
+
+    <div class="edit-note" *ngIf="editing">
+      يتم الآن تعديل: <strong>{{ editing.title || editing.originalName || '-' }}</strong>
+    </div>
 
     <input
       class="title-field"
@@ -50,10 +57,12 @@
 
     <div class="upload-actions">
       <label class="upload-action upload-action--file" for="resourceFileInput">
-        <span>{{ pickedFile ? pickedFile.name : 'اختيار الملف' }}</span>
+        <span>{{ pickedFile ? pickedFile.name : (editing ? 'اختيار ملف جديد - اختياري' : 'اختيار الملف') }}</span>
       </label>
-      <input id="resourceFileInput" class="hidden-file-input" type="file" (change)="onPickFile($event)" />
-      <button class="upload-action" type="button" (click)="upload()">رفع الملف</button>
+      <input #resourceFileInput id="resourceFileInput" class="hidden-file-input" type="file" (change)="onPickFile($event)" />
+      <button class="upload-action" type="button" (click)="upload()">
+        {{ editing ? 'حفظ التعديل' : 'رفع الملف' }}
+      </button>
     </div>
   </div>
 
@@ -92,6 +101,9 @@
 
         <div class="resource-main">
           <div class="resource-title">{{ r.title || r.originalName || '-' }}</div>
+          <div class="resource-meta" *ngIf="!isMakhdom() && r.uploadedByUsername">
+            تم رفعه بواسطة {{ r.uploadedByUsername }}
+          </div>
         </div>
       </div>
     </div>
@@ -102,16 +114,4 @@
       <div class="empty">لا توجد ملفات.</div>
     </div>
   </ng-template>
-
-  <div class="edit" *ngIf="editing">
-    <h3>تعديل ملف</h3>
-    <div class="row">
-      <input type="text" [(ngModel)]="editTitle" placeholder="العنوان (إجباري)" />
-    </div>
-    <div class="row">
-      <input type="file" (change)="onEditFile($event)" />
-      <button pButton type="button" label="حفظ" (click)="saveEdit()"></button>
-      <button pButton type="button" label="إلغاء" (click)="cancelEdit()"></button>
-    </div>
-  </div>
 </div>

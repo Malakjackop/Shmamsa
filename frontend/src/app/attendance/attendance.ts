@@ -443,10 +443,10 @@ if (canChoir) {
     if (!u?.id) return;
 
     if (this.isSelected(u.id)) {
-      this.selected = this.selected.filter((x) => x.id !== u.id);
-    } else {
-      this.selected = [...this.selected, u];
+      return;
     }
+
+    this.selected = [...this.selected, u];
   }
 
   remove(id: number) {

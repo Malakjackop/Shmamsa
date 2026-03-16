@@ -56,6 +56,22 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;min-width:200px;}
 .submit{margin-top:10px;}
 .hint{color:#666;}
 
+:host ::ng-deep .pickBtn.p-button {
+  min-width: 2.75rem;
+}
+
+:host ::ng-deep .pickBtn--locked.p-button {
+  opacity: 1;
+  background: #e8f5ea;
+  border-color: #9bc8a4;
+  color: #2f6b3b;
+}
+
+:host ::ng-deep .pickBtn--locked.p-button:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 @media (max-width:900px){
   .layout{flex-direction:column;}
   .sidebar{width:100%;position:relative;top:auto;}

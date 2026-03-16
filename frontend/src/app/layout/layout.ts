@@ -93,6 +93,23 @@ ngOnInit(): void {
     return ['AMIN_KHEDMA', 'DEVELOPER'].includes(r);
   }
 
+  private servedFamiliesCount(): number {
+    const families = [
+      this.user?.deaconFamily,
+      this.user?.deaconFamily2,
+      this.user?.deaconFamily3,
+      this.user?.deaconFamily4
+    ]
+      .map((family: any) => String(family ?? '').trim())
+      .filter(Boolean);
+
+    return new Set(families).size;
+  }
+
+  usePluralFamilyLabels(): boolean {
+    return this.isAminKhedmaOrDev() || this.servedFamiliesCount() > 1;
+  }
+
 
   goHome(): void {
     this.router.navigate(['/dashboard']);
