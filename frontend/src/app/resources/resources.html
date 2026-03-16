@@ -5,10 +5,37 @@
   <h1>الملفات</h1>
 
   <div class="top" *ngIf="showFamilySelector()">
-    <label>الأسرة</label>
-    <select [(ngModel)]="selectedFamily" (change)="loadResources()">
-      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
-    </select>
+    <label class="sr-only" for="familyFilter">الاسرة</label>
+    <div
+      class="filter-select"
+      [style.width]="getFilterWidth()"
+      [class.menu-locked]="familyMenuLocked"
+      (mouseenter)="onFamilyMenuEnter()"
+      (mouseleave)="unlockFamilyMenu()"
+    >
+      <div id="familyFilter" class="filter-select__trigger" aria-haspopup="listbox" aria-expanded="false">
+        <span class="filter-select__label">{{ getFamilyLabel(selectedFamily) }}</span>
+        <span class="filter-select__icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M6 10H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M9 15H11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </span>
+      </div>
+
+      <div class="filter-select__menu" *ngIf="!familyMenuLocked" role="listbox" [attr.aria-label]="'الاسرة'">
+        <button
+          class="filter-select__option"
+          *ngFor="let f of families"
+          type="button"
+          [class.is-active]="selectedFamily === f"
+          (click)="selectFamily(f)"
+        >
+          {{ getFamilyLabel(f) }}
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
@@ -22,7 +49,6 @@
     />
 
     <div class="upload-actions">
-
       <label class="upload-action upload-action--file" for="resourceFileInput">
         <span>{{ pickedFile ? pickedFile.name : 'اختيار الملف' }}</span>
       </label>
@@ -39,32 +65,28 @@
         <div class="resource-left" *ngIf="!isMakhdom() && isUploader(); else downloadOnly">
           <button class="icon-button" type="button" (click)="openEdit(r)" title="تعديل" aria-label="تعديل">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M11.6672 28.3333V21.6667L28.3339 5L35.0006 11.6667L18.3339 28.3333H11.6672Z" stroke="#5E2B20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5 35H35" stroke="#5E2B20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M23.3328 10L29.9994 16.6667" stroke="#5E2B20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
-
+              <path d="M11.6672 28.3333V21.6667L28.3339 5L35.0006 11.6667L18.3339 28.3333H11.6672Z" stroke="#5E2B20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 35H35" stroke="#5E2B20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M23.3328 10L29.9994 16.6667" stroke="#5E2B20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </button>
           <button class="icon-button" type="button" (click)="remove(r)" title="حذف" aria-label="حذف">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M11.6667 35C10.7501 35 9.96564 34.6739 9.31341 34.0217C8.66119 33.3694 8.33453 32.5844 8.33341 31.6667V10H6.66675V6.66667H15.0001V5H25.0001V6.66667H33.3334V10H31.6667V31.6667C31.6667 32.5833 31.3406 33.3683 30.6884 34.0217C30.0362 34.675 29.2512 35.0011 28.3334 35H11.6667ZM28.3334 10H11.6667V31.6667H28.3334V10ZM15.0001 28.3333H18.3334V13.3333H15.0001V28.3333ZM21.6667 28.3333H25.0001V13.3333H21.6667V28.3333Z" fill="#5E2B20"/>
-</svg>
-
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.6667 35C10.7501 35 9.96564 34.6739 9.31341 34.0217C8.66119 33.3694 8.33453 32.5844 8.33341 31.6667V10H6.66675V6.66667H15.0001V5H25.0001V6.66667H33.3334V10H31.6667V31.6667C31.6667 32.5833 31.3406 33.3683 30.6884 34.0217C30.0362 34.675 29.2512 35.0011 28.3334 35H11.6667ZM28.3334 10H11.6667V31.6667H28.3334V10ZM15.0001 28.3333H18.3334V13.3333H15.0001V28.3333ZM21.6667 28.3333H25.0001V13.3333H21.6667V28.3333Z" fill="#5E2B20"/>
+            </svg>
           </button>
           <button class="icon-button" type="button" (click)="download(r)" title="تحميل" aria-label="تحميل">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M20.0001 26.6665L11.6667 18.3332L14.0001 15.9165L18.3334 20.2498V6.6665H21.6667V20.2498L26.0001 15.9165L28.3334 18.3332L20.0001 26.6665ZM10.0001 33.3332C9.08341 33.3332 8.29897 33.0071 7.64675 32.3548C6.99453 31.7026 6.66786 30.9176 6.66675 29.9998V24.9998H10.0001V29.9998H30.0001V24.9998H33.3334V29.9998C33.3334 30.9165 33.0073 31.7015 32.3551 32.3548C31.7029 33.0082 30.9179 33.3343 30.0001 33.3332H10.0001Z" fill="#5E2B20"/>
-</svg>
-
+              <path d="M20.0001 26.6665L11.6667 18.3332L14.0001 15.9165L18.3334 20.2498V6.6665H21.6667V20.2498L26.0001 15.9165L28.3334 18.3332L20.0001 26.6665ZM10.0001 33.3332C9.08341 33.3332 8.29897 33.0071 7.64675 32.3548C6.99453 31.7026 6.66786 30.9176 6.66675 29.9998V24.9998H10.0001V29.9998H30.0001V24.9998H33.3334V29.9998C33.3334 30.9165 33.0073 31.7015 32.3551 32.3548C31.7029 33.0082 30.9179 33.3343 30.0001 33.3332H10.0001Z" fill="#5E2B20"/>
+            </svg>
           </button>
         </div>
 
         <ng-template #downloadOnly>
           <button class="download-button" type="button" (click)="download(r)" title="تحميل" aria-label="تحميل">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M20.0001 26.6665L11.6667 18.3332L14.0001 15.9165L18.3334 20.2498V6.6665H21.6667V20.2498L26.0001 15.9165L28.3334 18.3332L20.0001 26.6665ZM10.0001 33.3332C9.08341 33.3332 8.29897 33.0071 7.64675 32.3548C6.99453 31.7026 6.66786 30.9176 6.66675 29.9998V24.9998H10.0001V29.9998H30.0001V24.9998H33.3334V29.9998C33.3334 30.9165 33.0073 31.7015 32.3551 32.3548C31.7029 33.0082 30.9179 33.3343 30.0001 33.3332H10.0001Z" fill="#5E2B20"/>
-</svg>
-
+              <path d="M20.0001 26.6665L11.6667 18.3332L14.0001 15.9165L18.3334 20.2498V6.6665H21.6667V20.2498L26.0001 15.9165L28.3334 18.3332L20.0001 26.6665ZM10.0001 33.3332C9.08341 33.3332 8.29897 33.0071 7.64675 32.3548C6.99453 31.7026 6.66786 30.9176 6.66675 29.9998V24.9998H10.0001V29.9998H30.0001V24.9998H33.3334V29.9998C33.3334 30.9165 33.0073 31.7015 32.3551 32.3548C31.7029 33.0082 30.9179 33.3343 30.0001 33.3332H10.0001Z" fill="#5E2B20"/>
+            </svg>
           </button>
         </ng-template>
 

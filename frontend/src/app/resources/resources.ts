@@ -24,6 +24,8 @@ export class ResourcesComponent implements OnInit {
 
   families: string[] = [];
   selectedFamily: string = '';
+  familyMenuLocked = false;
+  familyMenuHovered = false;
 
   resources: any[] = [];
 
@@ -92,6 +94,47 @@ export class ResourcesComponent implements OnInit {
 
   showFamilySelector(): boolean {
     return this.isUploader() && this.families.length > 1;
+  }
+
+  getFamilyLabel(family: string): string {
+    return family === 'ALL' ? 'كل الاسر' : family;
+  }
+
+  private getLongestFamilyLabelLength(): number {
+    return this.families
+      .map((family) => this.getFamilyLabel(family).length)
+      .reduce((longest, current) => Math.max(longest, current), this.getFamilyLabel(this.selectedFamily).length);
+  }
+
+  getFilterWidth(): string {
+    const labelLength = this.familyMenuHovered
+      ? this.getLongestFamilyLabelLength()
+      : this.getFamilyLabel(this.selectedFamily).length;
+
+    return `calc(${labelLength + 2}ch + 52px)`;
+  }
+
+  selectFamily(family: string): void {
+    this.familyMenuLocked = true;
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    if (this.selectedFamily === family) {
+      return;
+    }
+
+    this.selectedFamily = family;
+    this.loadResources();
+  }
+
+  unlockFamilyMenu(): void {
+    this.familyMenuHovered = false;
+    this.familyMenuLocked = false;
+  }
+
+  onFamilyMenuEnter(): void {
+    this.familyMenuHovered = true;
   }
 
   initPage() {

@@ -1,32 +1,63 @@
-<div class="about-container">
-  <h1 class="about-title"> سجل حضوري </h1>
+<div class="attendance-history-page">
+  <div class="attendance-history-header">
+    <h1 class="page-title">حضوري</h1>
+  </div>
 
-  <div *ngIf="loading" class="about-subtitle">جاري التحميل...</div>
+  <div *ngIf="loading" class="page-state">جاري التحميل...</div>
 
-  <div *ngIf="!loading && filteredItems.length === 0" class="about-subtitle">
+  <div *ngIf="!loading && monthGroups.length === 0" class="page-state empty-state">
     لا يوجد سجل حضور حتى الآن.
   </div>
 
-  <table *ngIf="!loading && filteredItems.length > 0" class="history-table">
-    <thead>
-      <tr>
-        <th>التاريخ</th>
-        <th>الوقت</th>
-        <th>النوع</th>
-        <th>الحالة</th>
-        <th>الخادم الي سجلك الغياب</th>
-      </tr>
-    </thead>
+  <div *ngIf="!loading && monthGroups.length > 0" class="months-list">
+    <section *ngFor="let group of monthGroups; trackBy: trackMonth" class="month-card">
+      <button type="button" class="month-toggle" (click)="toggleMonth(group.key)">
+        <span class="month-title">{{ group.title }}</span>
 
-    <tbody>
-      <tr *ngFor="let it of filteredItems">
-        <td>{{ it.date }}</td>
-        <td class="time-cell">{{ formatTime12h(it.time) }}</td>
-        <td>{{ labelType(it.type) }}</td>
-        <td>{{ labelStatus(it.status) }}</td>
-        <td>{{ it.takenBy || '-' }}</td>
-      </tr>
-    </tbody>
-  </table>
+        <i
+          class="pi month-icon"
+          [class.pi-chevron-up]="isExpanded(group.key)"
+          [class.pi-chevron-down]="!isExpanded(group.key)"
+        ></i>
+      </button>
+
+      <div *ngIf="isExpanded(group.key)" class="month-content">
+        <div
+          *ngFor="let typeGroup of group.typeGroups; let isLast = last; trackBy: trackTypeGroup"
+          class="type-block"
+          [class.no-divider]="isLast"
+        >
+          <table class="history-table">
+            <colgroup>
+              <col class="col-event" />
+              <col class="col-status" />
+              <col class="col-servant" />
+              <col class="col-time" />
+            </colgroup>
+
+            <thead *ngIf="typeGroup === group.typeGroups[0]">
+              <tr>
+                <th>المناسبة</th>
+                <th>الحالة</th>
+                <th>الخادم</th>
+                <th>الوقت</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr *ngFor="let row of typeGroup.rows; trackBy: trackRow">
+                <td class="event-cell">
+                  <div class="event-name">{{ labelType(row.type) }}</div>
+                  <div class="event-date">{{ formatDate(row.date) }}</div>
+                </td>
+                <td class="status-cell">{{ labelStatus(row.status) }}</td>
+                <td class="servant-cell">{{ row.takenBy || '-' }}</td>
+                <td class="time-cell">{{ formatTime12h(row.time) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
 </div>
-
