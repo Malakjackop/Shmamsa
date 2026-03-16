@@ -80,7 +80,6 @@
   table-layout: fixed;
 }
 
-/* توزيع الأعمدة بشكل متوازن قريب من الصورة */
 .history-table .col-event {
   width: 24%;
 }
@@ -128,7 +127,7 @@
   text-align: center;
 }
 
-.event-date {
+.event-time {
   margin-top: 2px;
   color: #9a9a9a;
   font-size: 0.82rem;
@@ -144,6 +143,12 @@
 .time-cell {
   direction: rtl;
   white-space: nowrap;
+}
+
+.history-table tbody tr.absent-row td,
+.history-table tbody tr.absent-row .event-name,
+.history-table tbody tr.absent-row .event-time {
+  color: #d32f2f;
 }
 
 .page-state {
@@ -186,7 +191,7 @@
     font-size: 0.9rem;
   }
 
-  .event-date {
+  .event-time {
     font-size: 0.76rem;
   }
 }

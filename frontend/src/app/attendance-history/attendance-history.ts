@@ -257,13 +257,13 @@ export class AttendanceHistoryComponent implements OnInit {
 
   private typeOrder(type: string): number {
     switch (type) {
-      case 'FRIDAY_LITURGY':
-        return 1;
-      case 'TASBEEHA':
-        return 2;
       case 'FAMILY_MEETING':
-        return 3;
-      case 'MARMARKOS_KHORS':
+        return 1;
+      case 'FRIDAY_LITURGY':
+        return 2;
+        case 'MARMARKOS_KHORS':
+          return 3;
+          case 'TASBEEHA':
         return 4;
       case 'ATHANASIUS_KHORS':
         return 5;

@@ -40,19 +40,22 @@
                 <th>المناسبة</th>
                 <th>الحالة</th>
                 <th>الخادم</th>
-                <th>الوقت</th>
+                <th>اليوم</th>
               </tr>
             </thead>
 
             <tbody>
-              <tr *ngFor="let row of typeGroup.rows; trackBy: trackRow">
+              <tr
+                *ngFor="let row of typeGroup.rows; trackBy: trackRow"
+                [class.absent-row]="row.status === 'ABSENT'"
+              >
                 <td class="event-cell">
                   <div class="event-name">{{ labelType(row.type) }}</div>
-                  <div class="event-date">{{ formatDate(row.date) }}</div>
+                  <div class="event-time">{{ formatTime12h(row.time) }}</div>
                 </td>
                 <td class="status-cell">{{ labelStatus(row.status) }}</td>
                 <td class="servant-cell">{{ row.takenBy || '-' }}</td>
-                <td class="time-cell">{{ formatTime12h(row.time) }}</td>
+                <td class="time-cell">{{ formatDate(row.date) }}</td>
               </tr>
             </tbody>
           </table>
