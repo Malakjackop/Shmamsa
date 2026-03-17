@@ -194,7 +194,7 @@
       <div *ngIf="profile; else loadingProfile" class="profileGrid">
         <div><b>اسم المستخدم:</b> {{profile.username}}</div>
         <div><b>البريد الإلكتروني:</b> {{profile.email}}</div>
-        <div><b>الأسرة:</b> {{profile.deaconFamily}}</div>
+        <div><b>الأسرة:</b> {{familyLabel(profile)}}</div>
         <div><b>الرتبة:</b> {{profile.deaconDegree}}</div>
         <div><b>الرقم القومي:</b> {{profile.nationalId}}</div>
         <div>

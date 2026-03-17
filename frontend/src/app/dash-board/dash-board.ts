@@ -29,10 +29,7 @@ export class DashBoard implements OnInit {
     username: '',
     phoneNumber: '',
     status: '',
-    deaconFamily: '',
-    deaconFamily2: '',
-    deaconFamily3: '',
-    deaconFamily4: '',
+    familyAssignments: [],
     universityName: '',
     faculty: '',
     dateOfBirth: '',
@@ -201,6 +198,16 @@ export class DashBoard implements OnInit {
     return f;
   }
 
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: this.normRole(x?.role)
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
+
   private loadFamilyCatalog(): void {
     this.http.get<any[]>('/api/auth/family-options?audience=SERVANT', { withCredentials: true }).subscribe({
       next: (rows: any) => {
@@ -230,7 +237,7 @@ export class DashBoard implements OnInit {
   }
 
   private currentBaseFamily(): string {
-    const fam = this.mainFamily(this.user?.deaconFamily || '');
+    const fam = this.mainFamily(this.assignmentsOf(this.user)[0]?.familyName || '');
     return fam && fam.toUpperCase() !== 'SYSTEM' ? fam : '';
   }
 
@@ -385,8 +392,8 @@ export class DashBoard implements OnInit {
   }
 
   private userFamilies(): string[] {
-    const raw = [this.user?.deaconFamily, this.user?.deaconFamily2, this.user?.deaconFamily3, this.user?.deaconFamily4]
-      .map((x: any) => String(x || '').trim())
+    const raw = this.assignmentsOf(this.user)
+      .map((x: any) => String(x.familyName || '').trim())
       .filter((x: string) => !!x && x.toUpperCase() !== 'SYSTEM' && !this.isChoirBucket(x));
 
     const out: string[] = [];

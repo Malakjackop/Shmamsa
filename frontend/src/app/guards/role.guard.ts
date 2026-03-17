@@ -15,6 +15,21 @@ export class RoleGuard implements CanActivate {
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
+  private normRole(v: any): string {
+    const raw = String(v || '').trim();
+    const up = raw.toUpperCase();
+    if (!up) return '';
+    if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
+    if (['امين الخدمة','امين الخدمه','أمين الخدمة','أمين الخدمه','امين خدمه','أمين خدمه'].includes(raw)) return 'AMIN_KHEDMA';
+    if (up.startsWith('ROLE_')) return up.substring(5);
+    return up;
+  }
+
+  private scopedRoles(user: any): string[] {
+    const assignments = Array.isArray(user?.familyAssignments) ? user.familyAssignments : [];
+    return assignments.map((x: any) => this.normRole(x?.role)).filter(Boolean);
+  }
+
   canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot
@@ -30,17 +45,7 @@ export class RoleGuard implements CanActivate {
 
     return this.authService.getUserData().pipe(
       map(user => {
-        const normRole = (v: any) => {
-          const raw = String(v || '').trim();
-          const up = raw.toUpperCase();
-          if (!up) return '';
-          if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
-          if (['امين الخدمة','امين الخدمه','أمين الخدمة','أمين الخدمه','امين خدمه','أمين خدمه'].includes(raw)) return 'AMIN_KHEDMA';
-          if (up.startsWith('ROLE_')) return up.substring(5);
-          return up;
-        };
-
-        const role = normRole(user?.role);
+        const role = this.normRole(user?.role);
         if (!role) {
           return this.router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
         }
@@ -48,13 +53,7 @@ export class RoleGuard implements CanActivate {
           return true;
         }
 
-        // allow scoped AMIN_OSRA when route requires AMIN_OSRA
-        const scopedRoles = [
-          user?.deaconFamilyRole,
-          user?.deaconFamilyRole2,
-          user?.deaconFamilyRole3,
-          user?.deaconFamilyRole4
-        ].map((x: any) => normRole(x));
+        const scopedRoles = this.scopedRoles(user);
 
         if (allowed.includes('AMIN_OSRA') && scopedRoles.includes('AMIN_OSRA')) {
           return true;

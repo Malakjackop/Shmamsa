@@ -61,19 +61,22 @@ export class ResourcesComponent implements OnInit {
     return up;
   }
 
-  private getServedFamilies(): string[] {
-    const slots: Array<[string | undefined, string | undefined]> = [
-      [this.user?.deaconFamily, this.user?.deaconFamilyRole || this.user?.role],
-      [this.user?.deaconFamily2, this.user?.deaconFamilyRole2],
-      [this.user?.deaconFamily3, this.user?.deaconFamilyRole3],
-      [this.user?.deaconFamily4, this.user?.deaconFamilyRole4]
-    ];
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: this.normRole(x?.role)
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
 
+  private getServedFamilies(): string[] {
     const res: string[] = [];
-    for (const [fam, role] of slots) {
-      const f = String(fam || '').trim();
+    for (const assignment of this.assignmentsOf(this.user)) {
+      const f = String(assignment.familyName || '').trim();
       if (!f) continue;
-      const r = this.normRole(role);
+      const r = assignment.role;
       if (!['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r)) continue;
       if (!res.includes(f)) res.push(f);
     }

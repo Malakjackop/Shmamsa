@@ -16,19 +16,21 @@ import java.util.Set;
 public class FamilyAccessService {
 
     private final FamilyCatalogService familyCatalogService;
+    private final UserFamilyRoleService userFamilyRoleService;
 
     public String baseFamily(User user) {
-        if (user == null) return null;
-        return baseNameForId(user.getDeaconFamilyId(), user.getDeaconFamily());
+        List<com.shmamsa.model.UserFamilyAssignmentView> assignments = userFamilyRoleService.getAssignments(user);
+        if (assignments.isEmpty()) return null;
+        com.shmamsa.model.UserFamilyAssignmentView first = assignments.get(0);
+        return baseNameForId(first.getFamilyId(), first.getFamilyName());
     }
 
     public List<String> servingBasesOf(User user) {
         if (user == null) return List.of();
         Set<String> out = new LinkedHashSet<>();
-        addBase(out, user.getDeaconFamilyId(), user.getDeaconFamily());
-        addBase(out, user.getDeaconFamily2Id(), user.getDeaconFamily2());
-        addBase(out, user.getDeaconFamily3Id(), user.getDeaconFamily3());
-        addBase(out, user.getDeaconFamily4Id(), user.getDeaconFamily4());
+        for (com.shmamsa.model.UserFamilyAssignmentView assignment : userFamilyRoleService.getAssignments(user)) {
+            addBase(out, assignment.getFamilyId(), assignment.getFamilyName());
+        }
 
         String role = normRole(user.getRole());
         if ("KHADIM".equals(role)) {
@@ -53,18 +55,14 @@ public class FamilyAccessService {
         String base = String.valueOf(familyBase == null ? "" : familyBase).trim();
         if (base.isBlank()) return normalizeRole(user.getRole());
 
-        if (matchesBase(user.getDeaconFamilyId(), user.getDeaconFamily(), base)) {
-            String role = String.valueOf(user.getDeaconFamilyRole() == null ? user.getRole() : user.getDeaconFamilyRole()).trim();
-            return normalizeRole(role);
-        }
-        if (matchesBase(user.getDeaconFamily2Id(), user.getDeaconFamily2(), base)) {
-            return normalizeRole(user.getDeaconFamilyRole2());
-        }
-        if (matchesBase(user.getDeaconFamily3Id(), user.getDeaconFamily3(), base)) {
-            return normalizeRole(user.getDeaconFamilyRole3());
-        }
-        if (matchesBase(user.getDeaconFamily4Id(), user.getDeaconFamily4(), base)) {
-            return normalizeRole(user.getDeaconFamilyRole4());
+        List<com.shmamsa.model.UserFamilyAssignmentView> assignments = userFamilyRoleService.getAssignments(user);
+        for (int i = 0; i < assignments.size(); i++) {
+            com.shmamsa.model.UserFamilyAssignmentView assignment = assignments.get(i);
+            if (matchesBase(assignment.getFamilyId(), assignment.getFamilyName(), base)) {
+                String role = assignment.getRole();
+                if ((role == null || role.isBlank()) && i == 0) role = user.getRole();
+                return normalizeRole(role);
+            }
         }
         return null;
     }
@@ -103,23 +101,35 @@ public class FamilyAccessService {
     }
 
     public String primaryFamilyName(User user) {
-        if (user == null) return null;
-        return normalizeDisplayName(familyNameForId(user.getDeaconFamilyId(), user.getDeaconFamily()));
+        return familyNameAt(user, 0);
     }
 
     public String secondaryFamilyName(User user) {
-        if (user == null) return null;
-        return normalizeDisplayName(familyNameForId(user.getDeaconFamily2Id(), user.getDeaconFamily2()));
+        return familyNameAt(user, 1);
     }
 
     public String thirdFamilyName(User user) {
-        if (user == null) return null;
-        return normalizeDisplayName(familyNameForId(user.getDeaconFamily3Id(), user.getDeaconFamily3()));
+        return familyNameAt(user, 2);
     }
 
     public String fourthFamilyName(User user) {
-        if (user == null) return null;
-        return normalizeDisplayName(familyNameForId(user.getDeaconFamily4Id(), user.getDeaconFamily4()));
+        return familyNameAt(user, 3);
+    }
+
+    public String primaryFamilyRole(User user) {
+        return familyRoleAt(user, 0);
+    }
+
+    public String secondaryFamilyRole(User user) {
+        return familyRoleAt(user, 1);
+    }
+
+    public String thirdFamilyRole(User user) {
+        return familyRoleAt(user, 2);
+    }
+
+    public String fourthFamilyRole(User user) {
+        return familyRoleAt(user, 3);
     }
 
     private void addBase(Set<String> set, Long familyId, String fallbackName) {
@@ -141,6 +151,21 @@ public class FamilyAccessService {
 
     public String normalizeRole(String raw) {
         return normRole(raw);
+    }
+
+    private String familyNameAt(User user, int index) {
+        if (user == null) return null;
+        List<com.shmamsa.model.UserFamilyAssignmentView> assignments = userFamilyRoleService.getAssignments(user);
+        if (index < 0 || index >= assignments.size()) return null;
+        com.shmamsa.model.UserFamilyAssignmentView assignment = assignments.get(index);
+        return normalizeDisplayName(familyNameForId(assignment.getFamilyId(), assignment.getFamilyName()));
+    }
+
+    private String familyRoleAt(User user, int index) {
+        if (user == null) return null;
+        List<com.shmamsa.model.UserFamilyAssignmentView> assignments = userFamilyRoleService.getAssignments(user);
+        if (index < 0 || index >= assignments.size()) return null;
+        return normalizeDisplayName(assignments.get(index).getRole());
     }
 
     private String normRole(String raw) {

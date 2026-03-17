@@ -10,6 +10,8 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -95,40 +97,40 @@ public class User {
     @Column(length = 100)
     private String workDetails;
 
-    @Column(length = 100)
+    @Transient
     private String deaconFamily;
 
-    @Column(name = "deacon_family_id")
+    @Transient
     private Long deaconFamilyId;
 
-    @Column(length = 100)
+    @Transient
     private String deaconFamily2;
 
-    @Column(name = "deacon_family2_id")
+    @Transient
     private Long deaconFamily2Id;
 
-    @Column(length = 100)
+    @Transient
     private String deaconFamily3;
 
-    @Column(name = "deacon_family3_id")
+    @Transient
     private Long deaconFamily3Id;
 
-    @Column(length = 100)
+    @Transient
     private String deaconFamily4;
 
-    @Column(name = "deacon_family4_id")
+    @Transient
     private Long deaconFamily4Id;
 
-    @Column(length = 30)
+    @Transient
     private String deaconFamilyRole;
 
-    @Column(length = 30)
+    @Transient
     private String deaconFamilyRole2;
 
-    @Column(length = 30)
+    @Transient
     private String deaconFamilyRole3;
 
-    @Column(length = 30)
+    @Transient
     private String deaconFamilyRole4;
 
     @Column(length = 50)
@@ -162,4 +164,8 @@ public class User {
 
     @Column(name = "last_school_result_status", length = 10)
     private String lastSchoolResultStatus; // PASS / FAIL
+
+    @Transient
+    @Builder.Default
+    private List<UserFamilyAssignmentView> familyAssignments = new ArrayList<>();
 }

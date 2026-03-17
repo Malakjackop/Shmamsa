@@ -7,6 +7,7 @@ export type KhorsJoinRequestView = {
   requestId: number;
   userId: number;
   fullName: string;
+  familyName: string;
   deaconFamily: string;
   role: string;
   requestedKhors: string;

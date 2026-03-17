@@ -3,7 +3,9 @@ package com.shmamsa.controller;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.FamilyCatalog;
+import com.shmamsa.model.FamilyRoleCode;
 import com.shmamsa.model.User;
+import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
@@ -11,6 +13,7 @@ import com.shmamsa.service.AttendanceBackfillService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.FamilyCatalogService;
 import com.shmamsa.service.KhorsJoinRequestService;
+import com.shmamsa.service.UserFamilyRoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +33,7 @@ public class FamilyController {
     private final AttendanceBackfillService attendanceBackfillService;
     private final FamilyAccessService familyAccessService;
     private final FamilyCatalogService familyCatalogService;
+    private final UserFamilyRoleService userFamilyRoleService;
 
     private String baseFamilyOf(User u) {
         return familyAccessService.baseFamily(u);
@@ -269,10 +273,11 @@ if (servantsBucket) {
             row.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
             row.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
             row.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
-            row.put("deaconFamilyRole", u.getDeaconFamilyRole());
-            row.put("deaconFamilyRole2", u.getDeaconFamilyRole2());
-            row.put("deaconFamilyRole3", u.getDeaconFamilyRole3());
-            row.put("deaconFamilyRole4", u.getDeaconFamilyRole4());
+            row.put("deaconFamilyRole", familyAccessService.primaryFamilyRole(u));
+            row.put("deaconFamilyRole2", familyAccessService.secondaryFamilyRole(u));
+            row.put("deaconFamilyRole3", familyAccessService.thirdFamilyRole(u));
+            row.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(u));
+            row.put("familyAssignments", userFamilyRoleService.getAssignments(u));
             row.put("address", u.getAddress());
             row.put("phoneNumber", u.getPhoneNumber());
             row.put("guardiansPhone", u.getGuardiansPhone());
@@ -347,6 +352,11 @@ if (servantsBucket) {
         dto.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
         dto.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
         dto.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
+        dto.put("deaconFamilyRole", familyAccessService.primaryFamilyRole(u));
+        dto.put("deaconFamilyRole2", familyAccessService.secondaryFamilyRole(u));
+        dto.put("deaconFamilyRole3", familyAccessService.thirdFamilyRole(u));
+        dto.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(u));
+        dto.put("familyAssignments", userFamilyRoleService.getAssignments(u));
         dto.put("deaconDegree", u.getDeaconDegree());
         dto.put("nationalId", u.getNationalId());
         dto.put("phoneNumber", u.getPhoneNumber());
@@ -417,6 +427,7 @@ if (servantsBucket) {
         }
 
         attendanceRepo.deleteByUserOrTakenBy(target.getId());
+        userFamilyRoleService.deleteAssignments(target);
 
         userRepo.deleteById(target.getId());
 
@@ -788,10 +799,6 @@ if (servantsBucket) {
                 u.setRole(normalizedTargetRole);
             }
 
-            u.setDeaconFamily(effectiveFamily.trim());
-            u.setDeaconFamilyId(familyIdByName(effectiveFamily.trim()));
-            u.setDeaconFamilyRole(normalizedTargetRole != null ? normalizedTargetRole : normRole(u.getRole()));
-
             String primBase = familyCatalogService.baseNameForName(effectiveFamily);
 
             List<Map<String, String>> cleanExtras = new ArrayList<>();
@@ -812,16 +819,28 @@ if (servantsBucket) {
                 if (cleanExtras.size() >= 3) break;
             }
 
-            u.setDeaconFamily2(cleanExtras.size() >= 1 ? cleanExtras.get(0).get("family") : null);
-            u.setDeaconFamily3(cleanExtras.size() >= 2 ? cleanExtras.get(1).get("family") : null);
-            u.setDeaconFamily4(cleanExtras.size() >= 3 ? cleanExtras.get(2).get("family") : null);
-            u.setDeaconFamily2Id(cleanExtras.size() >= 1 ? familyIdByName(cleanExtras.get(0).get("family")) : null);
-            u.setDeaconFamily3Id(cleanExtras.size() >= 2 ? familyIdByName(cleanExtras.get(1).get("family")) : null);
-            u.setDeaconFamily4Id(cleanExtras.size() >= 3 ? familyIdByName(cleanExtras.get(2).get("family")) : null);
-            u.setDeaconFamilyRole2(cleanExtras.size() >= 1 ? cleanExtras.get(0).get("role") : null);
-            u.setDeaconFamilyRole3(cleanExtras.size() >= 2 ? cleanExtras.get(1).get("role") : null);
-            u.setDeaconFamilyRole4(cleanExtras.size() >= 3 ? cleanExtras.get(2).get("role") : null);
+            List<UserFamilyAssignmentView> newAssignments = new ArrayList<>();
+            String primaryRole = normalizedTargetRole != null ? normalizedTargetRole : normRole(u.getRole());
+            newAssignments.add(UserFamilyAssignmentView.builder()
+                    .familyId(familyIdByName(effectiveFamily.trim()))
+                    .familyName(effectiveFamily.trim())
+                    .roleCode(FamilyRoleCode.fromRole(primaryRole).getCode())
+                    .role(FamilyRoleCode.fromRole(primaryRole).getRoleName())
+                    .assignmentOrder(1)
+                    .build());
+            for (int i = 0; i < cleanExtras.size(); i++) {
+                Map<String, String> extra = cleanExtras.get(i);
+                String extraRole = normRole(extra.get("role"));
+                newAssignments.add(UserFamilyAssignmentView.builder()
+                        .familyId(familyIdByName(extra.get("family")))
+                        .familyName(extra.get("family"))
+                        .roleCode(FamilyRoleCode.fromRole(extraRole).getCode())
+                        .role(FamilyRoleCode.fromRole(extraRole).getRoleName())
+                        .assignmentOrder(i + 2)
+                        .build());
+            }
 
+            userFamilyRoleService.replaceAssignments(u, newAssignments);
             userRepo.save(u);
             attendanceBackfillService.backfillForUser(u);
             updated++;
@@ -875,8 +894,8 @@ if (servantsBucket) {
     // زوار النقل: غالبًا بيكون مكتوب "زوار" داخل واحدة من حقول الأسرة
     private boolean isTransferVisitorUser(User u) {
         if (u == null) return false;
-        String[] arr = new String[]{u.getDeaconFamily(), u.getDeaconFamily2(), u.getDeaconFamily3(), u.getDeaconFamily4()};
-        for (String f : arr) {
+        for (UserFamilyAssignmentView assignment : userFamilyRoleService.getAssignments(u)) {
+            String f = assignment.getFamilyName();
             if (f == null) continue;
             String s = f.trim();
             if (s.contains("زوار") || s.contains("زائر")) {
@@ -900,10 +919,10 @@ if (servantsBucket) {
     private String familyBaseMatch(User user, String familyBase) {
         if (user == null || familyBase == null || familyBase.isBlank()) return null;
         String base = familyCatalogService.baseNameForName(familyBase);
-        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamilyId(), user.getDeaconFamily()))) return base;
-        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamily2Id(), user.getDeaconFamily2()))) return base;
-        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamily3Id(), user.getDeaconFamily3()))) return base;
-        if (base.equalsIgnoreCase(familyAccessService.baseNameForId(user.getDeaconFamily4Id(), user.getDeaconFamily4()))) return base;
+        for (UserFamilyAssignmentView assignment : userFamilyRoleService.getAssignments(user)) {
+            String candidate = familyAccessService.baseNameForId(assignment.getFamilyId(), assignment.getFamilyName());
+            if (base.equalsIgnoreCase(candidate)) return base;
+        }
         return null;
     }
 

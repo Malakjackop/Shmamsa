@@ -4,6 +4,7 @@ package com.shmamsa.controller;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
+import com.shmamsa.service.UserFamilyRoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class AdminController {
 
     private final UserRepository userRepo;
+    private final UserFamilyRoleService userFamilyRoleService;
 
     private String authRole(Authentication auth) {
         if (auth == null || auth.getAuthorities() == null) return "MAKHDOM";
@@ -60,15 +62,8 @@ public class AdminController {
 
         target.setRole(newRole);
         if ("AMIN_KHEDMA".equalsIgnoreCase(newRole)) {
-            target.setDeaconFamily("SYSTEM");
-            target.setDeaconFamilyId(null);
-            target.setDeaconFamily2(null);
-            target.setDeaconFamily2Id(null);
-            target.setDeaconFamily3(null);
-            target.setDeaconFamily3Id(null);
-            target.setDeaconFamily4(null);
-            target.setDeaconFamily4Id(null);
             target.setServingScope("KHORS_ONLY");
+            userFamilyRoleService.replaceAssignments(target, List.of());
         }
         userRepo.save(target);
 

@@ -37,7 +37,6 @@ public class ResourceStorageService {
         String safeFamily = (family == null || family.isBlank()) ? "ALL" : family.trim();
         String original = StringUtils.cleanPath(file.getOriginalFilename() == null ? "file" : file.getOriginalFilename());
 
-        // امتداد
         String ext = "";
         int dot = original.lastIndexOf('.');
         if (dot >= 0) ext = original.substring(dot);

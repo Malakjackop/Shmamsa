@@ -5,7 +5,15 @@ import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { MessageService } from 'primeng/api';
 
-type PickUser = { id: number; username?: string; fullName: string; role?: string; deaconFamily?: string };
+type PickUser = {
+  id: number;
+  username?: string;
+  fullName: string;
+  role?: string;
+  familyName?: string;
+  deaconFamily?: string;
+  familyAssignments?: Array<{ familyId?: number; familyName?: string; roleCode?: number; role?: string; assignmentOrder?: number }>;
+};
 
 @Component({
   selector: 'app-attendance',
@@ -84,40 +92,27 @@ export class AttendanceComponent implements OnInit {
 
 
   private hasAnyAminOsraScope(): boolean {
-    const norm = (v: any) => {
-      const raw = String(v || '').trim();
-      const up = raw.toUpperCase();
-      if (!up) return '';
-      if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
-      if (up.startsWith('ROLE_')) return up.substring(5);
-      return up;
-    };
-    const roles = [
-      this.me?.deaconFamilyRole,
-      this.me?.deaconFamilyRole2,
-      this.me?.deaconFamilyRole3,
-      this.me?.deaconFamilyRole4
-    ].map(norm);
-    return roles.includes('AMIN_OSRA');
+    return this.assignmentRolesOf(this.me).includes('AMIN_OSRA');
   }
 
   private hasAnyAminPrivilegeScope(): boolean {
-    const norm = (v: any) => {
-      const raw = String(v || '').trim();
-      const up = raw.toUpperCase();
-      if (!up) return '';
-      if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
-      if (['امين خدمة','امين الخدمه','أمين خدمة','أمين الخدمه','امين الخدمة','أمين الخدمة'].includes(raw)) return 'AMIN_KHEDMA';
-      if (up.startsWith('ROLE_')) return up.substring(5);
-      return up;
-    };
-    const roles = [
-      this.me?.deaconFamilyRole,
-      this.me?.deaconFamilyRole2,
-      this.me?.deaconFamilyRole3,
-      this.me?.deaconFamilyRole4
-    ].map(norm);
+    const roles = this.assignmentRolesOf(this.me);
     return roles.includes('AMIN_OSRA') || roles.includes('AMIN_KHEDMA');
+  }
+
+  private normRole(v: any): string {
+    const raw = String(v || '').trim();
+    const up = raw.toUpperCase();
+    if (!up) return '';
+    if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
+    if (['امين خدمة','امين الخدمه','أمين خدمة','أمين الخدمه','امين الخدمة','أمين الخدمة'].includes(raw)) return 'AMIN_KHEDMA';
+    if (up.startsWith('ROLE_')) return up.substring(5);
+    return up;
+  }
+
+  private assignmentRolesOf(user: any): string[] {
+    const assignments = Array.isArray(user?.familyAssignments) ? user.familyAssignments : [];
+    return assignments.map((x: any) => this.normRole(x?.role)).filter(Boolean);
   }
 
   private initCalendarRules() {
@@ -395,8 +390,18 @@ if (canChoir) {
     username: u?.username,
     fullName: u?.fullName,
     role: u?.role,
-    deaconFamily: u?.deaconFamily
+    familyName: this.familyLabel(u),
+    deaconFamily: u?.deaconFamily,
+    familyAssignments: u?.familyAssignments
   });
+
+  familyLabel(entity: any): string {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => String(x?.familyName || '').trim())
+      .filter(Boolean)
+      .join(' + ') || String(entity?.deaconFamily || '').trim();
+  }
 
   isKhadim(): boolean {
     return this.me?.role === 'KHADIM';

@@ -69,12 +69,9 @@ ngOnInit(): void {
 
   /** True if user has AMIN_OSRA on any assigned family slot (scoped). */
   private hasAnyAminOsraScope(): boolean {
-    const roles = [
-      this.user?.deaconFamilyRole,
-      this.user?.deaconFamilyRole2,
-      this.user?.deaconFamilyRole3,
-      this.user?.deaconFamilyRole4
-    ].map((x: any) => this.normRole(x));
+    const roles = Array.isArray(this.user?.familyAssignments)
+      ? this.user.familyAssignments.map((x: any) => this.normRole(x?.role))
+      : [];
     return roles.includes('AMIN_OSRA');
   }
 
@@ -94,14 +91,11 @@ ngOnInit(): void {
   }
 
   private servedFamiliesCount(): number {
-    const families = [
-      this.user?.deaconFamily,
-      this.user?.deaconFamily2,
-      this.user?.deaconFamily3,
-      this.user?.deaconFamily4
-    ]
-      .map((family: any) => String(family ?? '').trim())
-      .filter(Boolean);
+    const families = Array.isArray(this.user?.familyAssignments)
+      ? this.user.familyAssignments
+          .map((x: any) => String(x?.familyName ?? '').trim())
+          .filter(Boolean)
+      : [];
 
     return new Set(families).size;
   }

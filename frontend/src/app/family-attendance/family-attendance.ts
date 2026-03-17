@@ -9,6 +9,7 @@ type Member = {
   id: number;
   fullName: string;
   role: string;
+  familyName?: string;
   deaconFamily: string;
 
   // choir membership (used to hide choir sections inside details)
@@ -125,8 +126,8 @@ export class FamilyAttendanceComponent implements OnInit {
   dailyPresentCount = 0;
   dailyAbsentCount = 0;
   dailyRecordsCount = 0;
-  dailyPresent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string }> = [];
-  dailyAbsent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string }> = [];
+  dailyPresent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
+  dailyAbsent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
   dailyMaxDate: Date = this.buildDailyMaxDate();
   dailyDisabledWeekDays: number[] = [0, 1, 2, 3]; // الأحد - الاثنين - الثلاثاء - الأربعاء
 
@@ -214,6 +215,20 @@ export class FamilyAttendanceComponent implements OnInit {
     return this.me?.role === 'KHADIM';
   }
 
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: String(x?.role || '').trim().toUpperCase()
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
+
+  familyLabel(entity: any): string {
+    return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
+  }
+
   canSelectFamily(): boolean {
     return this.isAminKhedmaOrDev() || this.isKhadim();
   }
@@ -235,7 +250,7 @@ export class FamilyAttendanceComponent implements OnInit {
         }
       });
     } else {
-      this.selectedFamily = this.me?.deaconFamily;
+      this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
       this.loadMembers();
     }
   }
@@ -624,7 +639,7 @@ export class FamilyAttendanceComponent implements OnInit {
     const rows = [
       { label: 'اسم المستخدم', value: String(p.username ?? '').trim() },
       { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim() },
-      { label: 'الأسرة', value: String(p.deaconFamily ?? '').trim() },
+      { label: 'الأسرة', value: this.familyLabel(p) },
       { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear) },
       { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim() },
       { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim() },
@@ -750,7 +765,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   private dailyFamilyParam(): string | undefined {
     if (this.canSelectFamily()) return this.selectedFamily;
-    return this.me?.deaconFamily;
+    return this.assignmentsOf(this.me)[0]?.familyName;
   }
 
   private canShowDailyKhorsTypes(): boolean {
@@ -1281,7 +1296,7 @@ export class FamilyAttendanceComponent implements OnInit {
       for (let idx = 0; idx < selected.length; idx++) {
         const m = selected[idx];
         const d = detailsArr[idx] || {};
-        const fam = (d.deaconFamily ?? m.deaconFamily) || '';
+        const fam = this.assignmentsOf(d)[0]?.familyName || this.assignmentsOf(m)[0]?.familyName || '';
         const phone = d.phoneNumber || '';
         const records = attArr[idx] || [];
 

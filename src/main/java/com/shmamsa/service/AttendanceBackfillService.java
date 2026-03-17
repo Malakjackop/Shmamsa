@@ -4,6 +4,7 @@ import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.User;
+import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.AttendanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class AttendanceBackfillService {
 
     private final AttendanceRepository attendanceRepo;
     private final FamilyAccessService familyAccessService;
+    private final UserFamilyRoleService userFamilyRoleService;
 
     public void backfillForUser(User user) {
         if (user == null || user.getId() == null) return;
@@ -84,10 +86,9 @@ public class AttendanceBackfillService {
 
     private List<String> assignedFamilyBases(User user) {
         Set<String> set = new LinkedHashSet<>();
-        addFamilyBase(set, user.getDeaconFamilyId(), user.getDeaconFamily());
-        addFamilyBase(set, user.getDeaconFamily2Id(), user.getDeaconFamily2());
-        addFamilyBase(set, user.getDeaconFamily3Id(), user.getDeaconFamily3());
-        addFamilyBase(set, user.getDeaconFamily4Id(), user.getDeaconFamily4());
+        for (UserFamilyAssignmentView assignment : userFamilyRoleService.getAssignments(user)) {
+            addFamilyBase(set, assignment.getFamilyId(), assignment.getFamilyName());
+        }
         set.remove("خورس مارمرقس");
         set.remove("خورس البابا اثناسيوس");
         return new ArrayList<>(set);
@@ -95,10 +96,9 @@ public class AttendanceBackfillService {
 
     private List<String> assignedChoirBases(User user) {
         Set<String> set = new LinkedHashSet<>();
-        addChoirBase(set, user.getDeaconFamilyId(), user.getDeaconFamily());
-        addChoirBase(set, user.getDeaconFamily2Id(), user.getDeaconFamily2());
-        addChoirBase(set, user.getDeaconFamily3Id(), user.getDeaconFamily3());
-        addChoirBase(set, user.getDeaconFamily4Id(), user.getDeaconFamily4());
+        for (UserFamilyAssignmentView assignment : userFamilyRoleService.getAssignments(user)) {
+            addChoirBase(set, assignment.getFamilyId(), assignment.getFamilyName());
+        }
 
         addChoirMembership(set, user.getKhors());
         addChoirMembership(set, user.getAttendKhors());

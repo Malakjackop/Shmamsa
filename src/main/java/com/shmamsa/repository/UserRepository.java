@@ -23,11 +23,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     java.util.List<User> findByKhorsInAndRoleIn(java.util.List<String> khors, java.util.List<String> roles);
 
     @Query("""
-            select u from User u
-            where (u.deaconFamilyId in :familyIds
-                or u.deaconFamily2Id in :familyIds
-                or u.deaconFamily3Id in :familyIds
-                or u.deaconFamily4Id in :familyIds)
+            select distinct u from User u
+            join UserFamilyRole ufr on ufr.user.id = u.id
+            where ufr.familyId in :familyIds
               and u.role in :roles
             """)
     java.util.List<User> findByAnyFamilyIdInAndRoleIn(@Param("familyIds") java.util.List<Long> familyIds,

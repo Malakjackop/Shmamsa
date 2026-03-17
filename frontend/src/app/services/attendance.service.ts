@@ -28,8 +28,8 @@ export class AttendanceService {
     presentCount: number;
     absentCount: number;
     recordsCount: number;
-    present: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string; status: 'PRESENT' | 'ABSENT' }>;
-    absent: Array<{ id: number; fullName: string; role?: string; deaconFamily?: string; status: 'PRESENT' | 'ABSENT' }>;
+    present: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; status: 'PRESENT' | 'ABSENT' }>;
+    absent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; status: 'PRESENT' | 'ABSENT' }>;
   }> {
     const params: any = { date, type };
     if (family) params.family = family;
@@ -66,6 +66,7 @@ export class AttendanceService {
     id: number;
     username: string;
     fullName: string;
+    familyName?: string;
     deaconFamily?: string;
     alreadyRecorded?: boolean;
     alreadyPresent?: boolean;
@@ -75,6 +76,7 @@ export class AttendanceService {
       id: number;
       username: string;
       fullName: string;
+      familyName?: string;
       deaconFamily?: string;
       alreadyRecorded?: boolean;
       alreadyPresent?: boolean;

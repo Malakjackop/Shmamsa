@@ -11,6 +11,7 @@ type Member = {
   id: number;
   fullName: string;
   role: string;
+  familyName?: string;
   deaconFamily: string;
   address?: string;
   phoneNumber?: string;
@@ -111,6 +112,20 @@ export class FamilyInfoComponent implements OnInit {
   private normalizeRole(role: any): string {
     const raw = String(role || '').trim().toUpperCase();
     return raw.startsWith('ROLE_') ? raw.slice(5) : raw;
+  }
+
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: this.normalizeRole(x?.role)
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
+
+  familyLabel(entity: any): string {
+    return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
   }
 
   private hasRole(...allowed: string[]): boolean {
@@ -224,7 +239,7 @@ export class FamilyInfoComponent implements OnInit {
         }
       });
     } else {
-      this.selectedFamily = this.me?.deaconFamily;
+      this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
       this.loadMembers();
       this.loadPendingRequestsCount();
     }
@@ -445,7 +460,7 @@ export class FamilyInfoComponent implements OnInit {
     const rows = [
       { label: 'اسم المستخدم', value: String(p.username ?? '').trim() },
       { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim() },
-      { label: 'الأسرة', value: String(p.deaconFamily ?? '').trim() },
+      { label: 'الأسرة', value: this.assignmentsOf(p).map((x) => x.familyName).join(' + ') },
       { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear) },
       { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim() },
       { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim() },

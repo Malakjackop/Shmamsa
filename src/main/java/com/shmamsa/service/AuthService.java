@@ -4,6 +4,7 @@ import com.shmamsa.dto.RegisterRequest;
 import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.FamilyCatalog;
+import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
@@ -31,6 +32,7 @@ public class AuthService {
 
     private final ServantSecretService servantSecretService;
     private final FamilyCatalogService familyCatalogService;
+    private final UserFamilyRoleService userFamilyRoleService;
 
     private static class RateWindow {
         int count;
@@ -139,8 +141,6 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(request.getNationalId());
         FamilyCatalog memberFamily = familyCatalogService.resolveMemberFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
-        user.setDeaconFamily(memberFamily.getNameAr());
-        user.setDeaconFamilyId(memberFamily.getId());
         user.setDeaconDegree(request.getDeaconDegree());
 
         String requestedKhors = normalizeKhors(request.getKhors(), false);
@@ -186,6 +186,16 @@ public class AuthService {
             );
         });
 
+        userRepository.save(user);
+        userFamilyRoleService.replaceAssignments(user, List.of(
+                UserFamilyAssignmentView.builder()
+                        .familyId(memberFamily.getId())
+                        .familyName(memberFamily.getNameAr())
+                        .roleCode(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getCode())
+                        .role(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getRoleName())
+                        .assignmentOrder(1)
+                        .build()
+        ));
         userRepository.save(user);
         attendanceBackfillService.backfillForUser(user);
 
@@ -244,27 +254,24 @@ public class AuthService {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(nid);
+        FamilyCatalog primaryFamily = null;
+        FamilyCatalog secondaryFamily = null;
 
         if ("KHORS_ONLY".equals(scope)) {
             String kTmp = normalizeKhors(request.getKhors(), true);
             if ("NONE".equals(kTmp) || kTmp.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "KHORS_REQUIRED", "Khors is required for this scope");
             }
-            FamilyCatalog khorsFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
-            user.setDeaconFamily(khorsFamily.getNameAr());
-            user.setDeaconFamilyId(khorsFamily.getId());
+            primaryFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
         } else {
-    FamilyCatalog servantFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
-    user.setDeaconFamily(servantFamily.getNameAr());
-    user.setDeaconFamilyId(servantFamily.getId());
+            primaryFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
 
-    if (request.getDeaconFamily2Id() != null || (request.getDeaconFamily2() != null && !request.getDeaconFamily2().trim().isBlank())) {
-        FamilyCatalog extraFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamily2Id(), request.getDeaconFamily2());
-        if (!extraFamily.getNameAr().equalsIgnoreCase(user.getDeaconFamily())) {
-            user.setDeaconFamily2(extraFamily.getNameAr());
-            user.setDeaconFamily2Id(extraFamily.getId());
-        }
-    }
+            if (request.getDeaconFamily2Id() != null || (request.getDeaconFamily2() != null && !request.getDeaconFamily2().trim().isBlank())) {
+                FamilyCatalog extraFamily = familyCatalogService.resolveServantFamily(request.getDeaconFamily2Id(), request.getDeaconFamily2());
+                if (!extraFamily.getId().equals(primaryFamily.getId())) {
+                    secondaryFamily = extraFamily;
+                }
+            }
         }
 
         user.setDeaconDegree(request.getDeaconDegree());
@@ -337,6 +344,27 @@ public class AuthService {
         user.setWorkDetails(request.getWorkDetails());
 
 
+        userRepository.save(user);
+        List<UserFamilyAssignmentView> assignments = new ArrayList<>();
+        if (primaryFamily != null) {
+            assignments.add(UserFamilyAssignmentView.builder()
+                    .familyId(primaryFamily.getId())
+                    .familyName(primaryFamily.getNameAr())
+                    .roleCode(com.shmamsa.model.FamilyRoleCode.KHADIM.getCode())
+                    .role(com.shmamsa.model.FamilyRoleCode.KHADIM.getRoleName())
+                    .assignmentOrder(1)
+                    .build());
+        }
+        if (secondaryFamily != null) {
+            assignments.add(UserFamilyAssignmentView.builder()
+                    .familyId(secondaryFamily.getId())
+                    .familyName(secondaryFamily.getNameAr())
+                    .roleCode(com.shmamsa.model.FamilyRoleCode.KHADIM.getCode())
+                    .role(com.shmamsa.model.FamilyRoleCode.KHADIM.getRoleName())
+                    .assignmentOrder(2)
+                    .build());
+        }
+        userFamilyRoleService.replaceAssignments(user, assignments);
         userRepository.save(user);
         attendanceBackfillService.backfillForUser(user);
 

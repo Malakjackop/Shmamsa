@@ -89,35 +89,36 @@ export class GradesComponent implements OnInit {
     return upper;
   }
 
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: this.normRole(x?.role)
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
+
   private servantBasesFromMe(): string[] {
     const set = new Set<string>();
     const add = (x: any) => {
       const b = this.mainFamily(String(x || '').trim());
       if (b && b.toUpperCase() !== 'SYSTEM') set.add(b);
     };
-    add(this.me?.deaconFamily);
-    add(this.me?.deaconFamily2);
-    add(this.me?.deaconFamily3);
-    add(this.me?.deaconFamily4);
+    for (const assignment of this.assignmentsOf(this.me)) add(assignment.familyName);
     return Array.from(set);
   }
 
   private hasAnyAminOsraScope(): boolean {
-    const roles = [this.me?.deaconFamilyRole, this.me?.deaconFamilyRole2, this.me?.deaconFamilyRole3, this.me?.deaconFamilyRole4].map((x: any) => this.normRole(x));
+    const roles = this.assignmentsOf(this.me).map((x) => x.role);
     return roles.includes('AMIN_OSRA');
   }
 
   private hasAminOsraScopeForBase(base: string): boolean {
     const b = this.mainFamily(String(base || '').trim()).toUpperCase();
-    const fams = [
-      { fam: this.me?.deaconFamily, role: this.me?.deaconFamilyRole },
-      { fam: this.me?.deaconFamily2, role: this.me?.deaconFamilyRole2 },
-      { fam: this.me?.deaconFamily3, role: this.me?.deaconFamilyRole3 },
-      { fam: this.me?.deaconFamily4, role: this.me?.deaconFamilyRole4 }
-    ];
-    for (const x of fams) {
-      const fb = this.mainFamily(String(x.fam || '').trim()).toUpperCase();
-      const r = this.normRole(x.role);
+    for (const x of this.assignmentsOf(this.me)) {
+      const fb = this.mainFamily(String(x.familyName || '').trim()).toUpperCase();
+      const r = x.role;
       if (fb && fb === b && r === 'AMIN_OSRA') return true;
     }
     return false;
@@ -151,7 +152,7 @@ export class GradesComponent implements OnInit {
         }
       });
     } else {
-      this.familyChoices = (bases.length ? bases : [this.mainFamily(this.me?.deaconFamily)]).filter(Boolean);
+      this.familyChoices = (bases.length ? bases : [this.mainFamily(this.assignmentsOf(this.me)[0]?.familyName || '')]).filter(Boolean);
       this.selectedFamilyBase = this.familyChoices[0] || '';
       this.refreshPerms();
       if (this.selectedFamilyBase) this.loadServantView();
@@ -161,7 +162,7 @@ export class GradesComponent implements OnInit {
   private refreshPerms() {
     const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
     this.canEdit = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
-    this.canPublish = ['AMIN_KHEDMA', 'DEVELOPER'].includes(role) || (role === 'AMIN_OSRA' && this.mainFamily(this.me?.deaconFamily) === this.selectedFamilyBase) || this.hasAminOsraScopeForBase(this.selectedFamilyBase);
+    this.canPublish = ['AMIN_KHEDMA', 'DEVELOPER'].includes(role) || (role === 'AMIN_OSRA' && this.mainFamily(this.assignmentsOf(this.me)[0]?.familyName || '') === this.selectedFamilyBase) || this.hasAminOsraScopeForBase(this.selectedFamilyBase);
   }
 
   onServantTermChange(): void {
@@ -670,7 +671,7 @@ export class GradesComponent implements OnInit {
       },
       error: () => {
         this.my = {
-          familyBase: this.mainFamily(this.me?.deaconFamily),
+          familyBase: this.mainFamily(this.assignmentsOf(this.me)[0]?.familyName || ''),
           firstPublishedAt: null,
           secondPublishedAt: null,
           firstRank: null,

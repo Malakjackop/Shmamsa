@@ -12,7 +12,9 @@ type Member = {
   id: number;
   fullName: string;
   role: string;
+  familyName?: string;
   deaconFamily: string;
+  familyAssignments?: Array<{ familyId?: number; familyName?: string; roleCode?: number; role?: string; assignmentOrder?: number }>;
   address?: string;
   phoneNumber?: string;
   guardiansPhone?: string;
@@ -110,6 +112,20 @@ export class FamilyComponent implements OnInit {
     return this.isAminKhedmaOrDev();
   }
 
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: String(x?.role || entity?.role || '').trim().toUpperCase()
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
+
+  familyLabel(entity: any): string {
+    return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
+  }
+
   private initFamilyMode() {
     if (this.isAminKhedmaOrDev()) {
       this.familySvc.families().subscribe({
@@ -123,7 +139,7 @@ export class FamilyComponent implements OnInit {
         error: () => {}
       });
     } else {
-      this.selectedFamily = this.me?.deaconFamily;
+      this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
       this.loadMembers();
     }
   }
@@ -322,13 +338,14 @@ export class FamilyComponent implements OnInit {
   async exportExcel() {
     try {
       const XLSX = await import('xlsx');
-      const rows = this.members.map((m) => ({
-        fullName: m.fullName,
-        role: m.role,
-        deaconFamily: m.deaconFamily,
-        address: m.address,
-        phoneNumber: m.phoneNumber,
-        guardiansPhone: m.guardiansPhone,
+        const rows = this.members.map((m) => ({
+          fullName: m.fullName,
+          role: m.role,
+          familyName: this.assignmentsOf(m)[0]?.familyName || m.deaconFamily,
+          deaconFamily: this.assignmentsOf(m)[0]?.familyName || m.deaconFamily,
+          address: m.address,
+          phoneNumber: m.phoneNumber,
+          guardiansPhone: m.guardiansPhone,
         fridayLiturgy: m.fridayLiturgy,
         tasbeeha: m.tasbeeha,
         familyMeeting: m.familyMeeting
