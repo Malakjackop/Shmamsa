@@ -35,6 +35,12 @@ public class ResourceController {
         return familyId == null ? "ALL" : String.valueOf(familyId);
     }
 
+    private String normalizeCategory(String raw) {
+        String value = raw == null ? "" : raw.trim().toUpperCase();
+        if (value.equals("HYMNS") || value.equals("COPTIC") || value.equals("STUDIES")) return value;
+        return "GENERAL";
+    }
+
     @GetMapping
     public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -59,6 +65,7 @@ public class ResourceController {
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "family", required = false) String family,
+            @RequestParam(value = "category", required = false) String category,
             Authentication auth
     ) throws Exception {
 
@@ -87,6 +94,7 @@ public class ResourceController {
                 .size(stored.size)
                 .family(targetFamily)
                 .familyId(targetFamilyId)
+                .category(normalizeCategory(category))
                 .uploadedByUsername(me.getUsername())
                 .build();
 
@@ -99,6 +107,7 @@ public class ResourceController {
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "family", required = false) String family,
+            @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "file", required = false) MultipartFile file
     ) throws Exception {
 
@@ -116,6 +125,7 @@ public class ResourceController {
 
         existing.setTitle(title);
         existing.setDescription(description);
+        existing.setCategory(normalizeCategory(category));
 
         if (family != null && !family.isBlank()) {
             existing.setFamily(family);

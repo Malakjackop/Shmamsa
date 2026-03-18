@@ -6,6 +6,8 @@ import { ResourcesService } from '../services/resources.service';
 import { MessageService } from 'primeng/api';
 import { ConfirmationService } from 'primeng/api';
 
+type ResourceCategory = 'GENERAL' | 'HYMNS' | 'COPTIC' | 'STUDIES';
+
 @Component({
   selector: 'app-resources',
   standalone: false,
@@ -31,6 +33,13 @@ export class ResourcesComponent implements OnInit {
   familyMenuHovered = false;
 
   resources: any[] = [];
+  readonly categoryOptions: Array<{ value: ResourceCategory; label: string }> = [
+    { value: 'GENERAL', label: 'عام' },
+    { value: 'HYMNS', label: 'الحان' },
+    { value: 'COPTIC', label: 'قبطي' },
+    { value: 'STUDIES', label: 'دراسات' }
+  ];
+  selectedUploadCategory: ResourceCategory = 'GENERAL';
 
   title: string = '';
   description: string = '';
@@ -161,16 +170,40 @@ export class ResourcesComponent implements OnInit {
   loadResources() {
     if (this.isAminKhedmaOrDev()) {
       this.resService.list(this.selectedFamily).subscribe({
-        next: (data) => (this.resources = data || []),
+        next: (data) => (this.resources = (data || []).map((r) => ({ ...r, category: this.normalizeCategory(r?.category) }))),
         error: () => (this.resources = [])
       });
       return;
     }
 
     this.resService.list(this.selectedFamily || undefined).subscribe({
-      next: (data) => (this.resources = data || []),
+      next: (data) => (this.resources = (data || []).map((r) => ({ ...r, category: this.normalizeCategory(r?.category) }))),
       error: () => (this.resources = [])
     });
+  }
+
+  selectUploadCategory(category: ResourceCategory): void {
+    this.selectedUploadCategory = category;
+  }
+
+  get uploadCategoryIndex(): number {
+    const index = this.categoryOptions.findIndex((category) => category.value === this.selectedUploadCategory);
+    return index >= 0 ? index : 0;
+  }
+
+  get categorySections(): Array<{ value: ResourceCategory; label: string; items: any[] }> {
+    return this.categoryOptions
+      .map((category) => ({
+        ...category,
+        items: (this.resources || []).filter((r) => this.normalizeCategory(r?.category) === category.value)
+      }))
+      .filter((section) => section.items.length > 0);
+  }
+
+  private normalizeCategory(value: any): ResourceCategory {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (normalized === 'HYMNS' || normalized === 'COPTIC' || normalized === 'STUDIES') return normalized;
+    return 'GENERAL';
   }
 
   onPickFile(e: any) {
@@ -200,6 +233,7 @@ export class ResourcesComponent implements OnInit {
     const fd = new FormData();
     fd.append('file', this.pickedFile);
     fd.append('title', trimmedTitle);
+    fd.append('category', this.selectedUploadCategory);
 
     if (this.selectedFamily) {
       fd.append('family', this.selectedFamily);
@@ -221,6 +255,7 @@ export class ResourcesComponent implements OnInit {
     this.editing = r;
     this.title = r?.title || '';
     this.description = r?.description || '';
+    this.selectedUploadCategory = this.normalizeCategory(r?.category);
     this.pickedFile = null;
     this.resetFileInput();
     this.scrollToUploadPanel();
@@ -238,6 +273,7 @@ export class ResourcesComponent implements OnInit {
     const fd = new FormData();
     fd.append('title', trimmedTitle);
     fd.append('description', this.description || '');
+    fd.append('category', this.selectedUploadCategory);
     if (this.pickedFile) fd.append('file', this.pickedFile);
 
     this.resService.update(this.editing.id, fd).subscribe({
@@ -285,6 +321,7 @@ export class ResourcesComponent implements OnInit {
     this.editing = null;
     this.title = '';
     this.description = '';
+    this.selectedUploadCategory = 'GENERAL';
     this.pickedFile = null;
     this.resetFileInput();
   }

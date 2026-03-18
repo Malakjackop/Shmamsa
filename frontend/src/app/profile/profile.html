@@ -46,10 +46,7 @@
 
       <div>
         <label>صلة القرابة</label>
-        <select formControlName="guardianRelation">
-          <option value="">اختر صلة القرابة</option>
-          <option *ngFor="let opt of guardianRelationOptions" [value]="opt.value">{{ opt.label }}</option>
-        </select>
+        <input formControlName="guardianRelation" />
       </div>
 
       <div>

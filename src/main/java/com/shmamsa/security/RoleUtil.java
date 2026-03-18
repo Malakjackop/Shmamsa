@@ -13,7 +13,6 @@ public class RoleUtil {
             "ADMIN"
     );
 
-    // ✅ Normalize role (حل مشكلة developer / Developer / developer)
     public static int level(String role) {
         if (role == null) return 0;
         String r = role.trim().toUpperCase();
