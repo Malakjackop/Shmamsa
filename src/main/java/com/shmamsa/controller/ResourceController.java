@@ -16,7 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Files;
+import org.springframework.core.io.InputStreamResource;
 import java.util.List;
 import java.util.Map;
 
@@ -93,47 +93,48 @@ public class ResourceController {
         return ResponseEntity.ok(resourceRepo.save(rf));
     }
 
-    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable Long id,
-            @RequestParam(value = "file", required = false) MultipartFile file,
-            @RequestParam(value = "title", required = false) String title,
+            @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "family", required = false) String family,
-            Authentication auth
+            @RequestParam(value = "file", required = false) MultipartFile file
     ) throws Exception {
 
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
         ResourceFile existing = resourceRepo.findById(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Resource not found"));
 
-        if (title != null) existing.setTitle(title);
-        if (description != null) existing.setDescription(description);
+        String oldStoredName = existing.getStoredName();
+        String oldFamily = existing.getFamily();
 
-        if (family != null && !family.isBlank()) {
-            if ("ALL".equalsIgnoreCase(family.trim())) {
-                existing.setFamily("ALL");
-                existing.setFamilyId(null);
-            } else {
-                String base = familyAccessService.baseNameForName(family);
-                existing.setFamily(base);
-                existing.setFamilyId(familyAccessService.familyIdForName(base));
-            }
-        }
+        ResourceStorageService.StoredFileInfo uploaded = null;
 
         if (file != null && !file.isEmpty()) {
-            storage.deletePhysical(folderKey(existing.getFamilyId(), existing.getFamily()), existing.getStoredName());
-
-            var stored = storage.store(file, folderKey(existing.getFamilyId(), existing.getFamily()));
-
-            existing.setOriginalName(stored.originalName);
-            existing.setStoredName(stored.storedName);
-            existing.setContentType(stored.contentType);
-            existing.setSize(stored.size);
+            uploaded = storage.store(file, family != null ? family : existing.getFamily());
         }
 
-        return ResponseEntity.ok(resourceRepo.save(existing));
+        existing.setTitle(title);
+        existing.setDescription(description);
+
+        if (family != null && !family.isBlank()) {
+            existing.setFamily(family);
+        }
+
+        if (uploaded != null) {
+            existing.setStoredName(uploaded.storedName);
+            existing.setOriginalName(uploaded.originalName);
+            existing.setContentType(uploaded.contentType);
+            existing.setSize(uploaded.size);
+        }
+
+        resourceRepo.save(existing);
+
+        if (uploaded != null && oldStoredName != null && !oldStoredName.isBlank()) {
+            storage.deletePhysical(oldFamily, oldStoredName);
+        }
+
+        return ResponseEntity.ok(existing);
     }
 
     @DeleteMapping("/{id}")
@@ -155,14 +156,14 @@ public class ResourceController {
         ResourceFile existing = resourceRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
 
-        var path = storage.resolvePath(folderKey(existing.getFamilyId(), existing.getFamily()), existing.getStoredName());
-        if (!Files.exists(path)) throw new ApiException(HttpStatus.NOT_FOUND, "Stored file missing");
-
-        var bytes = Files.readAllBytes(path);
+        var stream = storage.download(existing.getStoredName());
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + existing.getOriginalName() + "\"")
-                .contentType(MediaType.parseMediaType(existing.getContentType() == null ? "application/octet-stream" : existing.getContentType()))
-                .body(bytes);
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + existing.getOriginalName() + "\"")
+                .contentType(MediaType.parseMediaType(
+                        existing.getContentType() == null ? "application/octet-stream" : existing.getContentType()
+                ))
+                .body(new InputStreamResource(stream));
     }
 }
