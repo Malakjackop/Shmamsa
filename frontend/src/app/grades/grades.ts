@@ -302,6 +302,25 @@ export class GradesComponent implements OnInit {
     return this.parseColumnTitle(rawTitle).max;
   }
 
+  fullColumnLabelForView(rawTitle: string): string {
+    const parsed = this.parseColumnTitle(rawTitle);
+    const title = String(parsed.title || '').trim() || '-';
+    const max = String(parsed.max || '').trim();
+    return max ? `${title} / ${max}` : title;
+  }
+
+  currentColumnLabel(colId: string): string {
+    const meta = this.columnMeta[colId] || { title: '', max: '' };
+    const title = String(meta.title || '').trim() || '-';
+    const max = String(meta.max || '').trim();
+    return max ? `${title} / ${max}` : title;
+  }
+
+  currentTotalLabel(): string {
+    const total = this.columnsMaxTotal();
+    return total > 0 ? `المجموع / ${total}` : 'المجموع';
+  }
+
   rowTotal(values: Record<string, string> | undefined): number {
     return this.rowTotalForColumns(values, this.columns);
   }
@@ -419,6 +438,61 @@ export class GradesComponent implements OnInit {
     return typeof processArabic === 'function' ? processArabic(s) : s;
   }
 
+  private pdfServantSingleHead(doc: any): string[] {
+    const exportColumns = this.sheet?.columns || [];
+    const total = this.columnsMaxTotalForColumns(exportColumns);
+    return [
+      this.pdfText(doc, total > 0 ? `المجموع / ${total}` : 'المجموع'),
+      ...exportColumns.map((c) => this.pdfText(doc, this.fullColumnLabelForView(c.title))),
+      this.pdfText(doc, 'الاسم'),
+      this.pdfText(doc, 'م')
+    ];
+  }
+
+  private pdfServantSingleRows(doc: any): string[][] {
+    const exportColumns = this.sheet?.columns || [];
+    const exportMembers = (this.sheet?.members || []).map((m) => ({
+      id: m.id,
+      fullName: m.fullName,
+      values: { ...(m.values || {}) }
+    }));
+    const source = [...exportMembers].sort((a, b) => {
+      const totalDiff = this.rowTotalForColumns(b.values, exportColumns) - this.rowTotalForColumns(a.values, exportColumns);
+      if (totalDiff !== 0) return totalDiff;
+      return a.fullName.localeCompare(b.fullName, 'ar');
+    });
+
+    return source.map((m, i) => [
+      String(this.rowTotalForColumns(m.values, exportColumns)),
+      ...exportColumns.map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
+      this.pdfText(doc, m.fullName),
+      String(i + 1)
+    ]);
+  }
+
+  private pdfColumnsHead(doc: any, cols: GradeColumn[] | undefined): string[] {
+    const total = this.columnsMaxTotalForColumns(cols);
+    return [
+      this.pdfText(doc, total > 0 ? `المجموع / ${total}` : 'المجموع'),
+      ...(cols || []).map((c) => this.pdfText(doc, this.fullColumnLabelForView(c.title))),
+      this.pdfText(doc, 'الاسم'),
+      this.pdfText(doc, 'م')
+    ];
+  }
+
+  private pdfColumnsRows(
+    doc: any,
+    rows: Array<{ id: number; fullName: string; values: Record<string, string> }>,
+    cols: GradeColumn[] | undefined
+  ): string[][] {
+    return (rows || []).map((m, i) => [
+      String(this.rowTotalForColumns(m.values, cols)),
+      ...(cols || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
+      this.pdfText(doc, m.fullName),
+      String(i + 1)
+    ]);
+  }
+
   private rebuildMembersView(): void {
     const ranked = [...this.members].sort((a, b) => {
       const totalDiff = this.rowTotal(b.values) - this.rowTotal(a.values);
@@ -476,18 +550,8 @@ export class GradesComponent implements OnInit {
 
       autoTable(doc, {
         startY: 80,
-        head: [[
-          this.pdfText(doc, 'م'),
-          this.pdfText(doc, 'الاسم'),
-          ...(this.bothFirstColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
-          this.pdfText(doc, 'المجموع')
-        ]],
-        body: (this.bothFirstMembers || []).map((m, i) => [
-          String(i + 1),
-          this.pdfText(doc, m.fullName),
-          ...(this.bothFirstColumns || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
-          String(this.rowTotalForColumns(m.values, this.bothFirstColumns))
-        ]),
+        head: [this.pdfColumnsHead(doc, this.bothFirstColumns)],
+        body: this.pdfColumnsRows(doc, this.bothFirstMembers, this.bothFirstColumns),
         styles: { fontSize: 9, halign: 'center', font: 'DejaVu' },
         headStyles: { halign: 'center', font: 'DejaVu' }
       });
@@ -497,18 +561,8 @@ export class GradesComponent implements OnInit {
 
       autoTable(doc, {
         startY: y + 10,
-        head: [[
-          this.pdfText(doc, 'م'),
-          this.pdfText(doc, 'الاسم'),
-          ...(this.bothSecondColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
-          this.pdfText(doc, 'المجموع')
-        ]],
-        body: (this.bothSecondMembers || []).map((m, i) => [
-          String(i + 1),
-          this.pdfText(doc, m.fullName),
-          ...(this.bothSecondColumns || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
-          String(this.rowTotalForColumns(m.values, this.bothSecondColumns))
-        ]),
+        head: [this.pdfColumnsHead(doc, this.bothSecondColumns)],
+        body: this.pdfColumnsRows(doc, this.bothSecondMembers, this.bothSecondColumns),
         styles: { fontSize: 9, halign: 'center', font: 'DejaVu' },
         headStyles: { halign: 'center', font: 'DejaVu' }
       });
@@ -521,18 +575,8 @@ export class GradesComponent implements OnInit {
 
     autoTable(doc, {
       startY: 100,
-      head: [[
-        this.pdfText(doc, 'م'),
-        this.pdfText(doc, 'الاسم'),
-        ...(this.columns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
-        this.pdfText(doc, 'المجموع')
-      ]],
-      body: (this.rankedMembers?.length ? this.rankedMembers : this.members).map((m, i) => [
-        String(i + 1),
-        this.pdfText(doc, m.fullName),
-        ...(this.columns || []).map((c) => this.pdfText(doc, m.values?.[c.id] || '-')),
-        String(this.rowTotal(m.values))
-      ]),
+      head: [this.pdfServantSingleHead(doc)],
+      body: this.pdfServantSingleRows(doc),
       styles: { fontSize: 9, halign: 'center', font: 'DejaVu' },
       headStyles: { halign: 'center', font: 'DejaVu' }
     });
@@ -551,14 +595,14 @@ export class GradesComponent implements OnInit {
     autoTable(doc, {
       startY: 80,
       head: [[
-        this.pdfText(doc, 'الاسم'),
-        ...(this.my.firstColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
-        this.pdfText(doc, 'مجموع الترم الأول')
+        this.pdfText(doc, this.columnsMaxTotalForColumns(this.my?.firstColumns) > 0 ? `مجموع الترم الأول / ${this.columnsMaxTotalForColumns(this.my?.firstColumns)}` : 'مجموع الترم الأول'),
+        ...(this.my.firstColumns || []).map((c) => this.pdfText(doc, this.fullColumnLabelForView(c.title))),
+        this.pdfText(doc, 'الاسم')
       ]],
       body: [[
-        this.pdfText(doc, this.me?.fullName || 'أنا'),
+        String(this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns)),
         ...(this.my.firstColumns || []).map((c) => this.pdfText(doc, this.my?.firstValues?.[c.id] || '-')),
-        String(this.rowTotalForColumns(this.my?.firstValues, this.my?.firstColumns))
+        this.pdfText(doc, this.me?.fullName || 'أنا')
       ]],
       styles: { fontSize: 10, halign: 'center', font: 'DejaVu' },
       headStyles: { halign: 'center', font: 'DejaVu' }
@@ -568,14 +612,14 @@ export class GradesComponent implements OnInit {
     autoTable(doc, {
       startY: y,
       head: [[
-        this.pdfText(doc, 'الاسم'),
-        ...(this.my.secondColumns || []).map((c) => this.pdfText(doc, this.formatColumnTitleForView(c.title))),
-        this.pdfText(doc, 'مجموع الترم الثاني')
+        this.pdfText(doc, this.columnsMaxTotalForColumns(this.my?.secondColumns) > 0 ? `مجموع الترم الثاني / ${this.columnsMaxTotalForColumns(this.my?.secondColumns)}` : 'مجموع الترم الثاني'),
+        ...(this.my.secondColumns || []).map((c) => this.pdfText(doc, this.fullColumnLabelForView(c.title))),
+        this.pdfText(doc, 'الاسم')
       ]],
       body: [[
-        this.pdfText(doc, this.me?.fullName || 'أنا'),
+        String(this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns)),
         ...(this.my.secondColumns || []).map((c) => this.pdfText(doc, this.my?.secondValues?.[c.id] || '-')),
-        String(this.rowTotalForColumns(this.my?.secondValues, this.my?.secondColumns))
+        this.pdfText(doc, this.me?.fullName || 'أنا')
       ]],
       styles: { fontSize: 10, halign: 'center', font: 'DejaVu' },
       headStyles: { halign: 'center', font: 'DejaVu' }

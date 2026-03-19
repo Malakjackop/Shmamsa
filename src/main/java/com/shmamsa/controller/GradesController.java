@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/grades")
 @RequiredArgsConstructor
+@Transactional
 public class GradesController {
 
     private final UserRepository userRepo;
