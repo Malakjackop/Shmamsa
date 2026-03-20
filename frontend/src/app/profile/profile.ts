@@ -21,11 +21,6 @@ export class ProfileComponent implements OnInit {
   qrData = '';
   user: any;
 
-  readonly guardianRelationOptions = [
-    { value: 'mom', label: 'الأم' },
-    { value: 'dad', label: 'الأب' }
-  ];
-
   readonly deaconDegreeOptions = [
     'مش مرشوم',
     'ابصالتس',

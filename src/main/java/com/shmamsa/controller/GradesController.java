@@ -9,10 +9,12 @@ import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.FamilyAccessService;
+import com.shmamsa.service.UserFamilyRoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -21,11 +23,13 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/grades")
 @RequiredArgsConstructor
+@Transactional
 public class GradesController {
 
     private final UserRepository userRepo;
     private final GradeSheetRepository gradeRepo;
     private final FamilyAccessService familyAccessService;
+    private final UserFamilyRoleService userFamilyRoleService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public record Column(String id, String title) {}
@@ -643,10 +647,7 @@ public class GradesController {
 
         userRepo.save(me);
         me.setPassword(null);
-        me.setDeaconFamily(familyAccessService.primaryFamilyName(me));
-        me.setDeaconFamily2(familyAccessService.secondaryFamilyName(me));
-        me.setDeaconFamily3(familyAccessService.thirdFamilyName(me));
-        me.setDeaconFamily4(familyAccessService.fourthFamilyName(me));
+        userFamilyRoleService.syncUser(me);
         return ResponseEntity.ok(me);
     }
 }

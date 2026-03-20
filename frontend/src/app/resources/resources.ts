@@ -1,10 +1,12 @@
-import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, inject, Inject, PLATFORM_ID, ElementRef, ViewChild } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { ResourcesService } from '../services/resources.service';
 import { MessageService } from 'primeng/api';
 import { ConfirmationService } from 'primeng/api';
+
+type ResourceCategory = 'GENERAL' | 'HYMNS' | 'COPTIC' | 'STUDIES';
 
 @Component({
   selector: 'app-resources',
@@ -14,6 +16,9 @@ import { ConfirmationService } from 'primeng/api';
   providers: [MessageService ,ConfirmationService]
 })
 export class ResourcesComponent implements OnInit {
+  @ViewChild('uploadPanel') uploadPanel?: ElementRef<HTMLElement>;
+  @ViewChild('resourceFileInput') resourceFileInput?: ElementRef<HTMLInputElement>;
+
   private auth = inject(AuthService);
   private famService = inject(FamilyService);
   private resService = inject(ResourcesService);
@@ -28,15 +33,19 @@ export class ResourcesComponent implements OnInit {
   familyMenuHovered = false;
 
   resources: any[] = [];
+  readonly categoryOptions: Array<{ value: ResourceCategory; label: string }> = [
+    { value: 'GENERAL', label: 'عام' },
+    { value: 'HYMNS', label: 'الحان' },
+    { value: 'COPTIC', label: 'قبطي' },
+    { value: 'STUDIES', label: 'دراسات' }
+  ];
+  selectedUploadCategory: ResourceCategory = 'GENERAL';
 
   title: string = '';
   description: string = '';
   pickedFile: File | null = null;
 
   editing: any = null;
-  editTitle: string = '';
-  editDescription: string = '';
-  editFile: File | null = null;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
@@ -61,19 +70,22 @@ export class ResourcesComponent implements OnInit {
     return up;
   }
 
-  private getServedFamilies(): string[] {
-    const slots: Array<[string | undefined, string | undefined]> = [
-      [this.user?.deaconFamily, this.user?.deaconFamilyRole || this.user?.role],
-      [this.user?.deaconFamily2, this.user?.deaconFamilyRole2],
-      [this.user?.deaconFamily3, this.user?.deaconFamilyRole3],
-      [this.user?.deaconFamily4, this.user?.deaconFamilyRole4]
-    ];
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: this.normRole(x?.role)
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
 
+  private getServedFamilies(): string[] {
     const res: string[] = [];
-    for (const [fam, role] of slots) {
-      const f = String(fam || '').trim();
+    for (const assignment of this.assignmentsOf(this.user)) {
+      const f = String(assignment.familyName || '').trim();
       if (!f) continue;
-      const r = this.normRole(role);
+      const r = assignment.role;
       if (!['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r)) continue;
       if (!res.includes(f)) res.push(f);
     }
@@ -158,16 +170,40 @@ export class ResourcesComponent implements OnInit {
   loadResources() {
     if (this.isAminKhedmaOrDev()) {
       this.resService.list(this.selectedFamily).subscribe({
-        next: (data) => (this.resources = data || []),
+        next: (data) => (this.resources = (data || []).map((r) => ({ ...r, category: this.normalizeCategory(r?.category) }))),
         error: () => (this.resources = [])
       });
       return;
     }
 
     this.resService.list(this.selectedFamily || undefined).subscribe({
-      next: (data) => (this.resources = data || []),
+      next: (data) => (this.resources = (data || []).map((r) => ({ ...r, category: this.normalizeCategory(r?.category) }))),
       error: () => (this.resources = [])
     });
+  }
+
+  selectUploadCategory(category: ResourceCategory): void {
+    this.selectedUploadCategory = category;
+  }
+
+  get uploadCategoryIndex(): number {
+    const index = this.categoryOptions.findIndex((category) => category.value === this.selectedUploadCategory);
+    return index >= 0 ? index : 0;
+  }
+
+  get categorySections(): Array<{ value: ResourceCategory; label: string; items: any[] }> {
+    return this.categoryOptions
+      .map((category) => ({
+        ...category,
+        items: (this.resources || []).filter((r) => this.normalizeCategory(r?.category) === category.value)
+      }))
+      .filter((section) => section.items.length > 0);
+  }
+
+  private normalizeCategory(value: any): ResourceCategory {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (normalized === 'HYMNS' || normalized === 'COPTIC' || normalized === 'STUDIES') return normalized;
+    return 'GENERAL';
   }
 
   onPickFile(e: any) {
@@ -177,6 +213,11 @@ export class ResourcesComponent implements OnInit {
 
   upload() {
     if (!this.isUploader()) return;
+
+    if (this.editing) {
+      this.saveEdit();
+      return;
+    }
 
     const trimmedTitle = this.title.trim();
     if (!trimmedTitle) {
@@ -192,6 +233,7 @@ export class ResourcesComponent implements OnInit {
     const fd = new FormData();
     fd.append('file', this.pickedFile);
     fd.append('title', trimmedTitle);
+    fd.append('category', this.selectedUploadCategory);
 
     if (this.selectedFamily) {
       fd.append('family', this.selectedFamily);
@@ -200,9 +242,7 @@ export class ResourcesComponent implements OnInit {
     this.resService.upload(fd).subscribe({
       next: () => {
         this.msg.add({ severity: 'success', summary: 'رفع', detail: 'تم رفع الملف بنجاح' });
-        this.title = '';
-        this.description = '';
-        this.pickedFile = null;
+        this.resetForm();
         this.loadResources();
       },
       error: (err) => {
@@ -213,20 +253,18 @@ export class ResourcesComponent implements OnInit {
 
   openEdit(r: any) {
     this.editing = r;
-    this.editTitle = r?.title || '';
-    this.editDescription = r?.description || '';
-    this.editFile = null;
-  }
-
-  onEditFile(e: any) {
-    const f = e?.target?.files?.[0];
-    this.editFile = f || null;
+    this.title = r?.title || '';
+    this.description = r?.description || '';
+    this.selectedUploadCategory = this.normalizeCategory(r?.category);
+    this.pickedFile = null;
+    this.resetFileInput();
+    this.scrollToUploadPanel();
   }
 
   saveEdit() {
     if (!this.editing) return;
 
-    const trimmedTitle = this.editTitle.trim();
+    const trimmedTitle = this.title.trim();
     if (!trimmedTitle) {
       this.msg.add({ severity: 'warn', summary: 'العنوان مطلوب', detail: 'من فضلك اكتب اسم الملف قبل الحفظ' });
       return;
@@ -234,13 +272,14 @@ export class ResourcesComponent implements OnInit {
 
     const fd = new FormData();
     fd.append('title', trimmedTitle);
-    fd.append('description', this.editDescription || '');
-    if (this.editFile) fd.append('file', this.editFile);
+    fd.append('description', this.description || '');
+    fd.append('category', this.selectedUploadCategory);
+    if (this.pickedFile) fd.append('file', this.pickedFile);
 
     this.resService.update(this.editing.id, fd).subscribe({
       next: () => {
         this.msg.add({ severity: 'success', summary: 'تحديث', detail: 'تم تحديث المصادر' });
-        this.editing = null;
+        this.resetForm();
         this.loadResources();
       },
       error: (err) => {
@@ -250,7 +289,7 @@ export class ResourcesComponent implements OnInit {
   }
 
   cancelEdit() {
-    this.editing = null;
+    this.resetForm();
   }
 
   remove(r: any) {
@@ -276,5 +315,33 @@ export class ResourcesComponent implements OnInit {
 
   download(r: any) {
     window.open(this.resService.downloadUrl(r.id), '_blank');
+  }
+
+  private resetForm(): void {
+    this.editing = null;
+    this.title = '';
+    this.description = '';
+    this.selectedUploadCategory = 'GENERAL';
+    this.pickedFile = null;
+    this.resetFileInput();
+  }
+
+  private resetFileInput(): void {
+    if (this.resourceFileInput?.nativeElement) {
+      this.resourceFileInput.nativeElement.value = '';
+    }
+  }
+
+  private scrollToUploadPanel(): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const mainContainer = document.querySelector('.main');
+    if (mainContainer instanceof HTMLElement) {
+      mainContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    this.uploadPanel?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }

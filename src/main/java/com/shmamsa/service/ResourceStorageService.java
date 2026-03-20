@@ -1,33 +1,41 @@
 package com.shmamsa.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
-import java.nio.file.*;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class ResourceStorageService {
 
-    @Value("${app.upload.dir:uploads}")
-    private String uploadDir;
+    private final S3Client s3Client;
+
+    @Value("${cloudflare.r2.bucket}")
+    private String bucket;
 
     public static class StoredFileInfo {
         public final String storedName;
         public final String originalName;
         public final String contentType;
         public final long size;
-        public final Path fullPath;
 
-        public StoredFileInfo(String storedName, String originalName, String contentType, long size, Path fullPath) {
+        public StoredFileInfo(String storedName, String originalName, String contentType, long size) {
             this.storedName = storedName;
             this.originalName = originalName;
             this.contentType = contentType;
             this.size = size;
-            this.fullPath = fullPath;
         }
     }
 
@@ -35,33 +43,53 @@ public class ResourceStorageService {
         if (file == null || file.isEmpty()) throw new IOException("Empty file");
 
         String safeFamily = (family == null || family.isBlank()) ? "ALL" : family.trim();
-        String original = StringUtils.cleanPath(file.getOriginalFilename() == null ? "file" : file.getOriginalFilename());
+        String original = StringUtils.cleanPath(
+                file.getOriginalFilename() == null ? "file" : file.getOriginalFilename()
+        );
 
-        // امتداد
         String ext = "";
         int dot = original.lastIndexOf('.');
         if (dot >= 0) ext = original.substring(dot);
 
-        String stored = UUID.randomUUID() + ext;
+        String stored = "resources/" + safeFamily + "/" + UUID.randomUUID() + ext;
 
-        Path base = Paths.get(uploadDir, "resources", safeFamily);
-        Files.createDirectories(base);
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(stored)
+                .contentType(file.getContentType() == null ? "application/octet-stream" : file.getContentType())
+                .build();
 
-        Path target = base.resolve(stored);
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        s3Client.putObject(
+                request,
+                RequestBody.fromInputStream(file.getInputStream(), file.getSize())
+        );
 
-        return new StoredFileInfo(stored, original, file.getContentType(), file.getSize(), target);
+        return new StoredFileInfo(
+                stored,
+                original,
+                file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
+                file.getSize()
+        );
     }
 
-    public Path resolvePath(String family, String storedName) {
-        String safeFamily = (family == null || family.isBlank()) ? "ALL" : family.trim();
-        return Paths.get(uploadDir, "resources", safeFamily, storedName);
+    public ResponseInputStream<GetObjectResponse> download(String storedName) {
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(storedName)
+                .build();
+
+        return s3Client.getObject(request);
     }
 
     public void deletePhysical(String family, String storedName) {
         try {
-            Path p = resolvePath(family, storedName);
-            Files.deleteIfExists(p);
-        } catch (Exception ignored) {}
+            DeleteObjectRequest request = DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(storedName)
+                    .build();
+
+            s3Client.deleteObject(request);
+        } catch (Exception ignored) {
+        }
     }
 }

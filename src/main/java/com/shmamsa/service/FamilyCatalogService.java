@@ -59,7 +59,7 @@ public class FamilyCatalogService {
     public List<Long> relatedIdsForSelection(String familyName) {
         String x = String.valueOf(familyName == null ? "" : familyName).trim();
         if (x.isBlank()) return List.of();
-        FamilyCatalog selected = familyCatalogRepository.findByNameAr(x).orElse(null);
+        FamilyCatalog selected = findByName(x);
         if (selected == null || !Boolean.TRUE.equals(selected.getActive())) return List.of();
 
         String baseName = String.valueOf(selected.getBaseName() == null ? selected.getNameAr() : selected.getBaseName()).trim();
@@ -75,7 +75,7 @@ public class FamilyCatalogService {
     public List<String> relatedNamesPlusAll(String familyName) {
         String x = String.valueOf(familyName == null ? "" : familyName).trim();
         if (x.isBlank()) return List.of("ALL");
-        FamilyCatalog selected = familyCatalogRepository.findByNameAr(x).orElse(null);
+        FamilyCatalog selected = findByName(x);
         if (selected == null || !Boolean.TRUE.equals(selected.getActive())) return List.of("ALL", x);
 
         String baseName = String.valueOf(selected.getBaseName() == null ? selected.getNameAr() : selected.getBaseName()).trim();
@@ -93,12 +93,14 @@ public class FamilyCatalogService {
 
     public boolean isValidServantFamily(String name) {
         String x = String.valueOf(name == null ? "" : name).trim();
-        return !x.isBlank() && familyCatalogRepository.existsByNameArAndActiveTrueAndServantSelectableTrue(x);
+        FamilyCatalog item = findByName(x);
+        return item != null && Boolean.TRUE.equals(item.getActive()) && Boolean.TRUE.equals(item.getServantSelectable());
     }
 
     public boolean isValidMemberFamily(String name) {
         String x = String.valueOf(name == null ? "" : name).trim();
-        return !x.isBlank() && familyCatalogRepository.existsByNameArAndActiveTrueAndMemberSelectableTrue(x);
+        FamilyCatalog item = findByName(x);
+        return item != null && Boolean.TRUE.equals(item.getActive()) && Boolean.TRUE.equals(item.getMemberSelectable());
     }
 
     public FamilyCatalog findById(Long id) {
@@ -109,7 +111,17 @@ public class FamilyCatalogService {
     public FamilyCatalog findByName(String name) {
         String x = String.valueOf(name == null ? "" : name).trim();
         if (x.isBlank()) return null;
-        return familyCatalogRepository.findByNameAr(x).orElse(null);
+        FamilyCatalog exact = familyCatalogRepository.findByNameAr(x).orElse(null);
+        if (exact != null) return exact;
+
+        String target = normalizedArabicKey(x);
+        for (FamilyCatalog item : familyCatalogRepository.findAll()) {
+            if (target.equals(normalizedArabicKey(item.getNameAr()))
+                    || target.equals(normalizedArabicKey(item.getBaseName()))) {
+                return item;
+            }
+        }
+        return null;
     }
 
     public String baseNameForName(String familyName) {
@@ -143,10 +155,28 @@ public class FamilyCatalogService {
         if (x.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "DEACON_FAMILY_REQUIRED", "Deacon family is required");
         }
-        FamilyCatalog item = familyCatalogRepository.findByNameAr(x)
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEACON_FAMILY", "Invalid deacon family"));
+        FamilyCatalog item = findByName(x);
+        if (item == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEACON_FAMILY", "Invalid deacon family");
+        }
         validateAudience(item, servantAudience);
         return item;
+    }
+
+    private String normalizedArabicKey(String value) {
+        String normalized = String.valueOf(value == null ? "" : value)
+                .trim()
+                .replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "")
+                .replace('أ', 'ا')
+                .replace('إ', 'ا')
+                .replace('آ', 'ا')
+                .replace('ؤ', 'و')
+                .replace('ئ', 'ي')
+                .replace('ة', 'ه')
+                .replace('ى', 'ي')
+                .replaceAll("ي+", "ي")
+                .replaceAll("\\s+", " ");
+        return normalized.toLowerCase(Locale.ROOT);
     }
 
     private void validateAudience(FamilyCatalog item, boolean servantAudience) {

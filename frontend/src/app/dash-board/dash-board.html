@@ -296,7 +296,7 @@
           <td style="white-space:nowrap;"><strong>{{ g.family }}</strong></td>
           <td>
             <div *ngFor="let m of g.members" style="padding:2px 0;">
-              • {{ m.fullName }} <small style="opacity:.7;">({{ m.deaconFamily }})</small>
+              • {{ m.fullName }} <small style="opacity:.7;">({{ m.familyName || m.deaconFamily || '' }})</small>
             </div>
           </td>
         </tr>

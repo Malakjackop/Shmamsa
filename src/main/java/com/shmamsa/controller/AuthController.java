@@ -13,6 +13,7 @@ import com.shmamsa.service.AttendanceBackfillService;
 import com.shmamsa.service.AuthService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.FamilyCatalogService;
+import com.shmamsa.service.UserFamilyRoleService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class AuthController {
     private final AttendanceBackfillService attendanceBackfillService;
     private final FamilyCatalogService familyCatalogService;
     private final FamilyAccessService familyAccessService;
+    private final UserFamilyRoleService userFamilyRoleService;
 
 
     @PostMapping("/register")
@@ -89,10 +91,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
         attendanceBackfillService.backfillForUser(user);
         user.setPassword(null);
-        user.setDeaconFamily(familyAccessService.primaryFamilyName(user));
-        user.setDeaconFamily2(familyAccessService.secondaryFamilyName(user));
-        user.setDeaconFamily3(familyAccessService.thirdFamilyName(user));
-        user.setDeaconFamily4(familyAccessService.fourthFamilyName(user));
+        userFamilyRoleService.syncUser(user);
 
         return ResponseEntity.ok(user);
     }
@@ -170,10 +169,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             authService.saveUser(existingUser);
 
             existingUser.setPassword(null);
-            existingUser.setDeaconFamily(familyAccessService.primaryFamilyName(existingUser));
-            existingUser.setDeaconFamily2(familyAccessService.secondaryFamilyName(existingUser));
-            existingUser.setDeaconFamily3(familyAccessService.thirdFamilyName(existingUser));
-            existingUser.setDeaconFamily4(familyAccessService.fourthFamilyName(existingUser));
+            userFamilyRoleService.syncUser(existingUser);
             return ResponseEntity.ok(existingUser);
     }
 }

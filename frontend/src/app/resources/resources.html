@@ -8,7 +8,6 @@
     <label class="sr-only" for="familyFilter">الاسرة</label>
     <div
       class="filter-select"
-      [style.width]="getFilterWidth()"
       [class.menu-locked]="familyMenuLocked"
       (mouseenter)="onFamilyMenuEnter()"
       (mouseleave)="unlockFamilyMenu()"
@@ -38,8 +37,32 @@
     </div>
   </div>
 
-  <div class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
-    <h3>رفع الملفات</h3>
+  <div #uploadPanel class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
+    <div class="panel-head">
+      <h3>{{ editing ? 'تعديل ملف' : 'رفع الملفات' }}</h3>
+      <div class="panel-head__left">
+        <div
+          class="category-tabs category-tabs--upload"
+          [style.--active-index]="uploadCategoryIndex"
+          [style.--tab-count]="categoryOptions.length"
+        >
+          <button
+            *ngFor="let category of categoryOptions"
+            type="button"
+            class="category-tab"
+            [class.is-active]="selectedUploadCategory === category.value"
+            (click)="selectUploadCategory(category.value)"
+          >
+            {{ category.label }}
+          </button>
+        </div>
+        <button *ngIf="editing" class="cancel-edit-button" type="button" (click)="cancelEdit()">إلغاء التعديل</button>
+      </div>
+    </div>
+
+    <div class="edit-note" *ngIf="editing">
+      يتم الآن تعديل: <strong>{{ editing.title || editing.originalName || '-' }}</strong>
+    </div>
 
     <input
       class="title-field"
@@ -50,18 +73,21 @@
 
     <div class="upload-actions">
       <label class="upload-action upload-action--file" for="resourceFileInput">
-        <span>{{ pickedFile ? pickedFile.name : 'اختيار الملف' }}</span>
+        <span>{{ pickedFile ? pickedFile.name : (editing ? 'اختيار ملف جديد - اختياري' : 'اختيار الملف') }}</span>
       </label>
-      <input id="resourceFileInput" class="hidden-file-input" type="file" (change)="onPickFile($event)" />
-      <button class="upload-action" type="button" (click)="upload()">رفع الملف</button>
+      <input #resourceFileInput id="resourceFileInput" class="hidden-file-input" type="file" (change)="onPickFile($event)" />
+      <button class="upload-action" type="button" (click)="upload()">
+        {{ editing ? 'حفظ التعديل' : 'رفع الملف' }}
+      </button>
     </div>
   </div>
 
-  <div class="card" *ngIf="resources.length > 0; else emptyState">
-    <h3 *ngIf="!isMakhdom()" class="files-heading">الملفات</h3>
-
-    <div class="resource-list" [class.resource-list--servant]="!isMakhdom()">
-      <div class="resource-item" *ngFor="let r of resources">
+  <div class="card">
+    <div *ngIf="categorySections.length > 0; else emptyState">
+      <div class="category-section" *ngFor="let section of categorySections">
+        <h3 class="category-heading">{{ section.label }}</h3>
+        <div class="resource-list" [class.resource-list--servant]="!isMakhdom()">
+          <div class="resource-item" *ngFor="let r of section.items">
         <div class="resource-left" *ngIf="!isMakhdom() && isUploader(); else downloadOnly">
           <button class="icon-button" type="button" (click)="openEdit(r)" title="تعديل" aria-label="تعديل">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -92,26 +118,17 @@
 
         <div class="resource-main">
           <div class="resource-title">{{ r.title || r.originalName || '-' }}</div>
+          <div class="resource-meta" *ngIf="!isMakhdom() && r.uploadedByUsername">
+            تم رفعه بواسطة {{ r.uploadedByUsername }}
+          </div>
+        </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <ng-template #emptyState>
-    <div class="card empty-card">
-      <div class="empty">لا توجد ملفات.</div>
-    </div>
+    <div class="empty empty-card">لا توجد ملفات.</div>
   </ng-template>
-
-  <div class="edit" *ngIf="editing">
-    <h3>تعديل ملف</h3>
-    <div class="row">
-      <input type="text" [(ngModel)]="editTitle" placeholder="العنوان (إجباري)" />
-    </div>
-    <div class="row">
-      <input type="file" (change)="onEditFile($event)" />
-      <button pButton type="button" label="حفظ" (click)="saveEdit()"></button>
-      <button pButton type="button" label="إلغاء" (click)="cancelEdit()"></button>
-    </div>
-  </div>
 </div>

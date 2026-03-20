@@ -7,20 +7,16 @@ type Member = {
   id: number;
   fullName: string;
   role: string;
+  familyName?: string;
   deaconFamily: string;
-  deaconFamily2?: string;
-  deaconFamily3?: string;
-  deaconFamily4?: string;
   deaconFamilyRole?: string;
-  deaconFamilyRole2?: string;
-  deaconFamilyRole3?: string;
-  deaconFamilyRole4?: string;
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
   khors?: string;
   khorsYear?: number;
   servingScope?: string;
+  familyAssignments?: Array<{ familyId?: number; familyName?: string; roleCode?: number; role?: string; assignmentOrder?: number }>;
 };
 
 type TransferMode = 'MAKHDOM' | 'SERVANT';
@@ -133,7 +129,7 @@ familyRequestTargets: { label: string; value: string }[] = [
   return this.me?.role === 'AMIN_OSRA' || this.isScopedAminOsraForSelected();
 }
 
-private normRole(v: any): string {
+  private normRole(v: any): string {
   return String(v || '')
     .trim()
     .toUpperCase()
@@ -141,11 +137,22 @@ private normRole(v: any): string {
     .replace(/\s+/g, '_');
 }
 
+  private assignmentsOf(entity: any): Array<{ familyName: string; role: string; roleCode?: number }> {
+    const raw = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return raw
+      .map((x: any) => ({
+        familyName: String(x?.familyName || '').trim(),
+        role: this.normRole(x?.role),
+        roleCode: typeof x?.roleCode === 'number' ? x.roleCode : undefined
+      }))
+      .filter((x: any) => !!x.familyName);
+  }
+
   private bootstrapDefaults() {
     this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
     this.makhdomFamilies = this.sortFamiliesByPreferredOrder(this.makhdomFamilies);
 
-    const mineBase = (this.me?.deaconFamily || '').trim();
+    const mineBase = this.assignmentsOf(this.me)[0]?.familyName || '';
 
     if (this.isAminKhedmaOrDev()) {
       this.mode = 'MAKHDOM';
@@ -340,15 +347,10 @@ private levelLabel(n?: number): string {
 
 private familyRoleFor(m: Member, fam: string): string {
   const selected = this.canonicalFamilyName(fam);
-  const slots: Array<[string | undefined, string | undefined]> = [
-    [m.deaconFamily, (m as any).deaconFamilyRole],
-    [m.deaconFamily2, (m as any).deaconFamilyRole2],
-    [m.deaconFamily3, (m as any).deaconFamilyRole3],
-    [m.deaconFamily4, (m as any).deaconFamilyRole4],
-  ];
-  for (const [sf, sr] of slots) {
-    if (this.canonicalFamilyName(sf) === selected) {
-      return this.getRoleLabel(String(sr || '').trim().toUpperCase());
+  const assignments = this.assignmentsOf(m);
+  for (const assignment of assignments) {
+    if (this.canonicalFamilyName(assignment.familyName) === selected) {
+      return this.getRoleLabel(assignment.role);
     }
   }
   return '';
@@ -369,9 +371,9 @@ displayFamily(m: Member): string {
   const role = String(m.role || '').trim().toUpperCase();
   const isServantRole = role === 'KHADIM' || role === 'AMIN_OSRA' || role === 'AMIN_KHEDMA';
 
-  // ✅ collect all الأسرة assignments (up to 4) and dedupe
-  const rawFamilies = [m.deaconFamily, m.deaconFamily2, m.deaconFamily3, m.deaconFamily4]
-    .map(x => String(x || '').trim())
+  // ✅ collect all الأسرة assignments and dedupe
+  const rawFamilies = this.assignmentsOf(m)
+    .map((x) => x.familyName)
     .filter(x => !!x && x.toUpperCase() !== 'SYSTEM' && !this.isChoirBucket(x));
 
   const families: string[] = [];
@@ -396,7 +398,7 @@ displayFamily(m: Member): string {
     parts.push(...families.map(f => this.familyWithRole(m, f)));
 
 
-    const baseFamily = String(m.deaconFamily || '').trim();
+  const baseFamily = this.assignmentsOf(m)[0]?.familyName || '';
     const shouldShowKhors = (scope === 'KHORS_ONLY' || scope === 'BOTH') && !!khLabel;
     if (shouldShowKhors && khLabel && !parts.includes(khLabel)) parts.push(khLabel);
 
@@ -409,7 +411,7 @@ displayFamily(m: Member): string {
   const parts: string[] = [];
   parts.push(...families.map(f => this.familyWithRole(m, f)));
   if (khLabel && !parts.includes(khLabel)) parts.push(khLabel);
-  return parts.length ? parts.join(' + ') : (String(m.deaconFamily || '').trim() || '—');
+  return parts.length ? parts.join(' + ') : '—';
 }
 
 private isChoirBucket(base: string): boolean {
@@ -424,8 +426,7 @@ isPapaAthanasiusView(): boolean {
 }
 
 private isTransferVisitor(m: any): boolean {
-  const fields = [m?.deaconFamily, m?.deaconFamily2, m?.deaconFamily3, m?.deaconFamily4]
-    .map((x: any) => String(x || '').trim());
+  const fields = this.assignmentsOf(m).map((x) => x.familyName);
 
   const joined = fields.join(' | ');
   if (joined.includes('زوار') || joined.includes('زائر')) {
@@ -567,21 +568,15 @@ removeFromChoir(m: Member) {
   }
 
   canAddExtraFamily(): boolean {
-    return this.extraFamilies.length < 3;
+    return true;
   }
 
   private myRoleForFamily(fam: string): string {
   const selected = this.canonicalFamilyName(fam);
-  const slots: Array<[string | undefined, string | undefined]> = [
-    [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
-    [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
-    [this.me?.deaconFamily3, this.me?.deaconFamilyRole3],
-    [this.me?.deaconFamily4, this.me?.deaconFamilyRole4],
-  ];
-
-  for (const [sf, sr] of slots) {
-    if (this.canonicalFamilyName(sf) === selected) {
-      return this.normRole(sr);
+  const assignments = this.assignmentsOf(this.me);
+  for (const assignment of assignments) {
+    if (this.canonicalFamilyName(assignment.familyName) === selected) {
+      return assignment.role;
     }
   }
   return '';
@@ -594,19 +589,11 @@ private isScopedAminOsraForSelected(): boolean {
 }
 
 private getAminOsraFamilies(): string[] {
-  const slots: Array<[string | undefined, string | undefined]> = [
-    [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
-    [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
-    [this.me?.deaconFamily3, this.me?.deaconFamilyRole3],
-    [this.me?.deaconFamily4, this.me?.deaconFamilyRole4],
-  ];
-
   const res: string[] = [];
-  for (const [fam, role] of slots) {
-    const f = this.canonicalFamilyName(fam);
+  for (const assignment of this.assignmentsOf(this.me)) {
+    const f = this.canonicalFamilyName(assignment.familyName);
     if (!f) continue;
-
-    const r = this.normRole(role);
+    const r = assignment.role;
     if (r === 'AMIN_OSRA') {
       if (!res.includes(f)) res.push(f);
     }
@@ -619,19 +606,11 @@ private hasAnyScopedAminOsra(): boolean {
 }
 
 private getServedFamilies(): string[] {
-  const slots: Array<[string | undefined, string | undefined]> = [
-    [this.me?.deaconFamily, this.me?.deaconFamilyRole || this.me?.role],
-    [this.me?.deaconFamily2, this.me?.deaconFamilyRole2],
-    [this.me?.deaconFamily3, this.me?.deaconFamilyRole3],
-    [this.me?.deaconFamily4, this.me?.deaconFamilyRole4],
-  ];
-
   const res: string[] = [];
-  for (const [fam, role] of slots) {
-    const f = this.canonicalFamilyName(fam);
+  for (const assignment of this.assignmentsOf(this.me)) {
+    const f = this.canonicalFamilyName(assignment.familyName);
     if (!f) continue;
-
-    const r = this.normRole(role);
+    const r = assignment.role;
     if (!['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA'].includes(r)) continue;
     if (!res.includes(f)) res.push(f);
   }
@@ -649,8 +628,7 @@ private getServedFamilies(): string[] {
   }
 
   private countExtras(m: Member): number {
-    const arr = [m.deaconFamily2, m.deaconFamily3, m.deaconFamily4].filter(x => !!(x || '').trim());
-    return arr.length;
+    return Math.max(0, this.assignmentsOf(m).length - 1);
   }
 
   maxExistingExtraCols(): number {
@@ -664,8 +642,7 @@ private getServedFamilies(): string[] {
   }
 
   extraFamilyValue(m: Member, idx: number): string {
-    const vals = [m.deaconFamily2, m.deaconFamily3, m.deaconFamily4];
-    const fam = (vals[idx] || '').trim();
+    const fam = this.assignmentsOf(m)[idx + 1]?.familyName || '';
     if (!fam) return '—';
     return this.familyWithRole(m, fam);
   }

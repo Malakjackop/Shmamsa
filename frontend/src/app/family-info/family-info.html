@@ -189,7 +189,7 @@
           <div class="reqInfo">
             <div class="reqName">{{ r.fullName }}</div>
             <div class="reqMeta">
-              <span>الأسرة: {{ r.deaconFamily }}</span>
+              <span>الأسرة: {{ familyLabel(r) }}</span>
               <span>الدور: {{ r.role | roleLabel }}</span>
               <span>الخورس: {{ r.requestedKhors === 'MARMARKOS' ? 'مارمرقس' : 'الأنبا أثناسيوس' }}</span>
             </div>

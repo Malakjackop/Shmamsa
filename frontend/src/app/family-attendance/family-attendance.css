@@ -28,6 +28,23 @@ select{padding:8px;border-radius:8px;border:1px solid #ccc;}
 .modalHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
 .title{font-weight:700;font-size:18px;}
 .sub{color:#666;font-size:12px;}
+.detailsFilters{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  flex:0 0 auto;
+  width:fit-content;
+  margin-inline-start:auto;
+}
+.detailsFilters select{
+  width:auto;
+  min-width:0;
+  max-width:max-content;
+  padding:9px 12px 10px;
+  line-height:1.4;
+  height:auto;
+  box-sizing:border-box;
+}
 
 /* Profile modal cards (match family-info look) */
 .profileGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;}

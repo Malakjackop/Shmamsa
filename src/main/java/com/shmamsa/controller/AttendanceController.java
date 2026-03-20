@@ -7,12 +7,14 @@ import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.GradeSheet;
 import com.shmamsa.model.User;
+import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.AttendanceArchiveRepository;
 import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.QrTokenService;
+import com.shmamsa.service.UserFamilyRoleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.ibm.icu.text.ArabicShaping;
@@ -51,6 +53,7 @@ public class AttendanceController {
     private final GradeSheetRepository gradeRepo;
     private final FamilyAccessService familyAccessService;
     private final QrTokenService qrTokenService;
+    private final UserFamilyRoleService userFamilyRoleService;
     private final ObjectMapper objectMapper;
 
     private static final String TITLE_META_SEPARATOR = "::max::";
@@ -86,12 +89,11 @@ public class AttendanceController {
 
     private boolean hasAnyScopedAminPrivilege(User user) {
         if (user == null) return false;
-        List<String> roles = List.of(
-                normRole(user.getDeaconFamilyRole()),
-                normRole(user.getDeaconFamilyRole2()),
-                normRole(user.getDeaconFamilyRole3()),
-                normRole(user.getDeaconFamilyRole4())
-        );
+        List<String> roles = userFamilyRoleService.getAssignments(user).stream()
+                .map(UserFamilyAssignmentView::getRole)
+                .map(this::normRole)
+                .filter(x -> x != null && !x.isBlank())
+                .toList();
         return roles.contains("AMIN_OSRA") || roles.contains("AMIN_KHEDMA");
     }
 
@@ -515,7 +517,7 @@ public class AttendanceController {
             row.put("id", u.getId());
             row.put("fullName", u.getFullName());
             row.put("role", u.getRole());
-            row.put("deaconFamily", u.getDeaconFamily());
+            row.put("deaconFamily", familyAccessService.primaryFamilyName(u));
             row.put("status", st.name());
             if (st == AttendanceStatus.PRESENT) present.add(row);
             else absent.add(row);

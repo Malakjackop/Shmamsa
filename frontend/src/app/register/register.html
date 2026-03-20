@@ -274,11 +274,8 @@
           </div>
 
           <div class="input-group small">
-            <select formControlName="guardianRelation" (change)="markTouchedFromList('guardianRelation')">
-              <option value="" disabled>ولي الأمر</option>
-              <option value="mom">الأم</option>
-              <option value="dad">الأب</option>
-            </select>
+            <input type="text" formControlName="guardianRelation" placeholder="مين صاحب رقم ولي الأمر؟"
+                   (click)="markInteracted('guardianRelation')" (blur)="markTouched('guardianRelation')" />
             <small class="error-text" *ngIf="shouldShowError('guardianRelation')">{{ errorText('guardianRelation','صلة القرابة') }}</small>
           </div>
         </div>

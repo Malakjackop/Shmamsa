@@ -74,14 +74,17 @@
               {{u.fullName}}
               <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
             </div>
-            <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
+            <div class="sub" *ngIf="familyLabel(u)">{{familyLabel(u)}}</div>
           </div>
 
           <p-button
             type="button"
             [icon]="isSelected(u.id) ? 'pi pi-check' : 'pi pi-plus'"
+            [disabled]="isSelected(u.id)"
+            [label]="isSelected(u.id) ? 'تمت إضافته' : ''"
+            [styleClass]="isSelected(u.id) ? 'pickBtn pickBtn--locked' : 'pickBtn'"
             (onClick)="toggleSelect(u)"
-          >➕ </p-button>
+          ></p-button>
         </div>
       </div>
 
@@ -108,9 +111,9 @@
                 {{u.fullName}}
                 <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
               </div>
-              <div class="sub" *ngIf="u.deaconFamily">{{u.deaconFamily}}</div>
+              <div class="sub" *ngIf="familyLabel(u)">{{familyLabel(u)}}</div>
             </div>
-            <p-button type="button" icon="pi pi-times" (onClick)="remove(u.id)">🗑️</p-button>
+            <p-button type="button" icon="pi pi-times" (onClick)="remove(u.id)"></p-button>
           </div>
         </div>
 
