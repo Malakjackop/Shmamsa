@@ -6,6 +6,8 @@ import { GradesService, GradeColumn, SheetView, MyGradesView, SheetPayload, Resu
 import { FamilyService } from '../services/family.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
+import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 
 @Component({
   selector: 'app-grades',
@@ -79,14 +81,7 @@ export class GradesComponent implements OnInit {
   }
 
   private normRole(v: any): string {
-    const raw = String(v ?? '').trim();
-    if (!raw) return '';
-    const upper = raw.toUpperCase();
-    const ar = raw.replace(/\s+/g, ' ').trim();
-    if (['امين اسرة', 'امين الاسرة', 'أمين أسرة', 'أمين الاسرة', 'امين الأسرة', 'أمين الأسرة'].includes(ar)) return 'AMIN_OSRA';
-    if (['امين الخدمة', 'امين الخدمه', 'أمين الخدمة', 'أمين الخدمه', 'امين خدمه', 'أمين خدمه'].includes(ar)) return 'AMIN_KHEDMA';
-    if (upper.startsWith('ROLE_')) return upper.substring(5);
-    return upper;
+    return normalizeRole(v);
   }
 
   private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
@@ -94,7 +89,7 @@ export class GradesComponent implements OnInit {
     return assignments
       .map((x: any) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: this.normRole(x?.role)
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
       .filter((x: any) => !!x.familyName);
   }
@@ -125,7 +120,7 @@ export class GradesComponent implements OnInit {
   }
 
   private initMode() {
-    const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
+    const role = normalizeRole(this.me?.role) || 'MAKHDOM';
     const servantOrAbove = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
     this.viewMode = servantOrAbove ? 'SERVANT' : 'MAKHDOM';
 
@@ -160,7 +155,7 @@ export class GradesComponent implements OnInit {
   }
 
   private refreshPerms() {
-    const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
+    const role = normalizeRole(this.me?.role) || 'MAKHDOM';
     this.canEdit = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
     this.canPublish = ['AMIN_KHEDMA', 'DEVELOPER'].includes(role) || (role === 'AMIN_OSRA' && this.mainFamily(this.assignmentsOf(this.me)[0]?.familyName || '') === this.selectedFamilyBase) || this.hasAminOsraScopeForBase(this.selectedFamilyBase);
   }
@@ -399,43 +394,8 @@ export class GradesComponent implements OnInit {
     return Number.isFinite(val) ? val : 0;
   }
 
-  private async ensureDejaVuFont(doc: any): Promise<void> {
-    try {
-      if (typeof doc.setR2L === 'function') doc.setR2L(false);
-      if (doc.__hasDejaVu) {
-        doc.setFont('DejaVu', 'normal');
-        return;
-      }
-
-      const res = await fetch('assets/fonts/DejaVuSans.ttf');
-      const buf = await res.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const base64 = btoa(binary);
-
-      doc.addFileToVFS('DejaVuSans.ttf', base64);
-      doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
-      doc.__hasDejaVu = true;
-      doc.setFont('DejaVu', 'normal');
-    } catch {
-      // keep export working even if font loading fails
-    }
-  }
-
   private pdfText(doc: any, value: any): string {
-    const s = String(value ?? '');
-    if (!s) return '';
-    const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
-    if (!hasArabic) return s;
-
-    const processArabic =
-      doc?.processArabic ||
-      ((jsPDF as any)?.API?.processArabic
-        ? (text: string) => (jsPDF as any).API.processArabic(text)
-        : null);
-
-    return typeof processArabic === 'function' ? processArabic(s) : s;
+    return createPdfText(doc, jsPDF)(value);
   }
 
   private pdfServantSingleHead(doc: any): string[] {
@@ -540,7 +500,7 @@ export class GradesComponent implements OnInit {
   async exportServantSheetPdf(): Promise<void> {
     if (this.viewMode !== 'SERVANT') return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    await this.ensureDejaVuFont(doc);
+    await ensureDejaVuFont(doc);
 
     if (this.selectedTerm === 'BOTH') {
       doc.setFontSize(16);
@@ -587,7 +547,7 @@ export class GradesComponent implements OnInit {
   async exportMyResultPdf(): Promise<void> {
     if (this.viewMode !== 'MAKHDOM' || !this.my) return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    await this.ensureDejaVuFont(doc);
+    await ensureDejaVuFont(doc);
 
     doc.setFontSize(16);
     doc.text(this.pdfText(doc, `الدرجات - ${this.me?.fullName || ''}`), 40, 40);

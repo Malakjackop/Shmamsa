@@ -278,9 +278,6 @@ if (servantsBucket) {
             row.put("deaconFamilyRole3", familyAccessService.thirdFamilyRole(u));
             row.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(u));
             row.put("familyAssignments", userFamilyRoleService.getAssignments(u));
-            row.put("address", u.getAddress());
-            row.put("phoneNumber", u.getPhoneNumber());
-            row.put("guardiansPhone", u.getGuardiansPhone());
             row.put("fridayLiturgy", fridayPresent);
             row.put("tasbeeha", tasbeehaPresent);
             row.put("familyMeeting", meetingPresent);
@@ -342,6 +339,7 @@ if (servantsBucket) {
     }
 }
 
+        boolean includeSensitive = canViewSensitiveMemberDetails(me, u);
         Map<String, Object> dto = new LinkedHashMap<>();
         dto.put("id", u.getId());
         dto.put("fullName", u.getFullName());
@@ -358,13 +356,7 @@ if (servantsBucket) {
         dto.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(u));
         dto.put("familyAssignments", userFamilyRoleService.getAssignments(u));
         dto.put("deaconDegree", u.getDeaconDegree());
-        dto.put("nationalId", u.getNationalId());
         dto.put("phoneNumber", u.getPhoneNumber());
-        dto.put("address", u.getAddress());
-        dto.put("guardiansPhone", u.getGuardiansPhone());
-        dto.put("guardianRelation", u.getGuardianRelation());
-        dto.put("dateOfBirth", u.getDateOfBirth());
-        dto.put("gender", u.getGender());
         dto.put("status", u.getStatus());
         dto.put("studyType", u.getStudyType());
         dto.put("schoolName", u.getSchoolName());
@@ -378,6 +370,14 @@ if (servantsBucket) {
         dto.put("workDetails", u.getWorkDetails());
         dto.put("khors", u.getKhors());
         dto.put("khorsYear", u.getKhorsYear());
+        if (includeSensitive) {
+            dto.put("nationalId", u.getNationalId());
+            dto.put("address", u.getAddress());
+            dto.put("guardiansPhone", u.getGuardiansPhone());
+            dto.put("guardianRelation", u.getGuardianRelation());
+            dto.put("dateOfBirth", u.getDateOfBirth());
+            dto.put("gender", u.getGender());
+        }
         return ResponseEntity.ok(dto);
     }
 
@@ -859,6 +859,15 @@ if (servantsBucket) {
                                               Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        User member = userRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
+
+        if (!canViewMemberAttendance(me, member)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
         List<?> records = (type == null)
                 ? attendanceRepo.findByUser_IdAndArchivedFalseOrderByCreatedAtDesc(id)
                 : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(id, type);
@@ -924,6 +933,76 @@ if (servantsBucket) {
             if (base.equalsIgnoreCase(candidate)) return base;
         }
         return null;
+    }
+
+    private List<String> memberBasesOf(User user) {
+        Set<String> bases = new LinkedHashSet<>();
+        for (UserFamilyAssignmentView assignment : userFamilyRoleService.getAssignments(user)) {
+            String candidate = familyAccessService.baseNameForId(assignment.getFamilyId(), assignment.getFamilyName());
+            if (candidate != null && !candidate.isBlank()) {
+                bases.add(candidate);
+            }
+        }
+        return new ArrayList<>(bases);
+    }
+
+    private boolean sharesChoirScope(User actor, User member) {
+        String actorRole = normRole(actor == null ? null : actor.getRole());
+        if (!"KHADIM".equals(actorRole)) return false;
+
+        String scope = String.valueOf(actor.getServingScope() == null ? "" : actor.getServingScope()).trim().toUpperCase(Locale.ROOT);
+        if (!("KHORS_ONLY".equals(scope) || "BOTH".equals(scope))) return false;
+
+        String actorKhors = String.valueOf(actor.getKhors() == null ? "" : actor.getKhors()).trim().toUpperCase(Locale.ROOT);
+        String memberKhors = String.valueOf(member.getKhors() == null ? "" : member.getKhors()).trim().toUpperCase(Locale.ROOT);
+        String memberAttendKhors = String.valueOf(member.getAttendKhors() == null ? "" : member.getAttendKhors()).trim().toUpperCase(Locale.ROOT);
+
+        if ("BOTH".equals(actorKhors)) {
+            return "MARMARKOS".equals(memberKhors) || "ATHANASIUS".equals(memberKhors)
+                    || "MARMARKOS".equals(memberAttendKhors) || "ATHANASIUS".equals(memberAttendKhors)
+                    || "BOTH".equals(memberKhors) || "BOTH".equals(memberAttendKhors);
+        }
+        return actorKhors.equals(memberKhors) || actorKhors.equals(memberAttendKhors);
+    }
+
+    private boolean canViewMemberAttendance(User actor, User member) {
+        if (actor == null || member == null) return false;
+        if (actor.getId() != null && actor.getId().equals(member.getId())) return true;
+
+        String actorRole = normRole(actor.getRole());
+        if ("DEVELOPER".equals(actorRole) || "AMIN_KHEDMA".equals(actorRole)) return true;
+
+        List<String> actorBases = servingBasesOf(actor);
+        List<String> memberBases = memberBasesOf(member);
+        for (String actorBase : actorBases) {
+            for (String memberBase : memberBases) {
+                if (actorBase != null && actorBase.equalsIgnoreCase(memberBase)) {
+                    return true;
+                }
+            }
+        }
+
+        return sharesChoirScope(actor, member);
+    }
+
+    private boolean canViewSensitiveMemberDetails(User actor, User member) {
+        if (actor == null || member == null) return false;
+        if (actor.getId() != null && actor.getId().equals(member.getId())) return true;
+
+        String actorRole = normRole(actor.getRole());
+        if ("DEVELOPER".equals(actorRole) || "AMIN_KHEDMA".equals(actorRole)) return true;
+        if (!"AMIN_OSRA".equals(actorRole)) return false;
+
+        List<String> actorBases = servingBasesOf(actor);
+        List<String> memberBases = memberBasesOf(member);
+        for (String actorBase : actorBases) {
+            for (String memberBase : memberBases) {
+                if (actorBase != null && actorBase.equalsIgnoreCase(memberBase)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Long familyIdByName(String name) {

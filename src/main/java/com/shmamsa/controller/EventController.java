@@ -43,10 +43,6 @@ public class EventController {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
     }
 
-    private String baseFamily(User u) {
-        return familyAccessService.baseFamily(u);
-    }
-
     private List<String> allBaseFamilies(User u) {
         return familyAccessService.servingBasesOf(u);
     }
@@ -99,8 +95,7 @@ public class EventController {
             return RoleUtil.isAtLeast(scopedRole, "KHADIM");
         }
 
-        String myBase = baseFamily(user);
-        return myBase != null && myBase.equalsIgnoreCase(base) && isServantGlobal(user.getRole());
+        return familyAccessService.belongsToBase(user, base) && isServantGlobal(user.getRole());
     }
 
     private boolean matchesFamily(User me, Long targetFamilyId, String targetFamily) {
@@ -171,12 +166,10 @@ public class EventController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
-        String myBase = baseFamily(me);
-        if (myBase == null || myBase.isBlank()) {
+        if (!familyAccessService.belongsToBase(me, tf)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "No family");
         }
-
-        if (!myBase.equalsIgnoreCase(tf) || "ALL".equalsIgnoreCase(tf)) {
+        if ("ALL".equalsIgnoreCase(tf)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Target family not allowed");
         }
 

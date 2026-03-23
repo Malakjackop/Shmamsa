@@ -1,70 +1,103 @@
 <p-toast position="top-left"></p-toast>
 <p-confirmDialog [draggable]="false"></p-confirmDialog>
 
-<div class="page">
-  <h1>بدء سنة جديدة</h1>
+<div class="page-shell">
+  <div class="page">
+    <header class="page-header">
+      <h1>بدء سنة جديدة</h1>
+      <p>ابدأ سنة خدمة جديدة مع الاحتفاظ بأرشيف السنوات السابقة للرجوع إليه في أي وقت.</p>
+    </header>
 
-  <div class="card" *ngIf="isAllowed(); else forbidden">
+    <div class="content-grid" *ngIf="isAllowed(); else forbidden">
+      <section class="panel hero-panel">
+        <div class="panel-heading">
+          <h2>اسم الأرشيف</h2>
+          <p>اكتب اسمًا واضحًا للسنة قبل تنفيذ الأرشفة.</p>
+        </div>
 
-    <div class="form-row">
-      <label class="lbl">اسم الأرشيف</label>
-      <input
-        pInputText
-        type="text"
-        [(ngModel)]="archiveName"
-        placeholder="مثلاً: 2025-2026"
-        [disabled]="running"
-      />
-      <small class="hint">⚠️ مهم: اكتب اسم الأرشيف قبل البدء</small>
+        <div class="field-wrap">
+          <label class="sr-only" for="archiveName">اسم الأرشيف</label>
+          <input
+            id="archiveName"
+            pInputText
+            class="archive-input"
+            type="text"
+            [(ngModel)]="archiveName"
+            placeholder="مثلاً: 2025 - 2026"
+            [disabled]="running"
+          />
+          <small class="field-hint">
+            <i class="pi pi-exclamation-triangle"></i>
+            مهم: اكتب اسم الأرشيف قبل البدء
+          </small>
+        </div>
+
+        <button
+          type="button"
+          class="start-btn"
+          [disabled]="running"
+          (click)="startNewYear()"
+        >
+          <span>{{ running ? 'جاري بدء السنة الجديدة...' : 'بدء سنة جديدة' }}</span>
+        </button>
+
+        <div *ngIf="running" class="running-state">
+          <i class="pi pi-spin pi-spinner"></i>
+          <span>جاري تنفيذ الأرشفة، برجاء الانتظار...</span>
+        </div>
+      </section>
+
+      <section class="panel archives-panel">
+        <div class="panel-heading archives-heading">
+          <div>
+            <h2>اسم الأرشيف</h2>
+            <p>كل الأرشيفات السابقة متاحة للتحميل والرجوع إليها.</p>
+          </div>
+          <span class="archive-count" *ngIf="archivesList?.length">{{ archivesList.length }}</span>
+        </div>
+
+        <div *ngIf="!archivesList?.length" class="empty-state">
+          <i class="pi pi-inbox"></i>
+          <p>لا يوجد أرشيفات حتى الآن.</p>
+        </div>
+
+        <div class="table-wrap" *ngIf="archivesList?.length">
+          <table class="archives-table">
+            <thead>
+              <tr>
+                <th>الاسم</th>
+                <th>تاريخ الإنشاء</th>
+                <th>أنشأه</th>
+                <th>تحميل</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let a of archivesList">
+                <td data-label="الاسم">{{ a?.name }}</td>
+                <td data-label="تاريخ الإنشاء">{{ formatArchiveCreatedAt(a?.createdAt) }}</td>
+                <td data-label="أنشأه">{{ a?.createdBy }}</td>
+                <td data-label="تحميل">
+                  <a
+                    class="download-link"
+                    (click)="$event.preventDefault(); downloadPdf(a)"
+                    href="#"
+                  >
+                    <i class="pi pi-download"></i>
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
-    <button
-      pButton
-      type="button"
-      label="بدء سنة جديدة (أرشفة الحضور للجميع)"
-      styleClass="p-button-danger"
-      [disabled]="running"
-      (click)="startNewYear()"
-    ></button>
-
-    <div *ngIf="running" class="hint">جاري التنفيذ...</div>
-
-    <hr class="sep" />
-
-    <h3>الأرشيفات السابقة</h3>
-
-    <div *ngIf="!archivesList?.length" class="hint">لا يوجد أرشيفات حتى الآن.</div>
-
-    <table class="tbl" *ngIf="archivesList?.length">
-      <thead>
-        <tr>
-          <th>الاسم</th>
-          <th>تاريخ الإنشاء</th>
-          <th>أنشأه</th>
-          <th>تحميل</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let a of archivesList">
-          <td>{{ a?.name }}</td>
-          <td>{{ a?.createdAt }}</td>
-          <td>{{ a?.createdBy }}</td>
-          <td>
-            <a
-              class="link"
-              (click)="$event.preventDefault(); downloadPdf(a)"
-              href="#"
-              >تحميل PDF</a
-            >
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <ng-template #forbidden>
+      <section class="panel forbidden-panel">
+        <i class="pi pi-lock"></i>
+        <h2>غير مسموح بالدخول</h2>
+        <p>هذه الصفحة متاحة فقط للمستخدمين المصرح لهم ببدء سنة جديدة.</p>
+      </section>
+    </ng-template>
   </div>
-
-  <ng-template #forbidden>
-    <div class="card">
-      <p class="hint">غير مسموح لك بالدخول لهذه الصفحة.</p>
-    </div>
-  </ng-template>
 </div>

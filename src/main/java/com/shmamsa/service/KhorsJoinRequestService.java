@@ -35,7 +35,6 @@ public class KhorsJoinRequestService {
         String k = normKhors(requestedKhors);
         if ("NONE".equals(k) || k.isBlank()) return;
         if (!("MARMARKOS".equals(k) || "ATHANASIUS".equals(k))) {
-            // Self-registration can only request 1 choir
             return;
         }
 

@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -35,6 +36,48 @@ public class AuthController {
     private final FamilyCatalogService familyCatalogService;
     private final FamilyAccessService familyAccessService;
     private final UserFamilyRoleService userFamilyRoleService;
+
+    private Map<String, Object> toCurrentUserView(User user) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", user.getId());
+        out.put("authenticated", true);
+        out.put("fullName", user.getFullName());
+        out.put("username", user.getUsername());
+        out.put("email", user.getEmail());
+        out.put("phoneNumber", user.getPhoneNumber());
+        out.put("address", user.getAddress());
+        out.put("guardiansPhone", user.getGuardiansPhone());
+        out.put("guardianRelation", user.getGuardianRelation());
+        out.put("dateOfBirth", user.getDateOfBirth());
+        out.put("gender", user.getGender());
+        out.put("status", user.getStatus());
+        out.put("studyType", user.getStudyType());
+        out.put("schoolName", user.getSchoolName());
+        out.put("schoolGrade", user.getSchoolGrade());
+        out.put("universityName", user.getUniversityName());
+        out.put("faculty", user.getFaculty());
+        out.put("universityGrade", user.getUniversityGrade());
+        out.put("graduatedFrom", user.getGraduatedFrom());
+        out.put("graduateJob", user.getGraduateJob());
+        out.put("isWorking", user.getIsWorking());
+        out.put("workDetails", user.getWorkDetails());
+        out.put("role", user.getRole());
+        out.put("deaconDegree", user.getDeaconDegree());
+        out.put("khors", user.getKhors());
+        out.put("khorsYear", user.getKhorsYear());
+        out.put("servingScope", user.getServingScope());
+        out.put("attendKhors", user.getAttendKhors());
+        out.put("deaconFamily", familyAccessService.primaryFamilyName(user));
+        out.put("deaconFamily2", familyAccessService.secondaryFamilyName(user));
+        out.put("deaconFamily3", familyAccessService.thirdFamilyName(user));
+        out.put("deaconFamily4", familyAccessService.fourthFamilyName(user));
+        out.put("deaconFamilyRole", familyAccessService.primaryFamilyRole(user));
+        out.put("deaconFamilyRole2", familyAccessService.secondaryFamilyRole(user));
+        out.put("deaconFamilyRole3", familyAccessService.thirdFamilyRole(user));
+        out.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(user));
+        out.put("familyAssignments", user.getFamilyAssignments());
+        return out;
+    }
 
 
     @PostMapping("/register")
@@ -90,10 +133,9 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
         }
 
         attendanceBackfillService.backfillForUser(user);
-        user.setPassword(null);
         userFamilyRoleService.syncUser(user);
 
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(toCurrentUserView(user));
     }
 
     @PostMapping("/logout")
@@ -125,7 +167,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<?> updateProfile(@RequestBody ProfileUpdateRequest updated, Authentication authentication) {
+    public ResponseEntity<?> updateProfile(@Valid @RequestBody ProfileUpdateRequest updated, Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not authenticated");
@@ -154,10 +196,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             existingUser.setAddress(updated.getAddress());
             existingUser.setGuardiansPhone(updated.getGuardiansPhone());
             existingUser.setGuardianRelation(updated.getGuardianRelation());
-            existingUser.setDeaconDegree(updated.getDeaconDegree());
-            existingUser.setStudyType(updated.getStudyType());
             existingUser.setSchoolName(updated.getSchoolName());
-            existingUser.setStatus(updated.getStatus());
             existingUser.setSchoolGrade(updated.getSchoolGrade());
             existingUser.setUniversityName(updated.getUniversityName());
             existingUser.setFaculty(updated.getFaculty());
@@ -168,8 +207,7 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
             authService.saveUser(existingUser);
 
-            existingUser.setPassword(null);
             userFamilyRoleService.syncUser(existingUser);
-            return ResponseEntity.ok(existingUser);
+            return ResponseEntity.ok(toCurrentUserView(existingUser));
     }
 }

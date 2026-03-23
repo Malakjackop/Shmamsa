@@ -17,11 +17,11 @@ public class NationalIdValidator implements ConstraintValidator<ValidNationalId,
 
     @Override
     public boolean isValid(String nid, ConstraintValidatorContext context) {
+        if (nid == null || nid.isBlank()) return true;
 
-        if (nid == null || !nid.matches("\\d{14}"))
+        if (!nid.matches("\\d{14}"))
             return false;
 
-        // يمنع الأرقام المتكررة
         if (nid.matches("(\\d)\\1{13}"))
             return false;
 
@@ -39,7 +39,6 @@ public class NationalIdValidator implements ConstraintValidator<ValidNationalId,
 
             LocalDate birthDate = LocalDate.of(year, month, day);
 
-            // يمنع future
             if (birthDate.isAfter(LocalDate.now()))
                 return false;
 

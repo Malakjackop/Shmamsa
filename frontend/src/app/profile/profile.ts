@@ -1,8 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+﻿import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { Router } from '@angular/router';
+import { normalizeRole } from '../shared/role-utils';
 
 @Component({
   selector: 'app-profile',
@@ -18,7 +19,7 @@ export class ProfileComponent implements OnInit {
   router = inject(Router);
 
   editMode = false;
-  qrData = '';
+  activeTab: 'personal' | 'other' = 'personal';
   user: any;
 
   readonly deaconDegreeOptions = [
@@ -26,8 +27,6 @@ export class ProfileComponent implements OnInit {
     'ابصالتس',
     'اغنسطس',
     'ايبودياكون',
-    'دياكون',
-    'ارشي دياكون'
   ];
 
   readonly khorsOptions = [
@@ -102,13 +101,6 @@ export class ProfileComponent implements OnInit {
         this.applyStatusRules();
         this.applyStudyTypeRules();
         this.applyKhorsRules();
-
-        this.authService.getMyQrToken().subscribe({
-          next: (res) => (this.qrData = res?.token || ''),
-          error: () => {
-            this.qrData = '';
-          }
-        });
       },
       error: () =>
         this.messageService.add({
@@ -164,10 +156,7 @@ export class ProfileComponent implements OnInit {
   }
 
   private normalizeRole(v: any): string {
-    return String(v || '')
-      .trim()
-      .toUpperCase()
-      .replace(/^ROLE_/, '');
+    return normalizeRole(v);
   }
 
   private normalizeStatus(v: any): string {
@@ -199,8 +188,13 @@ export class ProfileComponent implements OnInit {
       this.profileForm.get('universityName')?.disable({ emitEvent: false });
       this.profileForm.get('faculty')?.disable({ emitEvent: false });
       this.profileForm.get('universityGrade')?.disable({ emitEvent: false });
-      this.profileForm.get('graduatedFrom')?.enable({ emitEvent: false });
-      this.profileForm.get('graduateJob')?.enable({ emitEvent: false });
+      if (this.editMode) {
+        this.profileForm.get('graduatedFrom')?.enable({ emitEvent: false });
+        this.profileForm.get('graduateJob')?.enable({ emitEvent: false });
+      } else {
+        this.profileForm.get('graduatedFrom')?.disable({ emitEvent: false });
+        this.profileForm.get('graduateJob')?.disable({ emitEvent: false });
+      }
       return;
     }
 
@@ -236,7 +230,7 @@ export class ProfileComponent implements OnInit {
     const kh = this.normalizeKhors(this.profileForm.get('khors')?.value);
 
     if (kh === 'MARMARKOS') {
-      this.profileForm.get('khorsYear')?.disable({ emitEvent: false });
+      this.profileForm.get('khorsYear')?.enable({ emitEvent: false });
       return;
     }
 
@@ -263,18 +257,14 @@ export class ProfileComponent implements OnInit {
     this.profileForm.get('address')?.enable({ emitEvent: false });
     this.profileForm.get('guardiansPhone')?.enable({ emitEvent: false });
     this.profileForm.get('guardianRelation')?.enable({ emitEvent: false });
-    this.profileForm.get('deaconDegree')?.enable({ emitEvent: false });
-    if (!this.isGraduate()) {
-      this.profileForm.get('workDetails')?.enable({ emitEvent: false });
-    }
-
-    if (this.showStatusField()) {
-      this.profileForm.get('status')?.enable({ emitEvent: false });
-    }
-
-    if (!this.isGraduate()) {
-      this.profileForm.get('studyType')?.enable({ emitEvent: false });
-    }
+    this.profileForm.get('workDetails')?.enable({ emitEvent: false });
+    this.profileForm.get('schoolName')?.enable({ emitEvent: false });
+    this.profileForm.get('schoolGrade')?.enable({ emitEvent: false });
+    this.profileForm.get('universityName')?.enable({ emitEvent: false });
+    this.profileForm.get('faculty')?.enable({ emitEvent: false });
+    this.profileForm.get('universityGrade')?.enable({ emitEvent: false });
+    this.profileForm.get('graduatedFrom')?.enable({ emitEvent: false });
+    this.profileForm.get('graduateJob')?.enable({ emitEvent: false });
 
     this.applyStatusRules();
     this.applyStudyTypeRules();
@@ -283,17 +273,22 @@ export class ProfileComponent implements OnInit {
 
   saveChanges() {
     const raw = this.profileForm.getRawValue();
-    const payload: any = { ...raw };
-
-    payload.status = this.normalizeStatus(payload.status);
-    payload.studyType = this.normalizeStudyType(payload.studyType);
-    payload.khors = this.normalizeKhors(payload.khors);
-
-    if (payload.khors !== 'MARMARKOS') {
-      payload.khorsYear = null;
-    }
-
-    if (!payload.isWorking) payload.workDetails = '';
+    const payload: any = {
+      fullName: raw.fullName,
+      email: raw.email,
+      phoneNumber: raw.phoneNumber,
+      address: raw.address,
+      guardiansPhone: raw.guardiansPhone,
+      guardianRelation: raw.guardianRelation,
+      schoolName: raw.schoolName,
+      schoolGrade: raw.schoolGrade,
+      universityName: raw.universityName,
+      faculty: raw.faculty,
+      universityGrade: raw.universityGrade,
+      graduatedFrom: raw.graduatedFrom,
+      graduateJob: raw.graduateJob,
+      workDetails: raw.isWorking ? raw.workDetails : ''
+    };
 
     this.authService.updateProfile(payload).subscribe({
       next: () => {
@@ -305,6 +300,10 @@ export class ProfileComponent implements OnInit {
         this.profileForm.disable({ emitEvent: false });
         this.editMode = false;
         this.user = { ...this.user, ...payload };
+        this.profileForm.patchValue(this.user, { emitEvent: false });
+        this.applyStatusRules();
+        this.applyStudyTypeRules();
+        this.applyKhorsRules();
       },
       error: (err) =>
         this.messageService.add({

@@ -42,12 +42,25 @@ public class IftekadController {
         return upper;
     }
 
-    private String baseFamilyOf(User u) {
-        return familyAccessService.baseFamily(u);
-    }
-
     private List<String> servingBasesOf(User u) {
         return familyAccessService.servingBasesOf(u);
+    }
+
+    private List<String> memberBasesOf(User user) {
+        if (user == null) return List.of();
+        List<String> bases = new ArrayList<>();
+        var assignments = user.getFamilyAssignments();
+        if (assignments == null || assignments.isEmpty()) {
+            String fallback = familyAccessService.baseFamily(user);
+            return (fallback == null || fallback.isBlank()) ? List.of() : List.of(fallback);
+        }
+        for (var assignment : assignments) {
+            String candidate = familyAccessService.baseNameForId(assignment.getFamilyId(), assignment.getFamilyName());
+            if (candidate != null && !candidate.isBlank() && bases.stream().noneMatch(x -> x.equalsIgnoreCase(candidate))) {
+                bases.add(candidate);
+            }
+        }
+        return bases;
     }
 
     private boolean canAccessMember(User actor, User member) {
@@ -56,16 +69,19 @@ public class IftekadController {
         String role = normRole(actor.getRole());
         if ("DEVELOPER".equals(role) || "AMIN_KHEDMA".equals(role)) return true;
 
-        String memberBase = baseFamilyOf(member);
-        String actorBase = baseFamilyOf(actor);
+        List<String> memberBases = memberBasesOf(member);
 
         if ("AMIN_OSRA".equals(role)) {
-            return actorBase != null && memberBase != null && actorBase.equalsIgnoreCase(memberBase);
+            return servingBasesOf(actor).stream().anyMatch(actorBase ->
+                    memberBases.stream().anyMatch(memberBase -> actorBase.equalsIgnoreCase(memberBase)));
         }
 
         if ("KHADIM".equals(role)) {
             List<String> bases = servingBasesOf(actor);
-            if (memberBase != null && bases.stream().anyMatch(b -> b.equalsIgnoreCase(memberBase))) return true;
+            if (bases.stream().anyMatch(actorBase ->
+                    memberBases.stream().anyMatch(memberBase -> actorBase.equalsIgnoreCase(memberBase)))) {
+                return true;
+            }
 
             // choir access
             String attend = member.getAttendKhors() == null ? "" : member.getAttendKhors().trim().toUpperCase(Locale.ROOT);

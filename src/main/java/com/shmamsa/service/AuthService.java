@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -53,21 +55,11 @@ public class AuthService {
             this.username = username;
             this.expiresAt = expiresAt;
         }
-    private static class RateWindow {
-        int count;
-        long windowStartMs;
-
-        RateWindow(int count, long windowStartMs) {
-            this.count = count;
-            this.windowStartMs = windowStartMs;
-        }
     }
 
-    }
-
-    private final Map<String, OtpData> otpStore = new HashMap<>();
-    private final Map<String, Long> otpTimestamps = new HashMap<>();
-    private final Map<String, OtpData.RateWindow> hourlyRequests = new HashMap<>();
+    private final Map<String, OtpData> otpStore = new ConcurrentHashMap<>();
+    private final Map<String, Long> otpTimestamps = new ConcurrentHashMap<>();
+    private final Map<String, RateWindow> hourlyRequests = new ConcurrentHashMap<>();
 
     private static final long OTP_TTL_MS = 5 * 60 * 1000;
     private static final long COOLDOWN_MS = 45_000;
@@ -112,17 +104,6 @@ public class AuthService {
                     throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
                 });
 
-        String phone = request.getPhoneNumber() == null ? "" : request.getPhoneNumber().trim();
-        String guardian = request.getGuardiansPhone() == null ? "" : request.getGuardiansPhone().trim();
-
-        if (!phone.isEmpty() && !guardian.isEmpty() && phone.equals(guardian)) {
-            throw new ApiException(
-                    HttpStatus.BAD_REQUEST,
-                    "GUARDIAN_SAME_AS_PHONE",
-                    "Guardian phone must be different",
-                    java.util.Map.of("guardiansPhone", "ممنوع تكرار نفس رقم ولي الأمر بالرقم الشخصي")
-            );
-        }
         String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
 
         userRepository.findByEmail(email).ifPresent(u -> {
@@ -148,7 +129,6 @@ public class AuthService {
         user.setAttendKhors("NONE");
         user.setServingScope(null);
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setAddress(request.getAddress());
         user.setAddress(request.getAddress());
         user.setGuardiansPhone(request.getGuardiansPhone());
         user.setGuardianRelation(request.getGuardianRelation());
@@ -398,12 +378,13 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "الايميل مطلوب ", "الايميل مطلوب");
         }
 
-        User user = userRepository.findByEmail(email.trim())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "الايميل غير موجود", "لا يوجود مستخدم بهاذا الايميل "));
+        User user = userRepository.findByEmail(email.trim()).orElse(null);
 
-        sendOtpForUserByEmail(user);
+        if (user != null) {
+            sendOtpForUserByEmail(user);
+        }
 
-        return Map.of("message", "تم اسرال الرمز بنجاح");
+        return Map.of("message", "إذا كان البريد الإلكتروني مسجلًا فسيتم إرسال رمز التحقق");
     }
 
 
@@ -418,19 +399,21 @@ public class AuthService {
             }
         }
 
-        OtpData.RateWindow window = hourlyRequests.get(username);
-        if (window == null || now - window.windowStartMs >= 3600_000) {
-            window = new OtpData.RateWindow(0, now);
-            hourlyRequests.put(username, window);
+        RateWindow window = hourlyRequests.compute(username, (key, current) -> {
+            if (current == null || now - current.windowStartMs >= 3600_000) {
+                return new RateWindow(0, now);
+            }
+            return current;
+        });
+
+        synchronized (window) {
+            if (window.count >= HOURLY_LIMIT) {
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT", "طلبات رمز التحقق كثيرة جدًا. حاول مرة أخرى بعد ساعة.");
+            }
+            window.count += 1;
         }
 
-        if (window.count >= HOURLY_LIMIT) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT", "طلبات رمز التحقق كثيرة جدًا. حاول مرة أخرى بعد ساعة.");
-        }
-
-        window.count += 1;
-
-        String code = String.format("%05d", new Random().nextInt(100000));
+        String code = String.format("%05d", ThreadLocalRandom.current().nextInt(100000));
 
         otpStore.put(code, new OtpData(username, now + OTP_TTL_MS));
 

@@ -19,5 +19,5 @@ public @interface ValidNationalId {
 
     Class<? extends Payload>[] payload() default {};
 
-    int minAge() default 6; // 👈 السحر هنا
+    int minAge() default 6;
 }

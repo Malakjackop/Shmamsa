@@ -29,20 +29,16 @@ public class DevAccountSeeder implements CommandLineRunner {
         if (!enabled) return;
 
         userRepository.findByUsername(devUsername).ifPresentOrElse(
-                u -> {}, // already exists
+                u -> {},
                 () -> {
                     User dev = new User();
                     dev.setFullName("System Developer");
                     dev.setUsername(devUsername);
                     dev.setEmail("developer@system.local");
                     dev.setPassword(passwordEncoder.encode(devPassword));
-
-                    // required fields on entity
                     dev.setNationalId("99999999999999");
                     dev.setDeaconDegree("SYSTEM");
-
                     dev.setRole("DEVELOPER");
-
                     userRepository.save(dev);
                 }
         );

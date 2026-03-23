@@ -1,11 +1,15 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AdminService } from '../services/admin.service';
-import { AuthService } from '../services/auth.service';
+import { AuthService, AuthUser } from '../services/auth.service';
 import { KhorsRequestsService, KhorsJoinRequestView } from '../services/khors-requests.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { hasRole, normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
+import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
+import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
+import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
 
 type Member = {
   id: number;
@@ -22,6 +26,39 @@ type Member = {
   selected?: boolean;
 };
 
+type FamilyAssignmentLike = { familyName?: string; role?: string | number; roleCode?: number };
+
+type ProfileView = {
+  username?: string;
+  email?: string;
+  familyAssignments?: FamilyAssignmentLike[];
+  role?: string | number;
+  deaconFamily?: string;
+  khors?: string;
+  khorsYear?: number | string | null;
+  deaconDegree?: string;
+  nationalId?: string;
+  phoneNumber?: string;
+  address?: string;
+  guardiansPhone?: string;
+  guardianRelation?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  status?: string;
+  studyType?: string;
+  schoolName?: string;
+  schoolGrade?: string;
+  universityName?: string;
+  faculty?: string;
+  universityGrade?: string;
+  graduatedFrom?: string;
+  graduateJob?: string;
+  isWorking?: boolean | string | number | null;
+  workDetails?: string;
+};
+
+type CurrentUser = AuthUser & { id?: number };
+
 @Component({
   selector: 'app-family-info',
   standalone: false,
@@ -37,7 +74,7 @@ export class FamilyInfoComponent implements OnInit {
   private message = inject(MessageService);
   private confirm = inject(ConfirmationService);
 
-  me: any;
+  me: CurrentUser | null = null;
   members: Member[] = [];
   families: string[] = [];
   selectedFamily = '';
@@ -49,7 +86,7 @@ export class FamilyInfoComponent implements OnInit {
   pendingExport: 'pdf' | null = null;
 
   profileFor: Member | null = null;
-  profile: any = null;
+  profile: ProfileView | null = null;
 
   allRoles: string[] = [];
 
@@ -57,18 +94,7 @@ export class FamilyInfoComponent implements OnInit {
   requestsOpen = false;
   requestsLoading = false;
   requests: KhorsJoinRequestView[] = [];
-  private readonly preferredFamilyOrder: string[] = [
-    'اسرة السمائين',
-    'اسرة القديس ابانوب',
-    'اسرة القديس ديسقورس',
-    'اسرة القديس سيدهم بشاي',
-    'اسرة القديس اسكلابيوس',
-    'اسرة القديس البابا كيرلس',
-    'اسرة القديس الانبا ابرام',
-    'اسرة القديس اسطفانوس',
-    'خورس مارمرقس',
-    'خورس البابا اثناسيوس'
-  ];
+  private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
   ngOnInit() {
     this.auth.getUserData().subscribe({
@@ -109,28 +135,26 @@ export class FamilyInfoComponent implements OnInit {
     return this.isAminKhedmaOrDev() || this.isKhadimServingKhors();
   }
 
-  private normalizeRole(role: any): string {
-    const raw = String(role || '').trim().toUpperCase();
-    return raw.startsWith('ROLE_') ? raw.slice(5) : raw;
+  private normalizeRole(role: unknown): string {
+    return normalizeRole(role);
   }
 
-  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+  private assignmentsOf(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): Array<{ familyName: string; role: string }> {
     const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
     return assignments
-      .map((x: any) => ({
+      .map((x) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: this.normalizeRole(x?.role)
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
-      .filter((x: any) => !!x.familyName);
+      .filter((x) => !!x.familyName);
   }
 
-  familyLabel(entity: any): string {
+  familyLabel(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): string {
     return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
   }
 
   private hasRole(...allowed: string[]): boolean {
-    const role = this.normalizeRole(this.me?.role);
-    return allowed.map((x) => this.normalizeRole(x)).includes(role);
+    return hasRole(this.me?.role, allowed);
   }
 
   private loadPendingRequestsCount() {
@@ -205,14 +229,15 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   canDeleteAccounts(): boolean {
-    return this.me?.role === 'AMIN_OSRA' || this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
+    return hasRole(this.me?.role, ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER']);
   }
 
   canDeleteMember(m: Member): boolean {
     if (!this.canDeleteAccounts()) return false;
     if (!m) return false;
-    if (this.me?.id && m.id === this.me.id) return false;
-    if ((m.role || '').toUpperCase() === 'DEVELOPER') return false;
+    const myId = Number(this.me?.['id'] || 0);
+    if (myId && m.id === myId) return false;
+    if (normalizeRole(m.role) === 'DEVELOPER') return false;
     return true;
   }
 
@@ -224,7 +249,7 @@ export class FamilyInfoComponent implements OnInit {
     if (this.canSelectFamily()) {
       this.familySvc.families().subscribe({
         next: (f) => {
-          this.families = this.sortFamiliesByPreferredOrder(f || []);
+          this.families = sortFamiliesByPreferredOrder(f || [], this.preferredFamilyOrder);
           if (this.families.length) {
             this.selectedFamily = this.families[0];
             this.loadMembers();
@@ -245,52 +270,6 @@ export class FamilyInfoComponent implements OnInit {
     }
   }
 
-  private normalizeFamilyName(value: any): string {
-    return String(value || '')
-      .trim()
-      .replace(/[أإآ]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
-  }
-
-  private familyOrderKey(family: string): string {
-    const n = this.normalizeFamilyName(family);
-
-    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
-    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
-    if (n.includes('سمائ')) return 'اسرة السمائين';
-    if (n.includes('ابانوب')) return 'اسرة القديس ابانوب';
-    if (n.includes('ديسقورس')) return 'اسرة القديس ديسقورس';
-    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسرة القديس سيدهم بشاي';
-    if (n.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
-    if (n.includes('كيرلس')) return 'اسرة القديس البابا كيرلس';
-    if (n.includes('ابرام')) return 'اسرة القديس الانبا ابرام';
-    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسرة القديس اسطفانوس';
-
-    return family;
-  }
-
-  private sortFamiliesByPreferredOrder(families: string[]): string[] {
-    const cleaned = (families || []).map((x) => this.familyOrderKey(String(x || '').trim())).filter(Boolean);
-    const deduped = Array.from(new Set(cleaned));
-    const orderMap = new Map(
-      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
-    );
-
-    return [...deduped].sort((a, b) => {
-      const aKey = this.familyOrderKey(a);
-      const bKey = this.familyOrderKey(b);
-      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
-      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
-
-      if (aOrder != null && bOrder != null) return aOrder - bOrder;
-      if (aOrder != null) return -1;
-      if (bOrder != null) return 1;
-      return a.localeCompare(b, 'ar');
-    });
-  }
-
   onFamilyChange() {
     this.loadMembers();
     if (this.canSeeKhorsRequests()) {
@@ -309,11 +288,9 @@ export class FamilyInfoComponent implements OnInit {
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
-        this.members = ((m as any) || []).map((x: any) => ({ ...x, selected: false }));
+        this.members = ((m || []) as FamilyMemberSummary[]).map((x) => ({ ...(x as Member), selected: false }));
         this.selectAll = false;
-        //  old UX: basic fields visible, full profile only via button
-        // we still need school grade, so fetch minimal fields once.
-        this.loadBasicFieldsForAllMembers(famParam);
+        this.loading = false;
       },
       error: (err) => {
         this.loading = false;
@@ -339,38 +316,6 @@ export class FamilyInfoComponent implements OnInit {
     return (this.members || []).filter((m) => !!m.selected);
   }
 
-  private loadBasicFieldsForAllMembers(famParam?: string) {
-    if (!this.members?.length) {
-      this.loading = false;
-      return;
-    }
-
-    const calls = this.members.map((mem) =>
-      this.familySvc.memberDetails(mem.id, famParam).pipe(catchError(() => of(null)))
-    );
-
-    forkJoin(calls).subscribe({
-      next: (detailsArr) => {
-        this.members = this.members.map((mem, idx) => {
-          const details = detailsArr[idx] || null;
-          return {
-            ...mem,
-            // keep common fields in sync
-            address: details?.address ?? mem.address,
-            phoneNumber: details?.phoneNumber ?? mem.phoneNumber,
-            guardiansPhone: details?.guardiansPhone ?? mem.guardiansPhone,
-            schoolGrade: details?.schoolGrade ?? mem.schoolGrade
-          };
-        });
-        this.loading = false;
-      },
-      error: () => {
-        // still show basic list
-        this.loading = false;
-      }
-    });
-  }
-
   // ===== Profile =====
   openProfile(member: Member) {
     this.profileFor = member;
@@ -378,7 +323,7 @@ export class FamilyInfoComponent implements OnInit {
     const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberDetails(member.id, famParam).subscribe({
-      next: (p) => (this.profile = p),
+      next: (p) => (this.profile = (p as ProfileView | null)),
       error: () => (this.profile = null)
     });
   }
@@ -388,7 +333,7 @@ export class FamilyInfoComponent implements OnInit {
     this.profile = null;
   }
 
-  async copyPhone(value: any) {
+  async copyPhone(value: unknown) {
     const phone = String(value ?? '').trim();
     if (!phone) return;
 
@@ -413,18 +358,18 @@ export class FamilyInfoComponent implements OnInit {
     }
   }
 
-  private hasDisplayValue(v: any): boolean {
+  private hasDisplayValue(v: unknown): boolean {
     if (v === false || v === 0) return true;
     return String(v ?? '').trim() !== '';
   }
 
-  private yesNoAr(v: any): string {
+  private yesNoAr(v: unknown): string {
     if (v === true) return 'نعم';
     if (v === false) return 'لا';
     return String(v ?? '').trim();
   }
 
-  private khorsYearAr(year: any): string {
+  private khorsYearAr(year: unknown): string {
     const y = Number(year || 0);
     if (y === 1) return 'سنة أولى';
     if (y === 2) return 'سنة ثانية';
@@ -434,7 +379,7 @@ export class FamilyInfoComponent implements OnInit {
     return '';
   }
 
-  private memberKhorsLabel(khors: any, khorsYear?: any): string {
+  private memberKhorsLabel(khors: unknown, khorsYear?: unknown): string {
     const k = String(khors || '').trim().toUpperCase();
 
     if (!k || k === 'NONE') return '';
@@ -451,7 +396,7 @@ export class FamilyInfoComponent implements OnInit {
   profileEntries(): Array<{ label: string; value: string }> {
     if (!this.profile) return [];
 
-    const p = this.profile;
+    const p = this.profile as ProfileView;
     const schoolValue = [p.schoolName, p.schoolGrade].filter((x) => this.hasDisplayValue(x)).join(' - ');
     const universityValue = [p.universityName, p.faculty, p.universityGrade]
       .filter((x) => this.hasDisplayValue(x))
@@ -499,11 +444,11 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   rolesForMember(member: Member): string[] {
-    const currentRole = String(member?.role || '').toUpperCase();
+    const currentRole = normalizeRole(member?.role);
     return (this.allRoles || []).filter((role) => {
-      const candidate = String(role || '').toUpperCase();
-      if (candidate === 'ADMIN' || candidate === 'ROLE_ADMIN') return false;
-      if (candidate === 'DEVELOPER' || candidate === 'DEV' || candidate === 'ROLE_DEVELOPER') return false;
+      const candidate = normalizeRole(role);
+      if (candidate === 'ADMIN') return false;
+      if (candidate === 'DEVELOPER') return false;
       if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
       return true;
     });
@@ -586,43 +531,8 @@ export class FamilyInfoComponent implements OnInit {
       // Use landscape layout and avoid a super-wide table (which breaks rendering).
       const doc = new jsPDF({ orientation: 'landscape' });
 
-      const ensureDejaVu = async (d: any) => {
-        try {
-          if (typeof d.setR2L === 'function') d.setR2L(false);
-          if (d.__hasDejaVu) {
-            d.setFont('DejaVu', 'normal');
-            return;
-          }
-          const res = await fetch('assets/fonts/DejaVuSans.ttf');
-          const buf = await res.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          let binary = '';
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          const base64 = btoa(binary);
-          d.addFileToVFS('DejaVuSans.ttf', base64);
-          d.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
-          d.__hasDejaVu = true;
-          d.setFont('DejaVu', 'normal');
-        } catch {
-          // If font loading fails, PDF still generates (Arabic may not render correctly)
-        }
-      };
-
-      await ensureDejaVu(doc);
-
-      // Shape Arabic glyphs and isolate direction to keep mixed RTL/LTR text stable in PDF.
-      const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
-      const processArabic =
-        (doc as any).processArabic ||
-        ((jsPDF as any)?.API?.processArabic
-          ? (text: string) => (jsPDF as any).API.processArabic(text)
-          : null);
-      const pdfText = (v: any) => {
-        const s = (v ?? '') + '';
-        if (!s) return '';
-        if (!hasArabic(s)) return s;
-        return typeof processArabic === 'function' ? processArabic(s) : s;
-      };
+      await ensureDejaVuFont(doc);
+      const pdfText = createPdfText(doc, jsPDF);
       const pageRight = doc.internal.pageSize.getWidth() - 14;
 
       doc.setFontSize(14);
@@ -634,44 +544,45 @@ export class FamilyInfoComponent implements OnInit {
 
       let y = 28;
       selected.forEach((m, idx) => {
-        const d = detailsArr[idx] || {};
+        const d = (detailsArr[idx] || null) as ProfileView | null;
+        const detail = d || {};
 
         doc.setFontSize(12);
         doc.text(pdfText(`${m.fullName} (${this.roleAr(m.role)})`), pageRight, y, { align: 'right' });
         y += 4;
 
-        const toYesNo = (v: any) => {
+        const toYesNo = (v: unknown) => {
           if (v === true) return 'نعم';
           if (v === false) return 'لا';
           return (v ?? '') + '';
         };
 
-        const show = (v: any) => {
+        const show = (v: unknown) => {
           const s = String(v ?? '').trim();
           return s ? s : '-';
         };
 
         const rows: [string, string][] = [
-          ['رقم الهاتف', d.phoneNumber ?? m.phoneNumber],
-          ['هاتف ولي الأمر', d.guardiansPhone ?? m.guardiansPhone],
-          ['العنوان', d.address ?? m.address],
-          ['الصف الدراسي', d.schoolGrade ?? m.schoolGrade],
-          ['اسم المستخدم', d.username],
-          ['البريد الإلكتروني', d.email],
-          ['الرقم القومي', d.nationalId],
-          ['الرتبة', d.deaconDegree],
-          ['صلة القرابة', this.guardianRelationAr(d.guardianRelation)],
-          ['تاريخ الميلاد', d.dateOfBirth],
-          ['النوع', this.genderAr(d.gender)],
-          ['الحالة', this.statusAr(d.status)],
-          ['نوع الدراسة', this.studyTypeAr(d.studyType)],
-          ['اسم المدرسة', d.schoolName],
-          ['اسم الجامعة', d.universityName],
-          ['الكلية', d.faculty],
-          ['السنة الجامعية', d.universityGrade],
-          ['الوظيفة', d.graduateJob],
-          ['هل يعمل', toYesNo(d.isWorking)],
-          ['تفاصيل العمل', d.workDetails]
+          ['رقم الهاتف', String(detail.phoneNumber ?? m.phoneNumber ?? '')],
+          ['هاتف ولي الأمر', String(detail.guardiansPhone ?? m.guardiansPhone ?? '')],
+          ['العنوان', String(detail.address ?? m.address ?? '')],
+          ['الصف الدراسي', String(detail.schoolGrade ?? m.schoolGrade ?? '')],
+          ['اسم المستخدم', String(detail.username ?? '')],
+          ['البريد الإلكتروني', String(detail.email ?? '')],
+          ['الرقم القومي', String(detail.nationalId ?? '')],
+          ['الرتبة', String(detail.deaconDegree ?? '')],
+          ['صلة القرابة', this.guardianRelationAr(detail.guardianRelation)],
+          ['تاريخ الميلاد', String(detail.dateOfBirth ?? '')],
+          ['النوع', this.genderAr(detail.gender)],
+          ['الحالة', this.statusAr(detail.status)],
+          ['نوع الدراسة', this.studyTypeAr(detail.studyType)],
+          ['اسم المدرسة', String(detail.schoolName ?? '')],
+          ['اسم الجامعة', String(detail.universityName ?? '')],
+          ['الكلية', String(detail.faculty ?? '')],
+          ['السنة الجامعية', String(detail.universityGrade ?? '')],
+          ['الوظيفة', String(detail.graduateJob ?? '')],
+          ['هل يعمل', toYesNo(detail.isWorking)],
+          ['تفاصيل العمل', String(detail.workDetails ?? '')]
         ];
 
         // Always render every field row so table borders stay consistent.
@@ -720,26 +631,27 @@ export class FamilyInfoComponent implements OnInit {
     this.members.forEach((m) => (m.selected = false));
   }
 
-  private fetchDetailsForMembers(list: Member[], famParam?: string): Promise<any[]> {
+  private fetchDetailsForMembers(list: Member[], famParam?: string): Promise<FamilyMemberDetails[]> {
     if (!list?.length) return Promise.resolve([]);
 
-    const calls = list.map((mem) => this.familySvc.memberDetails(mem.id, famParam).pipe(catchError(() => of({}))));
-
-    return new Promise((resolve) => {
-      forkJoin(calls).subscribe({
-        next: (arr) => resolve(arr as any[]),
-        error: () => resolve([])
-      });
-    });
+    return Promise.all(
+      list.map((mem) =>
+        new Promise<FamilyMemberDetails>((resolve) => {
+          this.familySvc.memberDetails(mem.id, famParam).pipe(catchError(() => of({}))).subscribe({
+            next: (details) => resolve((details || {}) as FamilyMemberDetails),
+            error: () => resolve({})
+          });
+        })
+      )
+    );
   }
 
   private roleAr(role?: string): string {
-    const r = (role || '').toUpperCase();
+    const r = normalizeRole(role);
     if (r === 'DEVELOPER') return 'مطوّر';
     if (r === 'AMIN_KHEDMA') return 'أمين خدمة';
     if (r === 'AMIN_OSRA') return 'أمين أسرة';
     if (r === 'KHADIM') return 'خادم';
-    if (r === 'MEMBER') return 'عضو';
     return role || '';
   }
 

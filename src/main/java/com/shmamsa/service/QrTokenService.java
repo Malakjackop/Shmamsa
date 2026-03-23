@@ -1,6 +1,7 @@
 package com.shmamsa.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -13,20 +14,24 @@ import java.util.Base64;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class QrTokenService {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
 
     @Value("${qr.secret:${jwt.secret}}")
     private String secret;
 
-    // Token format: base64url(payloadJson) + "." + base64url(hmacSha256(payloadB64))
+    @Value("${qr.expiration-seconds:86400}")
+    private long expirationSeconds;
+
     public String issueToken(Long userId) {
         try {
             Map<String, Object> payload = Map.of(
                     "v", 1,
                     "id", userId,
-                    "iat", Instant.now().getEpochSecond()
+                    "iat", Instant.now().getEpochSecond(),
+                    "exp", Instant.now().plusSeconds(Math.max(expirationSeconds, 60)).getEpochSecond()
             );
             String json = mapper.writeValueAsString(payload);
             String payloadB64 = b64UrlEncode(json.getBytes(StandardCharsets.UTF_8));
@@ -53,7 +58,6 @@ public class QrTokenService {
             byte[] expectedSig = hmacSha256(payloadB64.getBytes(StandardCharsets.UTF_8), secret.getBytes(StandardCharsets.UTF_8));
             byte[] providedSig = b64UrlDecode(sigB64);
 
-            // constant-time compare
             if (!MessageDigest.isEqual(expectedSig, providedSig)) return null;
 
             byte[] payloadJson = b64UrlDecode(payloadB64);
@@ -61,7 +65,14 @@ public class QrTokenService {
             Map<String, Object> payload = mapper.readValue(payloadJson, Map.class);
 
             Object idObj = payload.get("id");
+            Object expObj = payload.get("exp");
             if (idObj == null) return null;
+            if (expObj == null) return null;
+
+            long exp;
+            if (expObj instanceof Number n) exp = n.longValue();
+            else exp = Long.parseLong(String.valueOf(expObj));
+            if (Instant.now().getEpochSecond() > exp) return null;
 
             if (idObj instanceof Number n) return n.longValue();
             return Long.valueOf(String.valueOf(idObj));

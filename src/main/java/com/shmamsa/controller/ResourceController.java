@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.core.io.InputStreamResource;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 
@@ -41,21 +42,79 @@ public class ResourceController {
         return "GENERAL";
     }
 
+    private User requireUser(Authentication auth) {
+        if (auth == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        return userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+    }
+
+    private String normRole(String raw) {
+        if (raw == null) return "";
+        String role = raw.trim().toUpperCase(Locale.ROOT);
+        return role.startsWith("ROLE_") ? role.substring(5) : role;
+    }
+
+    private boolean isAdmin(User user) {
+        String role = normRole(user == null ? null : user.getRole());
+        return "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role) || "DEV".equals(role);
+    }
+
+    private String normalizeTargetFamily(String family) {
+        String raw = String.valueOf(family == null ? "" : family).trim();
+        if (raw.isBlank()) return "";
+        if ("ALL".equalsIgnoreCase(raw)) return "ALL";
+        return familyAccessService.baseNameForName(raw);
+    }
+
+    private boolean canViewFamily(User user, String family) {
+        String target = normalizeTargetFamily(family);
+        if (target.isBlank()) return false;
+        if ("ALL".equalsIgnoreCase(target)) return isAdmin(user);
+        return familyAccessService.belongsToBase(user, target);
+    }
+
+    private boolean canManageFamily(User user, String family) {
+        String target = normalizeTargetFamily(family);
+        if (target.isBlank()) return false;
+        if ("ALL".equalsIgnoreCase(target)) return isAdmin(user);
+        if (isAdmin(user)) return true;
+        String scopedRole = familyAccessService.scopedRole(user, target);
+        return scopedRole != null && ("KHADIM".equalsIgnoreCase(scopedRole)
+                || "AMIN_OSRA".equalsIgnoreCase(scopedRole)
+                || "AMIN_KHEDMA".equalsIgnoreCase(scopedRole));
+    }
+
+    private void assertCanViewResource(User user, ResourceFile resource) {
+        if (!canViewFamily(user, resource == null ? null : resource.getFamily())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+    }
+
+    private void assertCanManageResource(User user, ResourceFile resource) {
+        if (!canManageFamily(user, resource == null ? null : resource.getFamily())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+    }
+
     @GetMapping
     public ResponseEntity<?> list(@RequestParam(required = false) String family, Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User me =userRepo.findByUsername(auth.getName()).orElse(null);
-        if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = requireUser(auth);
 
         String target = (family != null && !family.isBlank()) ? family : familyAccessService.baseFamily(me);
+        String normalizedTarget = normalizeTargetFamily(target);
+        if (normalizedTarget.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
+        }
+        if (!canViewFamily(me, normalizedTarget)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
 
-        if ("ALL".equalsIgnoreCase(target.trim())) {
+        if ("ALL".equalsIgnoreCase(normalizedTarget.trim())) {
             // Show everything when "ALL" is selected (admins want to review/edit global + family-specific uploads)
             return ResponseEntity.ok(resourceRepo.findAllByOrderByCreatedAtDesc());
         }
 
-        List<Long> relatedIds = familyAccessService.relatedIdsForSelection(target);
+        List<Long> relatedIds = familyAccessService.relatedIdsForSelection(normalizedTarget);
         return ResponseEntity.ok(resourceRepo.findByFamilyIdInOrFamilyOrderByCreatedAtDesc(relatedIds, "ALL"));
     }
 
@@ -68,16 +127,20 @@ public class ResourceController {
             @RequestParam(value = "category", required = false) String category,
             Authentication auth
     ) throws Exception {
-
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        User me = userRepo.findByUsername(auth.getName()).orElse(null);
-        if (me == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = requireUser(auth);
 
         String targetFamily = (family == null || family.isBlank()) ? familyAccessService.baseFamily(me) : family;
+        String normalizedTargetFamily = normalizeTargetFamily(targetFamily);
+        if (normalizedTargetFamily.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
+        }
+        if (!canManageFamily(me, normalizedTargetFamily)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
 
         Long targetFamilyId = null;
-        if (!"ALL".equalsIgnoreCase(targetFamily.trim())) {
-            targetFamily = familyAccessService.baseNameForName(targetFamily);
+        if (!"ALL".equalsIgnoreCase(normalizedTargetFamily.trim())) {
+            targetFamily = normalizedTargetFamily;
             targetFamilyId = familyAccessService.familyIdForName(targetFamily);
         } else {
             targetFamily = "ALL";
@@ -108,28 +171,38 @@ public class ResourceController {
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "family", required = false) String family,
             @RequestParam(value = "category", required = false) String category,
-            @RequestParam(value = "file", required = false) MultipartFile file
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            Authentication auth
     ) throws Exception {
+        User me = requireUser(auth);
 
         ResourceFile existing = resourceRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Resource not found"));
+        assertCanManageResource(me, existing);
 
         String oldStoredName = existing.getStoredName();
-        String oldFamily = existing.getFamily();
+        String oldFolderKey = folderKey(existing.getFamilyId(), existing.getFamily());
+
+        String updatedFamily = family != null && !family.isBlank() ? normalizeTargetFamily(family) : existing.getFamily();
+        if (updatedFamily == null || updatedFamily.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "family is required");
+        }
+        if (!canManageFamily(me, updatedFamily)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+        Long updatedFamilyId = "ALL".equalsIgnoreCase(updatedFamily) ? null : familyAccessService.familyIdForName(updatedFamily);
 
         ResourceStorageService.StoredFileInfo uploaded = null;
 
         if (file != null && !file.isEmpty()) {
-            uploaded = storage.store(file, family != null ? family : existing.getFamily());
+            uploaded = storage.store(file, folderKey(updatedFamilyId, updatedFamily));
         }
 
         existing.setTitle(title);
         existing.setDescription(description);
         existing.setCategory(normalizeCategory(category));
-
-        if (family != null && !family.isBlank()) {
-            existing.setFamily(family);
-        }
+        existing.setFamily(updatedFamily);
+        existing.setFamilyId(updatedFamilyId);
 
         if (uploaded != null) {
             existing.setStoredName(uploaded.storedName);
@@ -141,7 +214,7 @@ public class ResourceController {
         resourceRepo.save(existing);
 
         if (uploaded != null && oldStoredName != null && !oldStoredName.isBlank()) {
-            storage.deletePhysical(oldFamily, oldStoredName);
+            storage.deletePhysical(oldFolderKey, oldStoredName);
         }
 
         return ResponseEntity.ok(existing);
@@ -149,10 +222,11 @@ public class ResourceController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = requireUser(auth);
 
         ResourceFile existing = resourceRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
+        assertCanManageResource(me, existing);
 
         storage.deletePhysical(folderKey(existing.getFamilyId(), existing.getFamily()), existing.getStoredName());
 
@@ -161,10 +235,12 @@ public class ResourceController {
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<?> download(@PathVariable Long id) throws Exception {
+    public ResponseEntity<?> download(@PathVariable Long id, Authentication auth) throws Exception {
+        User me = requireUser(auth);
 
         ResourceFile existing = resourceRepo.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "File not found"));
+        assertCanViewResource(me, existing);
 
         var stream = storage.download(existing.getStoredName());
 

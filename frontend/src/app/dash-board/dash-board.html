@@ -1,11 +1,26 @@
-<p-toast position="top-left"></p-toast>
+﻿<p-toast position="top-left"></p-toast>
 
 <main class="main">
   <header class="header">
-    <div>
+    <div class="header-copy">
       <h1>أهلاً بعودتك، {{user.fullName }} 👋</h1>
       <p>سعداء جداً بوجودك كجزء من <strong>أسرة الشمامسة</strong>.</p>
     </div>
+
+    <div class="header-qr" *ngIf="qrData; else dashboardQrPlaceholder">
+      <qrcode
+        [qrdata]="qrData"
+        [width]="110"
+        [errorCorrectionLevel]="'M'"
+        [allowEmptyString]="true"
+      ></qrcode>
+    </div>
+
+    <ng-template #dashboardQrPlaceholder>
+      <div class="header-qr header-qr--placeholder">
+        <i class="pi pi-qrcode"></i>
+      </div>
+    </ng-template>
   </header>
 
   <section class="stats">
@@ -347,3 +362,6 @@
   </p-dialog>
 
 </main>
+
+
+
