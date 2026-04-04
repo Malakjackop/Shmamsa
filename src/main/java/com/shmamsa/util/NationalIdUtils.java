@@ -2,11 +2,7 @@ package com.shmamsa.util;
 
 import java.time.LocalDate;
 
-/**
- * Utilities for Egyptian National ID (14 digits).
- * - Birth date: digits 1..7 (century + yy + mm + dd)
- * - Gender: digit 13 (index 12) -> odd = MALE, even = FEMALE
- */
+
 public final class NationalIdUtils {
 
     private NationalIdUtils() {}
@@ -31,12 +27,9 @@ public final class NationalIdUtils {
         }
     }
 
-    /**
-     * @return "MALE" or "FEMALE" or null if invalid
-     */
     public static String extractGender(String nid) {
         if (nid == null || !nid.matches("\\d{14}")) return null;
-        int genderDigit = Character.getNumericValue(nid.charAt(12)); // 13th digit
+        int genderDigit = Character.getNumericValue(nid.charAt(12)); 
         return (genderDigit % 2 == 0) ? "FEMALE" : "MALE";
     }
 }

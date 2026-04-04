@@ -20,10 +20,14 @@ export class LayoutComponent implements OnInit {
   private msg = inject(MessageService);
 
   user: any = null;
+  isSidebarCollapsed = false;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
 ngOnInit(): void {
+  if (isPlatformBrowser(this.platformId)) {
+    this.isSidebarCollapsed = localStorage.getItem('layout.sidebar.collapsed') === 'true';
+  }
   this.auth.getUserData(true).subscribe({
     next: (u) => this.user = u,
     error: () => this.user = null
@@ -67,6 +71,13 @@ ngOnInit(): void {
 
   goHome(): void {
     this.router.navigate(['/dashboard']);
+  }
+
+  toggleSidebar(): void {
+    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('layout.sidebar.collapsed', String(this.isSidebarCollapsed));
+    }
   }
 
 logout() {

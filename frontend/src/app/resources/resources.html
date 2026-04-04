@@ -13,7 +13,6 @@
       (mouseleave)="unlockFamilyMenu()"
     >
       <div id="familyFilter" class="filter-select__trigger" aria-haspopup="listbox" aria-expanded="false">
-        <span class="filter-select__label">{{ getFamilyLabel(selectedFamily) }}</span>
         <span class="filter-select__icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -21,6 +20,7 @@
             <path d="M9 15H11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
         </span>
+        <span class="filter-select__label">{{ getFamilyLabel(selectedFamily) }}</span>
       </div>
 
       <div class="filter-select__menu" *ngIf="!familyMenuLocked" role="listbox" [attr.aria-label]="'الاسرة'">

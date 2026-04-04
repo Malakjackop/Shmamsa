@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { MessageService } from 'primeng/api';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../services/auth.service';
@@ -16,7 +16,7 @@ import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
   standalone: false,
   providers: [MessageService]
 })
-export class GradesComponent implements OnInit {
+export class GradesComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private gradesSvc = inject(GradesService);
   private familySvc = inject(FamilyService);
@@ -52,7 +52,13 @@ export class GradesComponent implements OnInit {
   canPublish = false;
   saving = false;
   publishing = false;
+  familyMenuLocked = false;
+  autoSavePending = false;
+  lastSavedAt: string | null = null;
   private readonly titleMetaSeparator = '::max::';
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasUnsavedChanges = false;
+  private readonly autoSaveDelayMs = 1200;
 
   my: MyGradesView | null = null;
   showSchoolResultDialog = false;
@@ -70,6 +76,10 @@ export class GradesComponent implements OnInit {
         this.initMode();
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.clearAutoSaveTimer();
   }
 
   private mainFamily(name: string): string {
@@ -164,6 +174,28 @@ export class GradesComponent implements OnInit {
     this.loadServantView();
   }
 
+  getFamilyLabel(family: string): string {
+    return String(family || '').trim() || '-';
+  }
+
+  selectGradeFamily(family: string): void {
+    this.familyMenuLocked = true;
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    if (this.selectedFamilyBase === family) return;
+    this.selectedFamilyBase = family;
+    this.loadServantView();
+  }
+
+  unlockFamilyMenu(): void {
+    this.familyMenuLocked = false;
+  }
+
+  onFamilyMenuEnter(): void {
+    this.familyMenuLocked = false;
+  }
+
   loadServantView(): void {
     if (!this.selectedFamilyBase) return;
     this.refreshPerms();
@@ -174,6 +206,7 @@ export class GradesComponent implements OnInit {
         second: this.gradesSvc.getSheet(this.selectedFamilyBase, 'SECOND')
       }).subscribe({
         next: ({ first, second }) => {
+          this.resetAutoSaveState();
           this.sheet = null;
           this.bothFirstSheet = first;
           this.bothSecondSheet = second;
@@ -200,7 +233,9 @@ export class GradesComponent implements OnInit {
 
     this.gradesSvc.getSheet(this.selectedFamilyBase, this.selectedTerm).subscribe({
       next: (s) => {
+        this.resetAutoSaveState();
         this.sheet = s;
+        this.lastSavedAt = s.updatedAt || null;
         this.columns = (s.columns || []).map((c) => ({ id: c.id, title: c.title }));
         this.columnMeta = {};
         for (const c of this.columns) this.columnMeta[c.id] = this.parseColumnTitle(c.title);
@@ -225,6 +260,7 @@ export class GradesComponent implements OnInit {
     this.columnMeta[id] = { title: '', max: '' };
     this.members = this.members.map((m) => ({ ...m, values: { ...(m.values || {}), [id]: '' } }));
     this.rebuildMembersView();
+    this.scheduleAutoSave();
   }
 
   removeColumn(colId: string): void {
@@ -241,6 +277,7 @@ export class GradesComponent implements OnInit {
       return { ...m, values: nextValues };
     });
     this.rebuildMembersView();
+    this.scheduleAutoSave();
   }
 
   toggleTopRanksView(): void {
@@ -254,6 +291,7 @@ export class GradesComponent implements OnInit {
 
   onMemberValueChange(): void {
     this.rebuildMembersView();
+    this.scheduleAutoSave();
   }
 
   isTopThreeMember(memberId: number): boolean {
@@ -268,12 +306,45 @@ export class GradesComponent implements OnInit {
     const meta = this.columnMeta[colId] || { title: '', max: '' };
     meta.title = String(title ?? '');
     this.columnMeta[colId] = meta;
+    this.scheduleAutoSave();
   }
 
   setColumnMax(colId: string, max: string): void {
     const meta = this.columnMeta[colId] || { title: '', max: '' };
     meta.max = String(max ?? '');
     this.columnMeta[colId] = meta;
+    this.scheduleAutoSave();
+  }
+
+  autoSaveStatusText(): string {
+    if (this.selectedTerm === 'BOTH' || this.viewMode !== 'SERVANT' || !this.canEdit) return '';
+    if (this.saving) return 'جاري الحفظ...';
+    if (this.autoSavePending) return 'سيتم الحفظ تلقائيًا...';
+    if (this.lastSavedAt) return `آخر حفظ: ${new Date(this.lastSavedAt).toLocaleString('ar-EG')}`;
+    return 'الحفظ التلقائي مفعل';
+  }
+
+  private scheduleAutoSave(): void {
+    if (!this.canEdit || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    this.hasUnsavedChanges = true;
+    this.autoSavePending = true;
+    this.clearAutoSaveTimer();
+    this.autoSaveTimer = setTimeout(() => {
+      this.autoSaveTimer = null;
+      this.persistSheet(false);
+    }, this.autoSaveDelayMs);
+  }
+
+  private clearAutoSaveTimer(): void {
+    if (!this.autoSaveTimer) return;
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = null;
+  }
+
+  private resetAutoSaveState(): void {
+    this.clearAutoSaveTimer();
+    this.autoSavePending = false;
+    this.hasUnsavedChanges = false;
   }
 
   private buildPayload(): SheetPayload {
@@ -589,16 +660,40 @@ export class GradesComponent implements OnInit {
   }
 
   save() {
+    this.clearAutoSaveTimer();
+    this.autoSavePending = false;
+    this.persistSheet(true);
+  }
+
+  private persistSheet(showToast: boolean, afterSave?: () => void): void {
     if (!this.canEdit || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    if (this.saving) return;
     this.saving = true;
     this.gradesSvc.saveSheet(this.selectedFamilyBase, this.selectedTerm, this.buildPayload()).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.saving = false;
-        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ' });
-        this.loadServantView();
+        this.hasUnsavedChanges = false;
+        this.autoSavePending = false;
+        const updatedAt = String(res?.updatedAt || new Date().toISOString());
+        this.lastSavedAt = updatedAt;
+        if (this.sheet) {
+          this.sheet.updatedAt = updatedAt;
+          this.sheet.columns = this.columns.map((c) => ({
+            id: c.id,
+            title: this.composeColumnTitle(this.columnMeta[c.id]?.title || '', this.columnMeta[c.id]?.max || '')
+          }));
+          this.sheet.members = this.members.map((m) => ({
+            id: m.id,
+            fullName: m.fullName,
+            values: { ...(m.values || {}) }
+          }));
+        }
+        if (showToast) this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ' });
+        afterSave?.();
       },
       error: () => {
         this.saving = false;
+        this.autoSavePending = false;
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل الحفظ' });
       }
     });
@@ -621,6 +716,13 @@ export class GradesComponent implements OnInit {
 
   publish() {
     if (!this.canPublish || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    if (this.saving) return;
+    if (this.hasUnsavedChanges || this.autoSaveTimer) {
+      this.clearAutoSaveTimer();
+      this.autoSavePending = false;
+      this.persistSheet(false, () => this.publish());
+      return;
+    }
     const wasPublished = this.isSelectedTermPublished();
     const nowIso = new Date().toISOString();
     this.publishing = true;
