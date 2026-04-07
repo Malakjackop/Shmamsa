@@ -16,6 +16,7 @@
     <button pButton type="button" label="تصدير Excel" (click)="exportExcel()"></button>
     <button pButton type="button" label="تصدير PDF" (click)="exportPdf()"></button>
 <button
+  *ngIf="canResetAttendance()"
   pButton
   type="button"
   label="تصفير الحضور"
@@ -40,14 +41,11 @@
     <table class="tbl">
       <thead>
         <tr>
-          <th *ngIf="resetMode" class="selCol">
+          <th *ngIf="resetMode && canResetAttendance()" class="selCol">
             <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll($event)" />
           </th>
           <th>الاسم</th>
           <th>الدور</th>
-          <th>العنوان</th>
-          <th>الهاتف</th>
-          <th>رقم تليفون الأب</th>
           <th>قداس الجمعة</th>
           <th *ngIf="isChoirSelected()">خورس مارمرقس</th>
           <th *ngIf="isChoirSelected()">خورس البابا اثناسيوس</th>
@@ -60,34 +58,9 @@
       </thead>
       <tbody>
         <tr *ngFor="let m of members">
-          <td *ngIf="resetMode" class="selCol"><input type="checkbox" [checked]="isSelected(m.id)" (change)="toggleSelectOne(m, $event)" /></td>
+          <td *ngIf="resetMode && canResetAttendance()" class="selCol"><input type="checkbox" [checked]="isSelected(m.id)" (change)="toggleSelectOne(m, $event)" /></td>
           <td>{{m.fullName}}</td>
           <td>{{ m.role | roleLabel }}</td>
-          <td>{{m.address}}</td>
-          <td>
-            <span class="phoneInline" *ngIf="m.phoneNumber; else emptyPhone">
-              <span>{{m.phoneNumber}}</span>
-              <button type="button" class="copyPhoneBtn" (click)="copyPhone(m.phoneNumber)" title="نسخ الرقم" aria-label="نسخ الرقم">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                  <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </button>
-            </span>
-            <ng-template #emptyPhone></ng-template>
-          </td>
-          <td>
-            <span class="phoneInline" *ngIf="m.guardiansPhone; else emptyGuardianPhone">
-              <span>{{m.guardiansPhone}}</span>
-              <button type="button" class="copyPhoneBtn" (click)="copyPhone(m.guardiansPhone)" title="نسخ الرقم" aria-label="نسخ الرقم">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                  <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </button>
-            </span>
-            <ng-template #emptyGuardianPhone></ng-template>
-          </td>
           <td>{{ countLabel(m, 'FRIDAY_LITURGY') }}</td>
           <td *ngIf="isChoirSelected()">{{ countLabel(m, 'MARMARKOS_KHORS') }}</td>
           <td *ngIf="isChoirSelected()">{{ countLabel(m, 'ATHANASIUS_KHORS') }}</td>

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { MessageService } from 'primeng/api';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../services/auth.service';
@@ -6,6 +6,8 @@ import { GradesService, GradeColumn, SheetView, MyGradesView, SheetPayload, Resu
 import { FamilyService } from '../services/family.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
+import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 
 @Component({
   selector: 'app-grades',
@@ -14,7 +16,7 @@ import autoTable from 'jspdf-autotable';
   standalone: false,
   providers: [MessageService]
 })
-export class GradesComponent implements OnInit {
+export class GradesComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private gradesSvc = inject(GradesService);
   private familySvc = inject(FamilyService);
@@ -50,7 +52,13 @@ export class GradesComponent implements OnInit {
   canPublish = false;
   saving = false;
   publishing = false;
+  familyMenuLocked = false;
+  autoSavePending = false;
+  lastSavedAt: string | null = null;
   private readonly titleMetaSeparator = '::max::';
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasUnsavedChanges = false;
+  private readonly autoSaveDelayMs = 1200;
 
   my: MyGradesView | null = null;
   showSchoolResultDialog = false;
@@ -70,6 +78,10 @@ export class GradesComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.clearAutoSaveTimer();
+  }
+
   private mainFamily(name: string): string {
     if (!name) return '';
     const f = String(name).trim();
@@ -79,14 +91,7 @@ export class GradesComponent implements OnInit {
   }
 
   private normRole(v: any): string {
-    const raw = String(v ?? '').trim();
-    if (!raw) return '';
-    const upper = raw.toUpperCase();
-    const ar = raw.replace(/\s+/g, ' ').trim();
-    if (['امين اسرة', 'امين الاسرة', 'أمين أسرة', 'أمين الاسرة', 'امين الأسرة', 'أمين الأسرة'].includes(ar)) return 'AMIN_OSRA';
-    if (['امين الخدمة', 'امين الخدمه', 'أمين الخدمة', 'أمين الخدمه', 'امين خدمه', 'أمين خدمه'].includes(ar)) return 'AMIN_KHEDMA';
-    if (upper.startsWith('ROLE_')) return upper.substring(5);
-    return upper;
+    return normalizeRole(v);
   }
 
   private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
@@ -94,7 +99,7 @@ export class GradesComponent implements OnInit {
     return assignments
       .map((x: any) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: this.normRole(x?.role)
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
       .filter((x: any) => !!x.familyName);
   }
@@ -125,7 +130,7 @@ export class GradesComponent implements OnInit {
   }
 
   private initMode() {
-    const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
+    const role = normalizeRole(this.me?.role) || 'MAKHDOM';
     const servantOrAbove = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
     this.viewMode = servantOrAbove ? 'SERVANT' : 'MAKHDOM';
 
@@ -160,13 +165,35 @@ export class GradesComponent implements OnInit {
   }
 
   private refreshPerms() {
-    const role = String(this.me?.role || 'MAKHDOM').toUpperCase().trim();
+    const role = normalizeRole(this.me?.role) || 'MAKHDOM';
     this.canEdit = ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(role) || this.hasAnyAminOsraScope();
     this.canPublish = ['AMIN_KHEDMA', 'DEVELOPER'].includes(role) || (role === 'AMIN_OSRA' && this.mainFamily(this.assignmentsOf(this.me)[0]?.familyName || '') === this.selectedFamilyBase) || this.hasAminOsraScopeForBase(this.selectedFamilyBase);
   }
 
   onServantTermChange(): void {
     this.loadServantView();
+  }
+
+  getFamilyLabel(family: string): string {
+    return String(family || '').trim() || '-';
+  }
+
+  selectGradeFamily(family: string): void {
+    this.familyMenuLocked = true;
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    if (this.selectedFamilyBase === family) return;
+    this.selectedFamilyBase = family;
+    this.loadServantView();
+  }
+
+  unlockFamilyMenu(): void {
+    this.familyMenuLocked = false;
+  }
+
+  onFamilyMenuEnter(): void {
+    this.familyMenuLocked = false;
   }
 
   loadServantView(): void {
@@ -179,6 +206,7 @@ export class GradesComponent implements OnInit {
         second: this.gradesSvc.getSheet(this.selectedFamilyBase, 'SECOND')
       }).subscribe({
         next: ({ first, second }) => {
+          this.resetAutoSaveState();
           this.sheet = null;
           this.bothFirstSheet = first;
           this.bothSecondSheet = second;
@@ -205,7 +233,9 @@ export class GradesComponent implements OnInit {
 
     this.gradesSvc.getSheet(this.selectedFamilyBase, this.selectedTerm).subscribe({
       next: (s) => {
+        this.resetAutoSaveState();
         this.sheet = s;
+        this.lastSavedAt = s.updatedAt || null;
         this.columns = (s.columns || []).map((c) => ({ id: c.id, title: c.title }));
         this.columnMeta = {};
         for (const c of this.columns) this.columnMeta[c.id] = this.parseColumnTitle(c.title);
@@ -230,6 +260,7 @@ export class GradesComponent implements OnInit {
     this.columnMeta[id] = { title: '', max: '' };
     this.members = this.members.map((m) => ({ ...m, values: { ...(m.values || {}), [id]: '' } }));
     this.rebuildMembersView();
+    this.scheduleAutoSave();
   }
 
   removeColumn(colId: string): void {
@@ -246,6 +277,7 @@ export class GradesComponent implements OnInit {
       return { ...m, values: nextValues };
     });
     this.rebuildMembersView();
+    this.scheduleAutoSave();
   }
 
   toggleTopRanksView(): void {
@@ -259,6 +291,7 @@ export class GradesComponent implements OnInit {
 
   onMemberValueChange(): void {
     this.rebuildMembersView();
+    this.scheduleAutoSave();
   }
 
   isTopThreeMember(memberId: number): boolean {
@@ -273,12 +306,45 @@ export class GradesComponent implements OnInit {
     const meta = this.columnMeta[colId] || { title: '', max: '' };
     meta.title = String(title ?? '');
     this.columnMeta[colId] = meta;
+    this.scheduleAutoSave();
   }
 
   setColumnMax(colId: string, max: string): void {
     const meta = this.columnMeta[colId] || { title: '', max: '' };
     meta.max = String(max ?? '');
     this.columnMeta[colId] = meta;
+    this.scheduleAutoSave();
+  }
+
+  autoSaveStatusText(): string {
+    if (this.selectedTerm === 'BOTH' || this.viewMode !== 'SERVANT' || !this.canEdit) return '';
+    if (this.saving) return 'جاري الحفظ...';
+    if (this.autoSavePending) return 'سيتم الحفظ تلقائيًا...';
+    if (this.lastSavedAt) return `آخر حفظ: ${new Date(this.lastSavedAt).toLocaleString('ar-EG')}`;
+    return 'الحفظ التلقائي مفعل';
+  }
+
+  private scheduleAutoSave(): void {
+    if (!this.canEdit || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    this.hasUnsavedChanges = true;
+    this.autoSavePending = true;
+    this.clearAutoSaveTimer();
+    this.autoSaveTimer = setTimeout(() => {
+      this.autoSaveTimer = null;
+      this.persistSheet(false);
+    }, this.autoSaveDelayMs);
+  }
+
+  private clearAutoSaveTimer(): void {
+    if (!this.autoSaveTimer) return;
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = null;
+  }
+
+  private resetAutoSaveState(): void {
+    this.clearAutoSaveTimer();
+    this.autoSavePending = false;
+    this.hasUnsavedChanges = false;
   }
 
   private buildPayload(): SheetPayload {
@@ -399,43 +465,8 @@ export class GradesComponent implements OnInit {
     return Number.isFinite(val) ? val : 0;
   }
 
-  private async ensureDejaVuFont(doc: any): Promise<void> {
-    try {
-      if (typeof doc.setR2L === 'function') doc.setR2L(false);
-      if (doc.__hasDejaVu) {
-        doc.setFont('DejaVu', 'normal');
-        return;
-      }
-
-      const res = await fetch('assets/fonts/DejaVuSans.ttf');
-      const buf = await res.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const base64 = btoa(binary);
-
-      doc.addFileToVFS('DejaVuSans.ttf', base64);
-      doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
-      doc.__hasDejaVu = true;
-      doc.setFont('DejaVu', 'normal');
-    } catch {
-      // keep export working even if font loading fails
-    }
-  }
-
   private pdfText(doc: any, value: any): string {
-    const s = String(value ?? '');
-    if (!s) return '';
-    const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
-    if (!hasArabic) return s;
-
-    const processArabic =
-      doc?.processArabic ||
-      ((jsPDF as any)?.API?.processArabic
-        ? (text: string) => (jsPDF as any).API.processArabic(text)
-        : null);
-
-    return typeof processArabic === 'function' ? processArabic(s) : s;
+    return createPdfText(doc, jsPDF)(value);
   }
 
   private pdfServantSingleHead(doc: any): string[] {
@@ -540,7 +571,7 @@ export class GradesComponent implements OnInit {
   async exportServantSheetPdf(): Promise<void> {
     if (this.viewMode !== 'SERVANT') return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    await this.ensureDejaVuFont(doc);
+    await ensureDejaVuFont(doc);
 
     if (this.selectedTerm === 'BOTH') {
       doc.setFontSize(16);
@@ -587,7 +618,7 @@ export class GradesComponent implements OnInit {
   async exportMyResultPdf(): Promise<void> {
     if (this.viewMode !== 'MAKHDOM' || !this.my) return;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    await this.ensureDejaVuFont(doc);
+    await ensureDejaVuFont(doc);
 
     doc.setFontSize(16);
     doc.text(this.pdfText(doc, `الدرجات - ${this.me?.fullName || ''}`), 40, 40);
@@ -629,16 +660,40 @@ export class GradesComponent implements OnInit {
   }
 
   save() {
+    this.clearAutoSaveTimer();
+    this.autoSavePending = false;
+    this.persistSheet(true);
+  }
+
+  private persistSheet(showToast: boolean, afterSave?: () => void): void {
     if (!this.canEdit || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    if (this.saving) return;
     this.saving = true;
     this.gradesSvc.saveSheet(this.selectedFamilyBase, this.selectedTerm, this.buildPayload()).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.saving = false;
-        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ' });
-        this.loadServantView();
+        this.hasUnsavedChanges = false;
+        this.autoSavePending = false;
+        const updatedAt = String(res?.updatedAt || new Date().toISOString());
+        this.lastSavedAt = updatedAt;
+        if (this.sheet) {
+          this.sheet.updatedAt = updatedAt;
+          this.sheet.columns = this.columns.map((c) => ({
+            id: c.id,
+            title: this.composeColumnTitle(this.columnMeta[c.id]?.title || '', this.columnMeta[c.id]?.max || '')
+          }));
+          this.sheet.members = this.members.map((m) => ({
+            id: m.id,
+            fullName: m.fullName,
+            values: { ...(m.values || {}) }
+          }));
+        }
+        if (showToast) this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ' });
+        afterSave?.();
       },
       error: () => {
         this.saving = false;
+        this.autoSavePending = false;
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل الحفظ' });
       }
     });
@@ -661,6 +716,13 @@ export class GradesComponent implements OnInit {
 
   publish() {
     if (!this.canPublish || !this.selectedFamilyBase || this.selectedTerm === 'BOTH') return;
+    if (this.saving) return;
+    if (this.hasUnsavedChanges || this.autoSaveTimer) {
+      this.clearAutoSaveTimer();
+      this.autoSavePending = false;
+      this.persistSheet(false, () => this.publish());
+      return;
+    }
     const wasPublished = this.isSelectedTermPublished();
     const nowIso = new Date().toISOString();
     this.publishing = true;

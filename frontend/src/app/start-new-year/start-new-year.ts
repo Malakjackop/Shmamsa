@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
+import { normalizeRole } from '../shared/role-utils';
 
 @Component({
   selector: 'app-start-new-year',
@@ -12,7 +13,6 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 })
 export class StartNewYearComponent implements OnInit {
   private auth = inject(AuthService);
-  // ✅ لازم يبقى public عشان نستخدمه في الـ HTML
   attendanceSvc = inject(AttendanceService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
@@ -34,7 +34,7 @@ export class StartNewYearComponent implements OnInit {
   }
 
   isAllowed(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
+    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role));
   }
 
   loadArchives() {
@@ -44,6 +44,19 @@ export class StartNewYearComponent implements OnInit {
     });
   }
 
+  formatArchiveCreatedAt(value: unknown): string {
+    if (!value) return '-';
+
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return String(value);
+
+    return new Intl.DateTimeFormat('ar-EG', {
+      weekday: 'long',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date);
+  }
 
   downloadPdf(a: any) {
   this.attendanceSvc.downloadArchivePdf(a.id).subscribe({

@@ -1,4 +1,4 @@
-<p-toast position="top-left"></p-toast>
+﻿<p-toast position="top-left"></p-toast>
 <p-confirmDialog [draggable]="false"></p-confirmDialog>
 
 <div class="page">
@@ -13,7 +13,6 @@
       (mouseleave)="unlockFamilyMenu()"
     >
       <div id="familyFilter" class="filter-select__trigger" aria-haspopup="listbox" aria-expanded="false">
-        <span class="filter-select__label">{{ getFamilyLabel(selectedFamily) }}</span>
         <span class="filter-select__icon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -21,6 +20,7 @@
             <path d="M9 15H11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
         </span>
+        <span class="filter-select__label">{{ getFamilyLabel(selectedFamily) }}</span>
       </div>
 
       <div class="filter-select__menu" *ngIf="!familyMenuLocked" role="listbox" [attr.aria-label]="'الاسرة'">
@@ -37,26 +37,26 @@
     </div>
   </div>
 
+  <div
+    class="category-filter-bar"
+    [style.--active-index]="uploadCategoryIndex"
+    [style.--tab-count]="categoryOptions.length"
+  >
+    <button
+      *ngFor="let category of categoryOptions"
+      type="button"
+      class="category-tab"
+      [class.is-active]="selectedUploadCategory === category.value"
+      (click)="selectUploadCategory(category.value)"
+    >
+      {{ category.label }}
+    </button>
+  </div>
+
   <div #uploadPanel class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
     <div class="panel-head">
-      <h3>{{ editing ? 'تعديل ملف' : 'رفع الملفات' }}</h3>
+      <h3>{{ editing ? 'تعديل ملف' : 'رفع الملفات (' + selectedUploadCategoryLabel + ')' }}</h3>
       <div class="panel-head__left">
-        <div
-          class="category-tabs category-tabs--upload"
-          [style.--active-index]="uploadCategoryIndex"
-          [style.--tab-count]="categoryOptions.length"
-        >
-          <button
-            *ngFor="let category of categoryOptions"
-            type="button"
-            class="category-tab"
-            [class.is-active]="selectedUploadCategory === category.value"
-            (click)="selectUploadCategory(category.value)"
-          >
-            {{ category.label }}
-          </button>
-        </div>
-        <button *ngIf="editing" class="cancel-edit-button" type="button" (click)="cancelEdit()">إلغاء التعديل</button>
       </div>
     </div>
 
@@ -71,7 +71,7 @@
       placeholder="اسم الملف (إجباري)"
     />
 
-    <div class="upload-actions">
+    <div class="upload-actions" [class.upload-actions--editing]="editing">
       <label class="upload-action upload-action--file" for="resourceFileInput">
         <span>{{ pickedFile ? pickedFile.name : (editing ? 'اختيار ملف جديد - اختياري' : 'اختيار الملف') }}</span>
       </label>
@@ -79,13 +79,15 @@
       <button class="upload-action" type="button" (click)="upload()">
         {{ editing ? 'حفظ التعديل' : 'رفع الملف' }}
       </button>
+      <button *ngIf="editing" class="upload-action" type="button" (click)="cancelEdit()">
+        إلغاء التعديل
+      </button>
     </div>
   </div>
 
   <div class="card">
     <div *ngIf="categorySections.length > 0; else emptyState">
       <div class="category-section" *ngFor="let section of categorySections">
-        <h3 class="category-heading">{{ section.label }}</h3>
         <div class="resource-list" [class.resource-list--servant]="!isMakhdom()">
           <div class="resource-item" *ngFor="let r of section.items">
         <div class="resource-left" *ngIf="!isMakhdom() && isUploader(); else downloadOnly">

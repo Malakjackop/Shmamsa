@@ -4,6 +4,8 @@ import { AttendanceService, AttendanceType } from '../services/attendance.servic
 import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { MessageService } from 'primeng/api';
+import { assignmentRolesOf, normalizeRole, roleLabel } from '../shared/role-utils';
+import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 
 type PickUser = {
   id: number;
@@ -56,18 +58,7 @@ export class AttendanceComponent implements OnInit {
 
   families: string[] = [];
   selectedFamily = '';
-  private readonly preferredFamilyOrder: string[] = [
-    'اسرة السمائين',
-    'اسرة القديس ابانوب',
-    'اسرة القديس ديسقورس',
-    'اسرة القديس سيدهم بشاي',
-    'اسرة القديس اسكلابيوس',
-    'اسرة القديس البابا كيرلس',
-    'اسرة القديس الانبا ابرام',
-    'اسرة القديس اسطفانوس',
-    'خورس مارمرقس',
-    'خورس البابا اثناسيوس'
-  ];
+  private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
   members: PickUser[] = [];
 
@@ -92,27 +83,12 @@ export class AttendanceComponent implements OnInit {
 
 
   private hasAnyAminOsraScope(): boolean {
-    return this.assignmentRolesOf(this.me).includes('AMIN_OSRA');
+    return assignmentRolesOf(this.me).includes('AMIN_OSRA');
   }
 
   private hasAnyAminPrivilegeScope(): boolean {
-    const roles = this.assignmentRolesOf(this.me);
+    const roles = assignmentRolesOf(this.me);
     return roles.includes('AMIN_OSRA') || roles.includes('AMIN_KHEDMA');
-  }
-
-  private normRole(v: any): string {
-    const raw = String(v || '').trim();
-    const up = raw.toUpperCase();
-    if (!up) return '';
-    if (['امين اسرة','امين الاسرة','أمين أسرة','أمين الاسرة','امين الأسرة','أمين الأسرة','امين اسرة'].includes(raw)) return 'AMIN_OSRA';
-    if (['امين خدمة','امين الخدمه','أمين خدمة','أمين الخدمه','امين الخدمة','أمين الخدمة'].includes(raw)) return 'AMIN_KHEDMA';
-    if (up.startsWith('ROLE_')) return up.substring(5);
-    return up;
-  }
-
-  private assignmentRolesOf(user: any): string[] {
-    const assignments = Array.isArray(user?.familyAssignments) ? user.familyAssignments : [];
-    return assignments.map((x: any) => this.normRole(x?.role)).filter(Boolean);
   }
 
   private initCalendarRules() {
@@ -126,19 +102,11 @@ export class AttendanceComponent implements OnInit {
     monday.setDate(today.getDate() - diffToMonday);
 
 
-    const rawRole = String(this.me?.role || '').trim();
-    const roleNorm = rawRole.toUpperCase().replace(/[-\s]+/g, '_');
-    const roleArNorm = rawRole
-      .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
-      .trim()
-      .replace(/\s+/g, ' ');
-    const isKhadimRole =
-      ['KHADIM', 'ROLE_KHADIM'].includes(roleNorm) ||
-      ['خادم'].includes(roleArNorm);
+    const roleNorm = normalizeRole(this.me?.role);
+    const isKhadimRole = roleNorm === 'KHADIM';
 
     const canOverrideWeekClose =
-      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_OSRA', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm) ||
-      ['امين خدمة', 'أمين خدمة', 'امين الخدمه', 'أمين الخدمه', 'امين اسرة', 'أمين أسرة', 'امين الاسرة', 'أمين الاسرة', 'امين الأسرة'].includes(roleArNorm) || this.hasAnyAminPrivilegeScope();
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(roleNorm) || this.hasAnyAminPrivilegeScope();
 
 
     if (canOverrideWeekClose) {
@@ -217,13 +185,10 @@ export class AttendanceComponent implements OnInit {
       { value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' }
     ];
 
-const roleNorm = String(this.me?.role || '')
-  .trim()
-  .toUpperCase()
-  .replace(/[-\s]+/g, '_');
+const roleNorm = normalizeRole(this.me?.role);
 
 const isAminKhedmaOrDev =
-  ['AMIN_KHEDMA', 'DEVELOPER', 'DEV', 'ROLE_AMIN_KHEDMA', 'ROLE_DEVELOPER'].includes(roleNorm);
+  ['AMIN_KHEDMA', 'DEVELOPER'].includes(roleNorm);
 
 const canChoir = isAminKhedmaOrDev || scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH';
 
@@ -316,56 +281,10 @@ if (canChoir) {
     });
   }
 
-  private normalizeFamilyName(value: any): string {
-    return String(value || '')
-      .trim()
-      .replace(/[أإآ]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
-  }
-
-  private familyOrderKey(family: string): string {
-    const n = this.normalizeFamilyName(family);
-
-    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
-    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
-    if (n.includes('سمائ')) return 'اسرة السمائين';
-    if (n.includes('ابانوب')) return 'اسرة القديس ابانوب';
-    if (n.includes('ديسقورس')) return 'اسرة القديس ديسقورس';
-    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسرة القديس سيدهم بشاي';
-    if (n.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
-    if (n.includes('كيرلس')) return 'اسرة القديس البابا كيرلس';
-    if (n.includes('ابرام')) return 'اسرة القديس الانبا ابرام';
-    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسرة القديس اسطفانوس';
-
-    return family;
-  }
-
-  private sortFamiliesByPreferredOrder(families: string[]): string[] {
-    const cleaned = (families || []).map((x) => this.familyOrderKey(String(x || '').trim())).filter(Boolean);
-    const deduped = Array.from(new Set(cleaned));
-    const orderMap = new Map(
-      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
-    );
-
-    return [...deduped].sort((a, b) => {
-      const aKey = this.familyOrderKey(a);
-      const bKey = this.familyOrderKey(b);
-      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
-      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
-
-      if (aOrder != null && bOrder != null) return aOrder - bOrder;
-      if (aOrder != null) return -1;
-      if (bOrder != null) return 1;
-      return a.localeCompare(b, 'ar');
-    });
-  }
-
   private loadFamilies() {
     this.familySvc.families('attendance').subscribe({
       next: (f) => {
-        this.families = this.sortFamiliesByPreferredOrder(f || []);
+        this.families = sortFamiliesByPreferredOrder(f || [], this.preferredFamilyOrder);
         if (!this.selectedFamily && this.families.length) {
           this.selectedFamily = this.families[0];
           this.loadMembersForFamily();
@@ -404,29 +323,15 @@ if (canChoir) {
   }
 
   isKhadim(): boolean {
-    return this.me?.role === 'KHADIM';
+    return normalizeRole(this.me?.role) === 'KHADIM';
   }
 
   canSelectFamily(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER' || this.isKhadim() || this.hasAnyAminPrivilegeScope();
+    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role)) || this.isKhadim() || this.hasAnyAminPrivilegeScope();
   }
 
   prettyRole(role?: string): string {
-    const r = (role || '').toUpperCase();
-    switch (r) {
-      case 'MAKHDOM':
-        return 'مخدوم';
-      case 'KHADIM':
-        return 'خادم';
-      case 'AMIN_OSRA':
-        return 'امين اسرة';
-      case 'AMIN_KHEDMA':
-        return 'امين خدمة';
-      case 'DEVELOPER':
-        return 'dev';
-      default:
-        return role || '';
-    }
+    return roleLabel(role);
   }
 
   get displayedMembers(): PickUser[] {
@@ -536,13 +441,10 @@ onCodeResult(resultString: string) {
     }
 
     const users = this.selected.map((x) => ({ id: x.id, username: x.username }));
-    const roleNorm = String(this.me?.role || '')
-      .trim()
-      .toUpperCase()
-      .replace(/[-\s]+/g, '_');
+    const roleNorm = normalizeRole(this.me?.role);
 
     const canOverrideWeekClose =
-      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER', 'DEV'].includes(roleNorm) || this.hasAnyAminPrivilegeScope();
+      ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(roleNorm) || this.hasAnyAminPrivilegeScope();
 
     if (users.length === 0 && !canOverrideWeekClose) {
       this.message.add({ severity: 'warn', summary: 'No users', detail: 'اختار اسم واحد على الأقل أو اعمل Scan للـ QR' });

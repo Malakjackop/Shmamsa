@@ -1,9 +1,13 @@
 ﻿import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
-import { AuthService } from '../services/auth.service';
+import { AuthService, AuthUser } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
-import { AttendanceService, type AttendanceType } from '../services/attendance.service';
-import { IftekadService } from '../services/iftekad.service';
+import { AttendanceService, type AttendanceType, type DailyAttendanceResponse } from '../services/attendance.service';
+import { IftekadService, type IftekadVisitRecord } from '../services/iftekad.service';
+import { normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
+import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
+import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
+import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
 
 type Member = {
   id: number;
@@ -65,6 +69,48 @@ type IftekadVisitView = {
   recordedBy?: { id: number; fullName: string; role: string } | null;
 };
 
+type MemberWithIftekad = Member & { lastIftekadDate?: string | null };
+type FamilyAssignmentLike = { familyName?: string; role?: string | number; roleCode?: number };
+type AttendanceArchiveLike = {
+  archived?: boolean | number | string;
+  isArchived?: boolean | number | string;
+  inArchive?: boolean | number | string;
+  isInArchive?: boolean | number | string;
+  archiveId?: number | null;
+  archive?: unknown;
+  archiveName?: string;
+  archivedAt?: string;
+  archiveDate?: string;
+};
+type ProfileView = {
+  username?: string;
+  email?: string;
+  familyAssignments?: FamilyAssignmentLike[];
+  role?: string | number;
+  deaconFamily?: string;
+  khors?: string;
+  khorsYear?: number | string | null;
+  deaconDegree?: string;
+  nationalId?: string;
+  phoneNumber?: string;
+  address?: string;
+  guardiansPhone?: string;
+  guardianRelation?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  status?: string;
+  studyType?: string;
+  schoolName?: string;
+  schoolGrade?: string;
+  universityName?: string;
+  faculty?: string;
+  universityGrade?: string;
+  graduatedFrom?: string;
+  graduateJob?: string;
+  isWorking?: boolean | string | number | null;
+  workDetails?: string;
+};
+
 @Component({
   selector: 'app-family-attendance',
   standalone: false,
@@ -88,22 +134,11 @@ export class FamilyAttendanceComponent implements OnInit {
   private iftekadSvc = inject(IftekadService);
   private attendanceSvc = inject(AttendanceService);
 
-  me: any;
+  me: AuthUser | null = null;
   members: Member[] = [];
   families: string[] = [];
   selectedFamily = '';
-  private readonly preferredFamilyOrder: string[] = [
-    'اسرة السمائين',
-    'اسرة القديس ابانوب',
-    'اسرة القديس ديسقورس',
-    'اسرة القديس سيدهم بشاي',
-    'اسرة القديس اسكلابيوس',
-    'اسرة القديس البابا كيرلس',
-    'اسرة القديس الانبا ابرام',
-    'اسرة القديس اسطفانوس',
-    'خورس مارمرقس',
-    'خورس البابا اثناسيوس'
-  ];
+  private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
   loading = false;
 
   exportMode = false;
@@ -115,7 +150,7 @@ export class FamilyAttendanceComponent implements OnInit {
   detailsType: '' | AttendanceType = '';
 
   profileFor: Member | null = null;
-  profile: any = null;
+  profile: ProfileView | null = null;
 
   // ===== Daily attendance (حضور اليوم) =====
   showDaily = false;
@@ -208,24 +243,24 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   isAminKhedmaOrDev(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
+    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role));
   }
 
   isKhadim(): boolean {
-    return this.me?.role === 'KHADIM';
+    return normalizeRole(this.me?.role) === 'KHADIM';
   }
 
-  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+  private assignmentsOf(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): Array<{ familyName: string; role: string }> {
     const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
     return assignments
-      .map((x: any) => ({
+      .map((x) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: String(x?.role || '').trim().toUpperCase()
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
-      .filter((x: any) => !!x.familyName);
+      .filter((x) => !!x.familyName);
   }
 
-  familyLabel(entity: any): string {
+  familyLabel(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): string {
     return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
   }
 
@@ -237,7 +272,7 @@ export class FamilyAttendanceComponent implements OnInit {
     if (this.canSelectFamily()) {
       this.familySvc.families().subscribe({
         next: (f) => {
-          this.families = this.sortFamiliesByPreferredOrder(f || []);
+          this.families = sortFamiliesByPreferredOrder(f || [], this.preferredFamilyOrder);
           if (this.families.length) {
             this.selectedFamily = this.families[0];
             this.loadMembers();
@@ -255,52 +290,6 @@ export class FamilyAttendanceComponent implements OnInit {
     }
   }
 
-  private normalizeFamilyName(value: any): string {
-    return String(value || '')
-      .trim()
-      .replace(/[أإآ]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
-  }
-
-  private familyOrderKey(family: string): string {
-    const n = this.normalizeFamilyName(family);
-
-    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
-    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
-    if (n.includes('سمائ')) return 'اسرة السمائين';
-    if (n.includes('ابانوب')) return 'اسرة القديس ابانوب';
-    if (n.includes('ديسقورس')) return 'اسرة القديس ديسقورس';
-    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسرة القديس سيدهم بشاي';
-    if (n.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
-    if (n.includes('كيرلس')) return 'اسرة القديس البابا كيرلس';
-    if (n.includes('ابرام')) return 'اسرة القديس الانبا ابرام';
-    if (n.includes('اسطفانوس') || n.includes('استفانوس')) return 'اسرة القديس اسطفانوس';
-
-    return family;
-  }
-
-  private sortFamiliesByPreferredOrder(families: string[]): string[] {
-    const cleaned = (families || []).map((x) => this.familyOrderKey(String(x || '').trim())).filter(Boolean);
-    const deduped = Array.from(new Set(cleaned));
-    const orderMap = new Map(
-      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
-    );
-
-    return [...deduped].sort((a, b) => {
-      const aKey = this.familyOrderKey(a);
-      const bKey = this.familyOrderKey(b);
-      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
-      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
-
-      if (aOrder != null && bOrder != null) return aOrder - bOrder;
-      if (aOrder != null) return -1;
-      if (bOrder != null) return 1;
-      return a.localeCompare(b, 'ar');
-    });
-  }
-
   onFamilyChange() {
     this.loadMembers();
   }
@@ -311,7 +300,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
-        this.members = (m as any) || [];
+        this.members = (m || []) as Member[];
         this.refreshIftekadLastDates();
         this.loading = false;
       },
@@ -327,15 +316,15 @@ export class FamilyAttendanceComponent implements OnInit {
     if (!ids.length) return;
 
     this.iftekadSvc.lastVisitDates(ids).subscribe({
-      next: (map: any) => {
-        const m = (map as any) || {};
+      next: (map) => {
+        const m = map || {};
         this.members.forEach((mem) => {
           const key = String(mem.id);
-          (mem as any).lastIftekadDate = m[key] || null;
+          (mem as MemberWithIftekad).lastIftekadDate = m[key] || null;
         });
       },
       error: () => {
-        this.members.forEach((mem) => ((mem as any).lastIftekadDate = null));
+        this.members.forEach((mem) => (((mem as MemberWithIftekad).lastIftekadDate = null)));
       }
     });
   }
@@ -357,31 +346,31 @@ export class FamilyAttendanceComponent implements OnInit {
     return (this.members || []).filter((m) => !!m.selected);
   }
 
-  private async fetchDetailsForMembers(members: Member[], famParam?: string): Promise<any[]> {
+  private async fetchDetailsForMembers(members: Member[], famParam?: string): Promise<FamilyMemberDetails[]> {
     const { firstValueFrom } = await import('rxjs');
-    const arr: any[] = [];
-    for (const m of members) {
-      try {
-        arr.push(await firstValueFrom(this.familySvc.memberDetails(m.id, famParam)));
-      } catch {
-        arr.push({});
-      }
-    }
-    return arr;
+    return Promise.all(
+      members.map(async (m) => {
+        try {
+          return await firstValueFrom(this.familySvc.memberDetails(m.id, famParam));
+        } catch {
+          return null;
+        }
+      })
+    );
   }
 
   private async fetchAttendanceForMembers(members: Member[], famParam?: string): Promise<AttendanceRow[][]> {
     const { firstValueFrom } = await import('rxjs');
-    const out: AttendanceRow[][] = [];
-    for (const m of members) {
-      try {
-        const rows = await firstValueFrom(this.familySvc.memberAttendance(m.id, famParam));
-        out.push(((rows as any) || []) as AttendanceRow[]);
-      } catch {
-        out.push([]);
-      }
-    }
-    return out;
+    return Promise.all(
+      members.map(async (m) => {
+        try {
+          const rows = await firstValueFrom(this.familySvc.memberAttendance(m.id, famParam));
+          return (rows || []) as AttendanceRow[];
+        } catch {
+          return [];
+        }
+      })
+    );
   }
 
   openDetails(member: Member) {
@@ -401,17 +390,17 @@ export class FamilyAttendanceComponent implements OnInit {
     const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
-      next: (d) => (this.details = this.filterOutArchivedRows((d as any) || [])),
+      next: (d) => (this.details = this.filterOutArchivedRows((d || []) as AttendanceRow[])),
       error: () => (this.details = [])
     });
   }
 
-  private filterOutArchivedRows(rows: any[]): AttendanceRow[] {
+  private filterOutArchivedRows(rows: AttendanceRow[]): AttendanceRow[] {
     return (Array.isArray(rows) ? rows : []).filter((r) => !this.isArchivedRow(r)) as AttendanceRow[];
   }
 
-  private isArchivedRow(row: any): boolean {
-    const isTrue = (v: any) => {
+  private isArchivedRow(row: AttendanceRow & AttendanceArchiveLike): boolean {
+    const isTrue = (v: unknown) => {
       const s = String(v ?? '').trim().toLowerCase();
       return v === true || v === 1 || s === 'true' || s === 'yes' || s === 'y';
     };
@@ -488,22 +477,21 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   private roleAr(role?: string): string {
-    const r = (role || '').toUpperCase();
-    if (r === 'DEVELOPER') return 'مطوّر';
-    if (r === 'AMIN_KHEDMA') return 'أمين خدمة';
-    if (r === 'AMIN_OSRA') return 'أمين أسرة';
-    if (r === 'KHADIM') return 'خادم';
-    if (r === 'MEMBER') return 'عضو';
-    return role || '';
+    const normalized = normalizeRole(role);
+    if (normalized === 'DEVELOPER') return 'مطوّر';
+    if (normalized === 'AMIN_KHEDMA') return 'أمين خدمة';
+    if (normalized === 'AMIN_OSRA') return 'أمين أسرة';
+    if (normalized === 'KHADIM') return 'خادم';
+    return roleLabel(role);
   }
 
-  private memberChoirMembership(m: Member | any): '' | 'MARMARKOS' | 'ATHANASIUS' | 'BOTH' {
-    const attend = String((m as any)?.attendKhors || '').trim().toUpperCase();
+  private memberChoirMembership(m: Pick<Member, 'attendKhors' | 'khors'>): '' | 'MARMARKOS' | 'ATHANASIUS' | 'BOTH' {
+    const attend = String(m?.attendKhors || '').trim().toUpperCase();
     if (attend === 'MARMARKOS') return 'MARMARKOS';
     if (attend === 'ATHANASIUS') return 'ATHANASIUS';
     if (attend === 'BOTH') return 'BOTH';
 
-    const k = String((m as any)?.khors || '').trim().toUpperCase();
+    const k = String(m?.khors || '').trim().toUpperCase();
     if (k === 'MARMARKOS') return 'MARMARKOS';
     if (k === 'ATHANASIUS') return 'ATHANASIUS';
     if (k === 'BOTH') return 'BOTH';
@@ -526,7 +514,7 @@ export class FamilyAttendanceComponent implements OnInit {
       : this.allAttendanceTypes.filter((t) => t !== 'FAMILY_MEETING');
 
     if (!this.detailsFor) return baseTypes;
-    return baseTypes.filter((t) => this.isAttendanceTypeAllowedForMember(this.detailsFor!, t as any));
+    return baseTypes.filter((t) => this.isAttendanceTypeAllowedForMember(this.detailsFor!, t));
   }
 
   filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
@@ -546,7 +534,7 @@ export class FamilyAttendanceComponent implements OnInit {
     const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberDetails(member.id, famParam).subscribe({
-      next: (p) => (this.profile = p),
+      next: (p) => (this.profile = (p as ProfileView | null)),
       error: () => (this.profile = null)
     });
   }
@@ -556,7 +544,7 @@ export class FamilyAttendanceComponent implements OnInit {
     this.profile = null;
   }
 
-  async copyPhone(value: any) {
+  async copyPhone(value: unknown) {
     const phone = String(value ?? '').trim();
     if (!phone) return;
 
@@ -581,18 +569,18 @@ export class FamilyAttendanceComponent implements OnInit {
     }
   }
 
-  private hasDisplayValue(v: any): boolean {
+  private hasDisplayValue(v: unknown): boolean {
     if (v === false || v === 0) return true;
     return String(v ?? '').trim() !== '';
   }
 
-  private yesNoAr(v: any): string {
+  private yesNoAr(v: unknown): string {
     if (v === true) return 'نعم';
     if (v === false) return 'لا';
     return String(v ?? '').trim();
   }
 
-  private khorsYearAr(year: any): string {
+  private khorsYearAr(year: unknown): string {
     const y = Number(year || 0);
     if (y === 1) return 'سنة أولى';
     if (y === 2) return 'سنة ثانية';
@@ -602,7 +590,7 @@ export class FamilyAttendanceComponent implements OnInit {
     return '';
   }
 
-  private memberKhorsLabel(khors: any, khorsYear?: any): string {
+  private memberKhorsLabel(khors: unknown, khorsYear?: unknown): string {
     const k = String(khors || '').trim().toUpperCase();
 
     if (!k || k === 'NONE') return '';
@@ -626,7 +614,7 @@ export class FamilyAttendanceComponent implements OnInit {
   profileEntries(): Array<{ label: string; value: string }> {
     if (!this.profile) return [];
 
-    const p = this.profile;
+    const p = this.profile as ProfileView;
 
     const schoolValue = [p.schoolName, p.schoolGrade]
       .filter((x) => this.hasDisplayValue(x))
@@ -688,8 +676,8 @@ export class FamilyAttendanceComponent implements OnInit {
   // ===== Daily attendance (حضور اليوم) =====
 
   canEditDailyAttendance(): boolean {
-    const r = String(this.me?.role || '').trim().toUpperCase();
-    return r === 'KHADIM' || r === 'AMIN_OSRA' || r === 'AMIN_KHEDMA' || r === 'DEVELOPER' || r === 'DEV';
+    const r = normalizeRole(this.me?.role);
+    return r === 'KHADIM' || r === 'AMIN_OSRA' || r === 'AMIN_KHEDMA' || r === 'DEVELOPER';
   }
 
   private buildDailyMaxDate(): Date {
@@ -772,7 +760,7 @@ export class FamilyAttendanceComponent implements OnInit {
     const selected = String(this.selectedFamily || '').trim();
     if (selected === 'خورس مارمرقس' || selected === 'خورس البابا اثناسيوس') return true;
 
-    const role = String(this.me?.role || '').trim().toUpperCase();
+    const role = normalizeRole(this.me?.role);
     if (role !== 'KHADIM') return false;
 
     const scope = String(this.me?.servingScope || '').trim().toUpperCase();
@@ -853,14 +841,14 @@ export class FamilyAttendanceComponent implements OnInit {
     const fam = this.dailyFamilyParam();
 
     this.attendanceSvc.daily(isoDate, this.dailyType, fam).subscribe({
-      next: (res: any) => {
+      next: (res: DailyAttendanceResponse) => {
         const familyTotal = Number(this.members?.length || 0);
 
         this.dailyPresentCount = Number(res?.presentCount || 0);
         this.dailyAbsentCount = Number(res?.absentCount || 0);
         this.dailyRecordsCount = Number(res?.recordsCount || 0);
-        this.dailyPresent = (res?.present || []) as any;
-        this.dailyAbsent = (res?.absent || []) as any;
+        this.dailyPresent = res?.present || [];
+        this.dailyAbsent = res?.absent || [];
 
         this.dailyTotal = familyTotal > 0 ? familyTotal : Number(res?.total || 0);
 
@@ -871,7 +859,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
         this.dailyLoading = false;
       },
-      error: (err: any) => {
+      error: (err) => {
         this.clearDailyAttendanceData();
         this.message.add({
           severity: 'error',
@@ -908,7 +896,7 @@ export class FamilyAttendanceComponent implements OnInit {
         this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء الحضور وتسجيله غياب' });
         this.reloadDaily();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.dailyRemoveSaving = false;
         this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في التحميل' });
       }
@@ -961,8 +949,8 @@ export class FamilyAttendanceComponent implements OnInit {
     this.iftekadHistory = [];
 
     this.iftekadSvc.getVisits(memberId).subscribe({
-      next: (rows: any) => {
-        this.iftekadHistory = ((rows as any) || []) as IftekadVisitView[];
+      next: (rows) => {
+        this.iftekadHistory = (rows || []) as IftekadVisitView[];
         this.iftekadHistoryLoading = false;
         this.refreshLastIftekadFromHistory();
       },
@@ -977,13 +965,13 @@ export class FamilyAttendanceComponent implements OnInit {
   private refreshLastIftekadFromHistory() {
     if (!this.iftekadFor) return;
     const last = (this.iftekadHistory && this.iftekadHistory.length) ? this.iftekadHistory[0].visitDate : null;
-    (this.iftekadFor as any).lastIftekadDate = last;
+    (this.iftekadFor as MemberWithIftekad).lastIftekadDate = last;
     const idx = this.members.findIndex((x) => x.id === this.iftekadFor!.id);
-    if (idx >= 0) (this.members[idx] as any).lastIftekadDate = last;
+    if (idx >= 0) (this.members[idx] as MemberWithIftekad).lastIftekadDate = last;
   }
 
   needsIftekadAttention(member: Member): boolean {
-    const s = String((member as any)?.lastIftekadDate || '').trim();
+    const s = String((member as MemberWithIftekad)?.lastIftekadDate || '').trim();
     if (!s) return true;
 
     const last = new Date(`${s}T00:00:00`);
@@ -1013,10 +1001,10 @@ export class FamilyAttendanceComponent implements OnInit {
         companions: this.iftekadCompanions || undefined
       })
       .subscribe({
-        next: (created: any) => {
-          (this.iftekadFor as any).lastIftekadDate = visitDate;
+        next: (created: IftekadVisitRecord) => {
+          (this.iftekadFor as MemberWithIftekad).lastIftekadDate = visitDate;
           const idx = this.members.findIndex((x) => x.id === this.iftekadFor!.id);
-          if (idx >= 0) (this.members[idx] as any).lastIftekadDate = visitDate;
+          if (idx >= 0) (this.members[idx] as MemberWithIftekad).lastIftekadDate = visitDate;
 
           if (created) {
             const row: IftekadVisitView = {
@@ -1039,7 +1027,7 @@ export class FamilyAttendanceComponent implements OnInit {
           this.iftekadDesc = '';
           this.iftekadCompanions = '';
         },
-        error: (err: any) => {
+        error: (err) => {
           this.iftekadSaving = false;
           this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في الحفظ' });
         }
@@ -1091,7 +1079,7 @@ export class FamilyAttendanceComponent implements OnInit {
           this.cancelEditVisit();
           this.loadIftekadHistory(this.iftekadFor!.id);
         },
-        error: (err: any) => {
+        error: (err) => {
           this.verifyVisitUpdatedAfterError(v.id, expected, err);
         }
       });
@@ -1099,7 +1087,7 @@ export class FamilyAttendanceComponent implements OnInit {
   private verifyVisitUpdatedAfterError(
   visitId: number,
   expected: { date: string; description: string; companions: string },
-  originalErr: any
+  originalErr: { error?: { error?: string }; message?: string } | null | undefined
 ) {
   if (!this.iftekadFor) {
     this.editSaving = false;
@@ -1109,12 +1097,12 @@ export class FamilyAttendanceComponent implements OnInit {
 
   // نعمل Reload للسجل من الباك
   this.iftekadSvc.getVisits(this.iftekadFor.id).subscribe({
-    next: (rows: any) => {
-      this.iftekadHistory = ((rows as any) || []) as IftekadVisitView[];
+    next: (rows) => {
+      this.iftekadHistory = (rows || []) as IftekadVisitView[];
 
       const found = (this.iftekadHistory || []).find((x) => x.id === visitId);
 
-      const norm = (v: any) => String(v ?? '').trim();
+      const norm = (v: unknown) => String(v ?? '').trim();
 
       // ✅ لو لقينا نفس الزيارة ومتسجلة بالقيم الجديدة يبقى التعديل حصل فعلاً
       const ok =
@@ -1175,7 +1163,7 @@ export class FamilyAttendanceComponent implements OnInit {
         this.visitToDelete = null;
         this.loadIftekadHistory(this.iftekadFor!.id);
       },
-      error: (err: any) => {
+      error: (err) => {
         // ✅ Same parsing edge-case safeguard
         if (err && err.status === 200) {
           this.message.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الافتقاد' });
@@ -1239,30 +1227,6 @@ export class FamilyAttendanceComponent implements OnInit {
 
       // Load Arabic-capable font (DejaVuSans) so Arabic text doesn't become garbled.
       // Keep direction LTR to avoid "mirrored" text.
-      const ensureDejaVu = async (doc: any) => {
-        try {
-          if (typeof doc.setR2L === 'function') doc.setR2L(false);
-          if (doc.__hasDejaVu) {
-            doc.setFont('DejaVu', 'normal');
-            return;
-          }
-
-          const res = await fetch('assets/fonts/DejaVuSans.ttf');
-          const buf = await res.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          let binary = '';
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          const base64 = btoa(binary);
-
-          doc.addFileToVFS('DejaVuSans.ttf', base64);
-          doc.addFont('DejaVuSans.ttf', 'DejaVu', 'normal');
-          doc.__hasDejaVu = true;
-          doc.setFont('DejaVu', 'normal');
-        } catch {
-          // If font loading fails, PDF still generates (Arabic may not render correctly)
-        }
-      };
-
       const selected = this.getSelectedMembers();
       if (!selected.length) {
         this.message.add({ severity: 'warn', summary: 'حدد الاعضاء', detail: ' اختر عضو واحد علي الافل' });
@@ -1274,19 +1238,8 @@ export class FamilyAttendanceComponent implements OnInit {
       const attArr = await this.fetchAttendanceForMembers(selected, famParam);
 
       const doc = new jsPDF({ orientation: 'landscape' });
-      await ensureDejaVu(doc);
-      const hasArabic = (s: string) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(s);
-      const processArabic =
-        (doc as any).processArabic ||
-        ((jsPDF as any)?.API?.processArabic
-          ? (text: string) => (jsPDF as any).API.processArabic(text)
-          : null);
-      const pdfText = (v: any) => {
-        const s = (v ?? '') + '';
-        if (!s) return '';
-        if (!hasArabic(s)) return s;
-        return typeof processArabic === 'function' ? processArabic(s) : s;
-      };
+      await ensureDejaVuFont(doc);
+      const pdfText = createPdfText(doc, jsPDF);
       const pageRight = doc.internal.pageSize.getWidth() - 14;
       doc.setFontSize(14);
       doc.text(pdfText('تفاصيل حضور الأعضاء'), pageRight, 14, { align: 'right' });
@@ -1295,9 +1248,9 @@ export class FamilyAttendanceComponent implements OnInit {
       let y = 20;
       for (let idx = 0; idx < selected.length; idx++) {
         const m = selected[idx];
-        const d = detailsArr[idx] || {};
+        const d = (detailsArr[idx] || null) as ProfileView | null;
         const fam = this.assignmentsOf(d)[0]?.familyName || this.assignmentsOf(m)[0]?.familyName || '';
-        const phone = d.phoneNumber || '';
+        const phone = d?.phoneNumber || '';
         const records = attArr[idx] || [];
 
         doc.setFontSize(12);

@@ -3,6 +3,31 @@ import { CommonModule } from '@angular/common';
 import { AttendanceService } from '../services/attendance.service';
 import { MessageService } from 'primeng/api';
 
+type AttendanceHistoryPayload = {
+  items?: HistorySourceRow[];
+  history?: HistorySourceRow[];
+  records?: HistorySourceRow[];
+  rows?: HistorySourceRow[];
+  data?: HistorySourceRow[];
+};
+
+type HistorySourceRow = {
+  id?: number;
+  attendanceId?: number;
+  date?: string;
+  attendanceDate?: string;
+  day?: string;
+  time?: string;
+  attendanceTime?: string;
+  createdAt?: string;
+  type?: string;
+  attendanceType?: string;
+  status?: 'PRESENT' | 'ABSENT' | string;
+  takenBy?: string | null;
+  takenByName?: string | null;
+  servantName?: string | null;
+};
+
 type HistoryItem = {
   id: number;
   date: string;
@@ -120,7 +145,7 @@ export class AttendanceHistoryComponent implements OnInit {
   trackTypeGroup = (_: number, group: TypeGroup) => group.type;
   trackRow = (_: number, row: HistoryItem) => row.id;
 
-  private mapHistoryItem = (x: any): HistoryItem => ({
+  private mapHistoryItem = (x: HistorySourceRow): HistoryItem => ({
     id: Number(x?.id ?? x?.attendanceId ?? 0),
     date: String(x?.date ?? x?.attendanceDate ?? x?.day ?? '-'),
     time: String(x?.time ?? x?.attendanceTime ?? x?.createdAt ?? '-'),
@@ -129,13 +154,13 @@ export class AttendanceHistoryComponent implements OnInit {
     takenBy: x?.takenBy ?? x?.takenByName ?? x?.servantName ?? null
   });
 
-  private extractHistoryRows(payload: any): any[] {
+  private extractHistoryRows(payload: AttendanceHistoryPayload | HistorySourceRow[] | null | undefined): HistorySourceRow[] {
     if (Array.isArray(payload)) return payload;
     if (!payload || typeof payload !== 'object') return [];
 
-    const candidates = ['items', 'history', 'records', 'rows', 'data'];
+    const candidates: Array<keyof AttendanceHistoryPayload> = ['items', 'history', 'records', 'rows', 'data'];
     for (const key of candidates) {
-      const value = (payload as any)[key];
+      const value = payload[key];
       if (Array.isArray(value)) return value;
     }
     return [];

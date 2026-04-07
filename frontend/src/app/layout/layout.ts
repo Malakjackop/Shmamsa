@@ -4,6 +4,7 @@ import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
+import { assignmentRolesOf, normalizeRole } from '../shared/role-utils';
 
 @Component({
   selector: 'app-layout',
@@ -19,74 +20,37 @@ export class LayoutComponent implements OnInit {
   private msg = inject(MessageService);
 
   user: any = null;
+  isSidebarCollapsed = false;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
 ngOnInit(): void {
+  if (isPlatformBrowser(this.platformId)) {
+    this.isSidebarCollapsed = localStorage.getItem('layout.sidebar.collapsed') === 'true';
+  }
   this.auth.getUserData(true).subscribe({
     next: (u) => this.user = u,
     error: () => this.user = null
   });
 }
-
-
-
-  /** Normalize role values coming from backend (supports ROLE_*, and Arabic labels). */
-  private normRole(v: any): string {
-    const raw = String(v ?? '').trim();
-    if (!raw) return '';
-    const upper = raw.toUpperCase();
-
-    // Arabic variants
-    const ar = raw.replace(/\s+/g, ' ').trim();
-    if (
-      [
-        'امين اسرة',
-        'امين الاسرة',
-        'أمين أسرة',
-        'أمين الاسرة',
-        'امين الأسرة',
-        'أمين الأسرة',
-        'امين اسرة'
-      ].includes(ar)
-    )
-      return 'AMIN_OSRA';
-    if (
-      [
-        'امين الخدمة',
-        'امين الخدمه',
-        'أمين الخدمة',
-        'أمين الخدمه',
-        'امين خدمه',
-        'أمين خدمه'
-      ].includes(ar)
-    )
-      return 'AMIN_KHEDMA';
-
-    if (upper.startsWith('ROLE_')) return upper.substring(5);
-    return upper;
-  }
-
   /** True if user has AMIN_OSRA on any assigned family slot (scoped). */
   private hasAnyAminOsraScope(): boolean {
-    const roles = Array.isArray(this.user?.familyAssignments)
-      ? this.user.familyAssignments.map((x: any) => this.normRole(x?.role))
-      : [];
+    const roles = assignmentRolesOf(this.user);
     return roles.includes('AMIN_OSRA');
   }
 
   isServantOrAbove(): boolean {
-    const r = this.normRole(this.user?.role);
+    const r = normalizeRole(this.user?.role);
     return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r) || this.hasAnyAminOsraScope();
   }
 
   isAminOsraOrAbove(): boolean {
-    const r = this.normRole(this.user?.role);
+    const r = normalizeRole(this.user?.role);
     return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r) || this.hasAnyAminOsraScope();
   }
 
   isAminKhedmaOrDev(): boolean {
-    const r = this.normRole(this.user?.role);
+    const r = normalizeRole(this.user?.role);
     return ['AMIN_KHEDMA', 'DEVELOPER'].includes(r);
   }
 
@@ -107,6 +71,13 @@ ngOnInit(): void {
 
   goHome(): void {
     this.router.navigate(['/dashboard']);
+  }
+
+  toggleSidebar(): void {
+    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('layout.sidebar.collapsed', String(this.isSidebarCollapsed));
+    }
   }
 
 logout() {

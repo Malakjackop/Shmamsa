@@ -16,7 +16,7 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration-ms:86400000}") // 1 day
+    @Value("${jwt.expiration-ms:86400000}") 
     private long expirationMs;
 
     private Key key;
@@ -26,7 +26,6 @@ public class JwtUtils {
         key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    // ✅ Generate JWT token
     public String generateToken(String username, String role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
@@ -40,7 +39,6 @@ public class JwtUtils {
                 .compact();
     }
 
-    // ✅ Extract username from token
     public String extractUsername(String token) {
         try {
             return Jwts.parserBuilder()
@@ -54,7 +52,6 @@ public class JwtUtils {
         }
     }
 
-    // ✅ Validate JWT token
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
@@ -65,7 +62,6 @@ public class JwtUtils {
 
     }
 
-    // ✅ Extract role from token
     public String extractRole(String token) {
         try {
             Object role = Jwts.parserBuilder()

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+﻿import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
@@ -6,6 +6,60 @@ import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { FamilyService } from '../services/family.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
+import { AuthUser } from '../services/auth.service';
+import {
+  BoardAnnouncement as AnnouncementView,
+  BoardEvent as EventView,
+  BoardParticipantGroup as ParticipantGroup,
+  BoardService
+} from '../services/board.service';
+
+type FamilyAssignmentView = {
+  familyName?: string;
+  role?: string | number;
+  roleCode?: number;
+};
+
+type DashboardUser = AuthUser & {
+  fullName?: string;
+  phoneNumber?: string;
+  universityName?: string;
+  faculty?: string;
+  dateOfBirth?: string;
+  attendKhors?: string | null;
+  familyAssignments?: FamilyAssignmentView[];
+};
+
+type FamilyCatalogItem = {
+  id: number;
+  nameAr: string;
+  baseName?: string;
+};
+
+type FamilyOptionRow = {
+  id?: number | string;
+  nameAr?: string;
+  baseName?: string;
+};
+
+type EventForm = {
+  id: number | null;
+  title: string;
+  description: string;
+  eventAt: Date | null;
+  removeAt: Date | null;
+  targetFamily: string;
+  targetAudience: string;
+};
+
+type AnnouncementForm = {
+  id: number | null;
+  title: string;
+  description: string;
+  targetFamily: string;
+  targetAudience: string;
+};
 
 @Component({
   selector: 'app-dash-board',
@@ -18,13 +72,14 @@ export class DashBoard implements OnInit {
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
   private familyService = inject(FamilyService);
+  private boardService = inject(BoardService);
   private router = inject(Router);
   private messageService = inject(MessageService);
   private http = inject(HttpClient);
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
-  user: any = {
+  user: DashboardUser = {
     fullName: '',
     username: '',
     phoneNumber: '',
@@ -39,18 +94,11 @@ export class DashBoard implements OnInit {
     khorsYear: null,
     attendKhors: ''
   };
+  qrData = '';
 
   // ===== Roles =====
-  private normRole(role: any): string {
-    const r = String(role || '').trim().toUpperCase();
-    if (!r) return 'MAKHDOM';
-    if (r.includes('DEVELOPER')) return 'DEVELOPER';
-    if (r.includes('ADMIN')) return 'ADMIN';
-    if (r.includes('AMIN_KHEDMA')) return 'AMIN_KHEDMA';
-    if (r.includes('AMIN_OSRA')) return 'AMIN_OSRA';
-    if (r.includes('KHADIM')) return 'KHADIM';
-    if (r.includes('MAKHDOM')) return 'MAKHDOM';
-    return r;
+  private normRole(role: unknown): string {
+    return normalizeRole(role) || 'MAKHDOM';
   }
 
   // ✅ Developer/Admin أعلى من أمين خدمة
@@ -75,8 +123,8 @@ export class DashBoard implements OnInit {
   scopeLocked: boolean = true;
 
   monthCursor: Date = new Date();
-  events: any[] = [];
-  announcements: any[] = [];
+  events: EventView[] = [];
+  announcements: AnnouncementView[] = [];
 
   showEventDialog = false;
   showJoinDialog = false;
@@ -84,11 +132,11 @@ export class DashBoard implements OnInit {
   showAnnDialog = false;
   showAnnDetailsDialog = false;
 
-  selectedJoinEvent: any = null;
-  selectedAnn: any = null;
-  participantsGroups: Array<{ family: string; members: any[] }> = [];
+  selectedJoinEvent: EventView | null = null;
+  selectedAnn: AnnouncementView | null = null;
+  participantsGroups: ParticipantGroup[] = [];
 
-  eventForm: any = {
+  eventForm: EventForm = {
     id: null,
     title: '',
     description: '',
@@ -98,7 +146,7 @@ export class DashBoard implements OnInit {
     targetAudience: 'EVERYONE'
   };
 
-  annForm: any = {
+  annForm: AnnouncementForm = {
     id: null,
     title: '',
     description: '',
@@ -137,21 +185,21 @@ export class DashBoard implements OnInit {
   private familyMeetingByFamily: Record<string, number> = {};
   private familyMeetingTotalByFamily: Record<string, number> = {};
   familyMeetingCards: Array<{ family: string; present: number; total: number | null }> = [];
-  private familyCatalog: Array<{ id: number; nameAr: string; baseName?: string }> = [];
+  private familyCatalog: FamilyCatalogItem[] = [];
 
 
   // ===== Helpers =====
   private pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
 
-  private errMsg(err: any, fallback: string): string {
+  private errMsg(err: { error?: { message?: string; error?: string }; message?: string } | null | undefined, fallback: string): string {
     return err?.error?.message || err?.error?.error || err?.message || fallback;
   }
 
-  private hasText(value: any): boolean {
+  private hasText(value: unknown): boolean {
     return String(value || '').trim().length > 0;
   }
 
-  private toNumOrNull(v: any): number | null {
+  private toNumOrNull(v: unknown): number | null {
     if (v === null || v === undefined || v === '') return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
@@ -174,7 +222,7 @@ export class DashBoard implements OnInit {
   }
 
   // ✅ دي اللي كانت ناقصة عندك (LocalDate => YYYY-MM-DD)
-  private toYmd(d: any): string | null {
+  private toYmd(d: string | number | Date | null | undefined): string | null {
     if (!d) return null;
     const dt = (d instanceof Date) ? d : new Date(d);
     if (isNaN(dt.getTime())) return null;
@@ -198,24 +246,24 @@ export class DashBoard implements OnInit {
     return f;
   }
 
-  private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
+  private assignmentsOf(entity: { familyAssignments?: FamilyAssignmentView[]; role?: string | number } | null | undefined): Array<{ familyName: string; role: string }> {
     const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
     return assignments
-      .map((x: any) => ({
+      .map((x) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: this.normRole(x?.role)
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
-      .filter((x: any) => !!x.familyName);
+      .filter((x) => !!x.familyName);
   }
 
   private loadFamilyCatalog(): void {
-    this.http.get<any[]>('/api/auth/family-options?audience=SERVANT', { withCredentials: true }).subscribe({
-      next: (rows: any) => {
-        this.familyCatalog = (rows || []).map((x: any) => ({
+    this.http.get<FamilyOptionRow[]>('/api/auth/family-options?audience=SERVANT', { withCredentials: true }).subscribe({
+      next: (rows) => {
+        this.familyCatalog = (rows || []).map((x) => ({
           id: Number(x?.id || 0),
           nameAr: String(x?.nameAr || '').trim(),
           baseName: String(x?.baseName || '').trim() || undefined
-        })).filter((x: any) => !!x.id && !!x.nameAr);
+        })).filter((x) => !!x.id && !!x.nameAr);
       },
       error: () => {
         this.familyCatalog = [];
@@ -223,7 +271,7 @@ export class DashBoard implements OnInit {
     });
   }
 
-  private familyIdForTarget(targetFamily: any): number | null {
+  private familyIdForTarget(targetFamily: unknown): number | null {
     const raw = String(targetFamily || '').trim();
     if (!raw || raw.toUpperCase() === 'ALL') return null;
     const base = this.mainFamily(raw);
@@ -333,10 +381,10 @@ export class DashBoard implements OnInit {
   private loadScopeOptions(): void {
     if (this.isAtLeast('AMIN_KHEDMA')) {
       this.familyService.families().subscribe({
-        next: (families: any) => {
+        next: (families) => {
           const familyOptions = (families || [])
-            .filter((x: any) => !!x)
-            .map((x: any) => ({ label: x, value: `FAMILY::${x}` }));
+            .filter((x) => !!x)
+            .map((x) => ({ label: x, value: `FAMILY::${x}` }));
 
           this.scopeOptions = [
             { label: 'كل الأسر (الجميع)', value: 'ALL_USERS' },
@@ -371,11 +419,11 @@ export class DashBoard implements OnInit {
     this.syncFormsWithScope();
   }
 
-  targetLabel(item: any): string {
+  targetLabel(item: { targetFamily?: string; targetAudience?: string } | null | undefined): string {
     return this.targetLabelFromData(item?.targetFamily, item?.targetAudience);
   }
 
-  targetLabelFromData(targetFamily: any, targetAudience: any): string {
+  targetLabelFromData(targetFamily: unknown, targetAudience: unknown): string {
     const family = String(targetFamily || '').trim();
     const audience = String(targetAudience || 'EVERYONE').trim().toUpperCase();
 
@@ -393,7 +441,7 @@ export class DashBoard implements OnInit {
 
   private userFamilies(): string[] {
     const raw = this.assignmentsOf(this.user)
-      .map((x: any) => String(x.familyName || '').trim())
+      .map((x) => String(x.familyName || '').trim())
       .filter((x: string) => !!x && x.toUpperCase() !== 'SYSTEM' && !this.isChoirBucket(x));
 
     const out: string[] = [];
@@ -412,14 +460,14 @@ export class DashBoard implements OnInit {
     return this.userFamilies().length > 0;
   }
 
-  private arKhorsName(khors: any): string {
+  private arKhorsName(khors: unknown): string {
     const k = String(khors || '').trim().toUpperCase();
     if (k === 'MARMARKOS') return 'خورس مارمرقس';
     if (k === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
     return '';
   }
 
-  private arYearLabel(year?: number): string {
+  private arYearLabel(year?: string | number | null): string {
     const y = Number(year || 0);
     if (!y) return '';
     if (y === 1) return 'سنه اوله';
@@ -494,7 +542,7 @@ export class DashBoard implements OnInit {
 
   loadUserData(): void {
     this.authService.getUserData().subscribe({
-      next: (data: any) => {
+      next: (data) => {
         if (!data) {
           this.router.navigate(['/login']);
           return;
@@ -514,6 +562,7 @@ export class DashBoard implements OnInit {
         this.loadScopeOptions();
         this.syncFormsWithScope();
         this.rebuildFamilyMeetingCards();
+        this.loadMyQrToken();
         this.loadMonthBoards();
         this.loadAnnouncements();
       },
@@ -521,9 +570,20 @@ export class DashBoard implements OnInit {
     });
   }
 
+  private loadMyQrToken(): void {
+    this.authService.getMyQrToken().subscribe({
+      next: (res) => {
+        this.qrData = res?.token || '';
+      },
+      error: () => {
+        this.qrData = '';
+      }
+    });
+  }
+
   loadMyStats(): void {
     this.attendanceService.getMyStats().subscribe({
-      next: (data: any) => {
+      next: (data) => {
         this.stats = {
           ...this.stats,
           FRIDAY_LITURGY: data?.FRIDAY_LITURGY ?? 0,
@@ -554,13 +614,9 @@ export class DashBoard implements OnInit {
     const month = this.monthParam(this.monthCursor);
     const scope = this.currentScopeConfig();
 
-    let params = new HttpParams().set('month', month);
-    if (scope.requestFamily) params = params.set('family', scope.requestFamily);
-    if (scope.requestAudience) params = params.set('audience', scope.requestAudience);
-
-    this.http.get<any[]>('/api/events', { params, withCredentials: true }).subscribe({
-      next: (rows: any) => this.events = rows || [],
-      error: (err: any) => {
+    this.boardService.listEvents(month, scope.requestFamily, scope.requestAudience).subscribe({
+      next: (rows) => this.events = rows || [],
+      error: (err) => {
         this.events = [];
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'حصل خطأ أثناء تحميل جدول الشهر.') });
       }
@@ -569,14 +625,9 @@ export class DashBoard implements OnInit {
 
   private loadAnnouncements(): void {
     const scope = this.currentScopeConfig();
-    let params = new HttpParams();
-
-    if (scope.requestFamily) params = params.set('family', scope.requestFamily);
-    if (scope.requestAudience) params = params.set('audience', scope.requestAudience);
-
-    this.http.get<any[]>('/api/announcements', { params, withCredentials: true }).subscribe({
-      next: (rows: any) => this.announcements = rows || [],
-      error: (err: any) => {
+    this.boardService.listAnnouncements(scope.requestFamily, scope.requestAudience).subscribe({
+      next: (rows) => this.announcements = rows || [],
+      error: (err) => {
         this.announcements = [];
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'حصل خطأ أثناء تحميل التنبيهات.') });
       }
@@ -610,7 +661,7 @@ export class DashBoard implements OnInit {
     this.showEventDialog = true;
   }
 
-  openEditEvent(e: any): void {
+  openEditEvent(e: EventView): void {
     const cfg = this.currentScopeConfig();
     this.eventForm = {
       id: e?.id ?? null,
@@ -651,8 +702,8 @@ export class DashBoard implements OnInit {
 
     const id = this.eventForm?.id;
     const req$ = id
-      ? this.http.put(`/api/events/${id}`, payload, { withCredentials: true })
-      : this.http.post('/api/events', payload, { withCredentials: true });
+      ? this.boardService.updateEvent(id, payload)
+      : this.boardService.createEvent(payload);
 
     req$.subscribe({
       next: () => {
@@ -660,45 +711,45 @@ export class DashBoard implements OnInit {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ.' });
         this.loadMonthBoards();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل الحفظ.') });
       }
     });
   }
 
-  publishEvent(e: any): void {
+  publishEvent(e: EventView): void {
     if (!e?.id) {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن نشر الموعد حالياً.' });
       return;
     }
-    this.http.post(`/api/events/${e.id}/publish`, {}, { withCredentials: true }).subscribe({
+    this.boardService.publishEvent(e.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر الموعد.' });
         this.loadMonthBoards();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل نشر الموعد.') });
       }
     });
   }
 
-  deleteEvent(e: any): void {
+  deleteEvent(e: EventView): void {
     if (!e?.id) {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن مسح الموعد حالياً.' });
       return;
     }
-    this.http.delete(`/api/events/${e.id}`, { withCredentials: true }).subscribe({
+    this.boardService.deleteEvent(e.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الموعد.' });
         this.loadMonthBoards();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل مسح الموعد.') });
       }
     });
   }
 
-  openJoin(e: any): void {
+  openJoin(e: EventView): void {
     this.selectedJoinEvent = e;
     this.showJoinDialog = true;
   }
@@ -708,42 +759,42 @@ export class DashBoard implements OnInit {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'الموعد غير متاح للانضمام الآن.' });
       return;
     }
-    this.http.post(`/api/events/${this.selectedJoinEvent.id}/join`, {}, { withCredentials: true }).subscribe({
+    this.boardService.joinEvent(this.selectedJoinEvent.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الانضمام.' });
         this.showJoinDialog = false;
         this.loadMonthBoards();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل الانضمام.') });
       }
     });
   }
 
-  unjoin(e: any): void {
+  unjoin(e: EventView): void {
     if (!e?.id) {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن إلغاء الانضمام الآن.' });
       return;
     }
-    this.http.delete(`/api/events/${e.id}/join`, { withCredentials: true }).subscribe({
+    this.boardService.unjoinEvent(e.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'info', summary: 'تم', detail: 'تم إلغاء الانضمام.' });
         this.loadMonthBoards();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل إلغاء الانضمام.') });
       }
     });
   }
 
-  openParticipants(e: any): void {
+  openParticipants(e: EventView): void {
     if (!e?.id) return;
-    this.http.get<any[]>(`/api/events/${e.id}/participants`, { withCredentials: true }).subscribe({
-      next: (groups: any) => {
+    this.boardService.participants(e.id).subscribe({
+      next: (groups) => {
         this.participantsGroups = groups || [];
         this.showParticipantsDialog = true;
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل تحميل تفاصيل المنضمين.') });
       }
     });
@@ -761,7 +812,7 @@ export class DashBoard implements OnInit {
     this.showAnnDialog = true;
   }
 
-  openEditAnnouncement(a: any): void {
+  openEditAnnouncement(a: AnnouncementView): void {
     const cfg = this.currentScopeConfig();
     this.annForm = {
       id: a?.id ?? null,
@@ -794,8 +845,8 @@ export class DashBoard implements OnInit {
 
     const id = this.annForm?.id;
     const req$ = id
-      ? this.http.put(`/api/announcements/${id}`, payload, { withCredentials: true })
-      : this.http.post('/api/announcements', payload, { withCredentials: true });
+      ? this.boardService.updateAnnouncement(id, payload)
+      : this.boardService.createAnnouncement(payload);
 
     req$.subscribe({
       next: () => {
@@ -803,50 +854,50 @@ export class DashBoard implements OnInit {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ التنبيه.' });
         this.loadAnnouncements();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل حفظ التنبيه.') });
       }
     });
   }
 
-  publishAnnouncement(a: any): void {
+  publishAnnouncement(a: AnnouncementView): void {
     if (!a?.id) {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن نشر التنبيه حالياً.' });
       return;
     }
-    this.http.post(`/api/announcements/${a.id}/publish`, {}, { withCredentials: true }).subscribe({
+    this.boardService.publishAnnouncement(a.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر التنبيه.' });
         this.loadAnnouncements();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل نشر التنبيه.') });
       }
     });
   }
 
-  deleteAnnouncement(a: any): void {
+  deleteAnnouncement(a: AnnouncementView): void {
     if (!a?.id) {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن مسح التنبيه حالياً.' });
       return;
     }
-    this.http.delete(`/api/announcements/${a.id}`, { withCredentials: true }).subscribe({
+    this.boardService.deleteAnnouncement(a.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح التنبيه.' });
         this.loadAnnouncements();
       },
-      error: (err: any) => {
+      error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل مسح التنبيه.') });
       }
     });
   }
 
-  openAnnDetails(a: any): void {
+  openAnnDetails(a: AnnouncementView): void {
     this.selectedAnn = a;
     this.showAnnDetailsDialog = true;
   }
 
-  pendingEventAlarmLabel(e: any): string {
+  pendingEventAlarmLabel(e: EventView | null | undefined): string {
     if (!e || e.status !== 'PENDING') return '';
 
     const eventDate = e?.eventAt ? new Date(e.eventAt) : null;
@@ -864,14 +915,15 @@ export class DashBoard implements OnInit {
     return 'تنبيه: الموعد ما زال Pending ولم يتم نشره';
   }
 
-  formatDateTime(value: any): string {
+  formatDateTime(value: string | number | Date | null | undefined): string {
     if (!value) return '';
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     return date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
-  daysAgo(value: any): string {
+  daysAgo(value: string | number | Date | null | undefined): string {
+    if (!value) return '';
     const created = new Date(value);
     if (Number.isNaN(created.getTime())) return '';
     const diff = Math.floor((Date.now() - created.getTime()) / 86400000);
@@ -882,8 +934,11 @@ export class DashBoard implements OnInit {
     return `منذ ${diff} يوم`;
   }
 
-  annDaysLabel(a: any): string {
+  annDaysLabel(a: AnnouncementView | null | undefined): string {
     const ref = a?.publishedAt || a?.createdAt;
     return this.daysAgo(ref);
   }
 }
+
+
+

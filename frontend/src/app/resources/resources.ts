@@ -1,10 +1,11 @@
-import { Component, OnInit, inject, Inject, PLATFORM_ID, ElementRef, ViewChild } from '@angular/core';
+﻿import { Component, OnInit, inject, Inject, PLATFORM_ID, ElementRef, ViewChild } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { ResourcesService } from '../services/resources.service';
 import { MessageService } from 'primeng/api';
 import { ConfirmationService } from 'primeng/api';
+import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
 
 type ResourceCategory = 'GENERAL' | 'HYMNS' | 'COPTIC' | 'STUDIES';
 
@@ -61,13 +62,7 @@ export class ResourcesComponent implements OnInit {
   }
 
   private normRole(v: any): string {
-    const raw = String(v || '').trim();
-    const up = raw.toUpperCase();
-    if (!up) return '';
-    if (['امين اسرة', 'امين الاسرة', 'أمين أسرة', 'أمين الاسرة', 'امين الأسرة', 'أمين الأسرة'].includes(raw)) return 'AMIN_OSRA';
-    if (['امين خدمة', 'امين الخدمه', 'أمين خدمة', 'أمين الخدمه', 'امين الخدمة', 'أمين الخدمة'].includes(raw)) return 'AMIN_KHEDMA';
-    if (up.startsWith('ROLE_')) return up.substring(5);
-    return up;
+    return normalizeRole(v);
   }
 
   private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
@@ -75,7 +70,7 @@ export class ResourcesComponent implements OnInit {
     return assignments
       .map((x: any) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: this.normRole(x?.role)
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
       .filter((x: any) => !!x.familyName);
   }
@@ -186,13 +181,19 @@ export class ResourcesComponent implements OnInit {
     this.selectedUploadCategory = category;
   }
 
+  get selectedUploadCategoryLabel(): string {
+    return this.categoryOptions.find((category) => category.value === this.selectedUploadCategory)?.label || '';
+  }
+
   get uploadCategoryIndex(): number {
     const index = this.categoryOptions.findIndex((category) => category.value === this.selectedUploadCategory);
     return index >= 0 ? index : 0;
   }
 
   get categorySections(): Array<{ value: ResourceCategory; label: string; items: any[] }> {
+    const activeCategory = this.selectedUploadCategory;
     return this.categoryOptions
+      .filter((category) => category.value === activeCategory)
       .map((category) => ({
         ...category,
         items: (this.resources || []).filter((r) => this.normalizeCategory(r?.category) === category.value)
@@ -345,3 +346,4 @@ export class ResourcesComponent implements OnInit {
     this.uploadPanel?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
+

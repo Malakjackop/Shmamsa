@@ -1,21 +1,33 @@
 package com.shmamsa.validation.customAnnotation;
 
-import com.shmamsa.model.User;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
-public class DifferentParentPhonesValidator implements ConstraintValidator<DifferentParentPhones, User> {
+public class DifferentParentPhonesValidator implements ConstraintValidator<DifferentParentPhones, DifferentParentPhonesValidator.HasParentPhones> {
 
-    @Override
-    public boolean isValid(User user, ConstraintValidatorContext context) {
-        if (user == null) return true;
-
-        String guardianPhone = user.getGuardiansPhone();
-        String userPhone = user.getPhoneNumber();
-
-        if (guardianPhone == null || userPhone == null) return true;
-
-        return !guardianPhone.equals(userPhone);
+    public interface HasParentPhones {
+        String getPhoneNumber();
+        String getGuardiansPhone();
     }
 
+    @Override
+    public boolean isValid(HasParentPhones value, ConstraintValidatorContext context) {
+        if (value == null) return true;
+
+        String guardianPhone = normalize(value.getGuardiansPhone());
+        String userPhone = normalize(value.getPhoneNumber());
+
+        if (guardianPhone.isBlank() || userPhone.isBlank()) return true;
+        if (!guardianPhone.equals(userPhone)) return true;
+
+        context.disableDefaultConstraintViolation();
+        context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
+                .addPropertyNode("guardiansPhone")
+                .addConstraintViolation();
+        return false;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
+    }
 }

@@ -1,7 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
-import { AuthService } from '../services/auth.service';
+import { AuthService, FamilyOption } from '../services/auth.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
+import { normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
+import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
+import { forkJoin } from 'rxjs';
 
 type Member = {
   id: number;
@@ -45,20 +48,9 @@ export class TransferMembersComponent implements OnInit {
   selecting = false;
   selectedIds = new Set<number>();
 
-  private readonly preferredFamilyOrder: string[] = [
-    'اسرة السمائين',
-    'اسرة القديس ابانوب',
-    'اسرة القديس ديسقورس',
-    'اسرة القديس سيدهم بشاي',
-    'اسرة القديس اسكلابيوس',
-    'اسرة القديس البابا كيرلس',
-    'اسرة القديس الانبا ابرام',
-    'اسرة القديس اسطفانوس',
-    'خورس مارمرقس',
-    'خورس البابا اثناسيوس'
-  ];
+  private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
-  /** ✅ Registration lists (same as Register page) */
+  /** fallback only when family-options is unavailable */
   servantFamilies: string[] = [
   'اسرة السمائين',
   'اسرة القديس ابانوب',
@@ -118,31 +110,27 @@ familyRequestTargets: { label: string; value: string }[] = [
   }
 
   isKhadim(): boolean {
-  return this.me?.role === 'KHADIM';
-}
+    return normalizeRole(this.me?.role) === 'KHADIM';
+  }
 
   isAminKhedmaOrDev(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
+    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role));
   }
 
   isAminOsra(): boolean {
-  return this.me?.role === 'AMIN_OSRA' || this.isScopedAminOsraForSelected();
-}
+    return normalizeRole(this.me?.role) === 'AMIN_OSRA' || this.isScopedAminOsraForSelected();
+  }
 
   private normRole(v: any): string {
-  return String(v || '')
-    .trim()
-    .toUpperCase()
-    .replace(/^ROLE_/, '')
-    .replace(/\s+/g, '_');
-}
+    return normalizeRole(v);
+  }
 
   private assignmentsOf(entity: any): Array<{ familyName: string; role: string; roleCode?: number }> {
     const raw = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
     return raw
       .map((x: any) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: this.normRole(x?.role),
+        role: normalizeAssignmentRole(x, entity?.role),
         roleCode: typeof x?.roleCode === 'number' ? x.roleCode : undefined
       }))
       .filter((x: any) => !!x.familyName);
@@ -174,78 +162,35 @@ familyRequestTargets: { label: string; value: string }[] = [
     this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
   }
 
-  private normalizeFamilyName(value: any): string {
-    return String(value || '')
-      .trim()
-      .replace(/[أإآ]/g, 'ا')
-      .replace(/ة/g, 'ه')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
-  }
-
   private canonicalFamilyName(value: any): string {
-    const raw = String(value || '').trim();
-    const n = this.normalizeFamilyName(raw);
-
-    if (!n) return '';
-    if (n.includes('خورس') && n.includes('مار') && n.includes('مرقس')) return 'خورس مارمرقس';
-    if (n.includes('خورس') && n.includes('اثناسيوس')) return 'خورس البابا اثناسيوس';
-    if (n.includes('سمائ')) return 'اسرة السمائين';
-    if (n.includes('ابانوب')) return 'اسرة القديس ابانوب';
-    if (n.includes('ديسقورس')) return 'اسرة القديس ديسقورس';
-    if (n.includes('سيدهم') || n.includes('بشاي')) return 'اسرة القديس سيدهم بشاي';
-    if (n.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
-    if (n.includes('كيرلس')) {
-      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(n)) return 'اسرة القديس البابا كيرلس أ';
-      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(n)) return 'اسرة القديس البابا كيرلس ب';
-      return 'اسرة القديس البابا كيرلس';
-    }
-    if (n.includes('ابرام')) {
-      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(n)) return 'اسرة القديس الانبا ابرام أ';
-      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(n)) return 'اسرة القديس الانبا ابرام ب';
-      return 'اسرة القديس الانبا ابرام';
-    }
-    if (n.includes('اسطفانوس') || n.includes('استفانوس')) {
-      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(n)) return 'اسرة القديس اسطفانوس أ';
-      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(n)) return 'اسرة القديس اسطفانوس ب';
-      return 'اسرة القديس اسطفانوس';
-    }
-
-    return raw;
+    return canonicalFamilyName(value, { keepSubFamilies: true });
   }
 
-  private familyOrderKey(family: string): string {
-    return this.canonicalFamilyName(family);
+  private familyNameFromOption(option: FamilyOption | null | undefined): string {
+    return this.canonicalFamilyName(option?.nameAr || option?.baseName || option?.code || '');
   }
 
   private sortFamiliesByPreferredOrder(families: string[]): string[] {
-    const cleaned = (families || [])
-      .map((x) => this.canonicalFamilyName(x))
-      .filter(Boolean);
-    const deduped = Array.from(new Set(cleaned));
-    const orderMap = new Map(
-      this.preferredFamilyOrder.map((name, index) => [this.normalizeFamilyName(name), index])
-    );
-
-    return [...deduped].sort((a, b) => {
-      const aKey = this.familyOrderKey(a);
-      const bKey = this.familyOrderKey(b);
-      const aOrder = orderMap.get(this.normalizeFamilyName(aKey));
-      const bOrder = orderMap.get(this.normalizeFamilyName(bKey));
-
-      if (aOrder != null && bOrder != null) {
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return a.localeCompare(b, 'ar');
-      }
-      if (aOrder != null) return -1;
-      if (bOrder != null) return 1;
-      return a.localeCompare(b, 'ar');
-    });
+    return sortFamiliesByPreferredOrder(families, this.preferredFamilyOrder, { keepSubFamilies: true });
   }
 
   private loadFamilyLists() {
-    this.familySvc.families().subscribe({
-      next: (list) => {
+    forkJoin({
+      actualFamilies: this.familySvc.families(),
+      servantOptions: this.auth.getFamilyOptions('SERVANT'),
+      memberOptions: this.auth.getFamilyOptions('MEMBER')
+    }).subscribe({
+      next: ({ actualFamilies, servantOptions, memberOptions }) => {
+        const servantFromApi = servantOptions
+          .map((option) => this.familyNameFromOption(option))
+          .filter(Boolean);
+        const memberFromApi = memberOptions
+          .map((option) => this.familyNameFromOption(option))
+          .filter(Boolean);
+
+        this.servantFamilies = this.sortFamiliesByPreferredOrder(servantFromApi.length ? servantFromApi : this.servantFamilies);
+        this.makhdomFamilies = this.sortFamiliesByPreferredOrder(memberFromApi.length ? memberFromApi : this.makhdomFamilies);
+
         this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
         this.makhdomFamilies = this.sortFamiliesByPreferredOrder(this.makhdomFamilies);
 
@@ -259,10 +204,10 @@ familyRequestTargets: { label: string; value: string }[] = [
           this.viewFamilies = this.sortFamiliesByPreferredOrder([...this.servantFamilies]);
         }
 
-        if (this.isAminKhedmaOrDev() && Array.isArray(list) && list.length) {
+        if (this.isAminKhedmaOrDev() && Array.isArray(actualFamilies) && actualFamilies.length) {
           this.viewFamilies = this.sortFamiliesByPreferredOrder([
             ...this.viewFamilies,
-            ...(list as any[]).map((x) => this.canonicalFamilyName(x))
+            ...(actualFamilies as any[]).map((x) => this.canonicalFamilyName(x))
           ]);
         }
 
@@ -280,7 +225,11 @@ familyRequestTargets: { label: string; value: string }[] = [
 
         this.loadMembers();
       },
-      error: () => {}
+      error: () => {
+        this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
+        this.makhdomFamilies = this.sortFamiliesByPreferredOrder(this.makhdomFamilies);
+        this.loadMembers();
+      }
     });
   }
   private loadMembers() {
@@ -307,15 +256,15 @@ familyRequestTargets: { label: string; value: string }[] = [
   if (this.mode === 'MAKHDOM') {
 
     if (!this.isChoirSelection()) {
-      list = list.filter((x: any) => String(x?.role || '').trim().toUpperCase() === 'MAKHDOM');
+      list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM');
     }
   }
   if (this.mode === 'SERVANT') {
     const ok = new Set(['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA']);
-    list = list.filter((x: any) => ok.has(String(x?.role || '').trim().toUpperCase()));
+    list = list.filter((x: any) => ok.has(normalizeRole(x?.role)));
   }
         } else if (this.isKhadim()) {
-          list = list.filter((x: any) => String(x?.role || '').trim().toUpperCase() === 'MAKHDOM');
+          list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM');
         }
         this.members = list;
         this.loading = false;
@@ -368,7 +317,7 @@ displayFamily(m: Member): string {
     return this.levelLabel(yr);
   }
 
-  const role = String(m.role || '').trim().toUpperCase();
+  const role = normalizeRole(m.role);
   const isServantRole = role === 'KHADIM' || role === 'AMIN_OSRA' || role === 'AMIN_KHEDMA';
 
   // ✅ collect all الأسرة assignments and dedupe
@@ -434,8 +383,8 @@ private isTransferVisitor(m: any): boolean {
     if (joined.includes('زوار النقل')) return true;
   }
 
-  const role = String(m?.role || '').trim().toUpperCase();
-  if (role === 'ZAYER' || role === 'VISITOR' || role === 'TRANSFER_VISITOR') return true;
+  const rawRole = String(m?.role || '').trim().toUpperCase();
+  if (rawRole === 'ZAYER' || rawRole === 'VISITOR' || rawRole === 'TRANSFER_VISITOR') return true;
 
   return false;
 }
@@ -648,12 +597,7 @@ private getServedFamilies(): string[] {
   }
 
   getRoleLabel(role: string): string {
-    if (role === 'MAKHDOM') return 'مخدوم';
-    if (role === 'KHADIM') return 'خادم';
-    if (role === 'AMIN_OSRA') return 'امين اسرة';
-    if (role === 'AMIN_KHEDMA') return 'امين خدمة';
-    if (role === 'DEVELOPER' || role === 'DEV' || role.toLowerCase() === 'dev') return 'dev';
-    return role;
+    return roleLabel(role);
   }
 }
 

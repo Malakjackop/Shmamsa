@@ -1,5 +1,7 @@
 package com.shmamsa.dto;
 
+import com.shmamsa.validation.customAnnotation.DifferentParentPhones;
+import com.shmamsa.validation.customAnnotation.DifferentParentPhonesValidator.HasParentPhones;
 import com.shmamsa.validation.customAnnotation.ValidNationalId;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -7,7 +9,8 @@ import lombok.Data;
 import jakarta.validation.constraints.Pattern;
 
 @Data
-public class RegisterServantRequest {
+@DifferentParentPhones(message = "رقم ولي الأمر يجب أن يكون مختلفًا عن الرقم الشخصي")
+public class RegisterServantRequest implements HasParentPhones {
 
     @NotBlank(message = "Full name is required")
     private String fullName;
@@ -25,7 +28,8 @@ public class RegisterServantRequest {
     @NotBlank(message = "Confirm password is required")
     private String confirmPassword;
 
-    @ValidNationalId(minAge = 16, message = "Servant must be at least 16 years old")
+    @NotBlank(message = "National ID is required")
+    @ValidNationalId(minAge = 16, message = "National ID is invalid or age is أقل من 16 سنة")
     private String nationalId;
 
     private String dateOfBirth;

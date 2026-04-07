@@ -48,7 +48,13 @@
               "xlsx",
               "file-saver",
               "jspdf",
-              "jspdf-autotable"
+              "jspdf-autotable",
+              "canvg",
+              "core-js",
+              "@babel/runtime",
+              "qrcode",
+              "raf",
+              "rgbcolor"
             ]
           },
           "configurations": {
@@ -56,13 +62,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumWarning": "2.8MB",
+                  "maximumError": "3MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "14kB",
+                  "maximumError": "16kB"
                 }
               ],
               "outputHashing": "all"

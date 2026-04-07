@@ -1,16 +1,26 @@
 package com.shmamsa.dto;
 
+import com.shmamsa.validation.customAnnotation.DifferentParentPhones;
+import com.shmamsa.validation.customAnnotation.DifferentParentPhonesValidator.HasParentPhones;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class ProfileUpdateRequest {
+@DifferentParentPhones(message = "رقم ولي الأمر يجب أن يكون مختلفًا عن الرقم الشخصي")
+public class ProfileUpdateRequest implements HasParentPhones {
+    @Email(message = "Email should be valid")
     private String email;
     private String fullName;
+
+    @Pattern(regexp = "^$|^\\d{11}$", message = "رقم الهاتف يجب أن يكون 11 رقم")
     private String phoneNumber;
 
     private String address;
+
+    @Pattern(regexp = "^$|^\\d{11}$", message = "رقم ولي الأمر يجب أن يكون 11 رقم")
     private String guardiansPhone;
     private String guardianRelation;
     private String deaconFamily;

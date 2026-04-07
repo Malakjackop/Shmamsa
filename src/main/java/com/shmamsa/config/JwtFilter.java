@@ -1,5 +1,7 @@
 package com.shmamsa.config;
 
+import com.shmamsa.model.User;
+import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,6 +23,7 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -30,7 +33,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // ✅ Skip public endpoints
         if (
                 path.startsWith("/api/auth/login") ||
                         path.startsWith("/api/auth/register") ||
@@ -45,13 +47,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String token = null;
 
-        // ✅ Try Authorization header (for Postman)
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
         }
 
-        // ✅ Try JWT cookie (for Angular)
         if (token == null && request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("jwt".equals(cookie.getName())) {
@@ -61,18 +61,22 @@ public class JwtFilter extends OncePerRequestFilter {
             }
         }
 
-        // ✅ Validate & set authentication if valid
         if (token != null && jwtUtils.validateToken(token)) {
             String username = jwtUtils.extractUsername(token);
+            if (username != null && !username.isBlank()) {
+                User user = userRepository.findByUsername(username).orElse(null);
+                if (user != null) {
+                    String role = user.getRole() == null ? "MAKHDOM" : user.getRole().trim();
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    user.getUsername(),
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_" + role.replace("ROLE_", "")))
+                            );
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            username,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + (jwtUtils.extractRole(token) != null ? jwtUtils.extractRole(token) : "MAKHDOM")))
-                    );
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            }
         }
 
         filterChain.doFilter(request, response);

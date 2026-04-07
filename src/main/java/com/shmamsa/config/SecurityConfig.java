@@ -44,8 +44,7 @@ public class SecurityConfig {
                                 "/api/auth/user"
                         ).permitAll()
                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/attendance/history").authenticated()
-                                .requestMatchers(HttpMethod.POST, "/api/attendance/scan-token").permitAll()
-.requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
+                                .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
 
                         .requestMatchers("/api/attendance/**")
                         .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")

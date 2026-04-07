@@ -7,6 +7,7 @@ import com.shmamsa.model.User;
 import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.AttendanceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalTime;
@@ -23,7 +24,11 @@ public class AttendanceBackfillService {
     private final FamilyAccessService familyAccessService;
     private final UserFamilyRoleService userFamilyRoleService;
 
+    @Value("${app.backfill.attendance-for-user:false}")
+    private boolean backfillEnabled;
+
     public void backfillForUser(User user) {
+        if (!backfillEnabled) return;
         if (user == null || user.getId() == null) return;
 
         for (String familyBase : assignedFamilyBases(user)) {

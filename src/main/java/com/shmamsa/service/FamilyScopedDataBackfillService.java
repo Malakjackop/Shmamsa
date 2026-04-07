@@ -12,6 +12,7 @@ import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.ResourceFileRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,8 +26,12 @@ public class FamilyScopedDataBackfillService {
     private final EventRepository eventRepository;
     private final FamilyAccessService familyAccessService;
 
+    @Value("${app.backfill.family-scoped-on-startup:false}")
+    private boolean backfillOnStartup;
+
     @PostConstruct
     public void backfill() {
+        if (!backfillOnStartup) return;
         backfillAttendance();
         backfillGradeSheets();
         backfillResources();

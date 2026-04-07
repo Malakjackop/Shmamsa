@@ -1,23 +1,18 @@
 
 import { Component, OnInit, inject } from '@angular/core';
-import { FamilyService } from '../services/family.service';
+import { FamilyService, FamilyAttendanceRecord, FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
 import { AdminService } from '../services/admin.service';
-import { AuthService } from '../services/auth.service';
+import { AuthService, AuthUser } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { AttendanceService } from '../services/attendance.service';
 import type { AttendanceType } from '../services/attendance.service';
 import { ConfirmationService } from 'primeng/api';
+import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
 
-type Member = {
+type Member = FamilyMemberSummary & {
   id: number;
-  fullName: string;
   role: string;
-  familyName?: string;
   deaconFamily: string;
-  familyAssignments?: Array<{ familyId?: number; familyName?: string; roleCode?: number; role?: string; assignmentOrder?: number }>;
-  address?: string;
-  phoneNumber?: string;
-  guardiansPhone?: string;
   // backward compatible fields (present count)
   fridayLiturgy: number;
   tasbeeha: number;
@@ -73,7 +68,7 @@ export class FamilyComponent implements OnInit {
 
 
 
-  me: any;
+  me: AuthUser | null = null;
   members: Member[] = [];
   families: string[] = [];
   selectedFamily = '';
@@ -89,7 +84,7 @@ export class FamilyComponent implements OnInit {
   }
 
   profileFor: Member | null = null;
-  profile: any = null;
+  profile: FamilyMemberDetails = null;
 
   allRoles: string[] = [];
 
@@ -105,11 +100,15 @@ export class FamilyComponent implements OnInit {
   }
 
   isAminKhedmaOrDev(): boolean {
-    return this.me?.role === 'AMIN_KHEDMA' || this.me?.role === 'DEVELOPER';
+    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role));
   }
 
   canEditRoles(): boolean {
     return this.isAminKhedmaOrDev();
+  }
+
+  canResetAttendance(): boolean {
+    return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role));
   }
 
   private assignmentsOf(entity: any): Array<{ familyName: string; role: string }> {
@@ -117,7 +116,7 @@ export class FamilyComponent implements OnInit {
     return assignments
       .map((x: any) => ({
         familyName: String(x?.familyName || '').trim(),
-        role: String(x?.role || entity?.role || '').trim().toUpperCase()
+        role: normalizeAssignmentRole(x, entity?.role)
       }))
       .filter((x: any) => !!x.familyName);
   }
@@ -150,7 +149,7 @@ export class FamilyComponent implements OnInit {
 
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
-        this.members = (m as any) || [];
+        this.members = (m || []) as Member[];
         this.resetMode = false;
         this.selectedIds.clear();
         this.loading = false;
@@ -173,17 +172,31 @@ export class FamilyComponent implements OnInit {
     const famParam = this.isAminKhedmaOrDev() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
-      next: (d) => (this.details = this.filterOutArchivedRows((d as any) || [])),
+      next: (d) => (this.details = this.filterOutArchivedRows(d || [])),
       error: () => (this.details = [])
     });
   }
 
-  private filterOutArchivedRows(rows: any[]): AttendanceRow[] {
-    return (Array.isArray(rows) ? rows : []).filter((r) => !this.isArchivedRow(r)) as AttendanceRow[];
+  private filterOutArchivedRows(rows: FamilyAttendanceRecord[]): AttendanceRow[] {
+    return (Array.isArray(rows) ? rows : []).filter((r) => !this.isArchivedRow(r)).map((row) => ({
+      id: Number(row.id ?? row.attendanceId ?? 0),
+      type: String(row.type ?? row.attendanceType ?? 'FAMILY_MEETING') as AttendanceType,
+      date: String(row.date ?? row.attendanceDate ?? row.day ?? ''),
+      time: row.time ? String(row.time) : undefined,
+      createdAt: row.createdAt ? String(row.createdAt) : undefined,
+      status: row.status === 'ABSENT' ? 'ABSENT' : row.status === 'PRESENT' ? 'PRESENT' : undefined,
+      takenBy: row.takenBy && typeof row.takenBy === 'object'
+        ? {
+            id: Number(row.takenBy.id ?? 0),
+            fullName: String(row.takenBy.fullName ?? ''),
+            role: String(row.takenBy.role ?? '')
+          }
+        : null
+    }));
   }
 
-  private isArchivedRow(row: any): boolean {
-    const isTrue = (v: any) => {
+  private isArchivedRow(row: FamilyAttendanceRecord): boolean {
+    const isTrue = (v: unknown) => {
       const s = String(v ?? '').trim().toLowerCase();
       return v === true || v === 1 || s === 'true' || s === 'yes' || s === 'y';
     };
@@ -280,7 +293,7 @@ export class FamilyComponent implements OnInit {
     this.profile = null;
   }
 
-  async copyPhone(value: any) {
+  async copyPhone(value: unknown) {
     const phone = String(value ?? '').trim();
     if (!phone) return;
 
@@ -311,11 +324,11 @@ export class FamilyComponent implements OnInit {
   }
 
   rolesForMember(member: Member): string[] {
-    const currentRole = String(member?.role || '').toUpperCase();
+    const currentRole = normalizeRole(member?.role);
     return (this.allRoles || []).filter((role) => {
-      const candidate = String(role || '').toUpperCase();
-      if (candidate === 'ADMIN' || candidate === 'ROLE_ADMIN') return false;
-      if (candidate === 'DEVELOPER' || candidate === 'DEV' || candidate === 'ROLE_DEVELOPER') return false;
+      const candidate = normalizeRole(role);
+      if (candidate === 'ADMIN') return false;
+      if (candidate === 'DEVELOPER') return false;
       if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
       return true;
     });
@@ -327,7 +340,7 @@ export class FamilyComponent implements OnInit {
     this.adminSvc.changeRole(member.id, newRole).subscribe({
       next: () => {
         this.message.add({ severity: 'success', summary: 'Updated', detail: 'Role updated' });
-        member.role = newRole;
+        this.loadMembers();
       },
       error: (err) => {
         this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed' });
@@ -343,9 +356,6 @@ export class FamilyComponent implements OnInit {
           role: m.role,
           familyName: this.assignmentsOf(m)[0]?.familyName || m.deaconFamily,
           deaconFamily: this.assignmentsOf(m)[0]?.familyName || m.deaconFamily,
-          address: m.address,
-          phoneNumber: m.phoneNumber,
-          guardiansPhone: m.guardiansPhone,
         fridayLiturgy: m.fridayLiturgy,
         tasbeeha: m.tasbeeha,
         familyMeeting: m.familyMeeting
@@ -369,11 +379,8 @@ export class FamilyComponent implements OnInit {
       doc.text(`Family: ${this.selectedFamily || ''}`, 14, 14);
 
       const body = this.members.map((m) => [
-        m.fullName,
-        m.role,
-        m.address || '',
-        m.phoneNumber || '',
-        m.guardiansPhone || '',
+        String(m.fullName || ''),
+        String(m.role || ''),
         String(m.fridayLiturgy),
         String(m.tasbeeha),
         String(m.familyMeeting)
@@ -381,7 +388,7 @@ export class FamilyComponent implements OnInit {
       
 
       autoTable(doc, {
-        head: [['Name', 'Role', 'Address', 'Phone', "Father's phone", 'Friday Liturgy', 'Tasbeeha', 'Family Meeting']],
+        head: [['Name', 'Role', 'Friday Liturgy', 'Tasbeeha', 'Family Meeting']],
         body
       });
 
@@ -391,6 +398,7 @@ export class FamilyComponent implements OnInit {
     }
   }
   onResetButton() {
+  if (!this.canResetAttendance()) return;
   // أول ضغطة: فعّل وضع الاختيار واظهر الـ checkboxes
   if (!this.resetMode) {
     this.resetMode = true;
@@ -435,6 +443,7 @@ toggleSelectOne(member: Member, ev: any) {
 }
 
 resetAttendance() {
+  if (!this.canResetAttendance()) return;
   const ids = Array.from(this.selectedIds);
   if (ids.length === 0) {
     this.message.add({ severity: 'warn', summary: 'No selection', detail: 'اختار عضو واحد على الأقل' });

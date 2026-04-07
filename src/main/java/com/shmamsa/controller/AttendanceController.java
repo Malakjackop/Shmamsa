@@ -99,15 +99,7 @@ public class AttendanceController {
 
     @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody Map<String, Object> body, Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User servant = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
-
-        Set<String> allowed = Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER");
-        if (servant.getRole() == null || !allowed.contains(servant.getRole())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
-        }
+        User servant = requireAttendanceActor(auth);
 
         Object typeObj = body.get("type");
         Object usersObj = body.get("users");
@@ -282,7 +274,9 @@ public class AttendanceController {
     }
 
     @PostMapping("/scan-token")
-    public ResponseEntity<?> scanToken(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> scanToken(@RequestBody Map<String, String> body, Authentication auth) {
+        User servant = requireAttendanceActor(auth);
+
         String token = body.get("token");
         Long userId = qrTokenService.verifyAndExtractUserId(token);
         if (userId == null) return ResponseEntity.badRequest().body(Map.of("error", "Invalid token"));
@@ -290,45 +284,45 @@ public class AttendanceController {
         User u = userRepo.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
 
-        AttendanceType selectedType = null;
         String typeRaw = body.get("type");
-        if (typeRaw != null && !typeRaw.isBlank()) {
-            try {
-                selectedType = AttendanceType.valueOf(typeRaw.trim());
-            } catch (Exception ignored) {
-                selectedType = null;
-            }
+        if (typeRaw == null || typeRaw.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "type is required");
+        }
+        AttendanceType selectedType;
+        try {
+            selectedType = AttendanceType.valueOf(typeRaw.trim());
+        } catch (Exception ignored) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
         }
 
-        LocalDate selectedDate = null;
         String dateRaw = body.get("date");
-        if (dateRaw != null && !dateRaw.isBlank()) {
-            try {
-                selectedDate = LocalDate.parse(dateRaw.trim());
-            } catch (Exception ignored) {
-                selectedDate = null;
-            }
+        if (dateRaw == null || dateRaw.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "date is required");
+        }
+        LocalDate selectedDate;
+        try {
+            selectedDate = LocalDate.parse(dateRaw.trim());
+        } catch (Exception ignored) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
         }
 
-        String familyBase = null;
-        Long familyId = null;
         String familyRaw = body.get("family");
-        if (selectedType == AttendanceType.FAMILY_MEETING && familyRaw != null && !familyRaw.isBlank()) {
-            familyBase = familyAccessService.baseNameForName(familyRaw.trim());
-            familyId = familyAccessService.familyIdForName(familyBase);
+        ScopeResult scope = resolveScopeUsers(servant, selectedType, familyRaw);
+        boolean inScope = scope.users.stream()
+                .anyMatch(member -> member != null && Objects.equals(member.getId(), u.getId()));
+        if (!inScope) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "User not in scope");
         }
 
         AttendanceRecord existing = null;
-        if (selectedType != null && selectedDate != null) {
-            if (familyId != null) {
-                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(
-                        u.getId(), selectedDate, selectedType, familyId
-                );
-            } else if (selectedType != null) {
-                existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(
-                        u.getId(), selectedDate, selectedType
-                );
-            }
+        if (scope.familyId != null) {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(
+                    u.getId(), selectedDate, selectedType, scope.familyId
+            );
+        } else {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(
+                    u.getId(), selectedDate, selectedType
+            );
         }
 
         boolean alreadyRecorded = existing != null;
@@ -655,6 +649,14 @@ public class AttendanceController {
         if (!allowed.contains(role)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
+    }
+
+    private User requireAttendanceActor(Authentication auth) {
+        if (auth == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        User servant = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        assertServantCanEditAttendance(servant);
+        return servant;
     }
 
     private void enforceWeekClose(User servant, LocalDate selectedDate) {
