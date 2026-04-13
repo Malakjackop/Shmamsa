@@ -8,6 +8,8 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import jakarta.validation.constraints.Pattern;
 
+import java.util.Map;
+
 @Data
 @DifferentParentPhones(message = "رقم ولي الأمر يجب أن يكون مختلفًا عن الرقم الشخصي")
 public class RegisterServantRequest implements HasParentPhones {
@@ -79,4 +81,7 @@ public class RegisterServantRequest implements HasParentPhones {
 
     private Boolean isWorking;
     private String workDetails;
+
+    /** Dynamic custom fields: key → value */
+    private Map<String, String> customFields;
 }

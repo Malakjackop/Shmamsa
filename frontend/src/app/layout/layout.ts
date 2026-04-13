@@ -54,6 +54,11 @@ ngOnInit(): void {
     return ['AMIN_KHEDMA', 'DEVELOPER'].includes(r);
   }
 
+  isDeveloper(): boolean {
+    const r = normalizeRole(this.user?.role);
+    return r === 'DEVELOPER';
+  }
+
   private servedFamiliesCount(): number {
     const families = Array.isArray(this.user?.familyAssignments)
       ? this.user.familyAssignments

@@ -279,6 +279,35 @@
         </div>
       </div>
 
+      <!-- ── Dynamic Custom Fields ────────────────────────────────────── -->
+      <ng-container *ngIf="customFields.length > 0">
+        <div class="input-row" *ngFor="let f of customFields">
+          <div class="input-group small" *ngIf="isCustomFieldVisible(f)">
+            <!-- Text Input -->
+            <input *ngIf="f.fieldType === 'TEXT'"
+                   type="text"
+                   [formControlName]="'custom_' + f.fieldKey"
+                   [placeholder]="f.labelAr"
+                   [required]="f.required"
+                   (blur)="markTouched('custom_' + f.fieldKey)" />
+
+            <!-- Select Selection -->
+            <select *ngIf="f.fieldType === 'SELECT'"
+                    class="form-select"
+                    [formControlName]="'custom_' + f.fieldKey"
+                    [required]="f.required"
+                    (change)="markTouchedFromList('custom_' + f.fieldKey)">
+              <option value="" disabled>{{ f.labelAr }}</option>
+              <option *ngFor="let opt of getCustomFieldOptions(f)" [value]="opt">{{ opt }}</option>
+            </select>
+
+            <small class="error-text" *ngIf="shouldShowError('custom_' + f.fieldKey)">
+              {{ errorText('custom_' + f.fieldKey, f.labelAr) }}
+            </small>
+          </div>
+        </div>
+      </ng-container>
+
       <!-- Password Section -->
       <div class="input-row">
         <div class="input-group small password-group">

@@ -8,7 +8,11 @@ import com.shmamsa.dto.ResetPasswordRequest;
 import com.shmamsa.dto.RegisterRequest;
 import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.exception.ApiException;
+import com.shmamsa.model.CustomFieldValue;
+import com.shmamsa.model.CustomRegistrationField;
 import com.shmamsa.model.User;
+import com.shmamsa.repository.CustomFieldValueRepository;
+import com.shmamsa.repository.CustomRegistrationFieldRepository;
 import com.shmamsa.service.AttendanceBackfillService;
 import com.shmamsa.service.AuthService;
 import com.shmamsa.service.FamilyAccessService;
@@ -24,6 +28,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -36,6 +41,8 @@ public class AuthController {
     private final FamilyCatalogService familyCatalogService;
     private final FamilyAccessService familyAccessService;
     private final UserFamilyRoleService userFamilyRoleService;
+    private final CustomRegistrationFieldRepository customFieldRepo;
+    private final CustomFieldValueRepository customFieldValueRepo;
 
     private Map<String, Object> toCurrentUserView(User user) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -76,13 +83,28 @@ public class AuthController {
         out.put("deaconFamilyRole3", familyAccessService.thirdFamilyRole(user));
         out.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(user));
         out.put("familyAssignments", user.getFamilyAssignments());
+
+        // Attach custom field values
+        List<CustomFieldValue> cfValues = customFieldValueRepo.findAllByUserId(user.getId());
+        Map<String, String> customFields = new LinkedHashMap<>();
+        for (CustomFieldValue cv : cfValues) {
+            customFields.put(cv.getFieldKey(), cv.getValue());
+        }
+        out.put("customFields", customFields);
+
         return out;
     }
 
 
+    @GetMapping("/custom-fields")
+    public ResponseEntity<List<CustomRegistrationField>> publicCustomFields() {
+        return ResponseEntity.ok(customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc());
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
+        User saved = authService.register(request);
+        saveCustomFieldValues(saved, request.getCustomFields());
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
@@ -90,7 +112,8 @@ public class AuthController {
 
 @PostMapping("/register-servant")
 public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
-    authService.registerServant(request);
+    User saved = authService.registerServant(request);
+    saveCustomFieldValues(saved, request.getCustomFields());
     return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
 }
 
@@ -209,5 +232,30 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
 
             userFamilyRoleService.syncUser(existingUser);
             return ResponseEntity.ok(toCurrentUserView(existingUser));
+    }
+
+    // ── Save custom field values for a newly registered user ──────────
+    private void saveCustomFieldValues(User user, Map<String, String> customFields) {
+        if (customFields == null || customFields.isEmpty() || user == null || user.getId() == null) return;
+
+        List<CustomRegistrationField> enabledFields = customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc();
+        var allowedKeys = new java.util.HashSet<String>();
+        for (CustomRegistrationField f : enabledFields) {
+            allowedKeys.add(f.getFieldKey());
+        }
+
+        for (var entry : customFields.entrySet()) {
+            String key = entry.getKey();
+            String val = entry.getValue();
+            if (key == null || key.isBlank() || !allowedKeys.contains(key)) continue;
+            if (val == null) val = "";
+
+            CustomFieldValue cfv = CustomFieldValue.builder()
+                    .userId(user.getId())
+                    .fieldKey(key)
+                    .value(val.trim())
+                    .build();
+            customFieldValueRepo.save(cfv);
+        }
     }
 }

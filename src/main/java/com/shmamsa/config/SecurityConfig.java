@@ -39,6 +39,7 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/register-servant",
                                 "/api/auth/family-options",
+                                "/api/auth/custom-fields",
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password",
                                 "/api/auth/user"
@@ -51,6 +52,9 @@ public class SecurityConfig {
 .requestMatchers("/api/family/**")
 .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
                         
+
+.requestMatchers("/api/dev/**")
+.hasRole("DEVELOPER")
 
 .requestMatchers("/api/admin/**")
 .hasAnyRole("AMIN_KHEDMA","DEVELOPER")
