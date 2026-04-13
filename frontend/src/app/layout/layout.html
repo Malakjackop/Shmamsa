@@ -68,6 +68,10 @@
           <i class="pi pi-calendar"></i>
           <span *ngIf="!isSidebarCollapsed">بدء سنة جديدة</span>
         </li>
+        <li *ngIf="isDeveloper()" routerLink="/dev-settings" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'إعدادات المطور' : null">
+          <i class="pi pi-cog"></i>
+          <span *ngIf="!isSidebarCollapsed">إعدادات المطور</span>
+        </li>
       </ng-container>
     </ul>
 

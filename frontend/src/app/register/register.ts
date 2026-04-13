@@ -1,9 +1,10 @@
 import { Component, Input, OnInit, PLATFORM_ID, inject } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors, ValidatorFn, FormControl } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
+import { DevSettingsService, CustomField } from '../services/dev-settings.service';
 
 import { ToastModule } from 'primeng/toast';
 import { ButtonModule } from 'primeng/button';
@@ -53,6 +54,9 @@ export class RegisterComponent implements OnInit {
   memberFamilyOptions: FamilyOption[] = [];
   servantWhereOptions: FamilyOption[] = [];
 
+  customFields: CustomField[] = [];
+  private devSettingsService = inject(DevSettingsService);
+
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
@@ -64,6 +68,7 @@ export class RegisterComponent implements OnInit {
     this.buildForm();
     if (isPlatformBrowser(this.platformId)) {
       this.loadFamilyOptions();
+      this.loadCustomFields();
     } else if (this.isServant) {
       this.servantWhereOptions = this.fallbackServantWhereOptions();
     } else {
@@ -233,6 +238,45 @@ export class RegisterComponent implements OnInit {
       { nameAr: 'خورس مارمرقس' },
       { nameAr: 'خورس البابا اثناسيوس' }
     ];
+  }
+
+  /* ── Custom fields ───────────────────────────────── */
+  private loadCustomFields(): void {
+    this.devSettingsService.getEnabledFields().subscribe({
+      next: (fields) => {
+        this.customFields = fields || [];
+        // Add dynamic form controls
+        for (const f of this.customFields) {
+          const validators = f.required ? [Validators.required] : [];
+          this.registerForm.addControl('custom_' + f.fieldKey, new FormControl('', validators));
+        }
+      },
+      error: () => {
+        this.customFields = [];
+      }
+    });
+  }
+
+  isCustomFieldVisible(f: CustomField): boolean {
+    const rule = f.visibilityRule;
+    if (rule === 'ALWAYS') return true;
+    if (rule === 'MEMBER_ONLY') return !this.isServant;
+    if (rule === 'SERVANT_ONLY') return this.isServant;
+
+    const status = this.registerForm.get('status')?.value;
+    const studyType = this.registerForm.get('studyType')?.value;
+
+    if (rule === 'STUDENT_ONLY') return status === 'student';
+    if (rule === 'STUDENT_SCHOOL') return status === 'student' && studyType === 'school';
+    if (rule === 'STUDENT_UNIVERSITY') return status === 'student' && studyType === 'university';
+    if (rule === 'GRADUATE_ONLY') return status === 'graduate';
+
+    return true;
+  }
+
+  getCustomFieldOptions(f: CustomField): string[] {
+    if (!f.options) return [];
+    return f.options.split(',').map(o => o.trim()).filter(Boolean);
   }
 
   private arabicTextOnly(allowNumbers = false): ValidatorFn {
@@ -726,7 +770,16 @@ private guardianNotSameAsPhone(): ValidatorFn {
       guardianRelation: formValue.guardianRelation,
 
       secret: String(formValue.secret || '').trim(),
+      customFields: {}
     };
+
+    // Extract custom fields values
+    for (const key in formValue) {
+      if (key.startsWith('custom_') && formValue[key] !== undefined && formValue[key] !== null) {
+        const fieldKey = key.substring(7); // remove 'custom_'
+        payload.customFields[fieldKey] = formValue[key];
+      }
+    }
 
     if (this.isServant) {
   payload.servingWhere = this.familyNameFromValue(formValue.servingWhere, this.servantWhereOptions);

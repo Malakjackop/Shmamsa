@@ -26,6 +26,7 @@ import { AttendanceHistoryComponent } from './attendance-history/attendance-hist
 import { TransferMembersComponent } from './transfer-members/transfer-members';
 import { StartNewYearComponent } from './start-new-year/start-new-year';
 import { GradesComponent } from './grades/grades';
+import { DevSettingsComponent } from './dev-settings/dev-settings';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -75,6 +76,7 @@ import { TableModule } from 'primeng/table';
     RegisterComponent,
     RegisterServantComponent,
     AttendanceHistoryComponent,
+    DevSettingsComponent,
     AppRoutingModule,
     HttpClientModule,
     ReactiveFormsModule,

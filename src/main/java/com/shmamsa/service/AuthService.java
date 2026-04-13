@@ -94,7 +94,7 @@ public class AuthService {
     }
 
 
-    public void register(RegisterRequest request) {
+    public User register(RegisterRequest request) {
         if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "Passwords do not match");
         }
@@ -180,10 +180,11 @@ public class AuthService {
         attendanceBackfillService.backfillForUser(user);
 
         khorsJoinRequestService.createForUserIfNeeded(user, requestedKhors);
+        return user;
     }
 
 
-    public void registerServant(RegisterServantRequest request) {
+    public User registerServant(RegisterServantRequest request) {
         if (!servantSecretService.validateSecret(request.getSecret())) {
             throw new ApiException(
                     HttpStatus.FORBIDDEN,
@@ -349,6 +350,7 @@ public class AuthService {
         attendanceBackfillService.backfillForUser(user);
 
         khorsJoinRequestService.createForUserIfNeeded(user, requestedAttendKhors);
+        return user;
 
     }
 

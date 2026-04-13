@@ -7,6 +7,7 @@ import { RegisterServantComponent } from './register-servant/register-servant';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password';
 import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
+import { DevSettingsComponent } from './dev-settings/dev-settings';
 
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
@@ -80,6 +81,12 @@ const routes: Routes = [
         component: StartNewYearComponent,
         canActivate: [RoleGuard],
         data: { roles: ['AMIN_KHEDMA','DEVELOPER'] }
+      },
+      {
+        path: 'dev-settings',
+        component: DevSettingsComponent,
+        canActivate: [RoleGuard],
+        data: { roles: ['DEVELOPER'] }
       }
     ]
   },
