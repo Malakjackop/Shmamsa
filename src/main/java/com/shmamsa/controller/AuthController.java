@@ -14,6 +14,8 @@ import com.shmamsa.model.User;
 import com.shmamsa.repository.CustomFieldValueRepository;
 import com.shmamsa.repository.CustomRegistrationFieldRepository;
 import com.shmamsa.service.AttendanceBackfillService;
+import com.shmamsa.service.AttendanceAccessGrantService;
+import com.shmamsa.service.AttendanceConfigService;
 import com.shmamsa.service.AuthService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.FamilyCatalogService;
@@ -43,6 +45,8 @@ public class AuthController {
     private final UserFamilyRoleService userFamilyRoleService;
     private final CustomRegistrationFieldRepository customFieldRepo;
     private final CustomFieldValueRepository customFieldValueRepo;
+    private final AttendanceAccessGrantService attendanceAccessGrantService;
+    private final AttendanceConfigService attendanceConfigService;
 
     private Map<String, Object> toCurrentUserView(User user) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -92,6 +96,13 @@ public class AuthController {
         }
         out.put("customFields", customFields);
 
+        var activeGrants = attendanceAccessGrantService.activeGrantsForUser(user.getId());
+        out.put("activeAttendanceGrants", activeGrants.stream().map(attendanceAccessGrantService::toView).toList());
+        out.put("canOpenAttendance", !activeGrants.isEmpty() || java.util.Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER").contains(
+                familyAccessService.normalizeRole(user.getRole())
+        ));
+        out.put("attendanceConfig", attendanceConfigService.getAttendanceConfig());
+
         return out;
     }
 
@@ -108,14 +119,14 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
-    
 
-@PostMapping("/register-servant")
-public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
-    User saved = authService.registerServant(request);
-    saveCustomFieldValues(saved, request.getCustomFields());
-    return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
-}
+
+    @PostMapping("/register-servant")
+    public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
+        User saved = authService.registerServant(request);
+        saveCustomFieldValues(saved, request.getCustomFields());
+        return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
+    }
 
     @GetMapping("/family-options")
     public ResponseEntity<java.util.List<FamilyOptionDto>> familyOptions(
@@ -214,24 +225,24 @@ public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequ
             }
         }
 
-            existingUser.setFullName(updated.getFullName());
-            existingUser.setPhoneNumber(updated.getPhoneNumber());
-            existingUser.setAddress(updated.getAddress());
-            existingUser.setGuardiansPhone(updated.getGuardiansPhone());
-            existingUser.setGuardianRelation(updated.getGuardianRelation());
-            existingUser.setSchoolName(updated.getSchoolName());
-            existingUser.setSchoolGrade(updated.getSchoolGrade());
-            existingUser.setUniversityName(updated.getUniversityName());
-            existingUser.setFaculty(updated.getFaculty());
-            existingUser.setUniversityGrade(updated.getUniversityGrade());
-            existingUser.setGraduatedFrom(updated.getGraduatedFrom());
-            existingUser.setGraduateJob(updated.getGraduateJob());
-            existingUser.setWorkDetails(updated.getWorkDetails());
+        existingUser.setFullName(updated.getFullName());
+        existingUser.setPhoneNumber(updated.getPhoneNumber());
+        existingUser.setAddress(updated.getAddress());
+        existingUser.setGuardiansPhone(updated.getGuardiansPhone());
+        existingUser.setGuardianRelation(updated.getGuardianRelation());
+        existingUser.setSchoolName(updated.getSchoolName());
+        existingUser.setSchoolGrade(updated.getSchoolGrade());
+        existingUser.setUniversityName(updated.getUniversityName());
+        existingUser.setFaculty(updated.getFaculty());
+        existingUser.setUniversityGrade(updated.getUniversityGrade());
+        existingUser.setGraduatedFrom(updated.getGraduatedFrom());
+        existingUser.setGraduateJob(updated.getGraduateJob());
+        existingUser.setWorkDetails(updated.getWorkDetails());
 
-            authService.saveUser(existingUser);
+        authService.saveUser(existingUser);
 
-            userFamilyRoleService.syncUser(existingUser);
-            return ResponseEntity.ok(toCurrentUserView(existingUser));
+        userFamilyRoleService.syncUser(existingUser);
+        return ResponseEntity.ok(toCurrentUserView(existingUser));
     }
 
     // ── Save custom field values for a newly registered user ──────────

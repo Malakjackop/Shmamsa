@@ -22,19 +22,21 @@
         <span *ngIf="!isSidebarCollapsed">الصفحة الرئيسية</span>
       </li>
 
-      <ng-container *ngIf="isServantOrAbove();  ">
+      <ng-container *ngIf="canOpenAttendance()">
         <li routerLink="/attendance" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'تسجيل الحضور' : null">
           <i class="pi pi-check-square"></i>
           <span *ngIf="!isSidebarCollapsed">تسجيل الحضور</span>
         </li>
-        <li routerLink="/family-attendance" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? (usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره') : null">
-          <i class="pi pi-users"></i>
-          <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره' }}</span>
-        </li>
-        <li routerLink="/family-info" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? (usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره') : null">
-          <i class="pi pi-id-card"></i>
-          <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره' }}</span>
-        </li>
+        <ng-container *ngIf="canOpenFamilyTools()">
+          <li routerLink="/family-attendance" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? (usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره') : null">
+            <i class="pi pi-users"></i>
+            <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره' }}</span>
+          </li>
+          <li routerLink="/family-info" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? (usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره') : null">
+            <i class="pi pi-id-card"></i>
+            <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره' }}</span>
+          </li>
+        </ng-container>
         <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الانتقلات' : null">
           <i class="pi pi-send"></i>
           <span *ngIf="!isSidebarCollapsed">الانتقلات</span>
@@ -63,7 +65,7 @@
         <span *ngIf="!isSidebarCollapsed">من نحن</span>
       </li>
 
-      <ng-container *ngIf="isServantOrAbove(); ">
+      <ng-container *ngIf="isServantOrAbove()">
         <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'بدء سنة جديدة' : null">
           <i class="pi pi-calendar"></i>
           <span *ngIf="!isSidebarCollapsed">بدء سنة جديدة</span>
@@ -87,8 +89,3 @@
     <router-outlet></router-outlet>
   </main>
 </div>
-
-
-
-
-

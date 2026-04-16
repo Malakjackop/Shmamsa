@@ -2,13 +2,15 @@ import { Injectable, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export type AttendanceType =
   | 'FRIDAY_LITURGY'
   | 'MARMARKOS_KHORS'
   | 'ATHANASIUS_KHORS'
   | 'TASBEEHA'
-  | 'FAMILY_MEETING';
+  | 'FAMILY_MEETING'
+  | 'CUSTOM_EVENT';
 
 export type AttendancePerson = {
   id: number;
@@ -53,6 +55,53 @@ export type AttendanceMutationResponse = {
   [key: string]: unknown;
 } | null;
 
+export type AttendanceConfig = {
+  servantEntryOpenDays: number[];
+  servantSelectableEventDays: number[];
+  allowCustomTitleOnNonDefaultDays: boolean;
+  typeLabels: Record<string, string>;
+  typeDays: Partial<Record<AttendanceType, number[]>>;
+  familyTypeDays?: Record<string, Partial<Record<AttendanceType, number[]>>>;
+  familyAbsenceAllowedDays?: Record<string, number[]>;
+  familyAbsenceOpenDays?: Record<string, number[]>;
+};
+
+export type AttendanceAccessGrant = {
+  id?: number;
+  targetUserId?: number;
+  targetUserName?: string;
+  targetUserRole?: string;
+  createdById?: number;
+  createdByName?: string;
+  grantKind: 'SELF_CHECKIN' | 'TAKE_ATTENDANCE';
+  familyId?: number | null;
+  familyBase?: string | null;
+  allowedTypes: AttendanceType[];
+  note?: string | null;
+  startsAt: string;
+  endsAt: string;
+  enabled?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AttendanceContext = {
+  config: AttendanceConfig;
+  role?: string;
+  todayOpenForServant: boolean;
+  activeGrants: AttendanceAccessGrant[];
+  selfCheckinAllowed: boolean;
+  takeAttendanceGrantActive: boolean;
+  selfAllowedTypes: AttendanceType[];
+  takeAllowedTypes: AttendanceType[];
+  canUseCustomEvent: boolean;
+};
+
+export type AttendanceConfigResponse = {
+  config: AttendanceConfig;
+  manageableFamilies?: string[];
+};
+
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
   private http = inject(HttpClient);
@@ -63,8 +112,33 @@ export class AttendanceService {
     this.isBrowser = isPlatformBrowser(platformId);
   }
 
+  context(): Observable<AttendanceContext> {
+    if (!this.isBrowser) {
+      return of({
+        config: {
+          servantEntryOpenDays: [4, 5, 6, 0, 1],
+          servantSelectableEventDays: [4, 5, 6],
+          allowCustomTitleOnNonDefaultDays: true,
+          typeLabels: {},
+          typeDays: {},
+          familyTypeDays: {},
+          familyAbsenceAllowedDays: {},
+          familyAbsenceOpenDays: {}
+        },
+        todayOpenForServant: true,
+        activeGrants: [],
+        selfCheckinAllowed: false,
+        takeAttendanceGrantActive: false,
+        selfAllowedTypes: [],
+        takeAllowedTypes: [],
+        canUseCustomEvent: false
+      });
+    }
+    return this.http.get<AttendanceContext>(`${this.baseUrl}/context`, { withCredentials: true });
+  }
+
   daily(
-    date: string, // yyyy-MM-dd
+    date: string,
     type: AttendanceType,
     family?: string
   ): Observable<DailyAttendanceResponse> {
@@ -100,13 +174,23 @@ export class AttendanceService {
   submit(
     users: { id: number; username?: string }[],
     type: AttendanceType,
-    date?: string, // yyyy-MM-dd
-    family?: string
+    date?: string,
+    family?: string,
+    customTitle?: string
   ): Observable<AttendanceMutationResponse> {
     if (!this.isBrowser) return of(null);
     return this.http.post<AttendanceMutationResponse>(
       `${this.baseUrl}/submit`,
-      { users, type, date, family },
+      { users, type, date, family, customTitle },
+      { withCredentials: true }
+    );
+  }
+
+  selfCheckin(type: AttendanceType, date?: string): Observable<AttendanceMutationResponse> {
+    if (!this.isBrowser) return of(null);
+    return this.http.post<AttendanceMutationResponse>(
+      `${this.baseUrl}/self-checkin`,
+      { type, date },
       { withCredentials: true }
     );
   }
@@ -122,6 +206,7 @@ export class AttendanceService {
     fullName: string;
     familyName?: string;
     deaconFamily?: string;
+    effectiveFamilyBase?: string;
     alreadyRecorded?: boolean;
     alreadyPresent?: boolean;
     existingStatus?: 'PRESENT' | 'ABSENT' | null;
@@ -139,6 +224,7 @@ export class AttendanceService {
       fullName: string;
       familyName?: string;
       deaconFamily?: string;
+      effectiveFamilyBase?: string;
       alreadyRecorded?: boolean;
       alreadyPresent?: boolean;
       existingStatus?: 'PRESENT' | 'ABSENT' | null;
@@ -146,6 +232,65 @@ export class AttendanceService {
       `${this.baseUrl}/scan-token`,
       { token, date, type, family }
     , { withCredentials: true });
+  }
+
+  listAccessGrants(): Observable<AttendanceAccessGrant[]> {
+    if (!this.isBrowser) return of([]);
+    return this.http.get<AttendanceAccessGrant[]>(`${this.baseUrl}/access-grants`, { withCredentials: true });
+  }
+
+  createAccessGrant(payload: Partial<AttendanceAccessGrant>): Observable<AttendanceAccessGrant> {
+    return this.http.post<AttendanceAccessGrant>(`${this.baseUrl}/access-grants`, payload, { withCredentials: true });
+  }
+
+  updateAccessGrant(id: number, payload: Partial<AttendanceAccessGrant>): Observable<AttendanceAccessGrant> {
+    return this.http.put<AttendanceAccessGrant>(`${this.baseUrl}/access-grants/${id}`, payload, { withCredentials: true });
+  }
+
+  deleteAccessGrant(id: number): Observable<{ ok: boolean; id: number }> {
+    return this.http.delete<{ ok: boolean; id: number }>(`${this.baseUrl}/access-grants/${id}`, { withCredentials: true });
+  }
+
+  getAttendanceConfig(): Observable<AttendanceConfigResponse> {
+    if (!this.isBrowser) {
+      return of({
+        config: {
+          servantEntryOpenDays: [4, 5, 6, 0, 1],
+          servantSelectableEventDays: [4, 5, 6],
+          allowCustomTitleOnNonDefaultDays: true,
+          typeLabels: {},
+          typeDays: {},
+          familyTypeDays: {}
+        },
+        manageableFamilies: []
+      });
+    }
+    return this.http.get<AttendanceConfigResponse>(`${this.baseUrl}/config`, { withCredentials: true });
+  }
+
+  saveFamilyTypeDays(
+    familyBase: string,
+    typeDays: Partial<Record<AttendanceType, number[]>>,
+    absenceAllowedDays?: number[],
+    absenceOpenDays?: number[]
+  ): Observable<AttendanceConfig> {
+    if (!this.isBrowser) {
+      return of({
+        servantEntryOpenDays: [4, 5, 6, 0, 1],
+        servantSelectableEventDays: [4, 5, 6],
+        allowCustomTitleOnNonDefaultDays: true,
+        typeLabels: {},
+        typeDays: {},
+        familyTypeDays: { [familyBase]: typeDays },
+        familyAbsenceAllowedDays: { [familyBase]: absenceAllowedDays || [] },
+        familyAbsenceOpenDays: { [familyBase]: absenceOpenDays || [] }
+      });
+    }
+    return this.http.put<AttendanceConfig>(
+      `${this.baseUrl}/config/family-days`,
+      { familyBase, typeDays, absenceAllowedDays, absenceOpenDays },
+      { withCredentials: true }
+    );
   }
 
   getMyStats(): Observable<{
@@ -197,13 +342,11 @@ export class AttendanceService {
     return this.http.get<Record<string, unknown>[]>(`${this.baseUrl}/history`, { withCredentials: true });
   }
 
-  // (لو زرار reset القديم لسه مستخدمينه في أي مكان)
   resetAttendance(userIds: number[]): Observable<AttendanceMutationResponse> {
     if (!this.isBrowser) return of(null);
     return this.http.post<AttendanceMutationResponse>(`${this.baseUrl}/reset`, { userIds }, { withCredentials: true });
   }
 
-  // ====== أرشيفات الحضور ======
   archives(): Observable<AttendanceArchive[]> {
     if (!this.isBrowser) return of([]);
     return this.http.get<AttendanceArchive[]>(`${this.baseUrl}/archives`, { withCredentials: true });
@@ -217,7 +360,6 @@ export class AttendanceService {
       { withCredentials: true }
     );
   }
-
 
   downloadArchivePdf(id: number) {
     if (!this.isBrowser) return of(new Blob());

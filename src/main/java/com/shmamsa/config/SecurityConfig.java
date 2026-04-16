@@ -44,29 +44,29 @@ public class SecurityConfig {
                                 "/api/auth/reset-password",
                                 "/api/auth/user"
                         ).permitAll()
-                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/attendance/history").authenticated()
-                                .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/attendance/history").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()
 
                         .requestMatchers("/api/attendance/**")
+                        .authenticated()
+                        .requestMatchers("/api/family/**")
                         .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
-.requestMatchers("/api/family/**")
-.hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
-                        
 
-.requestMatchers("/api/dev/**")
-.hasRole("DEVELOPER")
 
-.requestMatchers("/api/admin/**")
-.hasAnyRole("AMIN_KHEDMA","DEVELOPER")
+                        .requestMatchers("/api/dev/**")
+                        .hasRole("DEVELOPER")
 
-                                .requestMatchers("/api/khors-requests/**")
-                                .hasAnyRole("KHADIM","AMIN_KHEDMA","DEVELOPER")
+                        .requestMatchers("/api/admin/**")
+                        .hasAnyRole("AMIN_KHEDMA","DEVELOPER")
 
-                                .requestMatchers("/api/khors/**")
-                                .hasAnyRole("AMIN_KHEDMA","DEVELOPER")
+                        .requestMatchers("/api/khors-requests/**")
+                        .hasAnyRole("KHADIM","AMIN_KHEDMA","DEVELOPER")
 
-                                .requestMatchers("/api/resources/**").authenticated()
-                                .anyRequest().authenticated()
+                        .requestMatchers("/api/khors/**")
+                        .hasAnyRole("AMIN_KHEDMA","DEVELOPER")
+
+                        .requestMatchers("/api/resources/**").authenticated()
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

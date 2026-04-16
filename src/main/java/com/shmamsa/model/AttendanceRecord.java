@@ -39,6 +39,8 @@ public class AttendanceRecord {
     @Column(length = 120)
     private String familyBase;
 
+    @Column(length = 200)
+    private String customTitle;
 
 
     @ManyToOne

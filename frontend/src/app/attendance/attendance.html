@@ -1,128 +1,943 @@
 <p-toast position="top-left"></p-toast>
 
-<div class="page">
-  <h1>الحضور</h1>
+<div class="page" dir="rtl">
+  <div class="page-header">
+    <div>
+      <h1>الحضور</h1>
+      <p class="page-subtitle">صفحة الحضور بقت مبنية على الإعدادات والتخصيصات بدل القيم الثابتة.</p>
+    </div>
 
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="side-title">اختار الأسرة</div>
+    <div class="page-badges">
+      <span class="status-badge status-badge--self" *ngIf="isSelfCheckinMode() && !blockedMessage">تسجيل ذاتي للمخدوم</span>
+      <span class="status-badge status-badge--servant" *ngIf="isDelegatedAttendanceMode() && !blockedMessage">تسجيل حضور بالتخصيص</span>
+      <span class="status-badge status-badge--servant" *ngIf="!isSelfCheckinMode() && isServantOrAbove() && !blockedMessage">تسجيل حضور للخدام</span>
+      <span class="status-badge status-badge--blocked" *ngIf="blockedMessage">مقفول حالياً</span>
+    </div>
+  </div>
 
-      <select class="familyDrop" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
-       <option value="" *ngIf="!isKhadim()">كل الأسر</option>
-       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
-      </select>
+  <div class="alert alert--danger" *ngIf="blockedMessage">
+    <i class="pi pi-lock"></i>
+    <div>
+      <div class="alert-title">صفحة الحضور غير متاحة الآن</div>
+      <div class="alert-body">{{ blockedMessage }}</div>
+    </div>
+  </div>
 
-    </aside>
+  <ng-container *ngIf="!blockedMessage">
+    <div class="alert alert--info" *ngIf="isSelfCheckinMode()">
+      <i class="pi pi-user"></i>
+      <div>
+        <div class="alert-title">تم فتح تسجيل ذاتي لك</div>
+        <div class="alert-body">تقدر تسجل حضورك فقط في الوقت والمناسبات اللي أمين الأسرة أو المطور محددها لك.</div>
+      </div>
+    </div>
 
-    <section class="content">
-      <div class="controls">
-        <label>اليوم</label>
-        <p-datepicker
-          [(ngModel)]="selectedDate"
-          (onSelect)="onDateChange()"
-          (onBlur)="onDateChange()"
-          [showIcon]="true"
-          panelStyleClass="attendanceDatePanel"
-          [disabledDays]="disabledDays"
-          [minDate]="minDate"
-          [maxDate]="maxDate"
-          [firstDayOfWeek]="firstDayOfWeek"
-          dateFormat="yy-mm-dd"
-          placeholder="اختار يوم (خميس/جمعة/سبت)"
-        ></p-datepicker>
+    <div class="alert alert--info" *ngIf="isDelegatedAttendanceMode()">
+      <i class="pi pi-users"></i>
+      <div>
+        <div class="alert-title">تم فتح تسجيل حضور مخصص لك</div>
+        <div class="alert-body">تقدر تسجل الحضور أو الغياب لأشخاص الأسرة أو الأسر المحددة لك فقط، وفي الأنواع والمواعيد المسموح بها.</div>
+      </div>
+    </div>
 
-        <label>النوع</label>
-        <select [(ngModel)]="selectedType" [disabled]="typeOptions.length <= 1" (change)="onTypeChange()">
-          <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="side-card">
+          <div class="side-title">نطاق التسجيل</div>
+
+          <ng-container *ngIf="canSelectFamily(); else fixedFamilyBlock">
+            <label class="field-label">الأسرة</label>
+            <select class="familyDrop" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+              <option value="" *ngIf="!hasRestrictedFamilyScope()">كل الأسر</option>
+              <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+            </select>
+            <p class="side-hint">اختيار الأسرة بيحدد الأشخاص الظاهرين والتخصيصات اللي هتتعمل عليهم.</p>
+          </ng-container>
+
+          <ng-template #fixedFamilyBlock>
+            <label class="field-label">الأسرة</label>
+            <div class="readonly-box">{{ displayScopeFamilyLabel() || 'غير محددة' }}</div>
+            <p class="side-hint" *ngIf="isSelfCheckinMode()">الأسرة مأخوذة من التخصيص المفتوح لك الآن.</p>
+            <p class="side-hint" *ngIf="isDelegatedAttendanceMode()">الأسر الظاهرة هنا مأخوذة من التخصيص المفتوح لك الآن.</p>
+          </ng-template>
+        </div>
+
+        <div class="side-card countdown-card" *ngIf="hasActiveCountdownCard()">
+          <div class="side-title">الوقت المتبقي</div>
+          <div class="countdown-row">
+            <div class="countdown-meta">
+              <div class="countdown-label">هيتقفل على</div>
+              <div class="countdown-close-at" *ngIf="countdownEndsAtText">{{ countdownEndsAtText }}</div>
+            </div>
+            <div class="countdown-clock" *ngIf="showCountdownClock">{{ countdownText }}</div>
+          </div>
+          <div class="countdown-details">
+            <div class="countdown-detail" *ngIf="countdownFamilyText">
+              <span class="countdown-detail__label">الأسر المسموح بها</span>
+              <span class="countdown-detail__value">{{ countdownFamilyText }}</span>
+            </div>
+            <div class="countdown-detail" *ngIf="countdownTypeText">
+              <span class="countdown-detail__label">الأنواع المتاحة</span>
+              <span class="countdown-detail__value">{{ countdownTypeText }}</span>
+            </div>
+          </div>
+          <div class="countdown-note" *ngIf="!showCountdownClock && countdownEndsAtText">
+            العداد التنازلي بيظهر تلقائيًا لما يفضل أقل من 24 ساعة.
+          </div>
+          <p class="side-hint">عند انتهاء الوقت هيتقفل تسجيل الحضور للتخصيص الحالي تلقائياً من الواجهة.</p>
+        </div>
+
+        <div class="side-card" *ngIf="canManageAccessGrants()">
+          <div class="side-title">تخصيصات الحضور</div>
+          <button type="button" class="action-btn" (click)="openCreateGrant()" [disabled]="!selectedFamily">
+            <i class="pi pi-plus"></i>
+            إضافة تخصيص جديد
+          </button>
+          <button type="button" class="action-btn secondary attendance-side-btn" (click)="openGrantsPopup()">
+            <i class="pi pi-eye"></i>
+            عرض التخصيصات الحالية
+          </button>
+          <div class="grant-summary-card grant-summary-card--side">
+            <div class="grant-summary-card__count">{{ grants.length }}</div>
+            <div class="grant-summary-card__text">تخصيص محفوظ</div>
+          </div>
+          <p class="side-hint" *ngIf="!selectedFamily">اختار أسرة أولاً عشان تختار الأشخاص المستهدفين.</p>
+        </div>
+
+        <div class="side-card" *ngIf="canUseCustomEvent()">
+          <div class="side-title">المناسبات المخصصة</div>
+          <button type="button" class="action-btn" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily">
+            <i class="pi pi-calendar-plus"></i>
+            إضافة مناسبة مخصصة
+          </button>
+          <p class="side-hint" *ngIf="!selectedFamily">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة مخصصة لها.</p>
+
+          <div class="custom-event-list" *ngIf="familyCustomEvents.length; else noCustomEvents">
+            <div class="custom-event-card" *ngFor="let event of familyCustomEvents">
+              <div class="custom-event-card__top">
+                <div>
+                  <div class="custom-event-card__title">{{ event.title }}</div>
+                  <div class="custom-event-card__meta">{{ dayLabel(event.dayOfWeek) }} • {{ customEventDisplayRange(event) }}</div>
+                </div>
+                <span class="grant-enabled" [class.off]="event.enabled === false">{{ event.enabled === false ? 'معطلة' : 'مفعلة' }}</span>
+              </div>
+              <div class="grant-actions">
+                <button type="button" class="mini-btn" (click)="openEditCustomEvent(event)">
+                  <i class="pi pi-pencil"></i>
+                  تعديل
+                </button>
+                <button type="button" class="mini-btn danger" (click)="deleteCustomEvent(event)">
+                  <i class="pi pi-trash"></i>
+                  حذف
+                </button>
+              </div>
+            </div>
+          </div>
+          <ng-template #noCustomEvents>
+            <p class="side-hint">لا توجد مناسبات مخصصة محفوظة للأسرة أو الخورس المحدد.</p>
+          </ng-template>
+        </div>
+      </aside>
+
+      <section class="content">
+        <div class="controls-card">
+          <div class="controls-grid">
+            <div class="control-field">
+              <label>اليوم</label>
+              <p-datepicker
+                [(ngModel)]="selectedDate"
+                (onSelect)="onDateChange()"
+                (onBlur)="onDateChange()"
+                [showIcon]="true"
+                panelStyleClass="attendanceDatePanel"
+                [disabledDays]="disabledDays"
+                [minDate]="minDate"
+                [maxDate]="maxDate"
+                [firstDayOfWeek]="firstDayOfWeek"
+                dateFormat="yy-mm-dd"
+                placeholder="اختار يوم التسجيل"
+              ></p-datepicker>
+            </div>
+
+            <div class="control-field">
+              <label>النوع</label>
+              <select [(ngModel)]="selectedType" [disabled]="typeOptions.length <= 1" (change)="onTypeChange()">
+                <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+
+            <div class="control-field control-field--actions">
+              <label>QR</label>
+              <button
+                type="button"
+                class="scan-btn"
+                (click)="toggleScan()"
+                [disabled]="isSelfCheckinMode() || selectedType === 'CUSTOM_EVENT' || !!blockedMessage || !typeOptions.length"
+              >
+                <i class="pi" [ngClass]="scanning ? 'pi-stop' : 'pi-qrcode'"></i>
+                {{ scanning ? 'إيقاف السكان' : 'تشغيل السكان' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="custom-event-box" *ngIf="selectedType === 'CUSTOM_EVENT'">
+            <label>المناسبة المخصصة</label>
+            <select [(ngModel)]="selectedCustomEventId" (ngModelChange)="onCustomEventSelectionChange()">
+              <option value="" disabled>اختر المناسبة</option>
+              <option *ngFor="let event of availableCustomEvents" [value]="event.id">
+                {{ event.title }} — {{ dayLabel(event.dayOfWeek) }}
+              </option>
+            </select>
+            <p class="hint" *ngIf="selectedCustomEvent() as event">
+              {{ customEventDisplayRange(event) }}
+            </p>
+            <p class="hint" *ngIf="!availableCustomEvents.length">لا توجد مناسبات مخصصة متاحة للأسرة الحالية.</p>
+          </div>
+
+          <div class="hint alert-inline" *ngIf="!typeOptions.length && !blockedMessage">
+            مفيش أنواع متاحة للتسجيل في التاريخ ده حسب الإعدادات الحالية.
+          </div>
+        </div>
+
+        <div class="scanner" *ngIf="scanning">
+          <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
+        </div>
+
+        <div class="searchWrap" *ngIf="!isSelfCheckinMode()">
+          <span class="search">
+            <i class="pi pi-search"></i>
+            <input
+              pInputText
+              [(ngModel)]="searchText"
+              (ngModelChange)="onSearchChange($event)"
+              placeholder="اكتب اسم المخدوم أو الخادم..."
+              aria-label="بحث"
+            />
+          </span>
+
+          <div class="scope">
+            <span *ngIf="selectedFamily; else allScope">الأسرة الحالية: <b>{{ selectedFamily }}</b></span>
+            <ng-template #allScope>
+              البحث في: <b>كل الأسر</b>
+              <span class="loading" *ngIf="searching">(بيبحث...)</span>
+            </ng-template>
+          </div>
+        </div>
+
+        <h2 class="listTitle" *ngIf="selectedFamily && !isSelfCheckinMode()">أسماء المسجلين في: {{ selectedFamily }}</h2>
+        <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim() && !isSelfCheckinMode()">نتائج البحث</h2>
+        <h2 class="listTitle" *ngIf="isSelfCheckinMode()">المسجل الحالي</h2>
+
+        <div class="list" *ngIf="displayedMembers.length; else empty">
+          <div class="row" *ngFor="let u of displayedMembers">
+            <div>
+              <div class="name">
+                {{ u.fullName }}
+                <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
+              </div>
+              <div class="sub" *ngIf="familyLabel(u)">{{ familyLabel(u) }}</div>
+            </div>
+
+            <button
+              type="button"
+              class="pick-btn"
+              [class.pick-btn--locked]="isSelected(u.id)"
+              [disabled]="isSelected(u.id) || isSelfCheckinMode()"
+              (click)="toggleSelect(u)"
+            >
+              <i class="pi" [ngClass]="isSelected(u.id) ? 'pi-check' : 'pi-plus'"></i>
+              <span>{{ isSelected(u.id) ? 'تمت إضافته' : 'إضافة' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <ng-template #empty>
+          <p class="hint" *ngIf="!selectedFamily && !searchText.trim() && !isSelfCheckinMode()">
+            اختار أسرة من القائمة أو اكتب اسم علشان يدور في كل الأسر.
+          </p>
+          <p class="hint" *ngIf="!selectedFamily && searchText.trim() && !displayedMembers.length && !searching && !isSelfCheckinMode()">
+            مفيش نتائج للاسم ده.
+          </p>
+          <p class="hint" *ngIf="selectedFamily && !members.length && !isSelfCheckinMode()">
+            مفيش حد مسجل في الأسرة دي.
+          </p>
+          <p class="hint" *ngIf="isSelfCheckinMode()">لا يوجد تخصيص صالح لك حاليًا.</p>
+        </ng-template>
+
+        <div class="selectedBox" *ngIf="selected.length">
+          <div class="selectedHeader">
+            <h2>{{ isSelfCheckinMode() ? 'اللي هيتسجل دلوقتي' : 'الأسماء التي سيتم تسجيل حضورها' }}</h2>
+            <span class="selectedCount">{{ selected.length }} اسم</span>
+          </div>
+
+          <div class="list">
+            <div class="row" *ngFor="let u of selected">
+              <div>
+                <div class="name">
+                  {{ u.fullName }}
+                  <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
+                </div>
+                <div class="sub" *ngIf="familyLabel(u)">{{ familyLabel(u) }}</div>
+              </div>
+
+              <button type="button" class="remove-btn" *ngIf="!isSelfCheckinMode()" (click)="remove(u.id)">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="button" class="submit-btn" (click)="submit()" [disabled]="!selectedDate || !!blockedMessage || !typeOptions.length">
+            <i class="pi pi-check-square"></i>
+            {{ isSelfCheckinMode() ? 'تسجيل حضوري' : 'تسجيل الحضور' }}
+          </button>
+        </div>
+
+        <div class="grant-section" *ngIf="false && canManageAccessGrants()">
+          <div class="section-head">
+            <div>
+              <h2>التخصيصات الحالية</h2>
+              <p>تسجيل ذاتي للمخدومين أو فتح وقت محدد للخدام لأخذ الحضور.</p>
+            </div>
+            <button type="button" class="action-btn secondary" (click)="openGrantsPopup()">
+              <i class="pi pi-eye"></i>
+              عرض التخصيصات
+            </button>
+          </div>
+
+          <div class="grant-summary-card">
+            <div class="grant-summary-card__count">{{ grants.length }}</div>
+            <div class="grant-summary-card__text">تخصيص محفوظ</div>
+          </div>
+
+          <div class="grant-loading" *ngIf="false && grantsLoading">جارٍ تحميل التخصيصات...</div>
+
+          <div class="topFilterRow grant-top-filter" *ngIf="false && canFilterGrantFamilies()">
+            <label class="srOnly" for="grantFamilyFilter">الأسرة أو الخورس</label>
+            <div
+              class="filter-select"
+              [class.menu-locked]="grantsFilterMenuLocked"
+              (mouseenter)="onGrantFilterMenuEnter()"
+              (mouseleave)="unlockGrantFilterMenu()"
+            >
+              <div id="grantFamilyFilter" class="filter-select__trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="filter-select__icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M6 10H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M9 15H11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="filter-select__label">{{ grantFilterLabel() }}</span>
+              </div>
+
+              <div class="filter-select__menu" *ngIf="!grantsFilterMenuLocked" role="listbox" [attr.aria-label]="'الأسرة أو الخورس'">
+                <button
+                  class="filter-select__option"
+                  type="button"
+                  [class.is-active]="!grantsFilterFamily"
+                  (click)="selectGrantFilter('')"
+                >
+                  كل التخصيصات
+                </button>
+                <button
+                  class="filter-select__option"
+                  *ngFor="let family of grantFamilyFilterOptions()"
+                  type="button"
+                  [class.is-active]="grantsFilterFamily === family"
+                  (click)="selectGrantFilter(family)"
+                >
+                  {{ family }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grant-list" *ngIf="false && !grantsLoading && filteredGrants.length">
+            <div class="grant-card" *ngFor="let grant of filteredGrants">
+              <div class="grant-card__top">
+                <div>
+                  <div class="grant-kind">{{ grant.grantKind === 'SELF_CHECKIN' ? 'مخدوم' : 'خادم' }}</div>
+                  <div class="grant-target">{{ grant.targetUserName || 'بدون اسم' }}</div>
+                </div>
+                <span class="grant-enabled" [class.off]="grant.enabled === false">{{ grant.enabled === false ? 'معطل' : 'مفعل' }}</span>
+              </div>
+
+              <div class="grant-meta">
+                <div><b>الأسرة:</b> {{ grantFamilyLabel(grant.familyBase) }}</div>
+                <div><b>من:</b> {{ grant.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                <div><b>إلى:</b> {{ grant.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                <div *ngIf="grant.note"><b>ملاحظة:</b> {{ grant.note }}</div>
+              </div>
+
+              <div class="grant-types">
+                <span class="type-chip" *ngFor="let t of grant.allowedTypes">{{ displayTypeLabel(t) }}</span>
+              </div>
+
+              <div class="grant-actions">
+                <button type="button" class="mini-btn" (click)="openEditGrant(grant)">
+                  <i class="pi pi-pencil"></i>
+                  تعديل
+                </button>
+                <button type="button" class="mini-btn danger" (click)="deleteGrant(grant)">
+                  <i class="pi pi-trash"></i>
+                  حذف
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #noGrants>
+            <p class="hint" *ngIf="!grantsLoading && !grantsFilterFamily">لا توجد تخصيصات محفوظة حالياً.</p>
+            <p class="hint" *ngIf="!grantsLoading && grantsFilterFamily">لا توجد تخصيصات للأسرة أو الخورس المحدد.</p>
+          </ng-template>
+        </div>
+
+        <div class="grant-popup-backdrop" *ngIf="grantPopupVisible" (click)="closeGrantsPopup()">
+          <div class="grant-popup" (click)="$event.stopPropagation()">
+            <div class="grant-popup__head">
+              <div>
+                <h3>التخصيصات الحالية</h3>
+                <p>{{ popupGrantCountLabel() }}</p>
+              </div>
+              <button type="button" class="mini-btn" (click)="closeGrantsPopup()">
+                <i class="pi pi-times"></i>
+                إغلاق
+              </button>
+            </div>
+
+            <div class="grant-popup__tools">
+              <div class="grant-popup__search">
+                <i class="pi pi-search"></i>
+                <input type="text" [(ngModel)]="grantSearchText" placeholder="ابحث باسم الخادم أو المخدوم..." />
+              </div>
+
+              <div class="grant-popup__filters">
+                <button
+                  type="button"
+                  class="grant-popup__filter-btn"
+                  *ngFor="let option of grantPopupFilterOptions()"
+                  [class.is-active]="grantPopupFilter === option.value"
+                  (click)="grantPopupFilter = option.value"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+
+              <div class="topFilterRow grant-top-filter grant-popup__family-filter" *ngIf="canFilterGrantFamilies()">
+                <label class="srOnly" for="grantFamilyPopupFilter">الأسرة أو الخورس</label>
+                <div
+                  class="filter-select"
+                  [class.menu-locked]="grantsFilterMenuLocked"
+                  (mouseenter)="onGrantFilterMenuEnter()"
+                  (mouseleave)="unlockGrantFilterMenu()"
+                >
+                  <div id="grantFamilyPopupFilter" class="filter-select__trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="filter-select__icon" aria-hidden="true">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M6 10H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M9 15H11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                      </svg>
+                    </span>
+                    <span class="filter-select__label">{{ grantFilterLabel() }}</span>
+                  </div>
+
+                  <div class="filter-select__menu" *ngIf="!grantsFilterMenuLocked" role="listbox" [attr.aria-label]="'الأسرة أو الخورس'">
+                    <button
+                      class="filter-select__option"
+                      type="button"
+                      [class.is-active]="!grantsFilterFamily"
+                      (click)="selectGrantFilter('')"
+                    >
+                      كل التخصيصات
+                    </button>
+                    <button
+                      class="filter-select__option"
+                      *ngFor="let family of grantFamilyFilterOptions()"
+                      type="button"
+                      [class.is-active]="grantsFilterFamily === family"
+                      (click)="selectGrantFilter(family)"
+                    >
+                      {{ family }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grant-loading" *ngIf="grantsLoading">جارٍ تحميل التخصيصات...</div>
+
+            <div class="grant-popup__body" *ngIf="!grantsLoading && filteredGrants.length; else popupNoGrants">
+              <div class="grant-list grant-list--popup">
+                <div class="grant-card" *ngFor="let grant of filteredGrants">
+                  <div class="grant-card__top">
+                    <div>
+                      <div class="grant-kind">{{ grant.grantKind === 'SELF_CHECKIN' ? 'مخدوم' : 'خادم' }}</div>
+                      <div class="grant-target">{{ grant.targetUserName || 'بدون اسم' }}</div>
+                    </div>
+                    <span class="grant-enabled" [class.off]="grant.enabled === false">{{ grant.enabled === false ? 'معطل' : 'مفعل' }}</span>
+                  </div>
+
+                  <div class="grant-meta">
+                    <div><b>الأسرة:</b> {{ grantFamilyLabel(grant.familyBase) }}</div>
+                    <div><b>من:</b> {{ grant.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                    <div><b>إلى:</b> {{ grant.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                    <div *ngIf="grant.note"><b>ملاحظة:</b> {{ grant.note }}</div>
+                  </div>
+
+                  <div class="grant-types">
+                    <span class="type-chip" *ngFor="let t of grant.allowedTypes">{{ displayTypeLabel(t) }}</span>
+                  </div>
+
+                  <div class="grant-actions">
+                    <button type="button" class="mini-btn" (click)="openEditGrant(grant); closeGrantsPopup()">
+                      <i class="pi pi-pencil"></i>
+                      تعديل
+                    </button>
+                    <button type="button" class="mini-btn danger" (click)="deleteGrant(grant)">
+                      <i class="pi pi-trash"></i>
+                      حذف
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <ng-template #popupNoGrants>
+              <p class="hint">لا توجد تخصيصات مطابقة للبحث أو الفلتر الحالي.</p>
+            </ng-template>
+          </div>
+        </div>
+
+        <div class="grant-section config-section" *ngIf="canManageAttendanceConfig()">
+          <div class="section-head">
+            <div>
+              <h2>مواعيد الأنواع</h2>
+              <p>من هنا تقدر تحدد لكل أسرة أو خورس اليوم اللي يفتح فيه القداس أو التسبحة أو اجتماع الأسرة.</p>
+            </div>
+            <button type="button" class="action-btn" (click)="saveAttendanceConfig()" [disabled]="configSaving || !selectedConfigFamily">
+              <i class="pi pi-save"></i>
+              {{ configSaving ? 'جارٍ الحفظ...' : 'حفظ المواعيد' }}
+            </button>
+          </div>
+
+          <button type="button" class="config-dropdown-trigger" (click)="configPanelOpen = !configPanelOpen" [attr.aria-expanded]="configPanelOpen">
+            <span>إعدادات مواعيد الأنواع</span>
+            <i class="pi" [ngClass]="configPanelOpen ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
+          </button>
+
+          <div class="config-card" *ngIf="configPanelOpen">
+            <div class="form-group">
+              <label>الأسرة / الخورس</label>
+              <select *ngIf="!isConfigFamilyLocked(); else lockedConfigFamily" [(ngModel)]="selectedConfigFamily" [disabled]="isConfigFamilyLocked()" (ngModelChange)="onConfigFamilyChange()">
+                <option *ngFor="let family of configFamilyOptions" [value]="family">{{ family }}</option>
+              </select>
+              <ng-template #lockedConfigFamily>
+                <div class="readonly-box">{{ selectedConfigFamily || configFamilyOptions[0] || 'غير محددة' }}</div>
+              </ng-template>
+            </div>
+
+            <p class="hint" *ngIf="!selectedConfigFamily">اختار الأسرة أو الخورس الأول علشان تحدد اليوم.</p>
+
+            <div class="schedule-grid" *ngIf="selectedConfigFamily">
+              <div class="form-group">
+                <label>النوع</label>
+                <select [(ngModel)]="selectedScheduleConfigType" (ngModelChange)="onScheduleConfigTypeChange()">
+                  <option *ngFor="let item of scheduleEditableTypeOptions" [value]="item.value">{{ item.label }}</option>
+                </select>
+              </div>
+              <div class="form-group" *ngIf="selectedScheduleConfigType as selectedType">
+                <label>{{ displayTypeLabel(selectedType) }}</label>
+                <div class="day-chip-grid">
+                  <button
+                    type="button"
+                    class="day-chip"
+                    *ngFor="let day of attendanceDayOptions"
+                    [class.active]="hasTypeConfigDay(selectedType, day.value)"
+                    (click)="toggleTypeConfigDay(selectedType, day.value)"
+                  >
+                    {{ day.label }}
+                  </button>
+                </div>
+                <p class="hint" *ngIf="isSingleDayConfigType(selectedType)">تختار يوم واحد فقط لهذا النوع.</p>
+              </div>
+            </div>
+
+            <div class="schedule-grid" *ngIf="false && selectedConfigFamily">
+              <div class="form-group">
+                <label>وقت أخذ الحضور من</label>
+                <input
+                  type="time"
+                  step="300"
+                  [ngModel]="attendanceStartTimeForEditor()"
+                  (ngModelChange)="onAttendanceStartTimeChange($event)"
+                />
+              </div>
+              <div class="form-group">
+                <label>وقت أخذ الحضور إلى</label>
+                <input
+                  type="time"
+                  step="300"
+                  [ngModel]="attendanceEndTimeForEditor()"
+                  (ngModelChange)="onAttendanceEndTimeChange($event)"
+                />
+              </div>
+            </div>
+
+            <div class="schedule-grid config-card--labels" *ngIf="selectedConfigFamily">
+              <div class="form-group" *ngIf="false">
+                <label>الأيام المسموح تحديد الغياب لها</label>
+                <div class="day-chip-grid">
+                  <button
+                    type="button"
+                    class="day-chip"
+                    *ngFor="let day of attendanceDayOptions"
+                    [class.active]="hasAbsenceAllowedDay(day.value)"
+                    (click)="toggleAbsenceAllowedDay(day.value)"
+                  >
+                    {{ day.label }}
+                  </button>
+                </div>
+                <p class="hint">دي الأيام اللي ينفع تختارها في التاريخ لما تيجي تاخد غياب للأسرة دي.</p>
+              </div>
+
+              <div class="form-group">
+                <label>الأيام المسموح فيها بأخذ الغياب</label>
+                <div class="day-chip-grid">
+                  <button
+                    type="button"
+                    class="day-chip"
+                    *ngFor="let day of attendanceDayOptions"
+                    [class.active]="hasAbsenceOpenDay(day.value)"
+                    (click)="toggleAbsenceOpenDay(day.value)"
+                  >
+                    {{ day.label }}
+                  </button>
+                </div>
+                <p class="hint">لو النهارده مش ضمن الأيام دي، مش هينفع أي حد ياخد غياب للأسرة دي.</p>
+              </div>
+            </div>
+
+            <p class="hint" *ngIf="selectedConfigFamily === 'خورس مارمرقس' || selectedConfigFamily === 'خورس البابا أثناسيوس'">
+              في حالة اختيار خورس، هتحدد يوم الخورس نفسه فقط.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+</div>
+
+<p-dialog
+  [header]="grantDialogMode === 'create' ? 'إضافة تخصيص حضور' : 'تعديل تخصيص الحضور'"
+  [(visible)]="grantDialogVisible"
+  [modal]="true"
+  [style]="{ width: '640px', maxWidth: '95vw' }"
+  [baseZIndex]="10000"
+  [draggable]="false"
+  [resizable]="false"
+  dir="rtl"
+>
+  <div class="dialog-body">
+    <div class="dialog-grid">
+      <div class="form-group">
+        <label>الفئة المستهدفة</label>
+        <select [(ngModel)]="grantAudience" (ngModelChange)="onGrantAudienceChange()">
+          <option value="MEMBERS">مخدومين</option>
+          <option value="SERVANTS">خدام</option>
         </select>
-
-        <p-button type="button" (onClick)="toggleScan()" [label]="scanning ? 'Stop' : 'Scan'"></p-button>
       </div>
 
-      <div class="scanner" *ngIf="scanning">
-        <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
-      </div>
+      <div class="form-group grant-target-group">
+        <label>الشخص المستهدف</label>
+        <button type="button" class="grant-target-trigger" (click)="toggleGrantTargetPicker()" [class.open]="grantTargetPickerOpen">
+          <div class="grant-target-trigger__content">
+            <span class="grant-target-trigger__label">{{ grantTargetSummaryText() }}</span>
+            <span class="grant-target-trigger__count" *ngIf="grantTargetSelectedCount()">{{ grantTargetSelectedCount() }}</span>
+          </div>
+          <i class="pi" [ngClass]="grantTargetPickerOpen ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
+        </button>
 
-      <div class="searchWrap">
-        <span class="search">
-          <i class="pi pi-search"></i>
-          <input
-            pInputText
-            [(ngModel)]="searchText"
-            (ngModelChange)="onSearchChange($event)"
-            placeholder="اكتب اسم الولد..."
-            aria-label="بحث"
-          />
-        </span>
+        <div class="grant-target-panel" *ngIf="grantTargetPickerOpen">
+          <div class="grant-target-search">
+            <i class="pi pi-search"></i>
+            <input type="text" [ngModel]="grantTargetSearchText" (ngModelChange)="onGrantTargetSearchChange($event)" placeholder="ابحث بالاسم أو الأسرة..." />
+          </div>
 
-        <div class="scope">
-          <ng-template #allScope>
-            البحث في: <b>كل الأسر</b>
-            <span class="loading" *ngIf="searching">(بيبحث...)</span>
+          <div class="grant-target-selected" *ngIf="grantSelectedTargetIds.length">
+            <span class="grant-target-chip" *ngFor="let user of selectedGrantTargets(); trackBy: trackByUserId">
+              {{ user.fullName }}
+            </span>
+            <button type="button" class="mini-btn grant-target-clear" (click)="clearGrantTargetSelection()">مسح الاختيار</button>
+          </div>
+
+          <div class="grant-target-options" *ngIf="filteredGrantTargetsList.length; else noGrantTargets">
+            <label class="grant-target-option" *ngFor="let u of filteredGrantTargetsList; trackBy: trackByUserId">
+              <input type="checkbox" [checked]="isGrantTargetSelected(u.id)" (change)="toggleGrantTargetSelection(u)" />
+              <div class="grant-target-option__body">
+                <div class="grant-target-option__name">{{ u.fullName }}</div>
+                <div class="grant-target-option__meta">{{ grantTargetMeta(u) || prettyRole(u.role) }}</div>
+              </div>
+            </label>
+          </div>
+
+          <ng-template #noGrantTargets>
+            <p class="hint">لا يوجد أشخاص مطابقون للبحث الحالي.</p>
           </ng-template>
         </div>
       </div>
 
-      <!-- Results -->
-      <h2 class="listTitle" *ngIf="selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
-      <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim()">نتائج البحث</h2>
-
-      <div class="list" *ngIf="displayedMembers.length; else empty">
-        <div class="row" *ngFor="let u of displayedMembers">
-          <div>
-            <div class="name">
-              {{u.fullName}}
-              <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
-            </div>
-            <div class="sub" *ngIf="familyLabel(u)">{{familyLabel(u)}}</div>
+      <div class="form-group grant-family-group">
+        <label>الأسرة الأساسية</label>
+        <input
+          *ngIf="grantAudience === 'MEMBERS'"
+          type="text"
+          [(ngModel)]="grantForm.familyBase"
+          [readonly]="true"
+          [class.readonly-input]="true"
+          placeholder="هتتحدد تلقائيًا من أسرة المخدوم"
+        />
+        <div class="grant-family-layout" *ngIf="grantAudience === 'SERVANTS'">
+          <div class="grant-family-summary">
+            <span>الأسر المختارة</span>
+            <b>{{ grantFamilySelections.length || 0 }}</b>
           </div>
-
-          <p-button
-            type="button"
-            [icon]="isSelected(u.id) ? 'pi pi-check' : 'pi pi-plus'"
-            [disabled]="isSelected(u.id)"
-            [label]="isSelected(u.id) ? 'تمت إضافته' : ''"
-            [styleClass]="isSelected(u.id) ? 'pickBtn pickBtn--locked' : 'pickBtn'"
-            (onClick)="toggleSelect(u)"
-          ></p-button>
+          <div class="grant-family-checks">
+            <label class="grant-family-check" *ngFor="let family of families">
+              <input type="checkbox" [checked]="hasGrantFamilySelection(family)" (change)="toggleGrantFamilySelection(family)" />
+              <span>{{ family }}</span>
+            </label>
+          </div>
         </div>
       </div>
 
-      <ng-template #empty>
-        <p class="hint" *ngIf="!selectedFamily && !searchText.trim()">
-          اختار أسرة من القائمة أو اكتب اسم علشان يدور في كل الأسر.
-        </p>
-        <p class="hint" *ngIf="!selectedFamily && searchText.trim() && !displayedMembers.length && !searching">
-          مفيش نتائج للاسم ده.
-        </p>
-        <p class="hint" *ngIf="selectedFamily && !members.length">
-          مفيش حد مسجل في الأسرة دي.
-        </p>
-      </ng-template>
+      <div class="form-group" *ngIf="false">
+        <label>من</label>
+        <p-datepicker
+          [(ngModel)]="grantStartsAtDate"
+          (ngModelChange)="onGrantStartDateChange($event)"
+          [showIcon]="true"
+          [showTime]="true"
+          hourFormat="12"
+          [stepMinute]="5"
+          appendTo="body"
+          panelStyleClass="attendanceGrantDatePanel"
+          placeholder="اختر اليوم والوقت"
+        ></p-datepicker>
+      </div>
 
-      <!-- Selected + Submit -->
-      <div class="selectedBox" *ngIf="selected.length">
-        <h2>الأسماء التي سيتم تسجيل حضورها</h2>
+      <div class="form-group" *ngIf="false">
+        <label>إلى</label>
+        <p-datepicker
+          [(ngModel)]="grantEndsAtDate"
+          (ngModelChange)="onGrantEndDateChange($event)"
+          [showIcon]="true"
+          [showTime]="true"
+          hourFormat="12"
+          [stepMinute]="5"
+          appendTo="body"
+          panelStyleClass="attendanceGrantDatePanel"
+          placeholder="اختر اليوم والوقت"
+        ></p-datepicker>
+      </div>
 
-        <div class="list">
-          <div class="row" *ngFor="let u of selected">
-            <div>
-              <div class="name">
-                {{u.fullName}}
-                <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
-              </div>
-              <div class="sub" *ngIf="familyLabel(u)">{{familyLabel(u)}}</div>
+      <div class="form-group checkbox-wrap">
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="grantForm.enabled" />
+          <span>التخصيص مفعل</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group full-width" *ngIf="false">
+      <label>المناسبات المسموح بها</label>
+      <div class="type-grid">
+        <button
+          type="button"
+          class="type-toggle"
+          *ngFor="let opt of grantTypeOptions()"
+          [class.active]="hasGrantType(opt.value)"
+          (click)="toggleGrantType(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </div>
+
+    <div class="form-group full-width grant-type-window-group">
+      <div class="grant-type-windows__head">
+        <label>المناسبات ومواعيدها</label>
+        <button type="button" class="mini-btn grant-type-windows__add" (click)="addGrantTypeWindow()" [disabled]="!canAddMoreGrantTypeWindows()">
+          <i class="pi pi-plus"></i>
+          إضافة مناسبة
+        </button>
+      </div>
+
+      <div class="grant-type-windows">
+        <div class="grant-type-window" *ngFor="let item of grantTypeWindows; let i = index">
+          <div class="grant-type-window__grid">
+            <div class="form-group">
+              <label>المناسبة</label>
+              <span class="grant-type-window__field-label">المناسبة</span>
+              <select [ngModel]="item.optionKey" (ngModelChange)="onGrantTypeWindowTypeChange(i, $event)">
+                <option [ngValue]="null">اختر المناسبة</option>
+                <option *ngFor="let opt of grantTypeOptionsForWindow(i)" [ngValue]="opt.key">{{ opt.label }}</option>
+              </select>
             </div>
-            <p-button type="button" icon="pi pi-times" (onClick)="remove(u.id)"></p-button>
+
+            <div class="form-group">
+              <label>من</label>
+              <span class="grant-type-window__field-label">من</span>
+              <p-datepicker
+                [ngModel]="item.startsAtDate"
+                (ngModelChange)="onGrantTypeWindowStartChange(i, $event)"
+                [showIcon]="true"
+                [showTime]="true"
+                hourFormat="12"
+                [stepMinute]="5"
+                appendTo="body"
+                panelStyleClass="attendanceGrantDatePanel"
+                placeholder="اختر اليوم والوقت"
+              ></p-datepicker>
+            </div>
+
+            <div class="form-group">
+              <label>إلى</label>
+              <span class="grant-type-window__field-label">إلى</span>
+              <p-datepicker
+                [ngModel]="item.endsAtDate"
+                (ngModelChange)="onGrantTypeWindowEndChange(i, $event)"
+                [showIcon]="true"
+                [showTime]="true"
+                hourFormat="12"
+                [stepMinute]="5"
+                appendTo="body"
+                panelStyleClass="attendanceGrantDatePanel"
+                placeholder="اختر اليوم والوقت"
+              ></p-datepicker>
+            </div>
+
+            <div class="grant-type-window__actions">
+              <button type="button" class="mini-btn" (click)="removeGrantTypeWindow(i)" [disabled]="grantTypeWindows.length === 1">
+                <i class="pi pi-trash"></i>
+                حذف
+              </button>
+            </div>
           </div>
         </div>
-
-        <p-button type="button" class="submit" (onClick)="submit()" label="تسجيل" [disabled]="!selectedDate"></p-button>
       </div>
-    </section>
+
+      <div class="grant-type-windows__note">
+        <i class="pi pi-save"></i>
+        <span>التعديلات لن تتحفظ إلا بعد الضغط على زرار حفظ التخصيص.</span>
+      </div>
+    </div>
+
+    <div class="form-group full-width">
+      <label>ملاحظة اختيارية</label>
+      <textarea rows="3" [(ngModel)]="grantForm.note" placeholder="مثال: فتح تسجيل القداس فقط من 7:00 إلى 9:30 صباحًا"></textarea>
+    </div>
   </div>
-</div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button type="button" class="mini-btn" (click)="grantDialogVisible = false">إلغاء</button>
+      <button type="button" class="action-btn" (click)="saveGrant()">
+        <i class="pi pi-check"></i>
+        حفظ التخصيص
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
 
 
+<p-dialog
+  [header]="customEventDialogMode === 'create' ? 'إضافة مناسبة مخصصة' : 'تعديل المناسبة المخصصة'"
+  [(visible)]="customEventDialogVisible"
+  [modal]="true"
+  [style]="{ width: '620px', maxWidth: '95vw' }"
+  [baseZIndex]="10000"
+  [draggable]="false"
+  [resizable]="false"
+  dir="rtl"
+>
+  <div class="dialog-body">
+    <div class="dialog-grid">
+      <div class="form-group">
+        <label>الأسرة / الخورس</label>
+        <select *ngIf="!isCustomEventFamilyLocked(); else lockedCustomEventFamily" [(ngModel)]="customEventForm.familyBase">
+          <option *ngFor="let family of customEventFamilyOptions()" [value]="family">{{ family }}</option>
+        </select>
+        <ng-template #lockedCustomEventFamily>
+          <div class="readonly-box">{{ customEventForm.familyBase || customEventFamilyOptions()[0] || 'غير محددة' }}</div>
+        </ng-template>
+      </div>
 
+      <div class="form-group">
+        <label>اسم المناسبة</label>
+        <input type="text" [(ngModel)]="customEventForm.title" placeholder="مثال: قداس عيد، اجتماع صلاة، رحلة..." />
+      </div>
 
+      <div class="form-group">
+        <label>يوم المناسبة</label>
+        <select [(ngModel)]="customEventForm.dayOfWeek" (ngModelChange)="onCustomEventDayChange()">
+          <option *ngFor="let day of attendanceDayOptions" [ngValue]="day.value">{{ day.label }}</option>
+        </select>
+      </div>
+
+      <div class="form-group checkbox-wrap">
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="customEventForm.enabled" />
+          <span>المناسبة مفعلة</span>
+        </label>
+      </div>
+
+      <div class="form-group checkbox-wrap full-width">
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="customEventForm.alwaysActive" (ngModelChange)="onCustomEventAlwaysActiveChange()" />
+          <span>المناسبة مستمرة على طول</span>
+        </label>
+      </div>
+
+      <div class="form-group" *ngIf="customEventForm.alwaysActive === false">
+        <label>من تاريخ</label>
+        <p-datepicker
+          [(ngModel)]="customEventActiveFromDate"
+          (ngModelChange)="onCustomEventActiveFromChange($event)"
+          [showIcon]="true"
+          appendTo="body"
+          panelStyleClass="attendanceGrantDatePanel"
+          dateFormat="yy-mm-dd"
+          [disabledDates]="customEventBlockedDates"
+          placeholder="اختر أول تاريخ"
+        ></p-datepicker>
+      </div>
+
+      <div class="form-group" *ngIf="customEventForm.alwaysActive === false">
+        <label>إلى تاريخ</label>
+        <p-datepicker
+          [(ngModel)]="customEventActiveToDate"
+          (ngModelChange)="onCustomEventActiveToChange($event)"
+          [showIcon]="true"
+          [showTime]="true"
+          hourFormat="12"
+          appendTo="body"
+          panelStyleClass="attendanceGrantDatePanel"
+          dateFormat="yy-mm-dd"
+          [disabledDates]="customEventBlockedDates"
+          placeholder="اختر آخر تاريخ"
+        ></p-datepicker>
+      </div>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button type="button" class="mini-btn" (click)="customEventDialogVisible = false">إلغاء</button>
+      <button type="button" class="action-btn" (click)="saveCustomEvent()" [disabled]="customEventSaving">
+        <i class="pi pi-check"></i>
+        {{ customEventSaving ? 'جارٍ الحفظ...' : 'حفظ المناسبة' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>

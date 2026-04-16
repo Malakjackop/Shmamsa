@@ -8,8 +8,27 @@ html, body {
   background-color: #f4f4f6;
 }
 
+body {
+  border: none;
+  outline: none;
+  background-color: #f4f4f6;
+  box-shadow: none;
+}
 
-/* Main wrapper */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+body::-webkit-scrollbar {
+  display: none;
+}
+
+p-card, p-panel {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .dashboard {
   display: flex;
   flex-direction: row;
@@ -18,65 +37,107 @@ html, body {
   overflow: hidden;
   background-color: #f4f4f6;
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
 }
 
-/* ✅ Remove black border / outer box */
-body {
-  border: none;
-  outline: none;
-  background-color: #f4f4f6;
-  box-shadow: none;
-}
-
-/* ✅ Hide all scrollbars */
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-
-
-p-card, p-panel {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Sidebar */
 .sidebar {
-  width: 210px;
-  background-color: #5e2b20;
-  color: white;
+  width: 188px;
+  background: linear-gradient(180deg, #5e2b20 0%, #6f3527 100%);
+  color: #fff;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   height: 100vh;
-  padding: 1.5rem 1rem;
+  padding: 0.8rem 0.7rem 0.9rem;
   box-sizing: border-box;
+  transition: width 220ms ease, padding 220ms ease;
+  box-shadow: 10px 0 28px rgba(62, 24, 17, 0.12);
+}
+
+.sidebar.collapsed {
+  width: 64px;
+  padding-inline: 0.35rem;
+}
+
+.sidebar-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 0.9rem;
+}
+
+.sidebar.collapsed .sidebar-topbar {
+  justify-content: center;
+}
+
+.sidebar-toggle {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.sidebar-toggle:hover {
+  transform: translateY(-1px);
+  opacity: .82;
+}
+
+.sidebar-toggle .pi {
+  font-size: 1rem;
+}
+
+.logoLink {
+  display: inline-block;
+  line-height: 0;
+  cursor: pointer;
 }
 
 .sidebar-header {
-  text-align: center;
-}
-
-.sidebar-header .logo {
   cursor: pointer;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
   margin-bottom: 1rem;
 }
 
+.sidebar-header .logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  transition: width 220ms ease, height 220ms ease, margin 220ms ease;
+}
+
+.sidebar.collapsed .sidebar-header {
+  gap: 0;
+  margin-bottom: 1.15rem;
+}
+
+.sidebar.collapsed .sidebar-header .logo {
+  width: 42px;
+  height: 42px;
+}
+
 .sidebar-header h2 {
-  font-size: 1.2rem;
+  font-size: 1rem;
   margin: 0;
 }
 
 .sidebar-header p {
   color: #e6d0c2;
-  font-size: 0.85rem;
-  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  margin: 0;
+  text-align: center;
+  line-height: 1.45;
 }
 
 .menu {
@@ -85,15 +146,67 @@ p-card, p-panel {
   margin: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* keep items from pushing logout off-screen */
+  justify-content: flex-start;
   align-items: center;
   flex: 1 1 auto;
   overflow-y: auto;
   width: 100%;
-  gap: 0.88rem;                /* ✅ add spacing between menu items */
+  gap: 0.62rem;
 }
 
-/* Logout pinned at the bottom */
+.menu li {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  direction: rtl;
+  text-align: right;
+  padding: 0.72rem 0.7rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease, padding 220ms ease;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.menu li i {
+  width: 1.25rem;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.menu li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu li:hover,
+.menu li.active {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.menu li:hover {
+  transform: translateY(-1px);
+}
+
+.sidebar.collapsed .menu {
+  gap: 0.5rem;
+}
+
+.sidebar.collapsed .menu li {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+  direction: ltr;
+  padding: 0.68rem 0.2rem;
+}
+
+.sidebar.collapsed .menu li i {
+  width: auto;
+  font-size: 1rem;
+}
+
 .logout {
   width: 100%;
   margin-top: auto;
@@ -102,49 +215,31 @@ p-card, p-panel {
 
 .logout button {
   width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   text-align: center;
-  padding: 0.75rem 0;
-  border-radius: 8px;
+  padding: 0.7rem 0.55rem;
+  border-radius: 12px;
   cursor: pointer;
   border: none;
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
-  transition: 0.3s;
+  transition: background-color 160ms ease, transform 160ms ease;
+  font: inherit;
 }
 
 .logout button:hover {
   background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
-/* Menu items styling */
-.menu li {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1.25rem 1fr;
-  align-items: center;
-  gap: 0.75rem;
-  direction: rtl;
-  text-align: right;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.3s;
-  box-sizing: border-box;
-  white-space: nowrap;
+.sidebar.collapsed .logout button {
+  padding-inline: 0;
+  min-height: 38px;
 }
 
-.menu li i {
-  width: 1.25rem;
-  text-align: center;
-  font-size: 1rem;
-}
-
-.menu li:hover,
-.menu li.active {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-/* Main Area */
 .main {
   flex: 1;
   height: 100vh;
@@ -153,7 +248,6 @@ p-card, p-panel {
   background-color: #f4f4f6;
 }
 
-/* Header */
 .header {
   background: #fff;
   border-radius: 12px;
@@ -185,7 +279,6 @@ p-card, p-panel {
   width: 15rem;
 }
 
-/* Stats */
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -222,7 +315,6 @@ p-card, p-panel {
   background-color: #e7f0e5;
 }
 
-/* Panels */
 .panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -256,7 +348,6 @@ p-card, p-panel {
   font-size: 0.8rem;
 }
 
-/* Footer */
 .footer {
   text-align: center;
   color: #5e2b20;
@@ -265,27 +356,14 @@ p-card, p-panel {
   opacity: 0.8;
 }
 
+@media (max-width: 900px) {
+  .sidebar {
+    width: 64px;
+    padding-inline: 0.35rem;
+  }
 
-body::-webkit-scrollbar {
-  display: none;
+  .sidebar:not(.collapsed) {
+    width: 188px;
+    padding-inline: 0.7rem;
+  }
 }
-
-
-p-card, p-panel {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-
-
-.logoLink{
-  display:inline-block;
-  line-height:0;
-  cursor:pointer;
-}
-
-
-.sidebar-header{
-  cursor:pointer;
-}
-

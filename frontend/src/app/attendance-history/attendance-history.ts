@@ -26,6 +26,7 @@ type HistorySourceRow = {
   takenBy?: string | null;
   takenByName?: string | null;
   servantName?: string | null;
+  customTitle?: string | null;
 };
 
 type HistoryItem = {
@@ -33,6 +34,7 @@ type HistoryItem = {
   date: string;
   time: string;
   type: string;
+  customTitle?: string | null;
   status?: 'PRESENT' | 'ABSENT' | string;
   takenBy?: string | null;
 };
@@ -82,6 +84,8 @@ export class AttendanceHistoryComponent implements OnInit {
         return 'خورس مارمرقس';
       case 'ATHANASIUS_KHORS':
         return 'خورس أثناسيوس';
+      case 'CUSTOM_EVENT':
+        return 'مناسبة مخصصة';
       default:
         return t;
     }
@@ -150,6 +154,7 @@ export class AttendanceHistoryComponent implements OnInit {
     date: String(x?.date ?? x?.attendanceDate ?? x?.day ?? '-'),
     time: String(x?.time ?? x?.attendanceTime ?? x?.createdAt ?? '-'),
     type: String(x?.type ?? x?.attendanceType ?? '-'),
+    customTitle: x?.customTitle ? String(x.customTitle) : null,
     status: x?.status,
     takenBy: x?.takenBy ?? x?.takenByName ?? x?.servantName ?? null
   });

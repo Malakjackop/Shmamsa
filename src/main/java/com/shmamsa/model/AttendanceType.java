@@ -6,5 +6,6 @@ public enum AttendanceType {
     MARMARKOS_KHORS, // خورس مارمرقس (يوم الجمعة)
     ATHANASIUS_KHORS, // خورس الأنبا أثناسيوس (يوم الجمعة)
     TASBEEHA,       // تسبحة
-    FAMILY_MEETING  // اجتماع الأسرة
+    FAMILY_MEETING,  // اجتماع الأسرة
+    CUSTOM_EVENT     // مناسبة مخصصة
 }

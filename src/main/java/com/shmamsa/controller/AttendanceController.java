@@ -8,10 +8,14 @@ import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.GradeSheet;
 import com.shmamsa.model.User;
 import com.shmamsa.model.UserFamilyAssignmentView;
+import com.shmamsa.model.AttendanceGrantKind;
+import com.shmamsa.model.AttendanceAccessGrant;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.AttendanceArchiveRepository;
 import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.AttendanceAccessGrantService;
+import com.shmamsa.service.AttendanceConfigService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.QrTokenService;
 import com.shmamsa.service.UserFamilyRoleService;
@@ -55,6 +59,8 @@ public class AttendanceController {
     private final QrTokenService qrTokenService;
     private final UserFamilyRoleService userFamilyRoleService;
     private final ObjectMapper objectMapper;
+    private final AttendanceConfigService attendanceConfigService;
+    private final AttendanceAccessGrantService attendanceAccessGrantService;
 
     private static final String TITLE_META_SEPARATOR = "::max::";
     private static final List<String> PREFERRED_FAMILY_ORDER = List.of(
@@ -110,6 +116,7 @@ public class AttendanceController {
         }
 
         AttendanceType type = AttendanceType.valueOf(typeObj.toString());
+        enforceTakeAttendanceGrantIfNeeded(servant, type);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> users = (List<Map<String, Object>>) usersObj;
@@ -129,35 +136,23 @@ public class AttendanceController {
             return ResponseEntity.status(400).body(Map.of("خطأ", "مافيش حضور ليوم لسا مجاش"));
         }
 
-        LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        String roleNorm = normRole(servant.getRole());
-        boolean canOverrideWeekClose = roleNorm.equals("AMIN_OSRA")
-                || roleNorm.equals("AMIN_KHEDMA")
-                || roleNorm.equals("DEVELOPER")
-                || roleNorm.equals("DEV")
-                || hasAnyScopedAminPrivilege(servant);
-
-        if (selectedDate.isBefore(monday) && !canOverrideWeekClose) {
-            return ResponseEntity.status(400).body(Map.of("خطأ", "الاسبوع قفل خلاص يلا من هنا"));
+        try {
+            enforceWeekClose(servant, selectedDate);
+            enforceDayOfWeek(type, selectedDate);
+        } catch (ApiException ex) {
+            return ResponseEntity.status(ex.getStatus()).body(Map.of("error", ex.getMessage()));
         }
 
-        // Enforce day-of-week per type
-        DayOfWeek dow = selectedDate.getDayOfWeek();
-        if (type == AttendanceType.FAMILY_MEETING
-                && dow != DayOfWeek.THURSDAY
-                && dow != DayOfWeek.FRIDAY
-                && dow != DayOfWeek.SATURDAY) {
-            return ResponseEntity.status(400).body(Map.of("خطأ", "اجتماع الاسره لازم يتاخد يوم الخميس او الجمعه "));
+        String customTitle = body.get("customTitle") == null ? null : String.valueOf(body.get("customTitle")).trim();
+        if (type == AttendanceType.CUSTOM_EVENT) {
+            if (!canUseCustomEvent(servant)) {
+                return ResponseEntity.status(403).body(Map.of("error", "Only amin/developer can create custom attendance events"));
+            }
+            if (customTitle == null || customTitle.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "customTitle is required for custom events"));
+            }
         }
-        if ((type == AttendanceType.FRIDAY_LITURGY
-                || type == AttendanceType.MARMARKOS_KHORS
-                || type == AttendanceType.ATHANASIUS_KHORS)
-                && dow != DayOfWeek.FRIDAY) {
-            return ResponseEntity.status(400).body(Map.of("خطأ", "القداس لازم يكون يوم الجمعة"));
-        }
-        if (type == AttendanceType.TASBEEHA && dow != DayOfWeek.SATURDAY) {
-            return ResponseEntity.status(400).body(Map.of("خطأ", "التسبحة لازم تكون يوم السبت"));
-        }
+
         LocalTime now = LocalTime.now();
 
 
@@ -199,6 +194,7 @@ public class AttendanceController {
                     existing.setStatus(AttendanceStatus.PRESENT);
                     existing.setTime(now);
                     existing.setTakenBy(servant);
+                    existing.setCustomTitle(type == AttendanceType.CUSTOM_EVENT ? customTitle : existing.getCustomTitle());
                     attendanceRepo.save(existing);
                     updatedToPresent++;
                 } else {
@@ -226,6 +222,7 @@ public class AttendanceController {
                 r.setFamilyId(meetingFamilyId);
                 r.setFamilyBase(meetingBase);
             }
+            r.setCustomTitle(type == AttendanceType.CUSTOM_EVENT ? customTitle : null);
             r.setStatus(AttendanceStatus.PRESENT);
             r.setTakenBy(servant);
             attendanceRepo.save(r);
@@ -255,6 +252,7 @@ public class AttendanceController {
                 r.setFamilyId(meetingFamilyId);
                 r.setFamilyBase(meetingBase);
             }
+            r.setCustomTitle(type == AttendanceType.CUSTOM_EVENT ? customTitle : null);
             r.setStatus(AttendanceStatus.ABSENT);
             r.setTakenBy(servant);
             attendanceRepo.save(r);
@@ -294,6 +292,10 @@ public class AttendanceController {
         } catch (Exception ignored) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
         }
+        enforceTakeAttendanceGrantIfNeeded(servant, selectedType);
+        if (selectedType == AttendanceType.CUSTOM_EVENT) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "QR scan is not supported for custom events");
+        }
 
         String dateRaw = body.get("date");
         if (dateRaw == null || dateRaw.isBlank()) {
@@ -306,12 +308,25 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
         }
 
+        if (selectedDate.isAfter(LocalDate.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot scan attendance in the future");
+        }
+        enforceWeekClose(servant, selectedDate);
+        enforceDayOfWeek(selectedType, selectedDate);
+
         String familyRaw = body.get("family");
-        ScopeResult scope = resolveScopeUsers(servant, selectedType, familyRaw);
+        String effectiveFamilyBase = detectScanEffectiveFamily(u, selectedType, familyRaw);
+        enforceScanFamilyAccess(servant, selectedType, effectiveFamilyBase);
+
+        ScopeResult scope = resolveScopeUsers(servant, selectedType,
+                (selectedType == AttendanceType.FAMILY_MEETING || selectedType == AttendanceType.CUSTOM_EVENT
+                        || selectedType == AttendanceType.MARMARKOS_KHORS || selectedType == AttendanceType.ATHANASIUS_KHORS)
+                        ? effectiveFamilyBase
+                        : familyRaw);
         boolean inScope = scope.users.stream()
                 .anyMatch(member -> member != null && Objects.equals(member.getId(), u.getId()));
         if (!inScope) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "User not in scope");
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يمكن أخذ حضور هذه الأسرة");
         }
 
         AttendanceRecord existing = null;
@@ -335,6 +350,7 @@ public class AttendanceController {
         out.put("fullName", u.getFullName());
         out.put("role", u.getRole());
         out.put("deaconFamily", familyAccessService.primaryFamilyName(u));
+        out.put("effectiveFamilyBase", effectiveFamilyBase);
         out.put("alreadyRecorded", alreadyRecorded);
         out.put("alreadyPresent", alreadyPresent);
         out.put("existingStatus", existingStatus);
@@ -430,12 +446,107 @@ public class AttendanceController {
             row.put("date", r.getDate() == null ? null : r.getDate().toString());
             row.put("time", r.getTime() == null ? null : r.getTime().toString());
             row.put("type", r.getType() == null ? null : r.getType().name());
+            row.put("customTitle", r.getCustomTitle());
             row.put("status", r.getStatus() == null ? null : r.getStatus().name());
             row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
             row.put("familyBase", familyAccessService.baseNameForId(r.getFamilyId(), r.getFamilyBase()));
             out.add(row);
         }
         return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/context")
+    public ResponseEntity<?> context(Authentication auth) {
+        User me = requireAuthenticatedUser(auth);
+
+        var activeGrants = attendanceAccessGrantService.activeGrantsForUser(me.getId());
+        Set<AttendanceType> selfTypes = attendanceAccessGrantService.activeAllowedTypes(me.getId(), AttendanceGrantKind.SELF_CHECKIN);
+        Set<AttendanceType> takeTypes = attendanceAccessGrantService.activeAllowedTypes(me.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("config", attendanceConfigService.getAttendanceConfig());
+        out.put("role", me.getRole());
+        out.put("todayOpenForServant", attendanceConfigService.isTodayOpenForServant());
+        out.put("activeGrants", activeGrants.stream().map(attendanceAccessGrantService::toView).toList());
+        out.put("selfCheckinAllowed", !selfTypes.isEmpty());
+        out.put("takeAttendanceGrantActive", !takeTypes.isEmpty());
+        out.put("selfAllowedTypes", selfTypes.stream().map(Enum::name).toList());
+        out.put("takeAllowedTypes", takeTypes.stream().map(Enum::name).toList());
+        out.put("canUseCustomEvent", canUseCustomEvent(me));
+        return ResponseEntity.ok(out);
+    }
+
+    @PostMapping("/self-checkin")
+    public ResponseEntity<?> selfCheckin(@RequestBody Map<String, Object> body, Authentication auth) {
+        User me = requireAuthenticatedUser(auth);
+        Set<AttendanceType> allowedTypes = attendanceAccessGrantService.activeAllowedTypes(me.getId(), AttendanceGrantKind.SELF_CHECKIN);
+        if (allowedTypes.isEmpty()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "SELF_CHECKIN_NOT_ALLOWED", "Self check-in is not allowed now");
+        }
+
+        Object typeObj = body == null ? null : body.get("type");
+        if (typeObj == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "TYPE_REQUIRED", "type is required");
+        }
+
+        AttendanceType type;
+        try {
+            type = AttendanceType.valueOf(typeObj.toString());
+        } catch (Exception ex) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Invalid type");
+        }
+        if (!allowedTypes.contains(type)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "TYPE_NOT_ALLOWED", "This type is not allowed for you now");
+        }
+
+        LocalDate selectedDate = LocalDate.now();
+        Object dateObj = body.get("date");
+        if (dateObj != null && !String.valueOf(dateObj).isBlank()) {
+            selectedDate = LocalDate.parse(String.valueOf(dateObj));
+        }
+        if (!selectedDate.equals(LocalDate.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SELF_TODAY_ONLY", "Self check-in is allowed for today only");
+        }
+
+        AttendanceAccessGrant matchingGrant = attendanceAccessGrantService.activeGrantsForUser(me.getId()).stream()
+                .filter(g -> g.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN)
+                .filter(g -> attendanceAccessGrantService.toView(g) != null)
+                .filter(g -> {
+                    String csv = g.getAllowedTypesCsv() == null ? "" : g.getAllowedTypesCsv();
+                    return Arrays.stream(csv.split(",")).map(String::trim).anyMatch(x -> x.equalsIgnoreCase(type.name()));
+                })
+                .findFirst()
+                .orElse(null);
+
+        AttendanceRecord existing;
+        if (matchingGrant != null && matchingGrant.getFamilyId() != null) {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(me.getId(), selectedDate, type, matchingGrant.getFamilyId());
+        } else {
+            existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(me.getId(), selectedDate, type);
+        }
+
+        LocalTime now = LocalTime.now();
+        if (existing != null) {
+            existing.setStatus(AttendanceStatus.PRESENT);
+            existing.setTime(now);
+            existing.setTakenBy(me);
+            attendanceRepo.save(existing);
+            return ResponseEntity.ok(Map.of("ok", true, "date", selectedDate.toString(), "type", type.name(), "updated", 1, "created", 0));
+        }
+
+        AttendanceRecord r = new AttendanceRecord();
+        r.setUser(me);
+        r.setDate(selectedDate);
+        r.setTime(now);
+        r.setType(type);
+        r.setStatus(AttendanceStatus.PRESENT);
+        r.setTakenBy(me);
+        if (matchingGrant != null && matchingGrant.getFamilyId() != null) {
+            r.setFamilyId(matchingGrant.getFamilyId());
+            r.setFamilyBase(matchingGrant.getFamilyBase());
+        }
+        attendanceRepo.save(r);
+        return ResponseEntity.ok(Map.of("ok", true, "date", selectedDate.toString(), "type", type.name(), "updated", 0, "created", 1));
     }
 
 
@@ -448,12 +559,8 @@ public class AttendanceController {
                                    @RequestParam AttendanceType type,
                                    @RequestParam(required = false) String family,
                                    Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User servant = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
-
-        assertServantCanEditAttendance(servant);
+        User servant = requireAttendanceActor(auth);
+        enforceTakeAttendanceGrantIfNeeded(servant, type);
 
         LocalDate today = LocalDate.now();
         LocalDate selectedDate = today;
@@ -535,12 +642,7 @@ public class AttendanceController {
 
     @PostMapping("/mark-absent")
     public ResponseEntity<?> markAbsent(@RequestBody Map<String, Object> body, Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-
-        User servant = userRepo.findByUsername(auth.getName())
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
-
-        assertServantCanEditAttendance(servant);
+        User servant = requireAttendanceActor(auth);
 
         if (body == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Missing body");
 
@@ -579,6 +681,7 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot edit attendance in the future");
         }
 
+        enforceTakeAttendanceGrantIfNeeded(servant, type);
         enforceWeekClose(servant, selectedDate);
         enforceDayOfWeek(type, selectedDate);
 
@@ -645,17 +748,22 @@ public class AttendanceController {
     private void assertServantCanEditAttendance(User servant) {
         if (servant == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
         Set<String> allowed = Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER", "DEV");
-        String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
-        if (!allowed.contains(role)) {
+        String role = normRole(servant.getRole());
+        if (!allowed.contains(role) && !hasAnyScopedAminPrivilege(servant)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
     }
 
-    private User requireAttendanceActor(Authentication auth) {
+    private User requireAuthenticatedUser(Authentication auth) {
         if (auth == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
-        User servant = userRepo.findByUsername(auth.getName())
+        return userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+    }
+
+    private User requireAttendanceActor(Authentication auth) {
+        User servant = requireAuthenticatedUser(auth);
         assertServantCanEditAttendance(servant);
+        enforceServantEntryAvailability(servant);
         return servant;
     }
 
@@ -677,9 +785,129 @@ public class AttendanceController {
         }
     }
 
+    private void enforceServantEntryAvailability(User servant) {
+        String roleNorm = normRole(servant.getRole());
+        if (!"KHADIM".equals(roleNorm) || hasAnyScopedAminPrivilege(servant)) return;
+        if (attendanceConfigService.isTodayOpenForServant()) return;
+        throw new ApiException(HttpStatus.BAD_REQUEST, "تم إغلاق صفحة الحضور اليوم حسب الإعدادات");
+    }
+
+    private Set<AttendanceType> parseAttendanceTypesCsv(String csv) {
+        Set<AttendanceType> out = new LinkedHashSet<>();
+        if (csv == null || csv.isBlank()) return out;
+        for (String part : csv.split(",")) {
+            String value = String.valueOf(part == null ? "" : part).trim();
+            if (value.isBlank()) continue;
+            try {
+                out.add(AttendanceType.valueOf(value.toUpperCase(Locale.ROOT)));
+            } catch (Exception ignored) {
+            }
+        }
+        return out;
+    }
+
+    private boolean grantAllowsFamily(AttendanceAccessGrant grant, String familyBase) {
+        if (grant == null) return false;
+        String targetBase = String.valueOf(familyBase == null ? "" : familyBase).trim();
+        String grantBase = String.valueOf(grant.getFamilyBase() == null ? "" : grant.getFamilyBase()).trim();
+        if (grantBase.isBlank() || targetBase.isBlank()) return true;
+        return Arrays.stream(grantBase.split(","))
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .anyMatch(x -> x.equalsIgnoreCase(targetBase));
+    }
+
+    private boolean grantAllowsType(AttendanceAccessGrant grant, AttendanceType type) {
+        if (grant == null || type == null) return false;
+        Set<AttendanceType> types = parseAttendanceTypesCsv(grant.getAllowedTypesCsv());
+        return types.isEmpty() || types.contains(type);
+    }
+
+    private String detectScanEffectiveFamily(User target, AttendanceType type, String requestedFamily) {
+        if (type == null) return String.valueOf(requestedFamily == null ? "" : requestedFamily).trim();
+        if (type == AttendanceType.MARMARKOS_KHORS) return "خورس مارمرقس";
+        if (type == AttendanceType.ATHANASIUS_KHORS) return "خورس البابا اثناسيوس";
+        String base = familyAccessService.baseFamily(target);
+        if (base != null && !base.isBlank()) return base;
+        return String.valueOf(requestedFamily == null ? "" : requestedFamily).trim();
+    }
+
+    private void enforceScanFamilyAccess(User servant, AttendanceType type, String familyBase) {
+        if (servant == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        String roleNorm = normRole(servant.getRole());
+        if ("DEVELOPER".equals(roleNorm) || "DEV".equals(roleNorm) || "AMIN_KHEDMA".equals(roleNorm)) return;
+
+        if (type == AttendanceType.MARMARKOS_KHORS || type == AttendanceType.ATHANASIUS_KHORS) {
+            assertChoirAuthorization(servant, type);
+            return;
+        }
+
+        String targetBase = String.valueOf(familyBase == null ? "" : familyBase).trim();
+        if (targetBase.isBlank()) return;
+
+        if ("AMIN_OSRA".equals(roleNorm) || hasAnyScopedAminPrivilege(servant)) {
+            if (familyAccessService.belongsToBase(servant, targetBase)) return;
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يمكن أخذ حضور هذه الأسرة");
+        }
+
+        if (!"KHADIM".equals(roleNorm)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يمكن أخذ حضور هذه الأسرة");
+        }
+
+        boolean hasConfiguredGrant = attendanceAccessGrantService.hasConfiguredGrant(servant.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
+        if (hasConfiguredGrant) {
+            List<AttendanceAccessGrant> activeGrants = attendanceAccessGrantService.activeGrantsForUser(servant.getId()).stream()
+                    .filter(g -> g.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE)
+                    .toList();
+            if (activeGrants.isEmpty()) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "الوقت المسموح فيه لأخذ حضور هذه الأسرة انتهى");
+            }
+            boolean typeAllowed = activeGrants.stream().anyMatch(g -> grantAllowsType(g, type));
+            if (!typeAllowed) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "هذا النوع غير متاح لك الآن");
+            }
+            boolean familyAllowed = activeGrants.stream()
+                    .filter(g -> grantAllowsType(g, type))
+                    .anyMatch(g -> grantAllowsFamily(g, targetBase));
+            if (!familyAllowed) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "لا يمكن أخذ حضور هذه الأسرة");
+            }
+            return;
+        }
+
+        if (familyAccessService.belongsToBase(servant, targetBase)) return;
+        throw new ApiException(HttpStatus.FORBIDDEN, "لا يمكن أخذ حضور هذه الأسرة");
+    }
+
+    private void enforceTakeAttendanceGrantIfNeeded(User servant, AttendanceType type) {
+        if (servant == null || servant.getId() == null) return;
+        String roleNorm = normRole(servant.getRole());
+        if (!"KHADIM".equals(roleNorm) || hasAnyScopedAminPrivilege(servant)) return;
+        if (!attendanceAccessGrantService.hasConfiguredGrant(servant.getId(), AttendanceGrantKind.TAKE_ATTENDANCE)) return;
+
+        Set<AttendanceType> allowedTypes = attendanceAccessGrantService.activeAllowedTypes(servant.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
+        if (allowedTypes.isEmpty()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "وقت أخذ الحضور غير متاح الآن");
+        }
+        if (type != null && !allowedTypes.contains(type)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "هذا النوع غير متاح لك الآن");
+        }
+    }
+
+    private boolean canUseCustomEvent(User servant) {
+        if (servant == null) return false;
+        String roleNorm = normRole(servant.getRole());
+        return roleNorm.equals("AMIN_OSRA")
+                || roleNorm.equals("AMIN_KHEDMA")
+                || roleNorm.equals("DEVELOPER")
+                || roleNorm.equals("DEV")
+                || hasAnyScopedAminPrivilege(servant);
+    }
+
     private void enforceDayOfWeek(AttendanceType type, LocalDate selectedDate) {
         if (type == null || selectedDate == null) return;
         DayOfWeek dow = selectedDate.getDayOfWeek();
+        if (type == AttendanceType.CUSTOM_EVENT) return;
         if (type == AttendanceType.FAMILY_MEETING
                 && dow != DayOfWeek.THURSDAY
                 && dow != DayOfWeek.FRIDAY
@@ -753,7 +981,7 @@ public class AttendanceController {
             return new ScopeResult(userRepo.findByKhorsAndRoleIn(needed, roles), familyBase, familyAccessService.familyIdForName(familyBase));
         }
 
-        if (type == AttendanceType.FAMILY_MEETING) {
+        if (type == AttendanceType.FAMILY_MEETING || type == AttendanceType.CUSTOM_EVENT) {
             String base = (family == null || family.isBlank()) ? null : familyAccessService.baseNameForName(family);
             if (base == null || base.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting needs a selected family");
@@ -911,6 +1139,7 @@ public class AttendanceController {
             row.put("date", r.getDate() == null ? null : r.getDate().toString());
             row.put("time", r.getTime() == null ? null : r.getTime().toString());
             row.put("type", r.getType() == null ? null : r.getType().name());
+            row.put("customTitle", r.getCustomTitle());
             row.put("status", r.getStatus() == null ? null : r.getStatus().name());
             row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
             row.put("createdAt", r.getCreatedAt() == null ? null : r.getCreatedAt().toString());

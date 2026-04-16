@@ -44,6 +44,14 @@ ngOnInit(): void {
     return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r) || this.hasAnyAminOsraScope();
   }
 
+  canOpenAttendance(): boolean {
+    return this.isServantOrAbove() || !!this.user?.canOpenAttendance;
+  }
+
+  canOpenFamilyTools(): boolean {
+    return this.isServantOrAbove();
+  }
+
   isAminOsraOrAbove(): boolean {
     const r = normalizeRole(this.user?.role);
     return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(r) || this.hasAnyAminOsraScope();

@@ -50,7 +50,7 @@
                 [class.absent-row]="row.status === 'ABSENT'"
               >
                 <td class="event-cell">
-                  <div class="event-name">{{ labelType(row.type) }}</div>
+                  <div class="event-name">{{ row.customTitle || labelType(row.type) }}</div>
                   <div class="event-time">{{ formatTime12h(row.time) }}</div>
                 </td>
                 <td class="status-cell">{{ labelStatus(row.status) }}</td>

@@ -44,6 +44,10 @@ export class RoleGuard implements CanActivate {
         if (allowed.includes('AMIN_OSRA') && scopedRoles.includes('AMIN_OSRA')) {
           return true;
         }
+
+        if (state.url.startsWith('/attendance') && !!(user as any)?.canOpenAttendance) {
+          return true;
+        }
         return this.router.createUrlTree(['/dashboard']);
       }),
       catchError(() => of(this.router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } })))
