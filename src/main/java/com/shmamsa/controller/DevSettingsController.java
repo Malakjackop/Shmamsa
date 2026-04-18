@@ -12,13 +12,25 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dev")
 @RequiredArgsConstructor
 public class DevSettingsController {
+
+    private static final List<String> ALLOWED_REQUIRED_RULES = List.of(
+            "NEVER",
+            "MEMBER_ONLY",
+            "SERVANT_ONLY",
+            "STUDENT_ONLY",
+            "STUDENT_SCHOOL",
+            "STUDENT_UNIVERSITY",
+            "GRADUATE_ONLY"
+    );
 
     private final CustomRegistrationFieldRepository fieldRepo;
     private final CustomFieldValueRepository valueRepo;
@@ -38,6 +50,32 @@ public class DevSettingsController {
         }
     }
 
+    private String normalizeRequiredRuleSet(String rules) {
+        if (rules == null || rules.isBlank()) {
+            return "NEVER";
+        }
+
+        LinkedHashSet<String> normalizedRules = new LinkedHashSet<>();
+        for (String rawRule : rules.split(",")) {
+            String normalized = rawRule == null ? "" : rawRule.trim().toUpperCase(Locale.ROOT);
+            if (normalized.isBlank()) {
+                continue;
+            }
+            if (!ALLOWED_REQUIRED_RULES.contains(normalized)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUIRED_RULE", "Required rule is invalid");
+            }
+            if (!"NEVER".equals(normalized)) {
+                normalizedRules.add(normalized);
+            }
+        }
+
+        if (normalizedRules.isEmpty()) {
+            return "NEVER";
+        }
+
+        return String.join(",", normalizedRules);
+    }
+
     // ── GET all fields ──────────────────────────────────────────────────
     @GetMapping("/custom-fields")
     public ResponseEntity<List<CustomRegistrationField>> getAll(Authentication auth) {
@@ -52,6 +90,7 @@ public class DevSettingsController {
             String fieldType,
             String options,
             Boolean required,
+            String requiredRule,
             String visibilityRule,
             String showIn,
             Integer displayOrder
@@ -81,6 +120,7 @@ public class DevSettingsController {
         if (!List.of("TEXT", "SELECT").contains(type)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Type must be TEXT or SELECT");
         }
+        String requiredRule = normalizeRequiredRuleSet(req.requiredRule());
 
         CustomRegistrationField field = CustomRegistrationField.builder()
                 .fieldKey(key)
@@ -88,6 +128,7 @@ public class DevSettingsController {
                 .fieldType(type)
                 .options("SELECT".equals(type) ? (req.options() != null ? req.options().trim() : "") : null)
                 .required(req.required() != null && req.required())
+                .requiredRule(requiredRule)
                 .visibilityRule(req.visibilityRule() != null ? req.visibilityRule().trim() : "ALWAYS")
                 .showIn(req.showIn() != null ? req.showIn().trim() : "NONE")
                 .displayOrder(req.displayOrder() != null ? req.displayOrder() : 0)
@@ -105,6 +146,7 @@ public class DevSettingsController {
             String fieldType,
             String options,
             Boolean required,
+            String requiredRule,
             String visibilityRule,
             String showIn,
             Integer displayOrder
@@ -134,6 +176,9 @@ public class DevSettingsController {
         }
         if (req.required() != null) {
             field.setRequired(req.required());
+        }
+        if (req.requiredRule() != null) {
+            field.setRequiredRule(normalizeRequiredRuleSet(req.requiredRule()));
         }
         if (req.visibilityRule() != null && !req.visibilityRule().isBlank()) {
             field.setVisibilityRule(req.visibilityRule().trim());

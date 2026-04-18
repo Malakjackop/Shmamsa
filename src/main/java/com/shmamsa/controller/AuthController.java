@@ -20,6 +20,7 @@ import com.shmamsa.service.AuthService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.FamilyCatalogService;
 import com.shmamsa.service.UserFamilyRoleService;
+import com.shmamsa.util.NationalIdUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +33,19 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+    private static final java.util.Set<String> KNOWN_SCHOOL_GRADES = java.util.Set.of(
+            "أولى ابتدائي", "تانية ابتدائي", "تالتة ابتدائي", "رابعة ابتدائي", "خامسة ابتدائي", "سادسة ابتدائي",
+            "أولى إعدادي", "تانية إعدادي", "تالتة إعدادي",
+            "أولى ثانوي", "تانية ثانوي", "تالتة ثانوي",
+            "other"
+    );
+
 
     private final AuthService authService;
     private final AttendanceBackfillService attendanceBackfillService;
@@ -47,6 +56,15 @@ public class AuthController {
     private final CustomFieldValueRepository customFieldValueRepo;
     private final AttendanceAccessGrantService attendanceAccessGrantService;
     private final AttendanceConfigService attendanceConfigService;
+
+    private record RegistrationRuleContext(
+            boolean servant,
+            String status,
+            String studyType,
+            String schoolGrade,
+            String servingWhere,
+            Boolean isWorking
+    ) {}
 
     private Map<String, Object> toCurrentUserView(User user) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -114,6 +132,7 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        validateConfiguredRequirements(toFieldValueMap(request), false);
         User saved = authService.register(request);
         saveCustomFieldValues(saved, request.getCustomFields());
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));
@@ -123,6 +142,7 @@ public class AuthController {
 
     @PostMapping("/register-servant")
     public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
+        validateConfiguredRequirements(toFieldValueMap(request), true);
         User saved = authService.registerServant(request);
         saveCustomFieldValues(saved, request.getCustomFields());
         return ResponseEntity.ok(Map.of("message", "User registered successfully as KHADIM"));
@@ -268,5 +288,235 @@ public class AuthController {
                     .build();
             customFieldValueRepo.save(cfv);
         }
+    }
+
+    private void validateConfiguredRequirements(Map<String, String> values, boolean isServant) {
+        RegistrationRuleContext context = buildRuleContext(values, isServant);
+        Map<String, String> errors = new LinkedHashMap<>();
+
+        for (CustomRegistrationField field : customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc()) {
+            if (!isFieldVisibleForContext(field, context)) {
+                continue;
+            }
+            if (!isFieldRequiredForContext(field, context)) {
+                continue;
+            }
+
+            String raw = values.get(field.getFieldKey());
+            if (raw != null && !raw.isBlank()) {
+                continue;
+            }
+
+            String controlKey = Boolean.TRUE.equals(field.getIsSystem())
+                    ? field.getFieldKey()
+                    : "custom_" + field.getFieldKey();
+            errors.put(controlKey, field.getLabelAr() + " يلزم");
+        }
+
+        if (!errors.isEmpty()) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "CONFIG_REQUIRED_FIELDS",
+                    "Some required fields are missing",
+                    errors
+            );
+        }
+    }
+
+    private RegistrationRuleContext buildRuleContext(Map<String, String> values, boolean isServant) {
+        return new RegistrationRuleContext(
+                isServant,
+                normalizeRuleValue(values.get("status")),
+                normalizeRuleValue(values.get("studyType")),
+                normalizeSchoolGradeRuleValue(values.get("schoolGrade")),
+                values.getOrDefault("servingWhere", ""),
+                parseBoolean(values.get("isWorking"))
+        );
+    }
+
+    private boolean isFieldRequiredForContext(CustomRegistrationField field, RegistrationRuleContext context) {
+        boolean alwaysRequired = Boolean.TRUE.equals(field.getRequired());
+        boolean conditionalRequired = matchesAnyRule(field.getRequiredRule(), context);
+        return alwaysRequired || conditionalRequired;
+    }
+
+    private boolean isFieldVisibleForContext(CustomRegistrationField field, RegistrationRuleContext context) {
+        if (!matchesRule(field.getVisibilityRule(), context)) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(field.getIsSystem())) {
+            return true;
+        }
+
+        return switch (field.getFieldKey()) {
+            case "deaconFamily", "khors" -> !context.servant();
+            case "servingWhere" -> context.servant();
+            case "attendKhors" -> context.servant() && context.servingWhere() != null && !context.servingWhere().isBlank();
+            case "graduatedFrom", "graduateJob" -> "graduate".equals(context.status());
+            case "studyType" -> "student".equals(context.status());
+            case "schoolName", "schoolGrade" ->
+                    "student".equals(context.status()) && "school".equals(context.studyType());
+            case "otherGrade" ->
+                    "student".equals(context.status())
+                            && "school".equals(context.studyType())
+                            && "other".equals(context.schoolGrade());
+            case "universityName", "faculty", "universityGrade" ->
+                    "student".equals(context.status()) && "university".equals(context.studyType());
+            case "workDetails" -> Boolean.TRUE.equals(context.isWorking());
+            default -> true;
+        };
+    }
+
+    private boolean matchesRule(String rule, RegistrationRuleContext context) {
+        String normalized = (rule == null || rule.isBlank()) ? "ALWAYS" : rule.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "ALWAYS" -> true;
+            case "NEVER" -> false;
+            case "MEMBER_ONLY" -> !context.servant();
+            case "SERVANT_ONLY" -> context.servant();
+            case "STUDENT_ONLY" -> "student".equals(context.status());
+            case "STUDENT_SCHOOL" -> "student".equals(context.status()) && "school".equals(context.studyType());
+            case "STUDENT_UNIVERSITY" -> "student".equals(context.status()) && "university".equals(context.studyType());
+            case "GRADUATE_ONLY" -> "graduate".equals(context.status());
+            default -> false;
+        };
+    }
+
+    private boolean matchesAnyRule(String rules, RegistrationRuleContext context) {
+        if (rules == null || rules.isBlank()) {
+            return false;
+        }
+
+        for (String rawRule : rules.split(",")) {
+            String normalized = rawRule == null ? "" : rawRule.trim().toUpperCase(Locale.ROOT);
+            if (normalized.isBlank() || "NEVER".equals(normalized)) {
+                continue;
+            }
+            if (matchesRule(normalized, context)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private Map<String, String> toFieldValueMap(RegisterRequest request) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("fullName", safe(request.getFullName()));
+        values.put("username", safe(request.getUsername()));
+        values.put("phoneNumber", safe(request.getPhoneNumber()));
+        values.put("address", safe(request.getAddress()));
+        values.put("nationalId", safe(request.getNationalId()));
+        values.put("email", safe(request.getEmail()));
+        values.put("dateOfBirth", deriveDateOfBirth(request.getDateOfBirth(), request.getNationalId()));
+        values.put("gender", deriveGender(request.getGender(), request.getNationalId()));
+        values.put("deaconDegree", safe(request.getDeaconDegree()));
+        values.put("deaconFamily", safe(request.getDeaconFamily()));
+        values.put("khors", safe(request.getKhors()));
+        values.put("servingWhere", "");
+        values.put("attendKhors", "");
+        values.put("status", safe(request.getStatus()));
+        values.put("graduatedFrom", safe(request.getGraduatedFrom()));
+        values.put("graduateJob", safe(request.getGraduateJob()));
+        values.put("studyType", safe(request.getStudyType()));
+        values.put("schoolName", safe(request.getSchoolName()));
+        values.put("schoolGrade", safe(request.getSchoolGrade()));
+        values.put("otherGrade", extractOtherGradeValue(request.getSchoolGrade()));
+        values.put("universityName", safe(request.getUniversityName()));
+        values.put("faculty", safe(request.getFaculty()));
+        values.put("universityGrade", safe(request.getUniversityGrade()));
+        values.put("isWorking", String.valueOf(request.getIsWorking()));
+        values.put("workDetails", safe(request.getWorkDetails()));
+        values.put("guardiansPhone", safe(request.getGuardiansPhone()));
+        values.put("guardianRelation", safe(request.getGuardianRelation()));
+        if (request.getCustomFields() != null) {
+            request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
+        }
+        return values;
+    }
+
+    private Map<String, String> toFieldValueMap(RegisterServantRequest request) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("fullName", safe(request.getFullName()));
+        values.put("username", safe(request.getUsername()));
+        values.put("phoneNumber", safe(request.getPhoneNumber()));
+        values.put("address", safe(request.getAddress()));
+        values.put("nationalId", safe(request.getNationalId()));
+        values.put("email", safe(request.getEmail()));
+        values.put("dateOfBirth", deriveDateOfBirth(request.getDateOfBirth(), request.getNationalId()));
+        values.put("gender", deriveGender(request.getGender(), request.getNationalId()));
+        values.put("deaconDegree", safe(request.getDeaconDegree()));
+        values.put("deaconFamily", safe(request.getDeaconFamily()));
+        values.put("khors", safe(request.getKhors()));
+        values.put("servingWhere", safe(request.getDeaconFamily()));
+        values.put("attendKhors", safe(request.getAttendKhors()));
+        values.put("status", safe(request.getStatus()));
+        values.put("graduatedFrom", safe(request.getGraduatedFrom()));
+        values.put("graduateJob", safe(request.getGraduateJob()));
+        values.put("studyType", safe(request.getStudyType()));
+        values.put("schoolName", "");
+        values.put("schoolGrade", "");
+        values.put("otherGrade", "");
+        values.put("universityName", safe(request.getUniversityName()));
+        values.put("faculty", safe(request.getFaculty()));
+        values.put("universityGrade", safe(request.getUniversityGrade()));
+        values.put("isWorking", String.valueOf(request.getIsWorking()));
+        values.put("workDetails", safe(request.getWorkDetails()));
+        values.put("guardiansPhone", safe(request.getGuardiansPhone()));
+        values.put("guardianRelation", safe(request.getGuardianRelation()));
+        if (request.getCustomFields() != null) {
+            request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
+        }
+        return values;
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String normalizeRuleValue(String value) {
+        return safe(value).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeSchoolGradeRuleValue(String value) {
+        String normalized = normalizeRuleValue(value);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        return KNOWN_SCHOOL_GRADES.contains(value == null ? "" : value.trim()) ? normalized : "other";
+    }
+
+    private String extractOtherGradeValue(String schoolGrade) {
+        String safeGrade = safe(schoolGrade);
+        if (safeGrade.isBlank() || KNOWN_SCHOOL_GRADES.contains(safeGrade)) {
+            return "";
+        }
+        return safeGrade;
+    }
+
+    private Boolean parseBoolean(String value) {
+        String normalized = safe(value).toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) return null;
+        if ("true".equals(normalized)) return true;
+        if ("false".equals(normalized)) return false;
+        return null;
+    }
+
+    private String deriveDateOfBirth(String rawDate, String nationalId) {
+        String date = safe(rawDate);
+        if (!date.isBlank()) {
+            return date;
+        }
+        var derived = NationalIdUtils.extractBirthDate(safe(nationalId));
+        return derived == null ? "" : derived.toString();
+    }
+
+    private String deriveGender(String rawGender, String nationalId) {
+        String gender = safe(rawGender);
+        if (!gender.isBlank()) {
+            return gender;
+        }
+        String derived = NationalIdUtils.extractGender(safe(nationalId));
+        return derived == null ? "" : derived;
     }
 }

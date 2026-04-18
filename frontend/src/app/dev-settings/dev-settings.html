@@ -14,18 +14,6 @@
         <i class="pi pi-address-book"></i>
         <span>حقول التسجيل</span>
       </li>
-      <li class="disabled">
-        <i class="pi pi-shield"></i>
-        <span>إدارة الصلاحيات (قريباً)</span>
-      </li>
-      <li class="disabled">
-        <i class="pi pi-database"></i>
-        <span>قاعدة البيانات (قريباً)</span>
-      </li>
-      <li class="disabled">
-        <i class="pi pi-bell"></i>
-        <span>الإشعارات (قريباً)</span>
-      </li>
     </ul>
   </aside>
 
@@ -39,7 +27,6 @@
         </div>
         <div>
           <h1>بناء حقول التسجيل</h1>
-          <p>قم بسحب وإفلات الحقول لترتيبها في صفحة التسجيل</p>
         </div>
       </div>
       <button class="btn-add" (click)="openCreate()">
@@ -53,61 +40,52 @@
       <div class="form-preview">
         <div class="section-title">
           <i class="pi pi-desktop"></i>
-          شكل الحقول في صفحة التسجيل
+         الحقول الموجوده حاليا
         </div>
 
-        <div class="empty-state" *ngIf="!loading && fields.length === 0">
-          <div class="dashed-box">
-            <i class="pi pi-images"></i>
-            <p>لا توجد حقول حتى الآن.</p>
-            <button class="btn-add small" (click)="openCreate()">
-              <i class="pi pi-plus"></i> أضف حقلك الأول
-            </button>
+        <div class="fields-preview" *ngIf="fields.length > 0">
+          <div class="fields-preview__head">
+            <h2> حقول التسجيل</h2>
+            <p>الحقول مقسمة إلى أقسام واضحة، ويمكنك السحب والترتيب داخل كل قسم.</p>
           </div>
-        </div>
 
-        <div class="fields-list" cdkDropList (cdkDropListDropped)="drop($event)" *ngIf="fields.length > 0">
-          <div class="field-card" *ngFor="let f of fields" cdkDrag [class.disabled-field]="!f.enabled">
-            <div class="drag-handle" cdkDragHandle title="اسحب للترتيب">
-              <i class="pi pi-bars"></i>
-            </div>
+          <div class="sections-stack">
+            <section class="fields-section" *ngFor="let section of groupedSections">
+              <div class="fields-section__head">
+                <h3>{{ section.title }}</h3>
+                <span>{{ section.fields.length }} حقل</span>
+              </div>
 
-            <div class="field-content">
-              <div class="field-top-row">
-                <div class="field-details">
-                  <span class="field-name"><i class="pi pi-language"></i> {{ f.labelAr }}</span>
-                  <span class="field-key"><code>{{ f.fieldKey }}</code></span>
-                  
-                  <span class="badge badge-type" [class.select]="f.fieldType === 'SELECT'">
-                    {{ typeLabel(f.fieldType) }}
-                  </span>
-                  
-                  <span class="badge badge-vis"><i class="pi pi-eye"></i> {{ visibilityLabel(f.visibilityRule) }}</span>
-                  <span class="badge badge-show" *ngIf="f.showIn !== 'NONE'"><i class="pi pi-id-card"></i> {{ showInLabel(f.showIn) }}</span>
-                  <span class="badge badge-req" *ngIf="f.required">مطلوب</span>
-                </div>
-                
-                <div class="field-actions">
-                  <button class="toggle-btn" [class.on]="f.enabled" (click)="toggleField(f)" title="تفعيل / تعطيل">
-                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                  </button>
-                  <div class="action-btns">
-                    <button class="icon-btn edit" (click)="openEdit(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
-                    <button class="icon-btn delete" (click)="deleteField(f)" title="حذف"><i class="pi pi-trash"></i></button>
+              <div class="fields-list" cdkDropList [cdkDropListData]="section.fields" (cdkDropListDropped)="dropSection($event, section.id)">
+                <div class="field-wrapper" *ngFor="let f of section.fields" cdkDrag cdkDragLockAxis="y" [class.disabled-field]="!f.enabled">
+                  <div class="field-actions-overlay">
+                    <div class="field-main">
+                      <button class="drag-handle-btn" cdkDragHandle type="button" title="اسحب لنقل الحقل">
+                        <i class="pi pi-bars"></i>
+                      </button>
+                      <div class="field-summary">
+                        <div class="field-summary__title">
+                          {{ f.labelAr }}
+                        </div>
+                        <div class="field-summary__meta">
+                          <span class="badge badge-type">{{ f.fieldType === 'TEXT' ? 'Text' : 'List' }}</span>
+                          <span class="badge badge-req" [class.badge-muted]="isRequirementOptional(f)">{{ requirementLabel(f) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="action-btns-overlay">
+                      <button class="toggle-btn" [class.on]="f.enabled" (click)="$event.stopPropagation(); toggleField(f)" title="تفعيل / تعطيل">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                      </button>
+                      <button class="icon-btn edit" (click)="$event.stopPropagation(); openEdit(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
+                      <button class="icon-btn delete" (click)="$event.stopPropagation(); deleteField(f)" title="حذف"><i class="pi pi-trash"></i></button>
+                    </div>
                   </div>
+
+                  <div *cdkDragPlaceholder class="field-placeholder"></div>
                 </div>
               </div>
-
-              <div class="input-preview">
-                <input *ngIf="f.fieldType === 'TEXT'" tabindex="-1" type="text" [placeholder]="f.labelAr" disabled class="mock-input" />
-                
-                <select *ngIf="f.fieldType === 'SELECT'" tabindex="-1" disabled class="mock-input mock-select">
-                  <option selected>{{ f.labelAr }}</option>
-                </select>
-              </div>
-            </div>
-            
-            <div *cdkDragPlaceholder class="field-placeholder"></div>
+            </section>
           </div>
         </div>
       </div>
@@ -144,16 +122,26 @@
     <!-- Field Type -->
     <div class="form-group">
       <label>نوع الحقل</label>
-      <select [(ngModel)]="editingField.fieldType">
+      <select [(ngModel)]="editingField.fieldType" (ngModelChange)="onFieldTypeChange()">
         <option *ngFor="let opt of fieldTypeOptions" [value]="opt.value">{{ opt.label }}</option>
       </select>
     </div>
 
     <!-- Options (only for SELECT) -->
     <div class="form-group" *ngIf="editingField.fieldType === 'SELECT'">
-      <label>الاختيارات (مفصولة بفاصلة)</label>
-      <input type="text" [(ngModel)]="editingField.options" placeholder="مثال: اختيار1,اختيار2,اختيار3" />
-      <small>افصل بين الاختيارات بفاصلة ,</small>
+      <div class="options-header">
+        <label>الاختيارات</label>
+        <button type="button" class="option-add-btn" (click)="addOption()">
+          <i class="pi pi-plus"></i>
+        </button>
+      </div>
+      <div class="option-row" *ngFor="let option of optionInputs; let i = index">
+        <input type="text" [(ngModel)]="optionInputs[i]" [placeholder]="'اختيار ' + (i + 1)" />
+        <button type="button" class="icon-btn delete option-delete-btn" (click)="removeOption(i)" title="حذف الاختيار">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+      <small>كل اختيار في سطر مستقل، ويمكنك إضافة اختيارات جديدة من زر +</small>
     </div>
 
     <!-- Visibility Rule -->
@@ -175,9 +163,24 @@
     <!-- Required -->
     <div class="form-group checkbox-group">
       <label class="checkbox-label">
-        <input type="checkbox" [(ngModel)]="editingField.required" />
+        <input type="checkbox" [(ngModel)]="editingField.required" (ngModelChange)="onRequiredToggle($event)" />
         <span>حقل مطلوب</span>
       </label>
+    </div>
+
+    <div class="form-group" *ngIf="editingField.required">
+      <label>مطلوب بشرط</label>
+      <div class="rule-checkbox-list">
+        <label class="rule-checkbox" *ngFor="let opt of requiredRuleOptions">
+          <input
+            type="checkbox"
+            [ngModel]="hasRequiredRule(opt.value)"
+            (ngModelChange)="toggleRequiredRule(opt.value, $event)"
+            [ngModelOptions]="{ standalone: true }" />
+          <span>{{ opt.label }}</span>
+        </label>
+      </div>
+      <small>لو اخترت شرط أو أكثر، الحقل يبقى مطلوب فقط عند تحقق واحد منها. لو سبتهم فاضيين، يبقى مطلوب دائمًا.</small>
     </div>
   </div>
 

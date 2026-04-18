@@ -54,7 +54,7 @@ export class RegisterComponent implements OnInit {
   memberFamilyOptions: FamilyOption[] = [];
   servantWhereOptions: FamilyOption[] = [];
 
-  customFields: CustomField[] = [];
+  orderedFields: CustomField[] = [];
   private devSettingsService = inject(DevSettingsService);
 
   constructor(
@@ -66,9 +66,10 @@ export class RegisterComponent implements OnInit {
 
   ngOnInit(): void {
     this.buildForm();
+    this.registerForm.valueChanges.subscribe(() => this.syncConfiguredRequiredErrors());
     if (isPlatformBrowser(this.platformId)) {
       this.loadFamilyOptions();
-      this.loadCustomFields();
+      this.loadFields();
     } else if (this.isServant) {
       this.servantWhereOptions = this.fallbackServantWhereOptions();
     } else {
@@ -89,6 +90,7 @@ export class RegisterComponent implements OnInit {
 
     this.onStatusChange();
     this.onStudyTypeChange();
+    this.syncConfiguredRequiredErrors();
 
     this.registerForm.get('schoolGrade')?.valueChanges.subscribe(value => {
       this.showOtherGrade = value === 'other';
@@ -241,42 +243,168 @@ export class RegisterComponent implements OnInit {
   }
 
   /* ── Custom fields ───────────────────────────────── */
-  private loadCustomFields(): void {
+  private loadFields(): void {
     this.devSettingsService.getEnabledFields().subscribe({
       next: (fields) => {
-        this.customFields = fields || [];
-        // Add dynamic form controls
-        for (const f of this.customFields) {
-          const validators = f.required ? [Validators.required] : [];
-          this.registerForm.addControl('custom_' + f.fieldKey, new FormControl('', validators));
+        this.orderedFields = this.sortFields(fields || []);
+        // Add dynamic form controls only for non-system custom fields
+        for (const f of this.orderedFields) {
+          if (!f.isSystem && !this.registerForm.contains('custom_' + f.fieldKey)) {
+             const validators = f.required ? [Validators.required] : [];
+             this.registerForm.addControl('custom_' + f.fieldKey, new FormControl('', validators));
+          }
         }
+        this.syncConfiguredRequiredErrors();
       },
       error: () => {
-        this.customFields = [];
+        this.orderedFields = [];
       }
     });
   }
 
-  isCustomFieldVisible(f: CustomField): boolean {
-    const rule = f.visibilityRule;
-    if (rule === 'ALWAYS') return true;
-    if (rule === 'MEMBER_ONLY') return !this.isServant;
-    if (rule === 'SERVANT_ONLY') return this.isServant;
-
-    const status = this.registerForm.get('status')?.value;
-    const studyType = this.registerForm.get('studyType')?.value;
-
-    if (rule === 'STUDENT_ONLY') return status === 'student';
-    if (rule === 'STUDENT_SCHOOL') return status === 'student' && studyType === 'school';
-    if (rule === 'STUDENT_UNIVERSITY') return status === 'student' && studyType === 'university';
-    if (rule === 'GRADUATE_ONLY') return status === 'graduate';
-
-    return true;
+  isFieldVisible(f: CustomField): boolean {
+    return this.isFieldCurrentlyVisible(f);
   }
 
   getCustomFieldOptions(f: CustomField): string[] {
     if (!f.options) return [];
     return f.options.split(',').map(o => o.trim()).filter(Boolean);
+  }
+
+  getFieldConfig(fieldKey: string): CustomField | undefined {
+    return this.orderedFields.find(f => f.fieldKey === fieldKey);
+  }
+
+  isSelectField(fieldKey: string): boolean {
+    return this.getFieldConfig(fieldKey)?.fieldType === 'SELECT';
+  }
+
+  fieldLabel(fieldKey: string, fallback: string): string {
+    return this.getFieldConfig(fieldKey)?.labelAr || fallback;
+  }
+
+  fieldRequired(fieldKey: string, fallback = false): boolean {
+    const cfg = this.getFieldConfig(fieldKey);
+    return cfg ? this.isFieldConfiguredRequired(cfg) : fallback;
+  }
+
+  customFieldRequired(f: CustomField): boolean {
+    return this.isFieldConfiguredRequired(f);
+  }
+
+  fieldOptions(fieldKey: string, fallback: string[] = []): string[] {
+    const cfg = this.getFieldConfig(fieldKey);
+    const dynamic = cfg?.options?.split(',').map(o => o.trim()).filter(Boolean) || [];
+    return dynamic.length ? dynamic : fallback;
+  }
+
+  private matchesRule(rule: string): boolean {
+    const normalized = String(rule || 'ALWAYS').trim().toUpperCase();
+    const status = String(this.registerForm.get('status')?.value || '').trim().toLowerCase();
+    const studyType = String(this.registerForm.get('studyType')?.value || '').trim().toLowerCase();
+
+    if (normalized === 'ALWAYS') return true;
+    if (normalized === 'NEVER') return false;
+    if (normalized === 'MEMBER_ONLY') return !this.isServant;
+    if (normalized === 'SERVANT_ONLY') return this.isServant;
+    if (normalized === 'STUDENT_ONLY') return status === 'student';
+    if (normalized === 'STUDENT_SCHOOL') return status === 'student' && studyType === 'school';
+    if (normalized === 'STUDENT_UNIVERSITY') return status === 'student' && studyType === 'university';
+    if (normalized === 'GRADUATE_ONLY') return status === 'graduate';
+    return false;
+  }
+
+  private matchesAnyRule(rules?: string): boolean {
+    if (!rules) {
+      return false;
+    }
+
+    return rules
+      .split(',')
+      .map(rule => rule.trim().toUpperCase())
+      .filter(rule => !!rule && rule !== 'NEVER')
+      .some(rule => this.matchesRule(rule));
+  }
+
+  private isFieldConfiguredRequired(field: CustomField): boolean {
+    if (!field?.enabled) return false;
+    if (!this.isFieldCurrentlyVisible(field)) return false;
+    return !!field.required || this.matchesAnyRule(field.requiredRule);
+  }
+
+  private isFieldCurrentlyVisible(field: CustomField): boolean {
+    if (!field?.enabled) return false;
+    if (!this.matchesRule(field.visibilityRule || 'ALWAYS')) return false;
+    if (!field.isSystem) return true;
+
+    const status = String(this.registerForm.get('status')?.value || '').trim().toLowerCase();
+    const studyType = String(this.registerForm.get('studyType')?.value || '').trim().toLowerCase();
+    const schoolGrade = String(this.registerForm.get('schoolGrade')?.value || '').trim().toLowerCase();
+    const isWorking = this.registerForm.get('isWorking')?.value === true;
+    const servingWhere = this.servingWhereValue;
+
+    switch (field.fieldKey) {
+      case 'deaconFamily':
+      case 'khors':
+        return !this.isServant;
+      case 'servingWhere':
+        return this.isServant;
+      case 'attendKhors':
+        return this.isServant && !!servingWhere;
+      case 'graduatedFrom':
+      case 'graduateJob':
+        return status === 'graduate';
+      case 'studyType':
+        return status === 'student';
+      case 'schoolName':
+      case 'schoolGrade':
+        return status === 'student' && studyType === 'school';
+      case 'otherGrade':
+        return status === 'student' && studyType === 'school' && (this.showOtherGrade || schoolGrade === 'other');
+      case 'universityName':
+      case 'faculty':
+      case 'universityGrade':
+        return status === 'student' && studyType === 'university';
+      case 'workDetails':
+        return isWorking;
+      default:
+        return true;
+    }
+  }
+
+  private sortFields(fields: CustomField[]): CustomField[] {
+    return [...fields].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  }
+
+  private syncConfiguredRequiredErrors(): void {
+    for (const field of this.orderedFields) {
+      const controlName = field.isSystem ? field.fieldKey : 'custom_' + field.fieldKey;
+      const control = this.registerForm.get(controlName);
+      if (!control) continue;
+
+      const shouldRequire = this.isFieldConfiguredRequired(field);
+      const isEmpty = this.isEmptyValue(control.value);
+      const nextErrors = { ...(control.errors || {}) };
+
+      if (shouldRequire && isEmpty) {
+        nextErrors['configRequired'] = true;
+      } else {
+        delete nextErrors['configRequired'];
+      }
+
+      const hasErrors = Object.keys(nextErrors).length > 0;
+      const currentErrors = control.errors || null;
+      const nextValue = hasErrors ? nextErrors : null;
+      if (JSON.stringify(currentErrors) !== JSON.stringify(nextValue)) {
+        control.setErrors(nextValue);
+      }
+    }
+  }
+
+  private isEmptyValue(value: unknown): boolean {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'boolean') return false;
+    return String(value).trim() === '';
   }
 
   private arabicTextOnly(allowNumbers = false): ValidatorFn {
@@ -613,6 +741,7 @@ onServingWhereChange() {
 
     const e: any = c.errors;
     if (e['required']) return (label || 'هذا الحقل ') + ' يلزم';
+    if (e['configRequired']) return (label || 'هذا الحقل ') + ' يلزم';
     if (e['email']) return 'الايميل غير صحيح';
     if (e['arabicOnly']) return 'هذا الحقل لازم يتكتب بالعربي';
     if (e['nationalIdFormat']) return 'الرقم القومي لازم يكون 14 رقم ';

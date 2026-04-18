@@ -40,6 +40,16 @@ public class CustomRegistrationField {
     private Boolean required = false;
 
     /**
+     * Comma-separated conditional requirement rules:
+     * NEVER, MEMBER_ONLY, SERVANT_ONLY,
+     * STUDENT_ONLY, STUDENT_SCHOOL, STUDENT_UNIVERSITY,
+     * GRADUATE_ONLY
+     */
+    @Column(name = "required_rule", length = 30)
+    @Builder.Default
+    private String requiredRule = "NEVER";
+
+    /**
      * Visibility rule:
      * ALWAYS, MEMBER_ONLY, SERVANT_ONLY,
      * STUDENT_ONLY, STUDENT_SCHOOL, STUDENT_UNIVERSITY,
@@ -66,6 +76,11 @@ public class CustomRegistrationField {
     @Column(nullable = false)
     @Builder.Default
     private Boolean enabled = true;
+
+    /** Whether this field is a core system field (cannot be deleted or have key changed) */
+    @Column(name = "is_system", nullable = false)
+    @Builder.Default
+    private Boolean isSystem = false;
 
     @Column(name = "created_at")
     @Builder.Default

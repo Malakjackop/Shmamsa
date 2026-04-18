@@ -1638,4 +1638,30 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       }
     });
   }
+
+  // ===== Custom Events (Stubs) =====
+  customEventDialogMode: 'create' | 'edit' = 'create';
+  customEventDialogVisible = false;
+  customEventSaving = false;
+  customEventForm: any = { alwaysActive: true, enabled: true, dayOfWeek: 5 };
+  customEventActiveFromDate: Date | null = null;
+  customEventActiveToDate: Date | null = null;
+  customEventBlockedDates: Date[] = [];
+  familyCustomEvents: any[] = [];
+  availableCustomEvents: any[] = [];
+  selectedCustomEventId: any = '';
+
+  isCustomEventFamilyLocked(): boolean { return false; }
+  customEventFamilyOptions(): string[] { return this.families || []; }
+  onCustomEventDayChange(): void {}
+  onCustomEventAlwaysActiveChange(): void {}
+  onCustomEventActiveFromChange(val: Date | null): void { this.customEventActiveFromDate = val; }
+  onCustomEventActiveToChange(val: Date | null): void { this.customEventActiveToDate = val; }
+  saveCustomEvent(): void { this.customEventDialogVisible = false; }
+  openCreateCustomEvent(): void { this.customEventDialogMode = 'create'; this.customEventDialogVisible = true; }
+  customEventDisplayRange(event: any): string { return ''; }
+  openEditCustomEvent(event: any): void { this.customEventDialogMode = 'edit'; this.customEventDialogVisible = true; }
+  deleteCustomEvent(event: any): void {}
+  onCustomEventSelectionChange(): void {}
+  selectedCustomEvent(): any { return null; }
 }

@@ -563,29 +563,8 @@
               </div>
             </div>
 
-            <div class="schedule-grid" *ngIf="false && selectedConfigFamily">
-              <div class="form-group">
-                <label>وقت أخذ الحضور من</label>
-                <input
-                  type="time"
-                  step="300"
-                  [ngModel]="attendanceStartTimeForEditor()"
-                  (ngModelChange)="onAttendanceStartTimeChange($event)"
-                />
-              </div>
-              <div class="form-group">
-                <label>وقت أخذ الحضور إلى</label>
-                <input
-                  type="time"
-                  step="300"
-                  [ngModel]="attendanceEndTimeForEditor()"
-                  (ngModelChange)="onAttendanceEndTimeChange($event)"
-                />
-              </div>
-            </div>
-
             <div class="schedule-grid config-card--labels" *ngIf="selectedConfigFamily">
-              <div class="form-group" *ngIf="false">
+              <div class="form-group">
                 <label>الأيام المسموح تحديد الغياب لها</label>
                 <div class="day-chip-grid">
                   <button
@@ -650,41 +629,13 @@
 
       <div class="form-group grant-target-group">
         <label>الشخص المستهدف</label>
-        <button type="button" class="grant-target-trigger" (click)="toggleGrantTargetPicker()" [class.open]="grantTargetPickerOpen">
-          <div class="grant-target-trigger__content">
-            <span class="grant-target-trigger__label">{{ grantTargetSummaryText() }}</span>
-            <span class="grant-target-trigger__count" *ngIf="grantTargetSelectedCount()">{{ grantTargetSelectedCount() }}</span>
-          </div>
-          <i class="pi" [ngClass]="grantTargetPickerOpen ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
-        </button>
-
-        <div class="grant-target-panel" *ngIf="grantTargetPickerOpen">
-          <div class="grant-target-search">
-            <i class="pi pi-search"></i>
-            <input type="text" [ngModel]="grantTargetSearchText" (ngModelChange)="onGrantTargetSearchChange($event)" placeholder="ابحث بالاسم أو الأسرة..." />
-          </div>
-
-          <div class="grant-target-selected" *ngIf="grantSelectedTargetIds.length">
-            <span class="grant-target-chip" *ngFor="let user of selectedGrantTargets(); trackBy: trackByUserId">
-              {{ user.fullName }}
-            </span>
-            <button type="button" class="mini-btn grant-target-clear" (click)="clearGrantTargetSelection()">مسح الاختيار</button>
-          </div>
-
-          <div class="grant-target-options" *ngIf="filteredGrantTargetsList.length; else noGrantTargets">
-            <label class="grant-target-option" *ngFor="let u of filteredGrantTargetsList; trackBy: trackByUserId">
-              <input type="checkbox" [checked]="isGrantTargetSelected(u.id)" (change)="toggleGrantTargetSelection(u)" />
-              <div class="grant-target-option__body">
-                <div class="grant-target-option__name">{{ u.fullName }}</div>
-                <div class="grant-target-option__meta">{{ grantTargetMeta(u) || prettyRole(u.role) }}</div>
-              </div>
-            </label>
-          </div>
-
-          <ng-template #noGrantTargets>
-            <p class="hint">لا يوجد أشخاص مطابقون للبحث الحالي.</p>
-          </ng-template>
-        </div>
+        <select [(ngModel)]="grantForm.targetUserId" (ngModelChange)="onGrantTargetChange()">
+          <option [ngValue]="undefined" disabled>اختر الشخص</option>
+          <option *ngFor="let u of grantTargets" [ngValue]="u.id">
+            {{ u.fullName }}<ng-container *ngIf="familyLabel(u)"> - {{ familyLabel(u) }}</ng-container>
+          </option>
+        </select>
+        <p class="hint" *ngIf="!grantTargets.length">لا يوجد أشخاص متاحون ضمن الأسرة أو الفئة الحالية.</p>
       </div>
 
       <div class="form-group grant-family-group">
@@ -711,7 +662,7 @@
         </div>
       </div>
 
-      <div class="form-group" *ngIf="false">
+      <div class="form-group">
         <label>من</label>
         <p-datepicker
           [(ngModel)]="grantStartsAtDate"
@@ -726,7 +677,7 @@
         ></p-datepicker>
       </div>
 
-      <div class="form-group" *ngIf="false">
+      <div class="form-group">
         <label>إلى</label>
         <p-datepicker
           [(ngModel)]="grantEndsAtDate"
@@ -761,75 +712,6 @@
         >
           {{ opt.label }}
         </button>
-      </div>
-    </div>
-
-    <div class="form-group full-width grant-type-window-group">
-      <div class="grant-type-windows__head">
-        <label>المناسبات ومواعيدها</label>
-        <button type="button" class="mini-btn grant-type-windows__add" (click)="addGrantTypeWindow()" [disabled]="!canAddMoreGrantTypeWindows()">
-          <i class="pi pi-plus"></i>
-          إضافة مناسبة
-        </button>
-      </div>
-
-      <div class="grant-type-windows">
-        <div class="grant-type-window" *ngFor="let item of grantTypeWindows; let i = index">
-          <div class="grant-type-window__grid">
-            <div class="form-group">
-              <label>المناسبة</label>
-              <span class="grant-type-window__field-label">المناسبة</span>
-              <select [ngModel]="item.optionKey" (ngModelChange)="onGrantTypeWindowTypeChange(i, $event)">
-                <option [ngValue]="null">اختر المناسبة</option>
-                <option *ngFor="let opt of grantTypeOptionsForWindow(i)" [ngValue]="opt.key">{{ opt.label }}</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>من</label>
-              <span class="grant-type-window__field-label">من</span>
-              <p-datepicker
-                [ngModel]="item.startsAtDate"
-                (ngModelChange)="onGrantTypeWindowStartChange(i, $event)"
-                [showIcon]="true"
-                [showTime]="true"
-                hourFormat="12"
-                [stepMinute]="5"
-                appendTo="body"
-                panelStyleClass="attendanceGrantDatePanel"
-                placeholder="اختر اليوم والوقت"
-              ></p-datepicker>
-            </div>
-
-            <div class="form-group">
-              <label>إلى</label>
-              <span class="grant-type-window__field-label">إلى</span>
-              <p-datepicker
-                [ngModel]="item.endsAtDate"
-                (ngModelChange)="onGrantTypeWindowEndChange(i, $event)"
-                [showIcon]="true"
-                [showTime]="true"
-                hourFormat="12"
-                [stepMinute]="5"
-                appendTo="body"
-                panelStyleClass="attendanceGrantDatePanel"
-                placeholder="اختر اليوم والوقت"
-              ></p-datepicker>
-            </div>
-
-            <div class="grant-type-window__actions">
-              <button type="button" class="mini-btn" (click)="removeGrantTypeWindow(i)" [disabled]="grantTypeWindows.length === 1">
-                <i class="pi pi-trash"></i>
-                حذف
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grant-type-windows__note">
-        <i class="pi pi-save"></i>
-        <span>التعديلات لن تتحفظ إلا بعد الضغط على زرار حفظ التخصيص.</span>
       </div>
     </div>
 
@@ -941,3 +823,4 @@
     </div>
   </ng-template>
 </p-dialog>
+

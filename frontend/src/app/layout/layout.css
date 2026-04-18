@@ -167,7 +167,6 @@ p-card, p-panel {
   cursor: pointer;
   transition: background-color 160ms ease, transform 160ms ease, padding 220ms ease;
   box-sizing: border-box;
-  white-space: nowrap;
 }
 
 .menu li i {
@@ -178,7 +177,9 @@ p-card, p-panel {
 
 .menu li span {
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .menu li:hover,
@@ -195,11 +196,18 @@ p-card, p-panel {
 }
 
 .sidebar.collapsed .menu li {
-  grid-template-columns: 1fr;
-  justify-items: center;
-  text-align: center;
-  direction: ltr;
-  padding: 0.68rem 0.2rem;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  direction: rtl;
+  text-align: right;
+  padding: 0.72rem 0.7rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease, padding 220ms ease;
+  box-sizing: border-box;
 }
 
 .sidebar.collapsed .menu li i {
@@ -367,3 +375,5 @@ p-card, p-panel {
     padding-inline: 0.7rem;
   }
 }
+
+

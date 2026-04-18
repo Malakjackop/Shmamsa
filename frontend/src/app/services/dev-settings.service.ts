@@ -9,10 +9,12 @@ export interface CustomField {
   fieldType: 'TEXT' | 'SELECT';
   options?: string;
   required: boolean;
+  requiredRule?: string;
   visibilityRule: string;
   showIn: string;
   displayOrder: number;
   enabled: boolean;
+  isSystem?: boolean;
   createdAt?: string;
 }
 

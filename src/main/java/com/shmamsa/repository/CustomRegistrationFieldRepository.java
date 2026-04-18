@@ -15,4 +15,8 @@ public interface CustomRegistrationFieldRepository extends JpaRepository<CustomR
     Optional<CustomRegistrationField> findByFieldKey(String fieldKey);
 
     boolean existsByFieldKey(String fieldKey);
+
+    long countByIsSystemTrue();
+
+    List<CustomRegistrationField> findByIsSystemFalseOrderByDisplayOrderAsc();
 }
