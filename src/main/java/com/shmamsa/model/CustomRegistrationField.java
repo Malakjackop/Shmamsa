@@ -90,6 +90,10 @@ public class CustomRegistrationField {
     @Builder.Default
     private String showIn = "NONE";
 
+    @Column(name = "show_in_configured")
+    @Builder.Default
+    private Boolean showInConfigured = false;
+
     /** Display order in the registration form */
     @Column(name = "display_order")
     @Builder.Default
@@ -122,6 +126,24 @@ public class CustomRegistrationField {
     @JsonProperty("visibilityConditions")
     public void setVisibilityConditions(List<VisibilityConditionConfig> visibilityConditions) {
         this.visibilityConditionsJson = writeVisibilityConditionsJson(visibilityConditions);
+    }
+
+    @JsonProperty("showInConfigured")
+    public Boolean getShowInConfigured() {
+        return Boolean.TRUE.equals(showInConfigured);
+    }
+
+    @JsonProperty("showInConfigured")
+    public void setShowInConfigured(Boolean showInConfigured) {
+        this.showInConfigured = Boolean.TRUE.equals(showInConfigured);
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizeDefaults() {
+        if (showInConfigured == null) {
+            showInConfigured = false;
+        }
     }
 
     public static List<VisibilityConditionConfig> parseVisibilityConditionsJson(String rawJson) {

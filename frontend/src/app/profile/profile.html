@@ -73,32 +73,32 @@
 
     <form id="profileForm" [formGroup]="profileForm" (ngSubmit)="saveChanges()">
       <div class="form-grid" *ngIf="activeTab === 'personal'">
-        <div class="field-card">
+        <div class="field-card" *ngIf="showProfileField('phoneNumber')">
           <label>رقم الهاتف</label>
           <input formControlName="phoneNumber" />
         </div>
 
-        <div class="field-card">
+        <div class="field-card" *ngIf="showProfileField('email')">
           <label>البريد الإلكتروني</label>
           <input formControlName="email" />
         </div>
 
-        <div class="field-card field-wide">
+        <div class="field-card field-wide" *ngIf="showProfileField('address')">
           <label>العنوان بالتفصيل</label>
           <input formControlName="address" />
         </div>
 
-        <div class="field-card">
+        <div class="field-card" *ngIf="showProfileField('guardiansPhone')">
           <label>موبايل ولي الأمر</label>
           <input formControlName="guardiansPhone" />
         </div>
 
-        <div class="field-card">
+        <div class="field-card" *ngIf="showProfileField('guardianRelation')">
           <label>صلة القرابة</label>
           <input formControlName="guardianRelation" />
         </div>
 
-        <div class="field-card">
+        <div class="field-card" *ngIf="showProfileField('deaconDegree')">
           <label>رتبة الشماس</label>
           <select formControlName="deaconDegree">
             <option value="">اختر الرتبة</option>
@@ -108,7 +108,7 @@
       </div>
 
       <div class="form-grid" *ngIf="activeTab === 'other'">
-        <div class="field-card" *ngIf="showStatusField()">
+        <div class="field-card" *ngIf="showStatusField() && showProfileField('status')">
           <label>الحالة</label>
           <select formControlName="status">
             <option value="" disabled>اختر الحالة</option>
@@ -117,7 +117,7 @@
           </select>
         </div>
 
-        <div class="field-card" *ngIf="!isGraduate()">
+        <div class="field-card" *ngIf="!isGraduate() && showProfileField('studyType')">
           <label>نوع الدراسة</label>
           <select formControlName="studyType">
             <option value="" disabled>اختر نوع الدراسة</option>
@@ -126,42 +126,42 @@
           </select>
         </div>
 
-        <div class="field-card" *ngIf="!isGraduate() && isSchool()">
+        <div class="field-card" *ngIf="!isGraduate() && isSchool() && showProfileField('schoolName')">
           <label>اسم المدرسة</label>
           <input formControlName="schoolName" />
         </div>
 
-        <div class="field-card" *ngIf="!isGraduate() && isSchool()">
+        <div class="field-card" *ngIf="!isGraduate() && isSchool() && showProfileField('schoolGrade')">
           <label>الصف الدراسي</label>
           <input formControlName="schoolGrade" />
         </div>
 
-        <div class="field-card" *ngIf="!isGraduate() && isUniversity()">
+        <div class="field-card" *ngIf="!isGraduate() && isUniversity() && showProfileField('universityName')">
           <label>اسم الجامعة</label>
           <input formControlName="universityName" />
         </div>
 
-        <div class="field-card" *ngIf="!isGraduate() && isUniversity()">
+        <div class="field-card" *ngIf="!isGraduate() && isUniversity() && showProfileField('faculty')">
           <label>الكلية</label>
           <input formControlName="faculty" />
         </div>
 
-        <div class="field-card" *ngIf="!isGraduate() && isUniversity()">
+        <div class="field-card" *ngIf="!isGraduate() && isUniversity() && showProfileField('universityGrade')">
           <label>السنة/الفرقة</label>
           <input formControlName="universityGrade" />
         </div>
 
-        <div class="field-card" *ngIf="isGraduate()">
+        <div class="field-card" *ngIf="isGraduate() && showProfileField('graduatedFrom')">
           <label>تخرج من</label>
           <input formControlName="graduatedFrom" />
         </div>
 
-        <div class="field-card" *ngIf="isGraduate()">
+        <div class="field-card" *ngIf="isGraduate() && showProfileField('graduateJob')">
           <label>الوظيفة الحالية</label>
           <input formControlName="graduateJob" />
         </div>
 
-        <div class="field-card field-wide" *ngIf="!isGraduate()">
+        <div class="field-card field-wide" *ngIf="!isGraduate() && showProfileField('workDetails')">
           <label>تفاصيل العمل</label>
           <input formControlName="workDetails" />
         </div>

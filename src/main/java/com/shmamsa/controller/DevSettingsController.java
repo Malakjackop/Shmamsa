@@ -191,6 +191,7 @@ public class DevSettingsController {
                 .required(req.required() != null && req.required())
                 .requiredRule(requiredRule)
                 .showIn(showIn)
+                .showInConfigured(req.showIn() != null)
                 .displayOrder(req.displayOrder() != null ? req.displayOrder() : 0)
                 .enabled(true)
                 .createdAt(LocalDateTime.now())
@@ -258,6 +259,10 @@ public class DevSettingsController {
         }
         if (req.showIn() != null && !req.showIn().isBlank()) {
             field.setShowIn(normalizeShowIn(req.showIn()));
+            field.setShowInConfigured(true);
+        } else if (req.showIn() != null) {
+            field.setShowIn("NONE");
+            field.setShowInConfigured(true);
         }
         if (req.displayOrder() != null) {
             field.setDisplayOrder(req.displayOrder());

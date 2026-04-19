@@ -16,6 +16,7 @@ export interface CustomField {
   visibilityDependsValues?: string;
   visibilityConditions?: VisibilityCondition[];
   showIn: string;
+  showInConfigured?: boolean;
   displayOrder: number;
   enabled: boolean;
   isSystem?: boolean;

@@ -16,6 +16,7 @@ import { forkJoin } from 'rxjs';
 
 import { DevSettingsService, CustomField, VisibilityCondition } from '../services/dev-settings.service';
 import { AuthService, FamilyOption } from '../services/auth.service';
+import { effectiveShowInTargets, parseShowInTargets } from '../shared/custom-field-display';
 
 interface FieldSection {
   id: string;
@@ -56,6 +57,11 @@ export class DevSettingsComponent implements OnInit {
   private authService = inject(AuthService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
+  private readonly showInTargetOrder = ['FAMILY_INFO', 'PROFILE'];
+  private readonly showInTargetLabels: Record<string, string> = {
+    FAMILY_INFO: 'بيانات الأسرة',
+    PROFILE: 'الصفحة الشخصية'
+  };
 
   fields: CustomField[] = [];
   groupedSections: FieldSection[] = [];
@@ -186,7 +192,10 @@ export class DevSettingsComponent implements OnInit {
     this.loading = true;
     this.svc.getAllFields().subscribe({
       next: (data) => {
-        this.fields = this.sortFields(data || []);
+        this.fields = this.sortFields((data || []).map(field => ({
+          ...field,
+          showIn: this.resolveEffectiveShowInValue(field.showIn, field)
+        })));
         this.rebuildSections();
         this.loading = false;
       },
@@ -225,6 +234,7 @@ export class DevSettingsComponent implements OnInit {
       ...f,
       required: this.isRequiredConfigured(f),
       requiredRule: this.serializeRequiredRules(this.selectedRequiredRules),
+      showIn: this.resolveEffectiveShowInValue(f.showIn, f),
       visibilityRule: 'ALWAYS',
       visibilityDependsOn: '',
       visibilityDependsValues: ''
@@ -254,6 +264,8 @@ export class DevSettingsComponent implements OnInit {
       ...this.editingField,
       required: !!this.editingField.required && this.selectedRequiredRules.length === 0,
       requiredRule: !!this.editingField.required ? this.serializeRequiredRules(this.selectedRequiredRules) : 'NEVER',
+      showIn: this.normalizeConfiguredShowInValue(this.editingField.showIn),
+      showInConfigured: true,
       visibilityRule: this.legacyVisibilityRule(visibilityConditions),
       visibilityDependsOn: this.legacyVisibilityDependsOn(visibilityConditions),
       visibilityDependsValues: this.legacyVisibilityDependsValues(visibilityConditions),
@@ -762,7 +774,14 @@ export class DevSettingsComponent implements OnInit {
   }
 
   showInLabel(val: string): string {
-    return this.showInOptions.find(o => o.value === val)?.label || val;
+    const normalized = this.normalizeConfiguredShowInValue(val);
+    if (normalized === 'NONE') {
+      return this.showInOptions.find(o => o.value === 'NONE')?.label || 'متظهرش';
+    }
+
+    return parseShowInTargets(normalized)
+      .map(target => this.showInTargetLabels[target] || target)
+      .join(' + ');
   }
 
   typeLabel(type: string): string {
@@ -876,5 +895,22 @@ export class DevSettingsComponent implements OnInit {
       return String(this.editingField.options || '').trim();
     }
     return this.optionInputs.map(o => o.trim()).filter(Boolean).join(',');
+  }
+
+  private resolveEffectiveShowInValue(showIn?: string | null, field?: Partial<CustomField> | null): string {
+    const targets = effectiveShowInTargets({
+      fieldKey: String(field?.fieldKey || '').trim(),
+      isSystem: !!field?.isSystem,
+      showInConfigured: !!field?.showInConfigured,
+      showIn: showIn || ''
+    });
+    const orderedTargets = this.showInTargetOrder.filter(target => targets.includes(target));
+    return orderedTargets.length ? orderedTargets.join(',') : 'NONE';
+  }
+
+  private normalizeConfiguredShowInValue(showIn?: string | null): string {
+    const targets = parseShowInTargets(showIn);
+    const orderedTargets = this.showInTargetOrder.filter(target => targets.includes(target));
+    return orderedTargets.length ? orderedTargets.join(',') : 'NONE';
   }
 }

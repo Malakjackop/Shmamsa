@@ -5,7 +5,7 @@ import { MessageService } from 'primeng/api';
 import { Router } from '@angular/router';
 import { normalizeRole } from '../shared/role-utils';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
-import { buildVisibleCustomFieldEntries } from '../shared/custom-field-display';
+import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
 
 @Component({
   selector: 'app-profile',
@@ -25,6 +25,7 @@ export class ProfileComponent implements OnInit {
   activeTab: 'personal' | 'other' = 'personal';
   user: any;
   profileDisplayFields: CustomField[] = [];
+  profileDisplayFieldsLoaded = false;
 
   readonly deaconDegreeOptions = [
     'مش مرشوم',
@@ -363,10 +364,34 @@ export class ProfileComponent implements OnInit {
     this.devSettingsService.getEnabledFields().subscribe({
       next: (fields) => {
         this.profileDisplayFields = fields || [];
+        this.profileDisplayFieldsLoaded = true;
       },
       error: () => {
         this.profileDisplayFields = [];
+        this.profileDisplayFieldsLoaded = true;
       }
     });
+  }
+
+  showProfileField(fieldKey: string): boolean {
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    if (!normalizedFieldKey) {
+      return false;
+    }
+
+    const configuredField = this.profileDisplayFields.find(field => field.fieldKey === normalizedFieldKey);
+    if (configuredField) {
+      return customFieldHasTarget(configuredField, 'PROFILE');
+    }
+
+    if (this.profileDisplayFieldsLoaded) {
+      return false;
+    }
+
+    return effectiveShowInTargets({
+      fieldKey: normalizedFieldKey,
+      isSystem: true,
+      showIn: ''
+    }).includes('PROFILE');
   }
 }

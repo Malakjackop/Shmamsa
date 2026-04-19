@@ -9,7 +9,7 @@ import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
-import { buildVisibleCustomFieldEntries } from '../shared/custom-field-display';
+import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
 
 type Member = {
   id: number;
@@ -156,6 +156,7 @@ export class FamilyAttendanceComponent implements OnInit {
   profileFor: Member | null = null;
   profile: ProfileView | null = null;
   familyInfoFields: CustomField[] = [];
+  familyInfoFieldsLoaded = false;
 
   // ===== Daily attendance (حضور اليوم) =====
   showDaily = false;
@@ -631,36 +632,40 @@ export class FamilyAttendanceComponent implements OnInit {
       .join(' - ');
 
     const rows = [
-      { label: 'اسم المستخدم', value: String(p.username ?? '').trim() },
-      { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim() },
-      { label: 'الأسرة', value: this.familyLabel(p) },
-      { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear) },
-      { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim() },
-      { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim() },
-      { label: 'الهاتف', value: String(p.phoneNumber ?? '').trim() },
-      { label: 'العنوان', value: String(p.address ?? '').trim() },
-      { label: 'هاتف ولي الأمر', value: String(p.guardiansPhone ?? '').trim() },
-      { label: 'صلة القرابة', value: String(p.guardianRelation ?? '').trim() },
-      { label: 'تاريخ الميلاد', value: String(p.dateOfBirth ?? '').trim() },
-      { label: 'النوع', value: String(p.gender ?? '').trim() },
-      { label: 'الحالة', value: String(p.status ?? '').trim() },
-      { label: 'نوع الدراسة', value: String(p.studyType ?? '').trim() },
-      { label: 'المدرسة', value: schoolValue },
-      { label: 'الجامعة', value: universityValue },
-      { label: 'تخرج من', value: String(p.graduatedFrom ?? '').trim() },
-      { label: 'الوظيفة', value: String(p.graduateJob ?? '').trim() },
+      { label: 'اسم المستخدم', value: String(p.username ?? '').trim(), fieldKeys: ['username'] },
+      { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim(), fieldKeys: ['email'] },
+      { label: 'الأسرة', value: this.familyLabel(p), fieldKeys: ['deaconFamily'] },
+      { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear), fieldKeys: ['khors'] },
+      { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim(), fieldKeys: ['deaconDegree'] },
+      { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim(), fieldKeys: ['nationalId'] },
+      { label: 'الهاتف', value: String(p.phoneNumber ?? '').trim(), fieldKeys: ['phoneNumber'] },
+      { label: 'العنوان', value: String(p.address ?? '').trim(), fieldKeys: ['address'] },
+      { label: 'هاتف ولي الأمر', value: String(p.guardiansPhone ?? '').trim(), fieldKeys: ['guardiansPhone'] },
+      { label: 'صلة القرابة', value: String(p.guardianRelation ?? '').trim(), fieldKeys: ['guardianRelation'] },
+      { label: 'تاريخ الميلاد', value: String(p.dateOfBirth ?? '').trim(), fieldKeys: ['dateOfBirth'] },
+      { label: 'النوع', value: String(p.gender ?? '').trim(), fieldKeys: ['gender'] },
+      { label: 'الحالة', value: String(p.status ?? '').trim(), fieldKeys: ['status'] },
+      { label: 'نوع الدراسة', value: String(p.studyType ?? '').trim(), fieldKeys: ['studyType'] },
+      { label: 'المدرسة', value: schoolValue, fieldKeys: ['schoolName', 'schoolGrade'] },
+      { label: 'الجامعة', value: universityValue, fieldKeys: ['universityName', 'faculty', 'universityGrade'] },
+      { label: 'تخرج من', value: String(p.graduatedFrom ?? '').trim(), fieldKeys: ['graduatedFrom'] },
+      { label: 'الوظيفة', value: String(p.graduateJob ?? '').trim(), fieldKeys: ['graduateJob'] },
       {
         label: 'يعمل',
         value:
           p.isWorking === null || p.isWorking === undefined || String(p.isWorking).trim() === ''
             ? ''
-            : this.yesNoAr(p.isWorking)
+            : this.yesNoAr(p.isWorking),
+        fieldKeys: ['isWorking']
       },
-      { label: 'تفاصيل العمل', value: String(p.workDetails ?? '').trim() }
+      { label: 'تفاصيل العمل', value: String(p.workDetails ?? '').trim(), fieldKeys: ['workDetails'] }
     ];
 
     return [
-      ...rows.filter((row) => this.hasDisplayValue(row.value)),
+      ...rows
+        .filter((row) => row.fieldKeys.some((fieldKey) => this.showFamilyInfoField(fieldKey)))
+        .filter((row) => this.hasDisplayValue(row.value))
+        .map(({ label, value }) => ({ label, value })),
       ...buildVisibleCustomFieldEntries(this.familyInfoFields, p.customFields, 'FAMILY_INFO')
     ];
   }
@@ -711,11 +716,35 @@ export class FamilyAttendanceComponent implements OnInit {
     this.devSettings.getEnabledFields().subscribe({
       next: (fields) => {
         this.familyInfoFields = fields || [];
+        this.familyInfoFieldsLoaded = true;
       },
       error: () => {
         this.familyInfoFields = [];
+        this.familyInfoFieldsLoaded = true;
       }
     });
+  }
+
+  private showFamilyInfoField(fieldKey: string): boolean {
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    if (!normalizedFieldKey) {
+      return false;
+    }
+
+    const configuredField = this.familyInfoFields.find(field => field.fieldKey === normalizedFieldKey);
+    if (configuredField) {
+      return customFieldHasTarget(configuredField, 'FAMILY_INFO');
+    }
+
+    if (this.familyInfoFieldsLoaded) {
+      return false;
+    }
+
+    return effectiveShowInTargets({
+      fieldKey: normalizedFieldKey,
+      isSystem: true,
+      showIn: ''
+    }).includes('FAMILY_INFO');
   }
 
   private toDateValue(value: Date | string | null): Date | null {
