@@ -167,6 +167,18 @@
         </div>
       </div>
     </form>
+
+    <ng-container *ngIf="profileCustomEntries() as customEntries">
+      <section class="custom-fields-section" *ngIf="customEntries.length">
+        <div class="custom-fields-title">حقول إضافية</div>
+        <div class="custom-fields-grid">
+          <div class="custom-field-card" *ngFor="let item of customEntries">
+            <label>{{ item.label }}</label>
+            <div class="custom-field-value">{{ item.value }}</div>
+          </div>
+        </div>
+      </section>
+    </ng-container>
   </section>
 </section>
 

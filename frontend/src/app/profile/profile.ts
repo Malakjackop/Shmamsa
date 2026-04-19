@@ -4,6 +4,8 @@ import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { Router } from '@angular/router';
 import { normalizeRole } from '../shared/role-utils';
+import { DevSettingsService, CustomField } from '../services/dev-settings.service';
+import { buildVisibleCustomFieldEntries } from '../shared/custom-field-display';
 
 @Component({
   selector: 'app-profile',
@@ -15,12 +17,14 @@ import { normalizeRole } from '../shared/role-utils';
 export class ProfileComponent implements OnInit {
   fb = inject(FormBuilder);
   authService = inject(AuthService);
+  devSettingsService = inject(DevSettingsService);
   messageService = inject(MessageService);
   router = inject(Router);
 
   editMode = false;
   activeTab: 'personal' | 'other' = 'personal';
   user: any;
+  profileDisplayFields: CustomField[] = [];
 
   readonly deaconDegreeOptions = [
     'مش مرشوم',
@@ -68,6 +72,7 @@ export class ProfileComponent implements OnInit {
   });
 
   ngOnInit() {
+    this.loadProfileDisplayFields();
     this.profileForm.get('status')?.valueChanges.subscribe(() => this.applyStatusRules());
     this.profileForm.get('studyType')?.valueChanges.subscribe(() => this.applyStudyTypeRules());
     this.profileForm.get('khors')?.valueChanges.subscribe(() => this.applyKhorsRules());
@@ -109,6 +114,14 @@ export class ProfileComponent implements OnInit {
           detail: 'Failed to load profile.'
         })
     });
+  }
+
+  profileCustomEntries(): Array<{ label: string; value: string }> {
+    return buildVisibleCustomFieldEntries(
+      this.profileDisplayFields,
+      this.user?.customFields as Record<string, unknown> | undefined,
+      'PROFILE'
+    );
   }
 
   isServantOrAbove(): boolean {
@@ -343,6 +356,17 @@ export class ProfileComponent implements OnInit {
     this.authService.logout().subscribe(() => {
       localStorage.clear();
       window.location.href = '/login';
+    });
+  }
+
+  private loadProfileDisplayFields() {
+    this.devSettingsService.getEnabledFields().subscribe({
+      next: (fields) => {
+        this.profileDisplayFields = fields || [];
+      },
+      error: () => {
+        this.profileDisplayFields = [];
+      }
     });
   }
 }

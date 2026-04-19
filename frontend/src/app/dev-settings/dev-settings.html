@@ -131,25 +131,88 @@
     <div class="form-group" *ngIf="editingField.fieldType === 'SELECT'">
       <div class="options-header">
         <label>الاختيارات</label>
-        <button type="button" class="option-add-btn" (click)="addOption()">
+        <button *ngIf="!usesManagedFamilyOptions()" type="button" class="option-add-btn" (click)="addOption()">
           <i class="pi pi-plus"></i>
         </button>
       </div>
       <div class="option-row" *ngFor="let option of optionInputs; let i = index">
-        <input type="text" [(ngModel)]="optionInputs[i]" [placeholder]="'اختيار ' + (i + 1)" />
-        <button type="button" class="icon-btn delete option-delete-btn" (click)="removeOption(i)" title="حذف الاختيار">
+        <input
+          type="text"
+          [(ngModel)]="optionInputs[i]"
+          [placeholder]="'اختيار ' + (i + 1)"
+          [readonly]="usesManagedFamilyOptions()" />
+        <button *ngIf="!usesManagedFamilyOptions()" type="button" class="icon-btn delete option-delete-btn" (click)="removeOption(i)" title="حذف الاختيار">
           <i class="pi pi-times"></i>
         </button>
       </div>
-      <small>كل اختيار في سطر مستقل، ويمكنك إضافة اختيارات جديدة من زر +</small>
+      <small *ngIf="usesManagedFamilyOptions()">القيم هنا بتتعرض من صفحة الأسر الحالية فقط، ومش بتتعدل من شاشة حقول التسجيل.</small>
+      <small *ngIf="!usesManagedFamilyOptions()">كل اختيار في سطر مستقل، ويمكنك إضافة اختيارات جديدة من زر +</small>
     </div>
 
-    <!-- Visibility Rule -->
     <div class="form-group">
-      <label>يظهر امتى؟</label>
-      <select [(ngModel)]="editingField.visibilityRule">
-        <option *ngFor="let opt of visibilityOptions" [value]="opt.value">{{ opt.label }}</option>
-      </select>
+      <div class="options-header">
+        <label>شروط الظهور</label>
+        <button type="button" class="option-add-btn" (click)="addVisibilityCondition()" title="إضافة شرط ظهور">
+          <i class="pi pi-plus"></i>
+        </button>
+      </div>
+
+      <div class="visibility-conditions-stack" *ngIf="visibilityConditions.length; else noVisibilityConditions">
+        <div class="visibility-condition-card" *ngFor="let condition of visibilityConditions; let i = index">
+          <div class="option-row visibility-condition-head">
+            <select
+              [(ngModel)]="condition.type"
+              (ngModelChange)="onVisibilityConditionTypeChange(i)"
+              [ngModelOptions]="{ standalone: true }">
+              <option *ngFor="let opt of visibilityConditionTypeOptions" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+            <button type="button" class="icon-btn delete option-delete-btn" (click)="removeVisibilityCondition(i)" title="حذف الشرط">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+
+          <div class="form-group" *ngIf="condition.type === 'RULE'">
+            <label>نوع الشرط</label>
+            <select
+              [(ngModel)]="condition.rule"
+              [ngModelOptions]="{ standalone: true }">
+              <option value="" disabled>اختر الشرط</option>
+              <option *ngFor="let opt of visibilityConditionRuleOptions" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+
+          <div class="form-group" *ngIf="condition.type === 'FIELD'">
+            <label>الحقل المعتمد عليه</label>
+            <select
+              [(ngModel)]="condition.fieldKey"
+              (ngModelChange)="onVisibilityConditionFieldChange(i, $event)"
+              [ngModelOptions]="{ standalone: true }">
+              <option value="">اختر الحقل</option>
+              <option *ngFor="let opt of visibilityDependencyFieldChoices(condition)" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+
+          <div class="form-group" *ngIf="condition.type === 'FIELD' && condition.fieldKey">
+            <label>القيم التي يتحقق عندها الشرط</label>
+            <div class="rule-checkbox-list">
+              <label class="rule-checkbox" *ngFor="let opt of getVisibilityDependencyOptions(condition.fieldKey)">
+                <input
+                  type="checkbox"
+                  [ngModel]="hasVisibilityConditionValue(i, opt)"
+                  (ngModelChange)="toggleVisibilityConditionValue(i, opt, $event)"
+                  [ngModelOptions]="{ standalone: true }" />
+                <span>{{ visibilityDependencyValueLabel(condition.fieldKey, opt) }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #noVisibilityConditions>
+        <div class="visibility-empty-state">بدون شروط إضافية. الحقل سيظهر تلقائيًا حسب ترتيب الصفحة وقواعده الأساسية.</div>
+      </ng-template>
+
+      <small>كل الشروط لازم تتحقق معًا. داخل الشرط الواحد، يكفي اختيار أي قيمة من القيم المحددة.</small>
     </div>
 
     <!-- Show In -->

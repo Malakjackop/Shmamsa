@@ -10,6 +10,8 @@ import { hasRole, normalizeAssignmentRole, normalizeRole } from '../shared/role-
 import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
+import { DevSettingsService, CustomField } from '../services/dev-settings.service';
+import { buildVisibleCustomFieldEntries } from '../shared/custom-field-display';
 
 type Member = {
   id: number;
@@ -31,6 +33,7 @@ type FamilyAssignmentLike = { familyName?: string; role?: string | number; roleC
 type ProfileView = {
   username?: string;
   email?: string;
+  customFields?: Record<string, string>;
   familyAssignments?: FamilyAssignmentLike[];
   role?: string | number;
   deaconFamily?: string;
@@ -71,6 +74,7 @@ export class FamilyInfoComponent implements OnInit {
   private adminSvc = inject(AdminService);
   private auth = inject(AuthService);
   private khorsReq = inject(KhorsRequestsService);
+  private devSettings = inject(DevSettingsService);
   private message = inject(MessageService);
   private confirm = inject(ConfirmationService);
 
@@ -87,6 +91,7 @@ export class FamilyInfoComponent implements OnInit {
 
   profileFor: Member | null = null;
   profile: ProfileView | null = null;
+  familyInfoFields: CustomField[] = [];
 
   allRoles: string[] = [];
 
@@ -97,6 +102,7 @@ export class FamilyInfoComponent implements OnInit {
   private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
   ngOnInit() {
+    this.loadCustomFieldDefinitions();
     this.auth.getUserData().subscribe({
       next: (u) => {
         this.me = u;
@@ -431,7 +437,10 @@ export class FamilyInfoComponent implements OnInit {
       { label: 'تفاصيل العمل', value: String(p.workDetails ?? '').trim() }
     ];
 
-    return rows.filter((row) => this.hasDisplayValue(row.value));
+    return [
+      ...rows.filter((row) => this.hasDisplayValue(row.value)),
+      ...buildVisibleCustomFieldEntries(this.familyInfoFields, p.customFields, 'FAMILY_INFO')
+    ];
   }
 
   isPhoneLabel(label: string): boolean {
@@ -441,6 +450,17 @@ export class FamilyInfoComponent implements OnInit {
   private loadRoles() {
     if (!this.canEditRoles()) return;
     this.adminSvc.roles().subscribe({ next: (r) => (this.allRoles = r || []) });
+  }
+
+  private loadCustomFieldDefinitions() {
+    this.devSettings.getEnabledFields().subscribe({
+      next: (fields) => {
+        this.familyInfoFields = fields || [];
+      },
+      error: () => {
+        this.familyInfoFields = [];
+      }
+    });
   }
 
   rolesForMember(member: Member): string[] {

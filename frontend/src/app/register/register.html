@@ -95,18 +95,14 @@
             <!-- dateOfBirth -->
             <ng-container *ngSwitchCase="'dateOfBirth'">
               <div class="input-group small">
-                <input type="date" formControlName="dateOfBirth" placeholder="تاريخ الميلاد" [readonly]="true" autocomplete="off"
-                       (keydown)="$event.preventDefault()"
-                       (click)="$event.preventDefault()" />
+                <input type="date" formControlName="dateOfBirth" class="locked-derived" placeholder="تاريخ الميلاد" autocomplete="off" tabindex="-1" />
               </div>
             </ng-container>
 
             <!-- gender -->
             <ng-container *ngSwitchCase="'gender'">
               <div class="input-group small">
-                <input type="text" formControlName="gender" placeholder="النوع" [readonly]="true" autocomplete="off"
-                       (keydown)="$event.preventDefault()"
-                       (click)="$event.preventDefault()" />
+                <input type="text" formControlName="gender" class="locked-derived" placeholder="النوع" autocomplete="off" tabindex="-1" />
               </div>
             </ng-container>
 

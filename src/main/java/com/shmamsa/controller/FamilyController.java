@@ -2,11 +2,15 @@ package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AttendanceType;
+import com.shmamsa.model.CustomFieldValue;
+import com.shmamsa.model.CustomRegistrationField;
 import com.shmamsa.model.FamilyCatalog;
 import com.shmamsa.model.FamilyRoleCode;
 import com.shmamsa.model.User;
 import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.AttendanceRepository;
+import com.shmamsa.repository.CustomFieldValueRepository;
+import com.shmamsa.repository.CustomRegistrationFieldRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.AttendanceBackfillService;
@@ -25,7 +29,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/family")
 @RequiredArgsConstructor
-public class FamilyController {
+public class  FamilyController {
 
     private final UserRepository userRepo;
     private final AttendanceRepository attendanceRepo;
@@ -34,6 +38,8 @@ public class FamilyController {
     private final FamilyAccessService familyAccessService;
     private final FamilyCatalogService familyCatalogService;
     private final UserFamilyRoleService userFamilyRoleService;
+    private final CustomRegistrationFieldRepository customFieldRepo;
+    private final CustomFieldValueRepository customFieldValueRepo;
 
     private String baseFamilyOf(User u) {
         return familyAccessService.baseFamily(u);
@@ -378,6 +384,7 @@ if (servantsBucket) {
             dto.put("dateOfBirth", u.getDateOfBirth());
             dto.put("gender", u.getGender());
         }
+        appendCustomFieldValues(dto, u, "FAMILY_INFO");
         return ResponseEntity.ok(dto);
     }
 
@@ -1002,6 +1009,58 @@ if (servantsBucket) {
                 }
             }
         }
+        return false;
+    }
+
+    private void appendCustomFieldValues(Map<String, Object> dto, User user, String target) {
+        if (dto == null || user == null || user.getId() == null) {
+            return;
+        }
+
+        List<CustomRegistrationField> visibleFields = customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc().stream()
+                .filter(field -> showInContains(field.getShowIn(), target))
+                .toList();
+
+        if (visibleFields.isEmpty()) {
+            return;
+        }
+
+        Map<String, String> valuesByKey = new LinkedHashMap<>();
+        for (CustomFieldValue value : customFieldValueRepo.findAllByUserId(user.getId())) {
+            String key = value.getFieldKey();
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            valuesByKey.put(key, value.getValue());
+        }
+
+        Map<String, String> visibleValues = new LinkedHashMap<>();
+        for (CustomRegistrationField field : visibleFields) {
+            String value = valuesByKey.get(field.getFieldKey());
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            visibleValues.put(field.getFieldKey(), value.trim());
+        }
+
+        if (!visibleValues.isEmpty()) {
+            dto.put("customFields", visibleValues);
+        }
+    }
+
+    private boolean showInContains(String showIn, String target) {
+        if (target == null || target.isBlank() || showIn == null || showIn.isBlank()) {
+            return false;
+        }
+
+        String normalizedTarget = target.trim().toUpperCase(Locale.ROOT);
+        for (String rawPart : showIn.split(",")) {
+            String normalized = rawPart == null ? "" : rawPart.trim().toUpperCase(Locale.ROOT);
+            if (normalizedTarget.equals(normalized)) {
+                return true;
+            }
+        }
+
         return false;
     }
 

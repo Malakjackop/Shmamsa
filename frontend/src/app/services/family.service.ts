@@ -42,6 +42,7 @@ export type FamilyAttendanceRecord = {
 export type FamilyMemberDetails = {
   username?: string;
   email?: string;
+  customFields?: Record<string, string>;
   deaconDegree?: string;
   nationalId?: string;
   address?: string;

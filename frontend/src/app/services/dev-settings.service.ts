@@ -1,6 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 export interface CustomField {
   id?: number;
@@ -11,6 +12,9 @@ export interface CustomField {
   required: boolean;
   requiredRule?: string;
   visibilityRule: string;
+  visibilityDependsOn?: string;
+  visibilityDependsValues?: string;
+  visibilityConditions?: VisibilityCondition[];
   showIn: string;
   displayOrder: number;
   enabled: boolean;
@@ -18,19 +22,33 @@ export interface CustomField {
   createdAt?: string;
 }
 
+export interface VisibilityCondition {
+  type: 'RULE' | 'FIELD';
+  rule?: string;
+  fieldKey?: string;
+  values?: string[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class DevSettingsService {
   private http = inject(HttpClient);
+  private isBrowser: boolean;
+
+  constructor(@Inject(PLATFORM_ID) platformId: Object) {
+    this.isBrowser = isPlatformBrowser(platformId);
+  }
 
   /* ── Public (no auth needed) ─────────────────────────────── */
   getEnabledFields(): Observable<CustomField[]> {
+    if (!this.isBrowser) return of([]);
     return this.http.get<CustomField[]>('/api/auth/custom-fields', { withCredentials: true });
   }
 
   /* ── Developer-only ────────────────────────────────────────── */
   getAllFields(): Observable<CustomField[]> {
+    if (!this.isBrowser) return of([]);
     return this.http.get<CustomField[]>('/api/dev/custom-fields', { withCredentials: true });
   }
 

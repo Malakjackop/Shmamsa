@@ -8,6 +8,8 @@ import { normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/rol
 import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
+import { DevSettingsService, CustomField } from '../services/dev-settings.service';
+import { buildVisibleCustomFieldEntries } from '../shared/custom-field-display';
 
 type Member = {
   id: number;
@@ -85,6 +87,7 @@ type AttendanceArchiveLike = {
 type ProfileView = {
   username?: string;
   email?: string;
+  customFields?: Record<string, string>;
   familyAssignments?: FamilyAssignmentLike[];
   role?: string | number;
   deaconFamily?: string;
@@ -130,6 +133,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   private familySvc = inject(FamilyService);
   private auth = inject(AuthService);
+  private devSettings = inject(DevSettingsService);
   private message = inject(MessageService);
   private iftekadSvc = inject(IftekadService);
   private attendanceSvc = inject(AttendanceService);
@@ -151,6 +155,7 @@ export class FamilyAttendanceComponent implements OnInit {
 
   profileFor: Member | null = null;
   profile: ProfileView | null = null;
+  familyInfoFields: CustomField[] = [];
 
   // ===== Daily attendance (حضور اليوم) =====
   showDaily = false;
@@ -209,6 +214,7 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.loadCustomFieldDefinitions();
     this.auth.getUserData().subscribe({
       next: (u) => {
         this.me = u;
@@ -653,7 +659,10 @@ export class FamilyAttendanceComponent implements OnInit {
       { label: 'تفاصيل العمل', value: String(p.workDetails ?? '').trim() }
     ];
 
-    return rows.filter((row) => this.hasDisplayValue(row.value));
+    return [
+      ...rows.filter((row) => this.hasDisplayValue(row.value)),
+      ...buildVisibleCustomFieldEntries(this.familyInfoFields, p.customFields, 'FAMILY_INFO')
+    ];
   }
 
   isPhoneLabel(label: string): boolean {
@@ -696,6 +705,17 @@ export class FamilyAttendanceComponent implements OnInit {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private loadCustomFieldDefinitions() {
+    this.devSettings.getEnabledFields().subscribe({
+      next: (fields) => {
+        this.familyInfoFields = fields || [];
+      },
+      error: () => {
+        this.familyInfoFields = [];
+      }
+    });
   }
 
   private toDateValue(value: Date | string | null): Date | null {

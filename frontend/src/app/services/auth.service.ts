@@ -15,6 +15,7 @@ export type AuthUser = {
   khors?: string | null;
   khorsYear?: number | string | null;
   workDetails?: string | null;
+  customFields?: Record<string, string>;
   familyAssignments?: Array<Record<string, unknown>>;
   [key: string]: unknown;
 };

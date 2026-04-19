@@ -10,6 +10,7 @@ import com.shmamsa.dto.RegisterServantRequest;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.CustomFieldValue;
 import com.shmamsa.model.CustomRegistrationField;
+import com.shmamsa.model.VisibilityConditionConfig;
 import com.shmamsa.model.User;
 import com.shmamsa.repository.CustomFieldValueRepository;
 import com.shmamsa.repository.CustomRegistrationFieldRepository;
@@ -295,7 +296,7 @@ public class AuthController {
         Map<String, String> errors = new LinkedHashMap<>();
 
         for (CustomRegistrationField field : customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc()) {
-            if (!isFieldVisibleForContext(field, context)) {
+            if (!isFieldVisibleForContext(field, context, values)) {
                 continue;
             }
             if (!isFieldRequiredForContext(field, context)) {
@@ -340,8 +341,12 @@ public class AuthController {
         return alwaysRequired || conditionalRequired;
     }
 
-    private boolean isFieldVisibleForContext(CustomRegistrationField field, RegistrationRuleContext context) {
-        if (!matchesRule(field.getVisibilityRule(), context)) {
+    private boolean isFieldVisibleForContext(
+            CustomRegistrationField field,
+            RegistrationRuleContext context,
+            Map<String, String> values
+    ) {
+        if (!matchesVisibilityConditions(field, context, values)) {
             return false;
         }
         if (!Boolean.TRUE.equals(field.getIsSystem())) {
@@ -365,6 +370,95 @@ public class AuthController {
             case "workDetails" -> Boolean.TRUE.equals(context.isWorking());
             default -> true;
         };
+    }
+
+    private boolean matchesVisibilityConditions(
+            CustomRegistrationField field,
+            RegistrationRuleContext context,
+            Map<String, String> values
+    ) {
+        List<VisibilityConditionConfig> conditions = field.getVisibilityConditions();
+        if (conditions == null || conditions.isEmpty()) {
+            return matchesRule(field.getVisibilityRule(), context) && matchesVisibilityDependency(field, values);
+        }
+
+        for (VisibilityConditionConfig condition : conditions) {
+            if (!matchesVisibilityCondition(condition, context, values)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean matchesVisibilityCondition(
+            VisibilityConditionConfig condition,
+            RegistrationRuleContext context,
+            Map<String, String> values
+    ) {
+        if (condition == null) {
+            return true;
+        }
+
+        String type = safe(condition.getType()).toUpperCase(Locale.ROOT);
+        if ("RULE".equals(type)) {
+            return matchesRule(condition.getRule(), context);
+        }
+
+        if ("FIELD".equals(type)) {
+            String fieldKey = safe(condition.getFieldKey());
+            if (fieldKey.isBlank()) {
+                return false;
+            }
+
+            List<String> valuesList = condition.getValues() == null ? List.of() : condition.getValues();
+            if (valuesList.isEmpty()) {
+                return false;
+            }
+
+            String currentValue = normalizeVisibilityDependencyValue(values.get(fieldKey));
+            if (currentValue.isBlank()) {
+                return false;
+            }
+
+            for (String expectedValue : valuesList) {
+                if (normalizeVisibilityDependencyValue(expectedValue).equals(currentValue)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean matchesVisibilityDependency(CustomRegistrationField field, Map<String, String> values) {
+        String dependsOn = safe(field.getVisibilityDependsOn());
+        if (dependsOn.isBlank()) {
+            return true;
+        }
+
+        String dependsValues = safe(field.getVisibilityDependsValues());
+        if (dependsValues.isBlank()) {
+            return false;
+        }
+
+        String currentValue = normalizeVisibilityDependencyValue(values.get(dependsOn));
+        if (currentValue.isBlank()) {
+            return false;
+        }
+
+        for (String rawExpected : dependsValues.split(",")) {
+            if (normalizeVisibilityDependencyValue(rawExpected).equals(currentValue)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private String normalizeVisibilityDependencyValue(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean matchesRule(String rule, RegistrationRuleContext context) {

@@ -4,7 +4,7 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractContro
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { MessageService } from 'primeng/api';
-import { DevSettingsService, CustomField } from '../services/dev-settings.service';
+import { DevSettingsService, CustomField, VisibilityCondition } from '../services/dev-settings.service';
 
 import { ToastModule } from 'primeng/toast';
 import { ButtonModule } from 'primeng/button';
@@ -131,8 +131,8 @@ export class RegisterComponent implements OnInit {
       email: ['', [Validators.required, Validators.email]],
 
       nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
-      dateOfBirth: [''],
-      gender: [''],
+      dateOfBirth: this.fb.control({ value: '', disabled: true }),
+      gender: this.fb.control({ value: '', disabled: true }),
 
       servingWhere: this.fb.control('', { updateOn: 'change' }),
 
@@ -326,6 +326,92 @@ export class RegisterComponent implements OnInit {
       .some(rule => this.matchesRule(rule));
   }
 
+  private matchesVisibilityDependency(field: CustomField): boolean {
+    const dependsOn = String(field.visibilityDependsOn || '').trim();
+    if (!dependsOn) {
+      return true;
+    }
+
+    const expectedValues = this.parseVisibilityDependencyValues(field.visibilityDependsValues);
+    if (!expectedValues.length) {
+      return false;
+    }
+
+    const controlName = this.getVisibilityDependencyControlName(dependsOn);
+    const currentValue = this.normalizeVisibilityDependencyValue(this.registerForm.get(controlName)?.value);
+    if (!currentValue) {
+      return false;
+    }
+
+    return expectedValues.includes(currentValue);
+  }
+
+  private matchesVisibilityCondition(condition: VisibilityCondition): boolean {
+    if (!condition) {
+      return true;
+    }
+
+    if (condition.type === 'RULE') {
+      return this.matchesRule(condition.rule || 'ALWAYS');
+    }
+
+    if (condition.type === 'FIELD') {
+      const fieldKey = String(condition.fieldKey || '').trim();
+      if (!fieldKey) {
+        return false;
+      }
+
+      const expectedValues = Array.from(new Set(
+        (condition.values || [])
+          .map(value => this.normalizeVisibilityDependencyValue(value))
+          .filter(Boolean)
+      ));
+      if (!expectedValues.length) {
+        return false;
+      }
+
+      const controlName = this.getVisibilityDependencyControlName(fieldKey);
+      const currentValue = this.normalizeVisibilityDependencyValue(this.registerForm.get(controlName)?.value);
+      if (!currentValue) {
+        return false;
+      }
+
+      return expectedValues.includes(currentValue);
+    }
+
+    return true;
+  }
+
+  private matchesVisibilityConditions(field: CustomField): boolean {
+    const conditions = Array.isArray(field.visibilityConditions) ? field.visibilityConditions : [];
+    if (!conditions.length) {
+      return this.matchesRule(field.visibilityRule || 'ALWAYS') && this.matchesVisibilityDependency(field);
+    }
+
+    return conditions.every(condition => this.matchesVisibilityCondition(condition));
+  }
+
+  private getVisibilityDependencyControlName(fieldKey: string): string {
+    const config = this.getFieldConfig(fieldKey);
+    if (config && !config.isSystem) {
+      return 'custom_' + fieldKey;
+    }
+    return fieldKey;
+  }
+
+  private parseVisibilityDependencyValues(values?: string): string[] {
+    return Array.from(new Set(
+      String(values || '')
+        .split(',')
+        .map(value => this.normalizeVisibilityDependencyValue(value))
+        .filter(Boolean)
+    ));
+  }
+
+  private normalizeVisibilityDependencyValue(value: unknown): string {
+    return value == null ? '' : String(value).trim().toLowerCase();
+  }
+
   private isFieldConfiguredRequired(field: CustomField): boolean {
     if (!field?.enabled) return false;
     if (!this.isFieldCurrentlyVisible(field)) return false;
@@ -334,7 +420,7 @@ export class RegisterComponent implements OnInit {
 
   private isFieldCurrentlyVisible(field: CustomField): boolean {
     if (!field?.enabled) return false;
-    if (!this.matchesRule(field.visibilityRule || 'ALWAYS')) return false;
+    if (!this.matchesVisibilityConditions(field)) return false;
     if (!field.isSystem) return true;
 
     const status = String(this.registerForm.get('status')?.value || '').trim().toLowerCase();
@@ -758,7 +844,10 @@ onServingWhereChange() {
 
   onNationalIdBlur() {
     const nid = String(this.registerForm.get('nationalId')?.value || '').trim();
-    if (!/^\d{14}$/.test(nid)) return;
+    if (!/^\d{14}$/.test(nid)) {
+      this.setDerivedIdentityFields('', '');
+      return;
+    }
 
     const centuryCode = nid[0];
     const yy = nid.substring(1, 3);
@@ -766,19 +855,29 @@ onServingWhereChange() {
     const dd = nid.substring(5, 7);
 
     const yearBase = centuryCode === '2' ? 1900 : centuryCode === '3' ? 2000 : null;
-    if (yearBase === null) return;
+    if (yearBase === null) {
+      this.setDerivedIdentityFields('', '');
+      return;
+    }
 
     const year = yearBase + Number(yy);
     const month = Number(mm);
     const day = Number(dd);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return;
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      this.setDerivedIdentityFields('', '');
+      return;
+    }
 
     const iso = `${year.toString().padStart(4,'0')}-${mm}-${dd}`;
-    this.registerForm.get('dateOfBirth')?.setValue(iso);
 
     const genderDigit = Number(nid.charAt(12));
     const gender = (genderDigit % 2 === 0) ? 'FEMALE' : 'MALE';
-    this.registerForm.get('gender')?.setValue(gender);
+    this.setDerivedIdentityFields(iso, gender);
+  }
+
+  private setDerivedIdentityFields(dateOfBirth: string, gender: string): void {
+    this.registerForm.get('dateOfBirth')?.setValue(dateOfBirth, { emitEvent: false });
+    this.registerForm.get('gender')?.setValue(gender, { emitEvent: false });
   }
 
   private showApiErrors(err: any) {

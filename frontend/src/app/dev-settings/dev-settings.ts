@@ -14,13 +14,21 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { forkJoin } from 'rxjs';
 
-import { DevSettingsService, CustomField } from '../services/dev-settings.service';
+import { DevSettingsService, CustomField, VisibilityCondition } from '../services/dev-settings.service';
+import { AuthService, FamilyOption } from '../services/auth.service';
 
 interface FieldSection {
   id: string;
   title: string;
   fieldKeys: string[];
   fields: CustomField[];
+}
+
+interface VisibilityConditionDraft {
+  type: 'RULE' | 'FIELD';
+  rule: string;
+  fieldKey: string;
+  values: string[];
 }
 
 @Component({
@@ -45,6 +53,7 @@ interface FieldSection {
 })
 export class DevSettingsComponent implements OnInit {
   private svc = inject(DevSettingsService);
+  private authService = inject(AuthService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
 
@@ -58,6 +67,9 @@ export class DevSettingsComponent implements OnInit {
   editingField: Partial<CustomField> = {};
   optionInputs: string[] = [];
   selectedRequiredRules: string[] = [];
+  visibilityConditions: VisibilityConditionDraft[] = [];
+  memberFamilyOptions: string[] = [];
+  servantFamilyOptions: string[] = [];
 
   fieldTypeOptions = [
     { label: 'نص (Text)', value: 'TEXT' },
@@ -83,11 +95,33 @@ export class DevSettingsComponent implements OnInit {
     { label: 'خريج بس', value: 'GRADUATE_ONLY' }
   ];
 
+  visibilityConditionRuleOptions = [
+    { label: 'لا يظهر', value: 'NEVER' },
+    ...this.requiredRuleOptions
+  ];
+
+  visibilityConditionTypeOptions = [
+    { label: 'شرط عام', value: 'RULE' as const },
+    { label: 'قيمة حقل', value: 'FIELD' as const }
+  ];
+
   showInOptions = [
     { label: 'بيانات الأسرة', value: 'FAMILY_INFO' },
     { label: 'الصفحة الشخصية', value: 'PROFILE' },
+    { label: 'بيانات الأسرة والصفحة الشخصية', value: 'FAMILY_INFO,PROFILE' },
     { label: 'متظهرش', value: 'NONE' }
   ];
+
+  private readonly visibilityDependencyFallbackOptions: Record<string, string[]> = {
+    gender: ['MALE', 'FEMALE'],
+    deaconDegree: ['مش مرشوم', 'ابصالتس', 'اغنسطس', 'ايبودياكون'],
+    khors: ['MARMARKOS', 'ATHANASIUS', 'NONE'],
+    attendKhors: ['MARMARKOS', 'ATHANASIUS', 'NONE'],
+    status: ['student', 'graduate'],
+    studyType: ['school', 'university'],
+    schoolGrade: ['أولى ابتدائي', 'تانية ابتدائي', 'تالتة ابتدائي', 'رابعة ابتدائي', 'خامسة ابتدائي', 'سادسة ابتدائي', 'أولى إعدادي', 'تانية إعدادي', 'تالتة إعدادي', 'أولى ثانوي', 'تانية ثانوي', 'تالتة ثانوي', 'other'],
+    isWorking: ['false', 'true']
+  };
 
   private readonly sectionDefinitions: Array<Omit<FieldSection, 'fields'>> = [
     {
@@ -144,6 +178,7 @@ export class DevSettingsComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.loadFamilyOptionSources();
     this.loadFields();
   }
 
@@ -178,18 +213,23 @@ export class DevSettingsComponent implements OnInit {
     };
     this.optionInputs = [''];
     this.selectedRequiredRules = [];
+    this.visibilityConditions = [];
     this.dialogVisible = true;
   }
 
   openEdit(f: CustomField): void {
     this.dialogMode = 'edit';
     this.selectedRequiredRules = this.parseRequiredRules(f.requiredRule);
+    this.visibilityConditions = this.deserializeVisibilityConditions(f);
     this.editingField = {
       ...f,
       required: this.isRequiredConfigured(f),
-      requiredRule: this.serializeRequiredRules(this.selectedRequiredRules)
+      requiredRule: this.serializeRequiredRules(this.selectedRequiredRules),
+      visibilityRule: 'ALWAYS',
+      visibilityDependsOn: '',
+      visibilityDependsValues: ''
     };
-    this.optionInputs = this.parseOptions(f.options);
+    this.optionInputs = this.resolveDialogOptions(f);
     this.dialogVisible = true;
   }
 
@@ -205,11 +245,20 @@ export class DevSettingsComponent implements OnInit {
       return;
     }
 
+    const visibilityConditions = this.serializeVisibilityConditions();
+    if (visibilityConditions === null) {
+      return;
+    }
+
     const payload: Partial<CustomField> = {
       ...this.editingField,
       required: !!this.editingField.required && this.selectedRequiredRules.length === 0,
       requiredRule: !!this.editingField.required ? this.serializeRequiredRules(this.selectedRequiredRules) : 'NEVER',
-      options: this.editingField.fieldType === 'SELECT' ? this.optionInputs.map(o => o.trim()).filter(Boolean).join(',') : ''
+      visibilityRule: this.legacyVisibilityRule(visibilityConditions),
+      visibilityDependsOn: this.legacyVisibilityDependsOn(visibilityConditions),
+      visibilityDependsValues: this.legacyVisibilityDependsValues(visibilityConditions),
+      visibilityConditions,
+      options: this.resolveOptionsPayload()
     };
 
     if (this.dialogMode === 'create') {
@@ -266,6 +315,147 @@ export class DevSettingsComponent implements OnInit {
   onFieldTypeChange(): void {
     if (this.editingField.fieldType === 'SELECT' && !this.optionInputs.length) {
       this.optionInputs = [''];
+    }
+  }
+
+  usesManagedFamilyOptions(field: Partial<CustomField> = this.editingField): boolean {
+    return this.getManagedFamilyFieldAudience(field.fieldKey) !== null;
+  }
+
+  addVisibilityCondition(): void {
+    this.visibilityConditions = [
+      ...this.visibilityConditions,
+      { type: 'RULE', rule: this.requiredRuleOptions[0]?.value || '', fieldKey: '', values: [] }
+    ];
+  }
+
+  removeVisibilityCondition(index: number): void {
+    this.visibilityConditions = this.visibilityConditions.filter((_, currentIndex) => currentIndex !== index);
+  }
+
+  onVisibilityConditionTypeChange(index: number): void {
+    const condition = this.visibilityConditions[index];
+    if (!condition) {
+      return;
+    }
+
+    if (condition.type === 'RULE') {
+      condition.rule = condition.rule || this.requiredRuleOptions[0]?.value || '';
+      condition.fieldKey = '';
+      condition.values = [];
+      return;
+    }
+
+    condition.rule = '';
+    condition.fieldKey = '';
+    condition.values = [];
+  }
+
+  onVisibilityConditionFieldChange(index: number, fieldKey: string): void {
+    const condition = this.visibilityConditions[index];
+    if (!condition) {
+      return;
+    }
+
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    condition.fieldKey = normalizedFieldKey;
+
+    if (!normalizedFieldKey) {
+      condition.values = [];
+      return;
+    }
+
+    const allowedOptions = new Set(this.getVisibilityDependencyOptions(normalizedFieldKey));
+    condition.values = condition.values.filter(value => allowedOptions.has(value));
+  }
+
+  visibilityDependencyFieldChoices(currentCondition?: VisibilityConditionDraft): Array<{ label: string; value: string }> {
+    const currentFieldKey = String(this.editingField.fieldKey || '').trim();
+    const currentDependsOn = String(currentCondition?.fieldKey || '').trim();
+    const currentOrder = this.dialogMode === 'create'
+      ? Number.MAX_SAFE_INTEGER
+      : Number(this.editingField.displayOrder ?? Number.MAX_SAFE_INTEGER);
+
+    return this.sortFields(this.fields)
+      .filter(field => field.fieldKey !== currentFieldKey)
+      .filter(field => field.fieldKey === currentDependsOn || (
+        this.supportsVisibilityDependencyField(field) &&
+        (field.displayOrder ?? 0) < currentOrder
+      ))
+      .map(field => ({ label: field.labelAr, value: field.fieldKey }));
+  }
+
+  getVisibilityDependencyOptions(fieldKey?: string): string[] {
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    if (!normalizedFieldKey) {
+      return [];
+    }
+
+    const managedOptions = this.getManagedFamilyOptions(normalizedFieldKey);
+    if (managedOptions.length) {
+      return managedOptions;
+    }
+
+    const configuredOptions = (this.fields.find(field => field.fieldKey === normalizedFieldKey)?.options || '')
+      .split(',')
+      .map(option => option.trim())
+      .filter(Boolean);
+
+    if (configuredOptions.length) {
+      return configuredOptions;
+    }
+
+    return [...(this.visibilityDependencyFallbackOptions[normalizedFieldKey] || [])];
+  }
+
+  visibilityDependencyValueLabel(fieldKey: string | undefined, value: string): string {
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    const normalizedValue = String(value || '').trim();
+
+    if (normalizedFieldKey === 'gender') {
+      if (normalizedValue === 'MALE') return 'ذكر';
+      if (normalizedValue === 'FEMALE') return 'أنثى';
+    }
+    if (normalizedFieldKey === 'status') {
+      if (normalizedValue === 'student') return 'طالب';
+      if (normalizedValue === 'graduate') return 'خريج';
+    }
+    if (normalizedFieldKey === 'studyType') {
+      if (normalizedValue === 'school') return 'مدرسة';
+      if (normalizedValue === 'university') return 'جامعة';
+    }
+    if (normalizedFieldKey === 'isWorking') {
+      if (normalizedValue === 'true') return 'نعم';
+      if (normalizedValue === 'false') return 'لا';
+    }
+    if (normalizedFieldKey === 'khors' || normalizedFieldKey === 'attendKhors') {
+      if (normalizedValue === 'MARMARKOS') return 'خورس مارمرقس';
+      if (normalizedValue === 'ATHANASIUS') return 'خورس البابا أثناسيوس';
+      if (normalizedValue === 'NONE') return 'بدون خورس';
+    }
+    if (normalizedFieldKey === 'schoolGrade' && normalizedValue === 'other') {
+      return 'أخرى';
+    }
+
+    return normalizedValue;
+  }
+
+  hasVisibilityConditionValue(index: number, value: string): boolean {
+    return !!this.visibilityConditions[index]?.values.includes(value);
+  }
+
+  toggleVisibilityConditionValue(index: number, value: string, checked: boolean): void {
+    const condition = this.visibilityConditions[index];
+    if (!condition) {
+      return;
+    }
+
+    if (checked) {
+      if (!condition.values.includes(value)) {
+        condition.values = [...condition.values, value];
+      }
+    } else {
+      condition.values = condition.values.filter(item => item !== value);
     }
   }
 
@@ -335,6 +525,143 @@ export class DevSettingsComponent implements OnInit {
   private serializeRequiredRules(rules: string[]): string {
     const normalized = Array.from(new Set((rules || []).map(rule => rule.trim().toUpperCase()).filter(Boolean)));
     return normalized.length ? normalized.join(',') : 'NEVER';
+  }
+
+  private parseCsvValues(values?: string): string[] {
+    return Array.from(new Set(
+      String(values || '')
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean)
+    ));
+  }
+
+  private serializeCsvValues(values: string[]): string {
+    const normalized = Array.from(new Set((values || []).map(value => value.trim()).filter(Boolean)));
+    return normalized.join(',');
+  }
+
+  private deserializeVisibilityConditions(field: Partial<CustomField>): VisibilityConditionDraft[] {
+    const fromApi = Array.isArray(field.visibilityConditions)
+      ? field.visibilityConditions
+      : [];
+
+    if (fromApi.length) {
+      return fromApi
+        .map(condition => this.toVisibilityConditionDraft(condition))
+        .filter((condition): condition is VisibilityConditionDraft => condition !== null);
+    }
+
+    const legacyConditions: VisibilityConditionDraft[] = [];
+    const legacyRule = String(field.visibilityRule || '').trim().toUpperCase();
+    if (legacyRule && legacyRule !== 'ALWAYS') {
+      legacyConditions.push({
+        type: 'RULE',
+        rule: legacyRule,
+        fieldKey: '',
+        values: []
+      });
+    }
+
+    const legacyFieldKey = String(field.visibilityDependsOn || '').trim();
+    const legacyValues = this.parseCsvValues(field.visibilityDependsValues);
+    if (legacyFieldKey && legacyValues.length) {
+      legacyConditions.push({
+        type: 'FIELD',
+        rule: '',
+        fieldKey: legacyFieldKey,
+        values: legacyValues
+      });
+    }
+
+    return legacyConditions;
+  }
+
+  private toVisibilityConditionDraft(condition: VisibilityCondition | null | undefined): VisibilityConditionDraft | null {
+    if (!condition) {
+      return null;
+    }
+
+    const type = String(condition.type || '').trim().toUpperCase();
+    if (type === 'RULE') {
+      const rule = String(condition.rule || '').trim().toUpperCase();
+      if (!rule) {
+        return null;
+      }
+      return { type: 'RULE', rule, fieldKey: '', values: [] };
+    }
+
+    if (type === 'FIELD') {
+      const fieldKey = String(condition.fieldKey || '').trim();
+      const values = Array.from(new Set((condition.values || []).map(value => String(value || '').trim()).filter(Boolean)));
+      if (!fieldKey || !values.length) {
+        return null;
+      }
+      return { type: 'FIELD', rule: '', fieldKey, values };
+    }
+
+    return null;
+  }
+
+  private serializeVisibilityConditions(): VisibilityCondition[] | null {
+    const normalizedConditions: VisibilityCondition[] = [];
+
+    for (const condition of this.visibilityConditions) {
+      if (!condition) {
+        continue;
+      }
+
+      if (condition.type === 'RULE') {
+        const rule = String(condition.rule || '').trim().toUpperCase();
+        if (!rule) {
+          this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختَر الشرط العام في كل سطر من شروط الظهور.' });
+          return null;
+        }
+
+        normalizedConditions.push({ type: 'RULE', rule });
+        continue;
+      }
+
+      const fieldKey = String(condition.fieldKey || '').trim();
+      if (!fieldKey) {
+        this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختَر الحقل الذي سيعتمد عليه شرط الظهور.' });
+        return null;
+      }
+
+      const values = Array.from(new Set((condition.values || []).map(value => String(value || '').trim()).filter(Boolean)));
+      if (!values.length) {
+        this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختَر قيمة واحدة على الأقل لكل شرط ظهور يعتمد على حقل.' });
+        return null;
+      }
+
+      normalizedConditions.push({ type: 'FIELD', fieldKey, values });
+    }
+
+    return normalizedConditions;
+  }
+
+  private legacyVisibilityRule(conditions: VisibilityCondition[]): string {
+    return conditions.find(condition => condition.type === 'RULE')?.rule || 'ALWAYS';
+  }
+
+  private legacyVisibilityDependsOn(conditions: VisibilityCondition[]): string {
+    return conditions.find(condition => condition.type === 'FIELD')?.fieldKey || '';
+  }
+
+  private legacyVisibilityDependsValues(conditions: VisibilityCondition[]): string {
+    return this.serializeCsvValues(conditions.find(condition => condition.type === 'FIELD')?.values || []);
+  }
+
+  private supportsVisibilityDependencyField(field: CustomField): boolean {
+    if (!field?.enabled) {
+      return false;
+    }
+
+    if (field.fieldType === 'SELECT') {
+      return this.getVisibilityDependencyOptions(field.fieldKey).length > 0;
+    }
+
+    return this.getVisibilityDependencyOptions(field.fieldKey).length > 0;
   }
 
   deleteField(f: CustomField): void {
@@ -481,5 +808,73 @@ export class DevSettingsComponent implements OnInit {
 
   private sortFields(fields: CustomField[]): CustomField[] {
     return [...fields].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  }
+
+  private loadFamilyOptionSources(): void {
+    forkJoin({
+      member: this.authService.getFamilyOptions('MEMBER'),
+      servant: this.authService.getFamilyOptions('SERVANT')
+    }).subscribe({
+      next: ({ member, servant }) => {
+        this.memberFamilyOptions = this.extractFamilyNames(member || []);
+        this.servantFamilyOptions = this.extractFamilyNames(servant || []);
+        this.refreshManagedFieldOptionsIfNeeded();
+      },
+      error: () => {
+        this.memberFamilyOptions = [];
+        this.servantFamilyOptions = [];
+      }
+    });
+  }
+
+  private extractFamilyNames(options: FamilyOption[]): string[] {
+    return Array.from(new Set(
+      (options || [])
+        .map(option => String(option?.nameAr || '').trim())
+        .filter(Boolean)
+    ));
+  }
+
+  private getManagedFamilyFieldAudience(fieldKey?: string | null): 'MEMBER' | 'SERVANT' | null {
+    const normalized = String(fieldKey || '').trim();
+    if (normalized === 'deaconFamily') return 'MEMBER';
+    if (normalized === 'servingWhere') return 'SERVANT';
+    return null;
+  }
+
+  private getManagedFamilyOptions(fieldKey?: string | null): string[] {
+    const audience = this.getManagedFamilyFieldAudience(fieldKey);
+    if (audience === 'MEMBER') {
+      return [...this.memberFamilyOptions];
+    }
+    if (audience === 'SERVANT') {
+      return [...this.servantFamilyOptions];
+    }
+    return [];
+  }
+
+  private resolveDialogOptions(field: Partial<CustomField>): string[] {
+    const managedOptions = this.getManagedFamilyOptions(field.fieldKey);
+    if (managedOptions.length) {
+      return managedOptions;
+    }
+    return this.parseOptions(field.options);
+  }
+
+  private refreshManagedFieldOptionsIfNeeded(): void {
+    if (!this.dialogVisible || !this.usesManagedFamilyOptions()) {
+      return;
+    }
+    this.optionInputs = this.resolveDialogOptions(this.editingField);
+  }
+
+  private resolveOptionsPayload(): string {
+    if (this.editingField.fieldType !== 'SELECT') {
+      return '';
+    }
+    if (this.usesManagedFamilyOptions()) {
+      return String(this.editingField.options || '').trim();
+    }
+    return this.optionInputs.map(o => o.trim()).filter(Boolean).join(',');
   }
 }
