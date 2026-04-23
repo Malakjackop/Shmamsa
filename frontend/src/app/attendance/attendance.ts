@@ -1,11 +1,12 @@
-import { Component, OnDestroy, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+﻿import { Component, OnDestroy, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import {
   AttendanceService,
   AttendanceType,
   AttendanceContext,
   AttendanceAccessGrant,
-  AttendanceConfig
+  AttendanceConfig,
+  AttendanceCustomEvent
 } from '../services/attendance.service';
 import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
@@ -27,6 +28,18 @@ type PickUser = {
 type GrantAudience = 'SERVANTS' | 'MEMBERS';
 type TypeDaysMap = Partial<Record<AttendanceType, number[]>>;
 type GrantPopupFilter = 'ALL' | 'SERVANTS_SCOPE' | 'MEMBERS_SCOPE' | 'SERVANTS_ALL';
+type TypeOption = {
+  value: AttendanceType;
+  label: string;
+};
+type CustomEventForm = Partial<AttendanceCustomEvent> & {
+  familyBase: string;
+  title: string;
+  dayOfWeek: number;
+  enabled: boolean;
+  alwaysActive: boolean;
+  permittedEditorIds: number[];
+};
 
 @Component({
   selector: 'app-attendance',
@@ -53,7 +66,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   disabledDays: number[] = [0, 1, 2, 3];
   firstDayOfWeek = 1;
   selectedType: AttendanceType = 'FRIDAY_LITURGY';
-  typeOptions: { value: AttendanceType; label: string }[] = [];
+  typeOptions: TypeOption[] = [];
+  private readonly weekDays = [0, 1, 2, 3, 4, 5, 6];
   customTitle = '';
   pageBlockedMessage = '';
   runtimeBlockedMessage = '';
@@ -119,6 +133,20 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   countdownEndsAtText = '';
   showCountdownClock = false;
   private countdownTimer: any = null;
+
+  customEventDialogMode: 'create' | 'edit' = 'create';
+  customEventDialogVisible = false;
+  customEventSaving = false;
+  customEventForm: CustomEventForm = this.defaultCustomEventForm();
+  customEventActiveFromDate: Date | null = null;
+  customEventActiveToDate: Date | null = null;
+  customEventBlockedDates: Date[] = [];
+  familyCustomEvents: AttendanceCustomEvent[] = [];
+  availableCustomEvents: AttendanceCustomEvent[] = [];
+  selectedCustomEventId: number | '' = '';
+  customEventsPopupVisible = false;
+  customEventEditorTargets: PickUser[] = [];
+  customEventEditorPickerId: number | null = null;
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -196,7 +224,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canUseCustomEvent(): boolean {
-    return !!this.attendanceContext?.canUseCustomEvent && !this.isSelfCheckinMode();
+    return !!this.attendanceContext?.canUseCustomEvent && !this.isSelfCheckinMode() && !this.isKhadim();
   }
 
   canManageAccessGrants(): boolean {
@@ -213,6 +241,26 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   isDeveloper(): boolean {
     return this.roleNorm() === 'DEVELOPER';
+  }
+
+  isAminKhedmaOrDeveloper(): boolean {
+    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
+  }
+
+  private isAminAthanasius(): boolean {
+    if (this.roleNorm() !== 'AMIN_OSRA' && !this.hasAnyAminPrivilegeScope()) return false;
+    return this.assignmentsOf(this.me).some((x) => x.role === 'AMIN_OSRA' && this.isAthanasiusFamilyName(x.familyName))
+      || this.isAthanasiusFamilyName(this.me?.deaconFamily)
+      || this.isAthanasiusFamilyName(this.me?.familyName);
+  }
+
+  private isAthanasiusFamilyName(value?: string | null): boolean {
+    const normalized = canonicalFamilyName(String(value || ''));
+    return normalized.includes('اثناسيوس') || normalized.includes('أثناسيوس');
+  }
+
+  private canAccessAthanasiusKhors(): boolean {
+    return this.isAminKhedmaOrDeveloper() || this.isAminAthanasius();
   }
 
   private defaultAttendanceConfig(): AttendanceConfig {
@@ -280,7 +328,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private choirFamilies(): string[] {
-    return ['خورس مارمرقس', 'خورس البابا أثناسيوس'];
+    const families = ['خورس مارمرقس'];
+    if (this.canAccessAthanasiusKhors()) {
+      families.push('خورس البابا أثناسيوس');
+    }
+    return families;
   }
 
   private aminOsraFamilies(): string[] {
@@ -377,7 +429,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   grantFamilyFilterOptions(): string[] {
-    return Array.from(new Set([...this.families, ...this.choirFamilies()])).filter(Boolean);
+    return this.filterAthanasiusVisibility(Array.from(new Set([...this.families, ...this.choirFamilies()])).filter(Boolean));
   }
 
   grantFilterLabel(): string {
@@ -717,15 +769,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   private currentGrantFamilyOptions(now = new Date()): string[] {
     if (!this.shouldEnforceGrantWindow()) return [];
     const activeFamilies = this.grantedFamiliesFrom(this.activeScopeGrants(now));
-    if (!this.isGroupedMemberFamilyMode()) return activeFamilies;
-    return sortFamiliesByPreferredOrder(activeFamilies.map((family) => this.groupedFamilyLabel(family)), this.preferredFamilyOrder);
+    if (!this.isGroupedMemberFamilyMode()) return this.filterAthanasiusVisibility(activeFamilies);
+    return this.filterAthanasiusVisibility(sortFamiliesByPreferredOrder(activeFamilies.map((family) => this.groupedFamilyLabel(family)), this.preferredFamilyOrder));
   }
 
   private filterFamiliesByGrantScope(allFamilies: string[]): string[] {
     const allowed = this.currentGrantFamilyOptions();
-    if (!allowed.length) return allFamilies;
-    if (this.isGroupedMemberFamilyMode()) return allowed;
-    return allFamilies.filter((family) => allowed.includes(family));
+    const visibleFamilies = this.filterAthanasiusVisibility(allFamilies);
+    if (!allowed.length) return visibleFamilies;
+    if (this.isGroupedMemberFamilyMode()) return this.filterAthanasiusVisibility(allowed);
+    return visibleFamilies.filter((family) => allowed.includes(family));
+  }
+
+  private filterAthanasiusVisibility(families: string[]): string[] {
+    if (this.canAccessAthanasiusKhors()) return families;
+    return families.filter((family) => !this.isAthanasiusFamilyName(family));
   }
 
   private syncSelectedFamilyWithGrantScope(): void {
@@ -737,9 +795,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private restrictOptionsByGrantScope(
-    options: { value: AttendanceType; label: string }[],
+    options: TypeOption[],
     now = new Date()
-  ): { value: AttendanceType; label: string }[] {
+  ): TypeOption[] {
     if (this.isSelfCheckinMode() || !this.shouldEnforceGrantWindow()) return options;
     const allowedTypes = this.grantedTypesFrom(this.activeScopeGrants(now), this.selectedFamily);
     if (!allowedTypes.length) return options;
@@ -878,11 +936,144 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return (familyDays && familyDays.length ? familyDays : this.attendanceContext?.config?.servantEntryOpenDays) || [4, 5, 6, 0, 1];
   }
 
+  private configuredTypeHasDays(type: AttendanceType, family = this.selectedFamily): boolean {
+    return this.configDaysForType(type, family).length > 0;
+  }
+
+  private selectableCustomEvents(): AttendanceCustomEvent[] {
+    return this.familyCustomEvents.filter((event) => event.enabled !== false);
+  }
+
+  private buildTypeOptionsForCurrentScope(): TypeOption[] {
+    if (this.isSelfCheckinMode()) {
+      return (this.attendanceContext?.selfAllowedTypes || []).map(type => ({ value: type, label: this.typeLabel(type) }));
+    }
+
+    const selectedFamily = canonicalFamilyName(this.selectedFamily);
+    const scopeNorm = String(this.me?.servingScope || '').trim().toUpperCase().replace(/[-\s]+/g, '_');
+    const myKhors = String(this.me?.khors || '').trim().toUpperCase();
+    const isAminKhedmaOrDev = this.isAminKhedmaOrDeveloper();
+    const canChoir = isAminKhedmaOrDev || scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH';
+    const opts: TypeOption[] = [];
+
+    if (!selectedFamily.startsWith('خورس ')) {
+      if (this.configuredTypeHasDays('FAMILY_MEETING')) opts.push({ value: 'FAMILY_MEETING', label: this.typeLabel('FAMILY_MEETING') });
+      if (this.configuredTypeHasDays('FRIDAY_LITURGY')) opts.push({ value: 'FRIDAY_LITURGY', label: this.typeLabel('FRIDAY_LITURGY') });
+      if (this.configuredTypeHasDays('TASBEEHA')) opts.push({ value: 'TASBEEHA', label: this.typeLabel('TASBEEHA') });
+    }
+
+    if (canChoir && (isAminKhedmaOrDev || myKhors === 'BOTH' || myKhors === 'MARMARKOS' || selectedFamily === 'خورس مارمرقس')) {
+      if ((!selectedFamily || selectedFamily === 'خورس مارمرقس' || !selectedFamily.startsWith('خورس '))
+        && this.configuredTypeHasDays('MARMARKOS_KHORS', 'خورس مارمرقس')) {
+        opts.push({ value: 'MARMARKOS_KHORS', label: this.typeLabel('MARMARKOS_KHORS') });
+      }
+    }
+
+    if (canChoir && this.canAccessAthanasiusKhors() && (isAminKhedmaOrDev || myKhors === 'BOTH' || myKhors === 'ATHANASIUS' || selectedFamily === 'خورس البابا أثناسيوس')) {
+      if ((!selectedFamily || selectedFamily === 'خورس البابا أثناسيوس' || !selectedFamily.startsWith('خورس '))
+        && this.configuredTypeHasDays('ATHANASIUS_KHORS', 'خورس البابا أثناسيوس')) {
+        opts.push({ value: 'ATHANASIUS_KHORS', label: this.typeLabel('ATHANASIUS_KHORS') });
+      }
+    }
+
+    if (this.canUseCustomEvent() && this.selectableCustomEvents().length) {
+      opts.push({ value: 'CUSTOM_EVENT', label: this.typeLabel('CUSTOM_EVENT') });
+    }
+
+    return this.restrictOptionsByGrantScope(opts);
+  }
+
+  private refreshTypeOptions(): void {
+    const current = this.selectedType;
+    this.typeOptions = this.buildTypeOptionsForCurrentScope();
+    if (!this.typeOptions.some((option) => option.value === current)) {
+      this.selectedType = this.typeOptions[0]?.value || 'FRIDAY_LITURGY';
+    }
+    this.ensureCustomEventSelection();
+  }
+
+  private ensureCustomEventSelection(): void {
+    if (this.selectedType !== 'CUSTOM_EVENT') {
+      this.selectedCustomEventId = '';
+      this.customTitle = '';
+      return;
+    }
+
+    const events = this.selectableCustomEvents();
+    const selectedStillExists = events.some((event) => Number(event.id) === Number(this.selectedCustomEventId || 0));
+    const selected = selectedStillExists ? this.selectedCustomEvent() : events[0];
+    this.selectedCustomEventId = selected?.id || '';
+    this.customTitle = selected?.title || '';
+  }
+
+  private weekdaysForSelectedType(): number[] {
+    if (this.selectedType === 'CUSTOM_EVENT') {
+      const selected = this.selectedCustomEvent();
+      const events = selected ? [selected] : this.selectableCustomEvents();
+      return Array.from(new Set(events.map((event) => Number(event.dayOfWeek)).filter((day) => this.weekDays.includes(day))));
+    }
+    if (this.selectedType === 'MARMARKOS_KHORS') return this.configDaysForType('MARMARKOS_KHORS', 'خورس مارمرقس');
+    if (this.selectedType === 'ATHANASIUS_KHORS') return this.configDaysForType('ATHANASIUS_KHORS', 'خورس البابا أثناسيوس');
+    return this.configDaysForType(this.selectedType);
+  }
+
+  private canOverrideAbsenceOpenClose(): boolean {
+    const roleNorm = this.roleNorm();
+    return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(roleNorm) || this.hasAnyAminPrivilegeScope();
+  }
+
+  private dateMatchesSelectedType(date: Date): boolean {
+    const days = this.weekdaysForSelectedType();
+    if (!days.includes(date.getDay())) return false;
+    if (this.selectedType !== 'CUSTOM_EVENT') return true;
+    const selected = this.selectedCustomEvent();
+    if (selected) return this.isCustomEventAvailableForDate(selected, date);
+    return this.selectableCustomEvents().some((event) => this.isCustomEventAvailableForDate(event, date));
+  }
+
+  private findLatestAllowedTypeDate(from: Date, minDate: Date, maxDate: Date): Date | null {
+    const start = new Date(Math.min(from.getTime(), maxDate.getTime()));
+    start.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 370; i++) {
+      const candidate = new Date(start);
+      candidate.setDate(start.getDate() - i);
+      if (candidate < minDate) break;
+      if (this.dateMatchesSelectedType(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  private updateCalendarForSelectedType(keepCurrentDate = false): void {
+    if (!this.typeOptions.length) {
+      this.disabledDays = [...this.weekDays];
+      this.selectedDate = null;
+      return;
+    }
+
+    const typeDays = this.weekdaysForSelectedType();
+    const allowedAbsenceDays = this.canOverrideAbsenceOpenClose() ? this.weekDays : this.configAbsenceAllowedDays();
+    const allowedDays = typeDays.filter((day) => allowedAbsenceDays.includes(day));
+    this.disabledDays = this.weekDays.filter((day) => !allowedDays.includes(day));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const maxDate = this.maxDate || today;
+    const minDate = this.minDate || new Date(2000, 0, 1);
+    const current = this.selectedDate ? new Date(this.selectedDate) : null;
+    if (keepCurrentDate && current && current >= minDate && current <= maxDate && this.dateMatchesSelectedType(current)) {
+      this.refreshAvailableCustomEvents();
+      return;
+    }
+
+    this.selectedDate = this.findLatestAllowedTypeDate(today, minDate, maxDate);
+    this.refreshAvailableCustomEvents();
+  }
+
   private allowedWeekdaysForCurrentUser(): number[] {
     const days = new Set<number>();
     const scopeNorm = String(this.me?.servingScope || '').trim().toUpperCase().replace(/[-\s]+/g, '_');
     const myKhors = String(this.me?.khors || '').trim().toUpperCase();
-    const isAminKhedmaOrDev = ['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
+    const isAminKhedmaOrDev = this.isAminKhedmaOrDeveloper();
 
     ['FRIDAY_LITURGY', 'TASBEEHA', 'FAMILY_MEETING'].forEach((type) => {
       this.configDaysForType(type as AttendanceType).forEach((day) => days.add(day));
@@ -893,7 +1084,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       if (isAminKhedmaOrDev || myKhors === 'BOTH' || myKhors === 'MARMARKOS') {
         this.configDaysForType('MARMARKOS_KHORS', 'خورس مارمرقس').forEach((day) => days.add(day));
       }
-      if (isAminKhedmaOrDev || myKhors === 'BOTH' || myKhors === 'ATHANASIUS') {
+      if (this.canAccessAthanasiusKhors() || myKhors === 'BOTH' || myKhors === 'ATHANASIUS') {
         this.configDaysForType('ATHANASIUS_KHORS', 'خورس البابا أثناسيوس').forEach((day) => days.add(day));
       }
     }
@@ -916,19 +1107,19 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     today.setHours(0, 0, 0, 0);
     this.maxDate = today;
     this.pageBlockedMessage = '';
-    this.disabledDays = this.isSelfCheckinMode() ? [0, 1, 2, 3, 4, 5, 6].filter(x => x !== today.getDay()) : [];
+    this.disabledDays = this.isSelfCheckinMode() ? this.weekDays.filter(x => x !== today.getDay()) : [];
+    this.refreshTypeOptions();
 
     if (this.isSelfCheckinMode()) {
       this.minDate = today;
       this.maxDate = today;
       this.selectedDate = today;
       this.selected = [this.selfPickUser()];
-      this.onDateChange();
+      this.refreshAvailableCustomEvents();
       return;
     }
 
-    const roleNorm = this.roleNorm();
-    const canOverrideWeekClose = ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(roleNorm) || this.hasAnyAminPrivilegeScope();
+    const canOverrideWeekClose = this.canOverrideAbsenceOpenClose();
 
     if (!canOverrideWeekClose && !this.configAbsenceOpenDays().includes(today.getDay())) {
       this.pageBlockedMessage = 'تسجيل الغياب مقفول اليوم حسب الإعدادات الحالية لهذه الأسرة.';
@@ -941,28 +1132,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
     this.minDate = canOverrideWeekClose ? new Date(2000, 0, 1) : monday;
 
-    const allowedAbsenceDays = this.configAbsenceAllowedDays();
-
-    if (canOverrideWeekClose) {
-      this.disabledDays = [];
-      this.selectedDate = today;
-      this.onDateChange();
-      this.updateBlockedMessage();
-      return;
-    }
-
     if (this.isKhadim()) {
       this.minDate = new Date(2000, 0, 1);
-      const allowedWeekdays = this.allowedWeekdaysForCurrentUser();
-      const allowedDays = allowedWeekdays.filter((day) => allowedAbsenceDays.includes(day));
-      this.disabledDays = [0, 1, 2, 3, 4, 5, 6].filter(d => !allowedDays.includes(d));
-      this.selectedDate = this.findLatestAllowedDate(today, allowedDays, this.minDate) || today;
-    } else {
-      this.disabledDays = [0, 1, 2, 3, 4, 5, 6].filter(d => !allowedAbsenceDays.includes(d));
-      this.selectedDate = this.findLatestAllowedDate(today, allowedAbsenceDays, this.minDate) || today;
     }
 
-    this.onDateChange();
+    this.updateCalendarForSelectedType(false);
     this.updateBlockedMessage();
   }
 
@@ -989,76 +1163,26 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   onDateChange() {
     if (!this.selectedDate) {
-      this.typeOptions = [];
       this.refreshRuntimeState();
       return;
     }
 
     const d = new Date(this.selectedDate);
     d.setHours(0, 0, 0, 0);
-    const dow = d.getDay();
-    this.customTitle = '';
-
-    if (this.isSelfCheckinMode()) {
-      this.typeOptions = (this.attendanceContext?.selfAllowedTypes || []).map(type => ({ value: type, label: this.typeLabel(type) }));
-      this.selectedType = this.typeOptions[0]?.value || 'FRIDAY_LITURGY';
+    if (this.typeOptions.length && !this.dateMatchesSelectedType(d)) {
+      this.updateCalendarForSelectedType(false);
       this.refreshRuntimeState();
       return;
     }
 
-    const scopeNorm = String(this.me?.servingScope || '').trim().toUpperCase().replace(/[-\s]+/g, '_');
-    const myKhors = String(this.me?.khors || '').trim().toUpperCase();
-    const opts: { value: AttendanceType; label: string }[] = [];
-
-    if (this.configDaysForType('FAMILY_MEETING').includes(dow)) opts.push({ value: 'FAMILY_MEETING', label: this.typeLabel('FAMILY_MEETING') });
-    if (this.configDaysForType('FRIDAY_LITURGY').includes(dow)) opts.push({ value: 'FRIDAY_LITURGY', label: this.typeLabel('FRIDAY_LITURGY') });
-    if (this.configDaysForType('TASBEEHA').includes(dow)) opts.push({ value: 'TASBEEHA', label: this.typeLabel('TASBEEHA') });
-
-    const isAminKhedmaOrDev = ['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
-    const canChoir = isAminKhedmaOrDev || scopeNorm === 'KHORS_ONLY' || scopeNorm === 'BOTH';
-
-    if (canChoir) {
-      if (isAminKhedmaOrDev || myKhors === 'BOTH') {
-        if (this.configDaysForType('MARMARKOS_KHORS', 'خورس مارمرقس').includes(dow)) {
-          opts.push({ value: 'MARMARKOS_KHORS', label: this.typeLabel('MARMARKOS_KHORS') });
-        }
-        if (this.configDaysForType('ATHANASIUS_KHORS', 'خورس البابا أثناسيوس').includes(dow)) {
-          opts.push({ value: 'ATHANASIUS_KHORS', label: this.typeLabel('ATHANASIUS_KHORS') });
-        }
-      } else if (myKhors === 'MARMARKOS') {
-        if (this.configDaysForType('MARMARKOS_KHORS', 'خورس مارمرقس').includes(dow)) {
-          opts.push({ value: 'MARMARKOS_KHORS', label: this.typeLabel('MARMARKOS_KHORS') });
-        }
-      } else if (myKhors === 'ATHANASIUS') {
-        if (this.configDaysForType('ATHANASIUS_KHORS', 'خورس البابا أثناسيوس').includes(dow)) {
-          opts.push({ value: 'ATHANASIUS_KHORS', label: this.typeLabel('ATHANASIUS_KHORS') });
-        }
-      }
-    }
-
-    const scopedOptions = this.restrictOptionsByGrantScope(opts);
-
-    if (!scopedOptions.length) {
-      if (this.canUseCustomEvent() && this.attendanceContext?.config?.allowCustomTitleOnNonDefaultDays) {
-        this.typeOptions = [{ value: 'CUSTOM_EVENT', label: this.typeLabel('CUSTOM_EVENT') }];
-        this.selectedType = 'CUSTOM_EVENT';
-      } else {
-        this.typeOptions = [];
-      }
-      this.refreshRuntimeState();
-      return;
-    }
-
-    this.typeOptions = scopedOptions;
-    if (!scopedOptions.some(x => x.value === this.selectedType)) {
-      this.selectedType = scopedOptions[0]?.value || 'FRIDAY_LITURGY';
-    }
-    this.syncFamilyWithType();
+    this.refreshAvailableCustomEvents();
     this.refreshRuntimeState();
   }
 
   onTypeChange() {
+    this.ensureCustomEventSelection();
     this.syncFamilyWithType();
+    this.updateCalendarForSelectedType(false);
     this.refreshRuntimeState();
   }
 
@@ -1093,6 +1217,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (this.selectedFamily) this.loadMembersForFamily();
     else if (this.searchText.trim()) this.runSearch();
     if (this.canManageAccessGrants()) this.loadGrantTargets();
+    this.loadCustomEventsForFamily();
     this.initCalendarRules();
     this.refreshRuntimeState();
   }
@@ -1149,6 +1274,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         } else if (this.selectedFamily) {
           this.loadMembersForFamily();
         }
+        this.loadCustomEventsForFamily();
         this.initCalendarRules();
         this.refreshRuntimeState();
         if (this.canManageAccessGrants()) this.loadGrantTargets();
@@ -1639,29 +1765,334 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ===== Custom Events (Stubs) =====
-  customEventDialogMode: 'create' | 'edit' = 'create';
-  customEventDialogVisible = false;
-  customEventSaving = false;
-  customEventForm: any = { alwaysActive: true, enabled: true, dayOfWeek: 5 };
-  customEventActiveFromDate: Date | null = null;
-  customEventActiveToDate: Date | null = null;
-  customEventBlockedDates: Date[] = [];
-  familyCustomEvents: any[] = [];
-  availableCustomEvents: any[] = [];
-  selectedCustomEventId: any = '';
+  // ===== Custom Events =====
+  private defaultCustomEventForm(): CustomEventForm {
+    return {
+      familyBase: this.isAminKhedmaOrDeveloper() ? '' : this.selectedFamily,
+      title: '',
+      dayOfWeek: this.selectedDate?.getDay() ?? 5,
+      enabled: true,
+      alwaysActive: true,
+      permittedEditorIds: []
+    };
+  }
 
-  isCustomEventFamilyLocked(): boolean { return false; }
-  customEventFamilyOptions(): string[] { return this.families || []; }
-  onCustomEventDayChange(): void {}
-  onCustomEventAlwaysActiveChange(): void {}
-  onCustomEventActiveFromChange(val: Date | null): void { this.customEventActiveFromDate = val; }
-  onCustomEventActiveToChange(val: Date | null): void { this.customEventActiveToDate = val; }
-  saveCustomEvent(): void { this.customEventDialogVisible = false; }
-  openCreateCustomEvent(): void { this.customEventDialogMode = 'create'; this.customEventDialogVisible = true; }
-  customEventDisplayRange(event: any): string { return ''; }
-  openEditCustomEvent(event: any): void { this.customEventDialogMode = 'edit'; this.customEventDialogVisible = true; }
-  deleteCustomEvent(event: any): void {}
-  onCustomEventSelectionChange(): void {}
-  selectedCustomEvent(): any { return null; }
+  get visibleCustomEvents(): AttendanceCustomEvent[] {
+    return this.familyCustomEvents.slice(0, 2);
+  }
+
+  get extraCustomEventsCount(): number {
+    return Math.max(0, this.familyCustomEvents.length - this.visibleCustomEvents.length);
+  }
+
+  isCustomEventFamilyLocked(): boolean {
+    return !this.isAminKhedmaOrDeveloper();
+  }
+
+  customEventFamilyOptions(): Array<{ label: string; value: string }> {
+    const options = this.isAminKhedmaOrDeveloper()
+      ? [{ label: 'كل الأسر', value: '' }, ...this.filterAthanasiusVisibility(this.families).map((family) => ({ label: family, value: family }))]
+      : this.filterAthanasiusVisibility([this.selectedFamily || this.aminOsraFamilies()[0] || '']).filter(Boolean).map((family) => ({ label: family, value: family }));
+    return options;
+  }
+
+  private loadCustomEventsForFamily(): void {
+    if (!this.canUseCustomEvent()) {
+      this.familyCustomEvents = [];
+      this.availableCustomEvents = [];
+      return;
+    }
+    const familyBase = this.isAminKhedmaOrDeveloper() ? (this.selectedFamily || undefined) : (this.selectedFamily || this.aminOsraFamilies()[0] || undefined);
+    this.attendance.listCustomEvents(familyBase).subscribe({
+      next: (events) => {
+        this.familyCustomEvents = this.filterAthanasiusVisibilityForEvents(events || []);
+        this.refreshTypeOptions();
+        this.updateCalendarForSelectedType(true);
+        this.refreshAvailableCustomEvents();
+      },
+      error: () => {
+        this.familyCustomEvents = [];
+        this.availableCustomEvents = [];
+        this.refreshTypeOptions();
+        this.updateCalendarForSelectedType(true);
+      }
+    });
+  }
+
+  private filterAthanasiusVisibilityForEvents(events: AttendanceCustomEvent[]): AttendanceCustomEvent[] {
+    if (this.canAccessAthanasiusKhors()) return events;
+    return events.filter((event) => !this.isAthanasiusFamilyName(event.familyBase));
+  }
+
+  private refreshAvailableCustomEvents(): void {
+    const date = this.selectedDate ? new Date(this.selectedDate) : new Date();
+    const selectable = this.selectableCustomEvents();
+    this.availableCustomEvents = this.selectedType === 'CUSTOM_EVENT'
+      ? selectable
+      : selectable.filter((event) => this.isCustomEventAvailableForDate(event, date));
+    if (this.selectedType === 'CUSTOM_EVENT') {
+      const currentStillAvailable = this.availableCustomEvents.some((event) => Number(event.id) === Number(this.selectedCustomEventId || 0));
+      const next = currentStillAvailable ? this.selectedCustomEvent() : this.availableCustomEvents[0];
+      this.selectedCustomEventId = next?.id || '';
+      this.customTitle = next?.title || '';
+    }
+  }
+
+  private isCustomEventAvailableForDate(event: AttendanceCustomEvent, date: Date): boolean {
+    if (!event || event.enabled === false) return false;
+    if (Number(event.dayOfWeek) !== date.getDay()) return false;
+    if (event.alwaysActive !== false) return true;
+    const current = new Date(date);
+    current.setHours(0, 0, 0, 0);
+    if (event.activeFrom) {
+      const from = new Date(event.activeFrom);
+      from.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(from.getTime()) && current < from) return false;
+    }
+    if (event.activeTo) {
+      const to = new Date(event.activeTo);
+      to.setHours(23, 59, 59, 999);
+      if (!Number.isNaN(to.getTime()) && current > to) return false;
+    }
+    return true;
+  }
+
+  onCustomEventDayChange(): void {
+    if (this.customEventForm.dayOfWeek === undefined || this.customEventForm.dayOfWeek === null) {
+      this.customEventForm.dayOfWeek = this.selectedDate?.getDay() ?? 5;
+    }
+  }
+
+  onCustomEventAlwaysActiveChange(): void {
+    if (this.customEventForm.alwaysActive) {
+      this.customEventActiveFromDate = null;
+      this.customEventActiveToDate = null;
+      this.customEventForm.activeFrom = null;
+      this.customEventForm.activeTo = null;
+    }
+  }
+
+  onCustomEventActiveFromChange(val: Date | null): void {
+    this.customEventActiveFromDate = val;
+    this.customEventForm.activeFrom = val ? this.toIsoDate(val) : null;
+  }
+
+  onCustomEventActiveToChange(val: Date | null): void {
+    this.customEventActiveToDate = val;
+    this.customEventForm.activeTo = val ? this.toIsoDate(val) : null;
+  }
+
+  onCustomEventFamilyChange(): void {
+    this.customEventForm.permittedEditorIds = [];
+    this.customEventEditorPickerId = null;
+    this.loadCustomEventEditorTargets();
+  }
+
+  private loadCustomEventEditorTargets(): void {
+    const family = this.customEventForm.familyBase || this.selectedFamily;
+    if (!family) {
+      this.customEventEditorTargets = [];
+      return;
+    }
+    this.familySvc.members(family, true, 'attendance').subscribe({
+      next: (members) => {
+        this.customEventEditorTargets = (members || [])
+          .map((member: any) => this.toPickUser(member))
+          .filter((member) => this.isServantGrantTarget(member));
+        this.customEventForm.permittedEditorIds = (this.customEventForm.permittedEditorIds || [])
+          .filter((id) => this.customEventEditorTargets.some((member) => member.id === id));
+      },
+      error: () => this.customEventEditorTargets = []
+    });
+  }
+
+  onCustomEventPermittedEditorPick(value: number | null): void {
+    const id = Number(value || 0);
+    if (!id) {
+      this.customEventEditorPickerId = null;
+      return;
+    }
+    const current = new Set(this.customEventForm.permittedEditorIds || []);
+    current.add(id);
+    this.customEventForm.permittedEditorIds = Array.from(current);
+    this.customEventEditorPickerId = null;
+  }
+
+  removeCustomEventPermittedEditor(id: number): void {
+    this.customEventForm.permittedEditorIds = (this.customEventForm.permittedEditorIds || []).filter((item) => item !== id);
+  }
+
+  selectedCustomEventEditors(): PickUser[] {
+    const ids = new Set(this.customEventForm.permittedEditorIds || []);
+    return this.customEventEditorTargets.filter((member) => ids.has(member.id));
+  }
+
+  remainingCustomEventEditorTargets(): PickUser[] {
+    const ids = new Set(this.customEventForm.permittedEditorIds || []);
+    return this.customEventEditorTargets.filter((member) => !ids.has(member.id));
+  }
+
+  customEventPermittedEditorsSummary(event: AttendanceCustomEvent): string {
+    const names = (event.permittedEditors || [])
+      .map((editor) => String(editor?.fullName || '').trim())
+      .filter(Boolean);
+    if (names.length) return names.join(' + ');
+    const legacyName = String(event.permittedEditorName || '').trim();
+    return legacyName || 'بدون خدام محددين';
+  }
+
+  openCreateCustomEvent(): void {
+    if (!this.canUseCustomEvent()) return;
+    this.customEventDialogMode = 'create';
+    const options = this.customEventFamilyOptions();
+    this.customEventForm = {
+      ...this.defaultCustomEventForm(),
+      familyBase: this.isAminKhedmaOrDeveloper() ? (this.selectedFamily || options[0]?.value || '') : (this.selectedFamily || options[0]?.value || '')
+    };
+    this.customEventActiveFromDate = null;
+    this.customEventActiveToDate = null;
+    this.customEventEditorPickerId = null;
+    this.loadCustomEventEditorTargets();
+    this.customEventDialogVisible = true;
+  }
+
+  openEditCustomEvent(event: AttendanceCustomEvent): void {
+    if (!this.canEditCustomEvent(event)) return;
+    this.customEventDialogMode = 'edit';
+    this.customEventForm = {
+      ...event,
+      id: event.id,
+      familyBase: event.familyBase || '',
+      title: event.title || '',
+      dayOfWeek: Number(event.dayOfWeek ?? 5),
+      enabled: event.enabled !== false,
+      alwaysActive: event.alwaysActive !== false,
+      permittedEditorIds: [...(event.permittedEditorIds || []), ...(event.permittedEditorId ? [event.permittedEditorId] : [])]
+        .filter((id, index, arr) => !!id && arr.indexOf(id) === index)
+    };
+    this.customEventActiveFromDate = event.activeFrom ? new Date(event.activeFrom) : null;
+    this.customEventActiveToDate = event.activeTo ? new Date(event.activeTo) : null;
+    this.customEventEditorPickerId = null;
+    this.loadCustomEventEditorTargets();
+    this.customEventDialogVisible = true;
+  }
+
+  private buildCustomEventPayload(): Partial<AttendanceCustomEvent> {
+    return {
+      familyBase: this.customEventForm.familyBase || null,
+      title: this.customEventForm.title.trim(),
+      dayOfWeek: Number(this.customEventForm.dayOfWeek),
+      enabled: this.customEventForm.enabled !== false,
+      alwaysActive: this.customEventForm.alwaysActive !== false,
+      activeFrom: this.customEventForm.alwaysActive === false ? (this.customEventForm.activeFrom || null) : null,
+      activeTo: this.customEventForm.alwaysActive === false ? (this.customEventForm.activeTo || null) : null,
+      permittedEditorIds: [...new Set((this.customEventForm.permittedEditorIds || []).filter(Boolean))]
+    };
+  }
+
+  saveCustomEvent(): void {
+    if (!this.canUseCustomEvent()) return;
+    if (!this.customEventForm.title?.trim()) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اكتب اسم المناسبة أولاً' });
+      return;
+    }
+    if (!this.isAminKhedmaOrDeveloper() && !this.customEventForm.familyBase) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار الأسرة أو الخورس أولاً' });
+      return;
+    }
+    if (this.customEventForm.alwaysActive === false && this.customEventForm.activeFrom && this.customEventForm.activeTo) {
+      const from = new Date(this.customEventForm.activeFrom).getTime();
+      const to = new Date(this.customEventForm.activeTo).getTime();
+      if (!Number.isNaN(from) && !Number.isNaN(to) && to < from) {
+        this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'آخر تاريخ لازم يكون بعد أول تاريخ' });
+        return;
+      }
+    }
+
+    this.customEventSaving = true;
+    const payload = this.buildCustomEventPayload();
+    const req = this.customEventDialogMode === 'edit' && this.customEventForm.id
+      ? this.attendance.updateCustomEvent(Number(this.customEventForm.id), payload)
+      : this.attendance.createCustomEvent(payload);
+
+    req.subscribe({
+      next: () => {
+        this.customEventSaving = false;
+        this.customEventDialogVisible = false;
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ المناسبة بنجاح' });
+        this.loadCustomEventsForFamily();
+        this.onDateChange();
+      },
+      error: (err) => {
+        this.customEventSaving = false;
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.message || 'فشل حفظ المناسبة' });
+      }
+    });
+  }
+
+  deleteCustomEvent(event: AttendanceCustomEvent): void {
+    if (!event.id || !this.canEditCustomEvent(event)) return;
+    this.attendance.deleteCustomEvent(event.id).subscribe({
+      next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف المناسبة' });
+        this.loadCustomEventsForFamily();
+        this.onDateChange();
+      },
+      error: () => this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حذف المناسبة' })
+    });
+  }
+
+  onCustomEventSelectionChange(): void {
+    const selected = this.selectedCustomEvent();
+    this.customTitle = selected?.title || '';
+    this.updateCalendarForSelectedType(false);
+    this.refreshRuntimeState();
+  }
+
+  selectedCustomEvent(): AttendanceCustomEvent | null {
+    const id = Number(this.selectedCustomEventId || 0);
+    return this.familyCustomEvents.find((event) => Number(event.id) === id)
+      || this.availableCustomEvents.find((event) => Number(event.id) === id)
+      || null;
+  }
+
+  customEventDisplayRange(event: AttendanceCustomEvent): string {
+    if (event.alwaysActive !== false) return 'مستمرة على طول';
+    const from = event.activeFrom ? this.formatDateOnly(event.activeFrom) : '';
+    const to = event.activeTo ? this.formatDateOnly(event.activeTo) : '';
+    if (from && to) return `${from} ← ${to}`;
+    if (from) return `من ${from}`;
+    if (to) return `إلى ${to}`;
+    return 'بدون تاريخ محدد';
+  }
+
+  customEventScopeLabel(event: AttendanceCustomEvent): string {
+    return event.familyBase ? String(event.familyBase) : 'كل الأسر';
+  }
+
+  customEventStatusLabel(event: AttendanceCustomEvent): string {
+    return event.enabled === false ? 'pending' : 'مفعلة';
+  }
+
+  canEditCustomEvent(event: AttendanceCustomEvent): boolean {
+    if (!event) return false;
+    if (event.canEdit !== undefined) return !!event.canEdit;
+    const myId = Number(this.me?.id || 0);
+    return this.isAminKhedmaOrDeveloper()
+      || Number(event.createdById || 0) === myId
+      || Number(event.permittedEditorId || 0) === myId
+      || (event.permittedEditorIds || []).includes(myId)
+      || (event.permittedEditors || []).some((editor) => Number(editor?.id || 0) === myId);
+  }
+
+  private formatDateOnly(value?: string | Date | null): string {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date);
+  }
 }

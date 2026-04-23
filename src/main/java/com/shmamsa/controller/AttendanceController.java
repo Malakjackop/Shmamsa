@@ -912,7 +912,7 @@ public class AttendanceController {
                 && dow != DayOfWeek.THURSDAY
                 && dow != DayOfWeek.FRIDAY
                 && dow != DayOfWeek.SATURDAY) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "الاسرة لازم تكون يوم خميس او جمعة");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "الاسرة لازم تكون يوم خميس او جمعة او سبت");
         }
         if ((type == AttendanceType.FRIDAY_LITURGY
                 || type == AttendanceType.MARMARKOS_KHORS

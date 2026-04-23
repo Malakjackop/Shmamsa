@@ -1,4 +1,4 @@
-<p-toast position="top-left"></p-toast>
+﻿<p-toast position="top-left"></p-toast>
 
 <div class="page" dir="rtl">
   <div class="page-header">
@@ -106,22 +106,29 @@
 
         <div class="side-card" *ngIf="canUseCustomEvent()">
           <div class="side-title">المناسبات المخصصة</div>
-          <button type="button" class="action-btn" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily">
+          <button type="button" class="action-btn" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily && !isAminKhedmaOrDeveloper()">
             <i class="pi pi-calendar-plus"></i>
             إضافة مناسبة مخصصة
           </button>
-          <p class="side-hint" *ngIf="!selectedFamily">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة مخصصة لها.</p>
+          <p class="side-hint" *ngIf="!selectedFamily && !isAminKhedmaOrDeveloper()">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة مخصصة لها.</p>
 
           <div class="custom-event-list" *ngIf="familyCustomEvents.length; else noCustomEvents">
-            <div class="custom-event-card" *ngFor="let event of familyCustomEvents">
+            <div class="custom-event-card" *ngFor="let event of visibleCustomEvents">
               <div class="custom-event-card__top">
                 <div>
                   <div class="custom-event-card__title">{{ event.title }}</div>
-                  <div class="custom-event-card__meta">{{ dayLabel(event.dayOfWeek) }} • {{ customEventDisplayRange(event) }}</div>
+                  <div class="custom-event-card__meta">
+                    {{ customEventScopeLabel(event) }} • {{ dayLabel(event.dayOfWeek) }} • {{ customEventDisplayRange(event) }}
+                  </div>
+                  <div class="custom-event-card__meta" *ngIf="customEventPermittedEditorsSummary(event)">
+                    مسموح بالتعديل: {{ customEventPermittedEditorsSummary(event) }}
+                  </div>
                 </div>
-                <span class="grant-enabled" [class.off]="event.enabled === false">{{ event.enabled === false ? 'معطلة' : 'مفعلة' }}</span>
+                <span class="grant-enabled" [class.off]="event.enabled === false" [class.pending]="event.enabled === false">
+                  {{ customEventStatusLabel(event) }}
+                </span>
               </div>
-              <div class="grant-actions">
+              <div class="grant-actions" *ngIf="canEditCustomEvent(event)">
                 <button type="button" class="mini-btn" (click)="openEditCustomEvent(event)">
                   <i class="pi pi-pencil"></i>
                   تعديل
@@ -132,6 +139,9 @@
                 </button>
               </div>
             </div>
+            <button type="button" class="custom-event-more" *ngIf="extraCustomEventsCount" (click)="customEventsPopupVisible = true">
+              عرض {{ extraCustomEventsCount }} مناسبة أخرى
+            </button>
           </div>
           <ng-template #noCustomEvents>
             <p class="side-hint">لا توجد مناسبات مخصصة محفوظة للأسرة أو الخورس المحدد.</p>
@@ -142,6 +152,13 @@
       <section class="content">
         <div class="controls-card">
           <div class="controls-grid">
+            <div class="control-field">
+              <label>النوع</label>
+              <select [(ngModel)]="selectedType" [disabled]="typeOptions.length <= 1" (change)="onTypeChange()">
+                <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+
             <div class="control-field">
               <label>اليوم</label>
               <p-datepicker
@@ -157,13 +174,6 @@
                 dateFormat="yy-mm-dd"
                 placeholder="اختار يوم التسجيل"
               ></p-datepicker>
-            </div>
-
-            <div class="control-field">
-              <label>النوع</label>
-              <select [(ngModel)]="selectedType" [disabled]="typeOptions.length <= 1" (change)="onTypeChange()">
-                <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
-              </select>
             </div>
 
             <div class="control-field control-field--actions">
@@ -509,6 +519,50 @@
           </div>
         </div>
 
+        <div class="grant-popup-backdrop custom-events-popup" *ngIf="customEventsPopupVisible" (click)="customEventsPopupVisible = false">
+          <div class="grant-popup" (click)="$event.stopPropagation()">
+            <div class="grant-popup__head">
+              <div>
+                <h3>المناسبات المخصصة</h3>
+                <p>{{ familyCustomEvents.length }} مناسبة محفوظة</p>
+              </div>
+              <button type="button" class="mini-btn" (click)="customEventsPopupVisible = false">
+                <i class="pi pi-times"></i>
+                إغلاق
+              </button>
+            </div>
+
+            <div class="custom-event-list">
+              <div class="custom-event-card" *ngFor="let event of familyCustomEvents">
+                <div class="custom-event-card__top">
+                  <div>
+                    <div class="custom-event-card__title">{{ event.title }}</div>
+                    <div class="custom-event-card__meta">
+                      {{ customEventScopeLabel(event) }} • {{ dayLabel(event.dayOfWeek) }} • {{ customEventDisplayRange(event) }}
+                    </div>
+                    <div class="custom-event-card__meta" *ngIf="customEventPermittedEditorsSummary(event)">
+                      مسموح بالتعديل: {{ customEventPermittedEditorsSummary(event) }}
+                    </div>
+                  </div>
+                  <span class="grant-enabled" [class.off]="event.enabled === false" [class.pending]="event.enabled === false">
+                    {{ customEventStatusLabel(event) }}
+                  </span>
+                </div>
+                <div class="grant-actions" *ngIf="canEditCustomEvent(event)">
+                  <button type="button" class="mini-btn" (click)="openEditCustomEvent(event); customEventsPopupVisible = false">
+                    <i class="pi pi-pencil"></i>
+                    تعديل
+                  </button>
+                  <button type="button" class="mini-btn danger" (click)="deleteCustomEvent(event)">
+                    <i class="pi pi-trash"></i>
+                    حذف
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="grant-section config-section" *ngIf="canManageAttendanceConfig()">
           <div class="section-head">
             <div>
@@ -747,11 +801,11 @@
     <div class="dialog-grid">
       <div class="form-group">
         <label>الأسرة / الخورس</label>
-        <select *ngIf="!isCustomEventFamilyLocked(); else lockedCustomEventFamily" [(ngModel)]="customEventForm.familyBase">
-          <option *ngFor="let family of customEventFamilyOptions()" [value]="family">{{ family }}</option>
+        <select *ngIf="!isCustomEventFamilyLocked(); else lockedCustomEventFamily" [(ngModel)]="customEventForm.familyBase" (ngModelChange)="onCustomEventFamilyChange()">
+          <option *ngFor="let family of customEventFamilyOptions()" [value]="family.value">{{ family.label }}</option>
         </select>
         <ng-template #lockedCustomEventFamily>
-          <div class="readonly-box">{{ customEventForm.familyBase || customEventFamilyOptions()[0] || 'غير محددة' }}</div>
+          <div class="readonly-box">{{ customEventForm.familyBase || customEventFamilyOptions()[0]?.label || 'غير محددة' }}</div>
         </ng-template>
       </div>
 
@@ -772,6 +826,26 @@
           <input type="checkbox" [(ngModel)]="customEventForm.enabled" />
           <span>المناسبة مفعلة</span>
         </label>
+        <p class="hint" *ngIf="customEventForm.enabled === false">المناسبة هتفضل موجودة بحالة pending ومش هتظهر للتسجيل غير لما تتفعل.</p>
+      </div>
+
+      <div class="form-group" *ngIf="customEventForm.familyBase">
+        <label>الخدام المسموح لهم بالتعديل</label>
+        <select [(ngModel)]="customEventEditorPickerId" (ngModelChange)="onCustomEventPermittedEditorPick($event)">
+          <option [ngValue]="null">اختر خادم لإضافته</option>
+          <option *ngFor="let servant of remainingCustomEventEditorTargets()" [ngValue]="servant.id">{{ servant.fullName }}</option>
+        </select>
+        <div class="custom-editor-chips" *ngIf="selectedCustomEventEditors().length; else noCustomEventEditors">
+          <div class="custom-editor-chip" *ngFor="let servant of selectedCustomEventEditors()">
+            <span>{{ servant.fullName }}</span>
+            <button type="button" class="custom-editor-chip__remove" (click)="removeCustomEventPermittedEditor(servant.id)" aria-label="حذف الخادم">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+        </div>
+        <ng-template #noCustomEventEditors>
+          <p class="hint">لم يتم اختيار أي خدام للتعديل حتى الآن.</p>
+        </ng-template>
       </div>
 
       <div class="form-group checkbox-wrap full-width">

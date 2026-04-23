@@ -102,6 +102,29 @@ export type AttendanceConfigResponse = {
   manageableFamilies?: string[];
 };
 
+export type AttendanceCustomEvent = {
+  id?: number;
+  familyBase: string | null;
+  scope?: 'ALL' | 'FAMILY';
+  title: string;
+  dayOfWeek: number;
+  enabled: boolean;
+  status?: 'ACTIVE' | 'PENDING';
+  alwaysActive: boolean;
+  activeFrom?: string | null;
+  activeTo?: string | null;
+  createdById?: number | null;
+  createdByName?: string | null;
+  permittedEditors?: Array<{ id: number; fullName: string }>;
+  permittedEditorIds?: number[];
+  permittedEditorNames?: string[];
+  permittedEditorId?: number | null;
+  permittedEditorName?: string | null;
+  canEdit?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
   private http = inject(HttpClient);
@@ -266,6 +289,28 @@ export class AttendanceService {
       });
     }
     return this.http.get<AttendanceConfigResponse>(`${this.baseUrl}/config`, { withCredentials: true });
+  }
+
+  listCustomEvents(familyBase?: string): Observable<AttendanceCustomEvent[]> {
+    if (!this.isBrowser) return of([]);
+    const params: Record<string, string> = {};
+    if (familyBase) params['familyBase'] = familyBase;
+    return this.http.get<AttendanceCustomEvent[]>(`${this.baseUrl}/custom-events`, {
+      params,
+      withCredentials: true
+    });
+  }
+
+  createCustomEvent(payload: Partial<AttendanceCustomEvent>): Observable<AttendanceCustomEvent> {
+    return this.http.post<AttendanceCustomEvent>(`${this.baseUrl}/custom-events`, payload, { withCredentials: true });
+  }
+
+  updateCustomEvent(id: number, payload: Partial<AttendanceCustomEvent>): Observable<AttendanceCustomEvent> {
+    return this.http.put<AttendanceCustomEvent>(`${this.baseUrl}/custom-events/${id}`, payload, { withCredentials: true });
+  }
+
+  deleteCustomEvent(id: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/custom-events/${id}`, { withCredentials: true });
   }
 
   saveFamilyTypeDays(
