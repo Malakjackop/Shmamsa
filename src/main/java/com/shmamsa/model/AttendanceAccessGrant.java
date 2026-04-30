@@ -39,6 +39,9 @@ public class AttendanceAccessGrant {
     @Column(name = "allowed_types_csv", length = 500)
     private String allowedTypesCsv;
 
+    @Column(name = "day_of_week")
+    private Integer dayOfWeek;
+
     @Column(length = 255)
     private String note;
 
@@ -69,3 +72,4 @@ public class AttendanceAccessGrant {
         if (enabled == null) enabled = true;
     }
 }
+

@@ -132,6 +132,18 @@
             <option *ngFor="let t of dailyTypeOptions()" [ngValue]="t">{{ dailyTypeLabel(t) }}</option>
           </select>
         </div>
+
+        <div class="dailyField" *ngIf="dailyType === 'CUSTOM_EVENT'">
+          <label>المناسبة المخصصة</label>
+          <select
+            [(ngModel)]="selectedDailyCustomEventId"
+            (change)="onDailyCustomEventChange()"
+            [ngModelOptions]="{ standalone: true }"
+          >
+            <option value="" disabled [hidden]="!!selectedDailyCustomEventId">اختار المناسبة</option>
+            <option *ngFor="let event of availableDailyCustomEvents" [ngValue]="event.id">{{ event.title }}</option>
+          </select>
+        </div>
       </div>
 
       <div *ngIf="dailyLoading" class="hint">جاري التحميل...</div>
@@ -243,6 +255,7 @@
           </option>
           <option value="TASBEEHA">تسبحة</option>
           <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
+          <option value="CUSTOM_EVENT">مناسبة مخصصة</option>
         </select>
       </div>
 
@@ -288,13 +301,13 @@
         <div class="detailRow" *ngFor="let d of details">
           <!-- ✅ غياب -->
           <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock2">
-            <div class="dTitle">{{ titleForType(d.type) }} • غياب</div>
+            <div class="dTitle">{{ attendanceRowLabel(d) }} • غياب</div>
             <div class="dSub">يوم الغياب: {{ d.date }}</div>
           </ng-container>
 
           <!-- ✅ حضور -->
           <ng-template #presentBlock2>
-            <div class="dTitle">{{ titleForType(d.type) }} • حضور</div>
+            <div class="dTitle">{{ attendanceRowLabel(d) }} • حضور</div>
             <div class="dSub">يوم الحضور: {{ d.date }}</div>
             <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
             <div class="dSub" *ngIf="d.takenBy">

@@ -115,9 +115,9 @@ public class AuthController {
         }
         out.put("customFields", customFields);
 
-        var activeGrants = attendanceAccessGrantService.activeGrantsForUser(user.getId());
-        out.put("activeAttendanceGrants", activeGrants.stream().map(attendanceAccessGrantService::toView).toList());
-        out.put("canOpenAttendance", !activeGrants.isEmpty() || java.util.Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER").contains(
+        var visibleGrants = attendanceAccessGrantService.displayGrantsForUser(user.getId());
+        out.put("activeAttendanceGrants", visibleGrants.stream().map(attendanceAccessGrantService::toView).toList());
+        out.put("canOpenAttendance", !visibleGrants.isEmpty() || java.util.Set.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER").contains(
                 familyAccessService.normalizeRole(user.getRole())
         ));
         out.put("attendanceConfig", attendanceConfigService.getAttendanceConfig());

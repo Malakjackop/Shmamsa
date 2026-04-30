@@ -8,7 +8,7 @@
     </div>
 
     <div class="page-badges">
-      <span class="status-badge status-badge--self" *ngIf="isSelfCheckinMode() && !blockedMessage">تسجيل ذاتي للمخدوم</span>
+      <span class="status-badge status-badge--self" *ngIf="isSelfCheckinMode() && !blockedMessage">تسجيل حضور بالتخصيص</span>
       <span class="status-badge status-badge--servant" *ngIf="isDelegatedAttendanceMode() && !blockedMessage">تسجيل حضور بالتخصيص</span>
       <span class="status-badge status-badge--servant" *ngIf="!isSelfCheckinMode() && isServantOrAbove() && !blockedMessage">تسجيل حضور للخدام</span>
       <span class="status-badge status-badge--blocked" *ngIf="blockedMessage">مقفول حالياً</span>
@@ -23,12 +23,31 @@
     </div>
   </div>
 
+  <div class="controls-card grant-closed-schedule" *ngIf="blockedMessage && shouldShowGrantTypeStatuses()">
+    <div class="section-head section-head--compact">
+      <div>
+        <h2>{{ grantClosedScheduleTitle() }}</h2>
+        <p>الأنواع المقفولة ظاهرة بعلامة قفل، ولو المتبقي أقل من 5 ساعات هيظهر عداد. لو أكتر هيظهر التاريخ والوقت.</p>
+      </div>
+    </div>
+    <div class="grant-type-status-list">
+      <div class="grant-type-status" *ngFor="let status of grantTypeStatuses()" [class.open]="status.state === 'open'" [class.locked]="status.state !== 'open'">
+        <div class="grant-type-status__head">
+          <span>{{ status.icon }} {{ status.label }}</span>
+          <strong>{{ status.note }}</strong>
+        </div>
+        <div class="grant-type-status__range">{{ status.rangeText }}</div>
+        <div class="grant-type-status__countdown" *ngIf="status.countdownText">{{ status.state === 'open' ? 'هيتقفل بعد' : 'هيبدأ بعد' }} {{ status.countdownText }}</div>
+      </div>
+    </div>
+  </div>
+
   <ng-container *ngIf="!blockedMessage">
     <div class="alert alert--info" *ngIf="isSelfCheckinMode()">
       <i class="pi pi-user"></i>
       <div>
-        <div class="alert-title">تم فتح تسجيل ذاتي لك</div>
-        <div class="alert-body">تقدر تسجل حضورك فقط في الوقت والمناسبات اللي أمين الأسرة أو المطور محددها لك.</div>
+        <div class="alert-title">تم فتح تسجيل حضور لك</div>
+        <div class="alert-body">تقدر تسجل الحضور للأسماء المسموح بها في الأسرة حسب التخصيص المفتوح لك.</div>
       </div>
     </div>
 
@@ -45,7 +64,7 @@
         <div class="side-card">
           <div class="side-title">نطاق التسجيل</div>
 
-          <ng-container *ngIf="canSelectFamily(); else fixedFamilyBlock">
+          <ng-container *ngIf="!isSelfCheckinMode(); else fixedFamilyBlock">
             <label class="field-label">الأسرة</label>
             <select class="familyDrop" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
               <option value="" *ngIf="!hasRestrictedFamilyScope()">كل الأسر</option>
@@ -62,29 +81,19 @@
           </ng-template>
         </div>
 
-        <div class="side-card countdown-card" *ngIf="hasActiveCountdownCard()">
-          <div class="side-title">الوقت المتبقي</div>
-          <div class="countdown-row">
-            <div class="countdown-meta">
-              <div class="countdown-label">هيتقفل على</div>
-              <div class="countdown-close-at" *ngIf="countdownEndsAtText">{{ countdownEndsAtText }}</div>
-            </div>
-            <div class="countdown-clock" *ngIf="showCountdownClock">{{ countdownText }}</div>
-          </div>
-          <div class="countdown-details">
-            <div class="countdown-detail" *ngIf="countdownFamilyText">
-              <span class="countdown-detail__label">الأسر المسموح بها</span>
-              <span class="countdown-detail__value">{{ countdownFamilyText }}</span>
-            </div>
-            <div class="countdown-detail" *ngIf="countdownTypeText">
-              <span class="countdown-detail__label">الأنواع المتاحة</span>
-              <span class="countdown-detail__value">{{ countdownTypeText }}</span>
+        <div class="side-card grant-status-sidebar" *ngIf="!blockedMessage && shouldShowGrantTypeStatuses()">
+          <div class="side-title">حالة الأنواع</div>
+          <p class="side-hint">كل الأنواع ظاهرة هنا، والمقفل متعلم بعلامة قفل.</p>
+          <div class="grant-type-status-list">
+            <div class="grant-type-status" *ngFor="let status of grantTypeStatuses()" [class.open]="status.state === 'open'" [class.locked]="status.state !== 'open'">
+              <div class="grant-type-status__head">
+                <span>{{ status.icon }} {{ status.label }}</span>
+                <strong>{{ status.note }}</strong>
+              </div>
+              <div class="grant-type-status__range">{{ status.rangeText }}</div>
+              <div class="grant-type-status__countdown" *ngIf="status.countdownText">{{ status.state === 'open' ? 'هيتقفل بعد' : 'هيبدأ بعد' }} {{ status.countdownText }}</div>
             </div>
           </div>
-          <div class="countdown-note" *ngIf="!showCountdownClock && countdownEndsAtText">
-            العداد التنازلي بيظهر تلقائيًا لما يفضل أقل من 24 ساعة.
-          </div>
-          <p class="side-hint">عند انتهاء الوقت هيتقفل تسجيل الحضور للتخصيص الحالي تلقائياً من الواجهة.</p>
         </div>
 
         <div class="side-card" *ngIf="canManageAccessGrants()">
@@ -112,7 +121,7 @@
           </button>
           <p class="side-hint" *ngIf="!selectedFamily && !isAminKhedmaOrDeveloper()">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة مخصصة لها.</p>
 
-          <div class="custom-event-list" *ngIf="familyCustomEvents.length; else noCustomEvents">
+          <div class="custom-event-list" *ngIf="currentFamilyCustomEvents.length; else noCustomEvents">
             <div class="custom-event-card" *ngFor="let event of visibleCustomEvents">
               <div class="custom-event-card__top">
                 <div>
@@ -154,8 +163,8 @@
           <div class="controls-grid">
             <div class="control-field">
               <label>النوع</label>
-              <select [(ngModel)]="selectedType" [disabled]="typeOptions.length <= 1" (change)="onTypeChange()">
-                <option *ngFor="let o of typeOptions" [value]="o.value">{{ o.label }}</option>
+              <select [(ngModel)]="selectedType" [disabled]="enabledTypeOptionsCount() <= 1" (change)="onTypeChange()">
+                <option *ngFor="let o of typeOptions" [value]="o.value" [disabled]="o.disabled">{{ typeOptionLabel(o) }}</option>
               </select>
             </div>
 
@@ -182,26 +191,12 @@
                 type="button"
                 class="scan-btn"
                 (click)="toggleScan()"
-                [disabled]="isSelfCheckinMode() || selectedType === 'CUSTOM_EVENT' || !!blockedMessage || !typeOptions.length"
+                [disabled]="isSelfCheckinMode() || isSelectedCustomEventType() || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()"
               >
                 <i class="pi" [ngClass]="scanning ? 'pi-stop' : 'pi-qrcode'"></i>
                 {{ scanning ? 'إيقاف السكان' : 'تشغيل السكان' }}
               </button>
             </div>
-          </div>
-
-          <div class="custom-event-box" *ngIf="selectedType === 'CUSTOM_EVENT'">
-            <label>المناسبة المخصصة</label>
-            <select [(ngModel)]="selectedCustomEventId" (ngModelChange)="onCustomEventSelectionChange()">
-              <option value="" disabled>اختر المناسبة</option>
-              <option *ngFor="let event of availableCustomEvents" [value]="event.id">
-                {{ event.title }} — {{ dayLabel(event.dayOfWeek) }}
-              </option>
-            </select>
-            <p class="hint" *ngIf="selectedCustomEvent() as event">
-              {{ customEventDisplayRange(event) }}
-            </p>
-            <p class="hint" *ngIf="!availableCustomEvents.length">لا توجد مناسبات مخصصة متاحة للأسرة الحالية.</p>
           </div>
 
           <div class="hint alert-inline" *ngIf="!typeOptions.length && !blockedMessage">
@@ -213,7 +208,7 @@
           <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
         </div>
 
-        <div class="searchWrap" *ngIf="!isSelfCheckinMode()">
+        <div class="searchWrap">
           <span class="search">
             <i class="pi pi-search"></i>
             <input
@@ -234,9 +229,8 @@
           </div>
         </div>
 
-        <h2 class="listTitle" *ngIf="selectedFamily && !isSelfCheckinMode()">أسماء المسجلين في: {{ selectedFamily }}</h2>
-        <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim() && !isSelfCheckinMode()">نتائج البحث</h2>
-        <h2 class="listTitle" *ngIf="isSelfCheckinMode()">المسجل الحالي</h2>
+        <h2 class="listTitle" *ngIf="selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
+        <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim()">نتائج البحث</h2>
 
         <div class="list" *ngIf="displayedMembers.length; else empty">
           <div class="row" *ngFor="let u of displayedMembers">
@@ -251,32 +245,37 @@
             <button
               type="button"
               class="pick-btn"
-              [class.pick-btn--locked]="isSelected(u.id)"
-              [disabled]="isSelected(u.id) || isSelfCheckinMode()"
+              [class.pick-btn--locked]="isSelected(u.id) || !canPickDisplayedUser(u)"
+              [disabled]="isSelected(u.id) || !canPickDisplayedUser(u)"
               (click)="toggleSelect(u)"
             >
               <i class="pi" [ngClass]="isSelected(u.id) ? 'pi-check' : 'pi-plus'"></i>
-              <span>{{ isSelected(u.id) ? 'تمت إضافته' : 'إضافة' }}</span>
+              <span>{{ isSelected(u.id) ? 'تمت إضافته' : (canPickDisplayedUser(u) ? 'إضافة' : 'للعرض فقط') }}</span>
             </button>
           </div>
         </div>
 
         <ng-template #empty>
-          <p class="hint" *ngIf="!selectedFamily && !searchText.trim() && !isSelfCheckinMode()">
+          <p class="hint" *ngIf="!selectedFamily && !searchText.trim()">
             اختار أسرة من القائمة أو اكتب اسم علشان يدور في كل الأسر.
           </p>
-          <p class="hint" *ngIf="!selectedFamily && searchText.trim() && !displayedMembers.length && !searching && !isSelfCheckinMode()">
+          <p class="hint" *ngIf="!selectedFamily && searchText.trim() && !displayedMembers.length && !searching">
             مفيش نتائج للاسم ده.
           </p>
-          <p class="hint" *ngIf="selectedFamily && !members.length && !isSelfCheckinMode()">
+          <p class="hint" *ngIf="selectedFamily && membersLoading">
+            جاري تحميل أسماء الأسرة...
+          </p>
+          <p class="hint" *ngIf="selectedFamily && !membersLoading && membersLoadError">
+            {{ membersLoadError }}
+          </p>
+          <p class="hint" *ngIf="selectedFamily && !membersLoading && !membersLoadError && !members.length">
             مفيش حد مسجل في الأسرة دي.
           </p>
-          <p class="hint" *ngIf="isSelfCheckinMode()">لا يوجد تخصيص صالح لك حاليًا.</p>
         </ng-template>
 
         <div class="selectedBox" *ngIf="selected.length">
           <div class="selectedHeader">
-            <h2>{{ isSelfCheckinMode() ? 'اللي هيتسجل دلوقتي' : 'الأسماء التي سيتم تسجيل حضورها' }}</h2>
+            <h2>الأسماء التي سيتم تسجيل حضورها</h2>
             <span class="selectedCount">{{ selected.length }} اسم</span>
           </div>
 
@@ -290,15 +289,15 @@
                 <div class="sub" *ngIf="familyLabel(u)">{{ familyLabel(u) }}</div>
               </div>
 
-              <button type="button" class="remove-btn" *ngIf="!isSelfCheckinMode()" (click)="remove(u.id)">
+              <button type="button" class="remove-btn" (click)="remove(u.id)">
                 <i class="pi pi-times"></i>
               </button>
             </div>
           </div>
 
-          <button type="button" class="submit-btn" (click)="submit()" [disabled]="!selectedDate || !!blockedMessage || !typeOptions.length">
+          <button type="button" class="submit-btn" (click)="submit()" [disabled]="!selectedDate || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()">
             <i class="pi pi-check-square"></i>
-            {{ isSelfCheckinMode() ? 'تسجيل حضوري' : 'تسجيل الحضور' }}
+            تسجيل الحضور
           </button>
         </div>
 
@@ -306,7 +305,7 @@
           <div class="section-head">
             <div>
               <h2>التخصيصات الحالية</h2>
-              <p>تسجيل ذاتي للمخدومين أو فتح وقت محدد للخدام لأخذ الحضور.</p>
+              <p>تسجيل حضور بالتخصيصين أو فتح وقت محدد للخدام لأخذ الحضور.</p>
             </div>
             <button type="button" class="action-btn secondary" (click)="openGrantsPopup()">
               <i class="pi pi-eye"></i>
@@ -374,6 +373,7 @@
 
               <div class="grant-meta">
                 <div><b>الأسرة:</b> {{ grantFamilyLabel(grant.familyBase) }}</div>
+                <div><b>اليوم:</b> {{ grantDayLabel(grant) }}</div>
                 <div><b>من:</b> {{ grant.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
                 <div><b>إلى:</b> {{ grant.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
                 <div *ngIf="grant.note"><b>ملاحظة:</b> {{ grant.note }}</div>
@@ -477,34 +477,37 @@
 
             <div class="grant-loading" *ngIf="grantsLoading">جارٍ تحميل التخصيصات...</div>
 
-            <div class="grant-popup__body" *ngIf="!grantsLoading && filteredGrants.length; else popupNoGrants">
+            <div class="grant-popup__body" *ngIf="!grantsLoading && filteredGrantGroups.length; else popupNoGrants">
               <div class="grant-list grant-list--popup">
-                <div class="grant-card" *ngFor="let grant of filteredGrants">
+                <div class="grant-card" *ngFor="let group of filteredGrantGroups">
                   <div class="grant-card__top">
                     <div>
-                      <div class="grant-kind">{{ grant.grantKind === 'SELF_CHECKIN' ? 'مخدوم' : 'خادم' }}</div>
-                      <div class="grant-target">{{ grant.targetUserName || 'بدون اسم' }}</div>
+                      <div class="grant-kind">{{ group.first.grantKind === 'SELF_CHECKIN' ? 'مخدومين' : 'خدام' }}</div>
+                      <div class="grant-target">{{ group.targetNames || 'بدون اسم' }}</div>
                     </div>
-                    <span class="grant-enabled" [class.off]="grant.enabled === false">{{ grant.enabled === false ? 'معطل' : 'مفعل' }}</span>
+                    <span class="grant-enabled" [class.off]="group.first.enabled === false">{{ group.first.enabled === false ? 'معطل' : 'مفعل' }}</span>
                   </div>
 
                   <div class="grant-meta">
-                    <div><b>الأسرة:</b> {{ grantFamilyLabel(grant.familyBase) }}</div>
-                    <div><b>من:</b> {{ grant.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
-                    <div><b>إلى:</b> {{ grant.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
-                    <div *ngIf="grant.note"><b>ملاحظة:</b> {{ grant.note }}</div>
+                    <div><b>عدد الأشخاص:</b> {{ group.grants.length }}</div>
+                    <div><b>الأسماء:</b> {{ group.targetNames }}</div>
+                    <div><b>الأسرة:</b> {{ grantFamilyLabel(group.first.familyBase) }}</div>
+                    <div><b>اليوم:</b> {{ grantGroupDayLabel(group) }}</div>
+                    <div><b>من:</b> {{ group.first.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                    <div><b>إلى:</b> {{ group.first.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                    <div *ngIf="grantGroupNotesText(group)"><b>ملاحظة:</b> {{ grantGroupNotesText(group) }}</div>
                   </div>
 
                   <div class="grant-types">
-                    <span class="type-chip" *ngFor="let t of grant.allowedTypes">{{ displayTypeLabel(t) }}</span>
+                    <span class="type-chip" *ngFor="let t of group.first.allowedTypes">{{ displayTypeLabel(t) }}</span>
                   </div>
 
                   <div class="grant-actions">
-                    <button type="button" class="mini-btn" (click)="openEditGrant(grant); closeGrantsPopup()">
+                    <button type="button" class="mini-btn" (click)="openEditGrantGroup(group); closeGrantsPopup()">
                       <i class="pi pi-pencil"></i>
                       تعديل
                     </button>
-                    <button type="button" class="mini-btn danger" (click)="deleteGrant(grant)">
+                    <button type="button" class="mini-btn danger" (click)="deleteGrantGroup(group)">
                       <i class="pi pi-trash"></i>
                       حذف
                     </button>
@@ -524,7 +527,7 @@
             <div class="grant-popup__head">
               <div>
                 <h3>المناسبات المخصصة</h3>
-                <p>{{ familyCustomEvents.length }} مناسبة محفوظة</p>
+                <p>{{ currentFamilyCustomEvents.length }} مناسبة محفوظة</p>
               </div>
               <button type="button" class="mini-btn" (click)="customEventsPopupVisible = false">
                 <i class="pi pi-times"></i>
@@ -533,7 +536,7 @@
             </div>
 
             <div class="custom-event-list">
-              <div class="custom-event-card" *ngFor="let event of familyCustomEvents">
+              <div class="custom-event-card" *ngFor="let event of currentFamilyCustomEvents">
                 <div class="custom-event-card__top">
                   <div>
                     <div class="custom-event-card__title">{{ event.title }}</div>
@@ -581,7 +584,7 @@
           </button>
 
           <div class="config-card" *ngIf="configPanelOpen">
-            <div class="form-group">
+            <div class="form-group" *ngIf="shouldShowConfigFamilyPicker()">
               <label>الأسرة / الخورس</label>
               <select *ngIf="!isConfigFamilyLocked(); else lockedConfigFamily" [(ngModel)]="selectedConfigFamily" [disabled]="isConfigFamilyLocked()" (ngModelChange)="onConfigFamilyChange()">
                 <option *ngFor="let family of configFamilyOptions" [value]="family">{{ family }}</option>
@@ -617,42 +620,8 @@
               </div>
             </div>
 
-            <div class="schedule-grid config-card--labels" *ngIf="selectedConfigFamily">
-              <div class="form-group">
-                <label>الأيام المسموح تحديد الغياب لها</label>
-                <div class="day-chip-grid">
-                  <button
-                    type="button"
-                    class="day-chip"
-                    *ngFor="let day of attendanceDayOptions"
-                    [class.active]="hasAbsenceAllowedDay(day.value)"
-                    (click)="toggleAbsenceAllowedDay(day.value)"
-                  >
-                    {{ day.label }}
-                  </button>
-                </div>
-                <p class="hint">دي الأيام اللي ينفع تختارها في التاريخ لما تيجي تاخد غياب للأسرة دي.</p>
-              </div>
-
-              <div class="form-group">
-                <label>الأيام المسموح فيها بأخذ الغياب</label>
-                <div class="day-chip-grid">
-                  <button
-                    type="button"
-                    class="day-chip"
-                    *ngFor="let day of attendanceDayOptions"
-                    [class.active]="hasAbsenceOpenDay(day.value)"
-                    (click)="toggleAbsenceOpenDay(day.value)"
-                  >
-                    {{ day.label }}
-                  </button>
-                </div>
-                <p class="hint">لو النهارده مش ضمن الأيام دي، مش هينفع أي حد ياخد غياب للأسرة دي.</p>
-              </div>
-            </div>
-
             <p class="hint" *ngIf="selectedConfigFamily === 'خورس مارمرقس' || selectedConfigFamily === 'خورس البابا أثناسيوس'">
-              في حالة اختيار خورس، هتحدد يوم الخورس نفسه فقط.
+              الخورس هنا بيتعامل كأسرة، فتقدر تحدد له أيام القداس والتسبحة والاجتماع.
             </p>
           </div>
         </div>
@@ -666,6 +635,7 @@
   [(visible)]="grantDialogVisible"
   [modal]="true"
   [style]="{ width: '640px', maxWidth: '95vw' }"
+  styleClass="grant-dialog"
   [baseZIndex]="10000"
   [draggable]="false"
   [resizable]="false"
@@ -682,69 +652,104 @@
       </div>
 
       <div class="form-group grant-target-group">
-        <label>الشخص المستهدف</label>
-        <select [(ngModel)]="grantForm.targetUserId" (ngModelChange)="onGrantTargetChange()">
-          <option [ngValue]="undefined" disabled>اختر الشخص</option>
-          <option *ngFor="let u of grantTargets" [ngValue]="u.id">
-            {{ u.fullName }}<ng-container *ngIf="familyLabel(u)"> - {{ familyLabel(u) }}</ng-container>
-          </option>
-        </select>
-        <p class="hint" *ngIf="!grantTargets.length">لا يوجد أشخاص متاحون ضمن الأسرة أو الفئة الحالية.</p>
+        <label>الأشخاص المستهدفون</label>
+        <input
+          type="text"
+          [(ngModel)]="grantTargetSearch"
+          (ngModelChange)="onGrantTargetSearchChange()"
+          placeholder="ابحث باسم الشخص أو الأسرة..."
+        />
+        <div class="grant-target-options" *ngIf="filteredGrantTargetList.length; else noGrantTargets">
+          <button
+            type="button"
+            class="grant-target-option"
+            *ngFor="let u of filteredGrantTargetList"
+            (click)="addGrantTarget(u.id)"
+          >
+            <div>
+              <div class="grant-target-option__name">{{ u.fullName }}</div>
+              <div class="grant-target-option__meta">{{ familyLabel(u) || u.deaconFamily || 'بدون أسرة' }}</div>
+            </div>
+          </button>
+        </div>
+        <ng-template #noGrantTargets>
+          <div></div>
+        </ng-template>
+
+        <div class="custom-editor-chips" *ngIf="selectedGrantTargetList.length; else noSelectedGrantTargets">
+          <div class="custom-editor-chip" *ngFor="let u of selectedGrantTargetList">
+            <span>{{ u.fullName }}</span>
+            <button type="button" class="custom-editor-chip__remove" (click)="removeGrantTarget(u.id)" aria-label="حذف الشخص">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+        </div>
+        <ng-template #noSelectedGrantTargets>
+          <div></div>
+        </ng-template>
       </div>
 
-      <div class="form-group grant-family-group">
-        <label>الأسرة الأساسية</label>
-        <input
-          *ngIf="grantAudience === 'MEMBERS'"
-          type="text"
-          [(ngModel)]="grantForm.familyBase"
-          [readonly]="true"
-          [class.readonly-input]="true"
-          placeholder="هتتحدد تلقائيًا من أسرة المخدوم"
-        />
-        <div class="grant-family-layout" *ngIf="grantAudience === 'SERVANTS'">
-          <div class="grant-family-summary">
-            <span>الأسر المختارة</span>
-            <b>{{ grantFamilySelections.length || 0 }}</b>
+      <div class="grant-dialog-existing full-width" *ngIf="grantDialogMode === 'edit' && editingGrantGroup() as editGroup">
+        <div class="grant-dialog-existing__title">التخصيص الذي يتم تعديله حالياً</div>
+        <div class="grant-card grant-card--compact">
+          <div class="grant-card__top">
+            <div>
+              <div class="grant-kind">{{ editGroup.first.grantKind === 'SELF_CHECKIN' ? 'مخدومين' : 'خدام' }}</div>
+              <div class="grant-target">{{ editGroup.targetNames || 'بدون اسم' }}</div>
+            </div>
+            <span class="grant-enabled" [class.off]="editGroup.first.enabled === false">{{ editGroup.first.enabled === false ? 'معطل' : 'مفعل' }}</span>
           </div>
-          <div class="grant-family-checks">
-            <label class="grant-family-check" *ngFor="let family of families">
-              <input type="checkbox" [checked]="hasGrantFamilySelection(family)" (change)="toggleGrantFamilySelection(family)" />
-              <span>{{ family }}</span>
-            </label>
+          <div class="grant-meta">
+            <div><b>عدد الأشخاص:</b> {{ editGroup.grants.length }}</div>
+            <div><b>النوع:</b> <span *ngFor="let t of editGroup.first.allowedTypes; let last = last">{{ displayTypeLabel(t) }}{{ last ? '' : ' + ' }}</span></div>
+            <div><b>الأسماء:</b> {{ editGroup.targetNames }}</div>
+            <div><b>الأسر:</b> {{ grantFamilyLabel(editGroup.first.familyBase) }}</div>
+            <div><b>اليوم:</b> {{ grantGroupDayLabel(editGroup) }}</div>
+            <div><b>من:</b> {{ editGroup.first.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+            <div><b>إلى:</b> {{ editGroup.first.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+            <div *ngIf="grantGroupNotesText(editGroup)"><b>ملاحظة:</b> {{ grantGroupNotesText(editGroup) }}</div>
           </div>
         </div>
       </div>
 
-      <div class="form-group">
-        <label>من</label>
-        <p-datepicker
-          [(ngModel)]="grantStartsAtDate"
-          (ngModelChange)="onGrantStartDateChange($event)"
-          [showIcon]="true"
-          [showTime]="true"
-          hourFormat="12"
-          [stepMinute]="5"
-          appendTo="body"
-          panelStyleClass="attendanceGrantDatePanel"
-          placeholder="اختر اليوم والوقت"
-        ></p-datepicker>
-      </div>
-
-      <div class="form-group">
-        <label>إلى</label>
-        <p-datepicker
-          [(ngModel)]="grantEndsAtDate"
-          (ngModelChange)="onGrantEndDateChange($event)"
-          [showIcon]="true"
-          [showTime]="true"
-          hourFormat="12"
-          [stepMinute]="5"
-          appendTo="body"
-          panelStyleClass="attendanceGrantDatePanel"
-          placeholder="اختر اليوم والوقت"
-        ></p-datepicker>
-      </div>
+      <ng-container *ngIf="dialogExistingGrantGroups() as existingGroups">
+        <div class="grant-dialog-existing grant-dialog-existing--scrollbox full-width">
+          <div class="grant-dialog-existing__title">{{ dialogExistingGrantTitle() }}</div>
+          <div class="grant-list grant-list--dialog" *ngIf="existingGroups.length; else noExistingTargetGrants">
+            <div class="grant-card grant-card--compact" *ngFor="let group of existingGroups">
+              <div class="grant-card__top">
+                <div>
+                  <div class="grant-kind">{{ group.first.grantKind === 'SELF_CHECKIN' ? 'مخدومين' : 'خدام' }}</div>
+                  <div class="grant-target">{{ group.targetNames || 'بدون اسم' }}</div>
+                </div>
+                <span class="grant-enabled" [class.off]="group.first.enabled === false">{{ group.first.enabled === false ? 'معطل' : 'مفعل' }}</span>
+              </div>
+              <div class="grant-meta">
+                <div><b>عدد الأشخاص:</b> {{ group.grants.length }}</div>
+                <div><b>الأسماء:</b> {{ group.targetNames || 'بدون اسم' }}</div>
+                <div><b>النوع:</b> <span *ngFor="let t of group.first.allowedTypes; let last = last">{{ displayTypeLabel(t) }}{{ last ? '' : ' + ' }}</span></div>
+                <div><b>اليوم:</b> {{ grantGroupDayLabel(group) }}</div>
+                <div><b>من:</b> {{ group.first.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                <div><b>إلى:</b> {{ group.first.endsAt | date:'yyyy-MM-dd HH:mm' }}</div>
+                <div *ngIf="grantGroupNotesText(group)"><b>ملاحظة:</b> {{ grantGroupNotesText(group) }}</div>
+              </div>
+              <div class="grant-actions">
+                <button type="button" class="mini-btn" (click)="openEditGrantGroup(group)">
+                  <i class="pi pi-pencil"></i>
+                  تعديل
+                </button>
+                <button type="button" class="mini-btn danger" (click)="deleteGrantGroup(group)">
+                  <i class="pi pi-trash"></i>
+                  حذف
+                </button>
+              </div>
+            </div>
+          </div>
+          <ng-template #noExistingTargetGrants>
+            <p class="hint">{{ dialogExistingGrantHint() }}</p>
+          </ng-template>
+        </div>
+      </ng-container>
 
       <div class="form-group checkbox-wrap">
         <label class="checkbox-label">
@@ -754,18 +759,89 @@
       </div>
     </div>
 
-    <div class="form-group full-width" *ngIf="false">
-      <label>المناسبات المسموح بها</label>
+    <div class="form-group full-width grant-occasion-group">
+      <label>النوع</label>
       <div class="type-grid">
         <button
           type="button"
           class="type-toggle"
-          *ngFor="let opt of grantTypeOptions()"
-          [class.active]="hasGrantType(opt.value)"
-          (click)="toggleGrantType(opt.value)"
+          *ngFor="let option of grantOccasionOptionList"
+          [class.active]="grantSelectedOccasionKey === option.key"
+          (click)="selectGrantOccasion(option)"
         >
-          {{ opt.label }}
+          {{ option.label }}
         </button>
+      </div>
+
+      <div class="grant-weekdays" *ngIf="grantWeekdayOptionList.length">
+        <span class="grant-weekdays__label">اليوم</span>
+        <div class="grant-weekdays__chips">
+          <button
+            type="button"
+            class="grant-weekdays__chip"
+            *ngFor="let day of grantWeekdayOptionList"
+            [class.active]="grantSelectedWeekday === day"
+            (click)="selectGrantWeekday(day)"
+          >
+            {{ dayLabel(day) }}
+          </button>
+        </div>
+      </div>
+
+      <div class="grant-day-windows" *ngIf="selectedGrantWindowValue as window">
+        <div class="grant-day-window">
+          <div class="grant-day-window__title">{{ dayLabel(window.day) }}</div>
+          <div class="grant-day-window__grid">
+            <div class="form-group">
+              <label>من</label>
+              <p-datepicker
+                [ngModel]="window.startsAt"
+                (ngModelChange)="onGrantWindowStartChange(window.day, $event)"
+                [disabledDays]="grantNoDisabledDays"
+                [showIcon]="true"
+                [showTime]="true"
+                [showOtherMonths]="true"
+                [selectOtherMonths]="true"
+                [showButtonBar]="true"
+                [autoZIndex]="false"
+                [baseZIndex]="20000"
+                hourFormat="12"
+                [stepMinute]="5"
+                appendTo="body"
+                panelStyleClass="attendanceGrantDatePanel"
+                placeholder="اختر اليوم والوقت"
+              ></p-datepicker>
+            </div>
+
+            <div class="form-group">
+              <label>إلى</label>
+              <p-datepicker
+                [ngModel]="window.endsAt"
+                (ngModelChange)="onGrantWindowEndChange(window.day, $event)"
+                [disabledDays]="grantNoDisabledDays"
+                [showIcon]="true"
+                [showTime]="true"
+                [showOtherMonths]="true"
+                [selectOtherMonths]="true"
+                [showButtonBar]="true"
+                [autoZIndex]="false"
+                [baseZIndex]="20000"
+                hourFormat="12"
+                [stepMinute]="5"
+                appendTo="body"
+                panelStyleClass="attendanceGrantDatePanel"
+                placeholder="اختر اليوم والوقت"
+              ></p-datepicker>
+            </div>
+          </div>
+
+          <div class="grant-day-window__actions">
+            <button type="button" class="action-btn" (click)="saveGrant()">
+              <i class="pi pi-check"></i>
+              حفظ {{ dayLabel(window.day) }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -773,14 +849,15 @@
       <label>ملاحظة اختيارية</label>
       <textarea rows="3" [(ngModel)]="grantForm.note" placeholder="مثال: فتح تسجيل القداس فقط من 7:00 إلى 9:30 صباحًا"></textarea>
     </div>
+
   </div>
 
   <ng-template pTemplate="footer">
     <div class="dialog-footer">
       <button type="button" class="mini-btn" (click)="grantDialogVisible = false">إلغاء</button>
-      <button type="button" class="action-btn" (click)="saveGrant()">
+      <button type="button" class="action-btn" (click)="saveGrant(true)">
         <i class="pi pi-check"></i>
-        حفظ التخصيص
+        حفظ نهائي
       </button>
     </div>
   </ng-template>
@@ -799,13 +876,13 @@
 >
   <div class="dialog-body">
     <div class="dialog-grid">
-      <div class="form-group">
+      <div class="form-group" *ngIf="isAminKhedmaOrDeveloper()">
         <label>الأسرة / الخورس</label>
         <select *ngIf="!isCustomEventFamilyLocked(); else lockedCustomEventFamily" [(ngModel)]="customEventForm.familyBase" (ngModelChange)="onCustomEventFamilyChange()">
           <option *ngFor="let family of customEventFamilyOptions()" [value]="family.value">{{ family.label }}</option>
         </select>
         <ng-template #lockedCustomEventFamily>
-          <div class="readonly-box">{{ customEventForm.familyBase || customEventFamilyOptions()[0]?.label || 'غير محددة' }}</div>
+          <div class="readonly-box">{{ customEventFamilyLabel() }}</div>
         </ng-template>
       </div>
 
@@ -829,12 +906,28 @@
         <p class="hint" *ngIf="customEventForm.enabled === false">المناسبة هتفضل موجودة بحالة pending ومش هتظهر للتسجيل غير لما تتفعل.</p>
       </div>
 
-      <div class="form-group" *ngIf="customEventForm.familyBase">
+      <div class="form-group full-width" *ngIf="canManageCustomEventEditors()">
         <label>الخدام المسموح لهم بالتعديل</label>
-        <select [(ngModel)]="customEventEditorPickerId" (ngModelChange)="onCustomEventPermittedEditorPick($event)">
-          <option [ngValue]="null">اختر خادم لإضافته</option>
-          <option *ngFor="let servant of remainingCustomEventEditorTargets()" [ngValue]="servant.id">{{ servant.fullName }}</option>
-        </select>
+        <input
+          type="text"
+          [(ngModel)]="customEventEditorSearch"
+          placeholder="ابحث باسم الشخص أو الأسرة..."
+        />
+        <div class="custom-editor-options" *ngIf="filteredCustomEventEditorTargets().length; else noCustomEventEditorTargets">
+          <button
+            type="button"
+            class="custom-editor-option"
+            *ngFor="let servant of filteredCustomEventEditorTargets()"
+            (click)="addCustomEventEditor(servant.id)"
+          >
+            <span>{{ servant.fullName }}</span>
+            <small>{{ servant.familyName || servant.deaconFamily || 'خادم' }}</small>
+          </button>
+        </div>
+        <ng-template #noCustomEventEditorTargets>
+          <p class="hint">لا يوجد خدام متاحين للإضافة في النطاق الحالي.</p>
+        </ng-template>
+
         <div class="custom-editor-chips" *ngIf="selectedCustomEventEditors().length; else noCustomEventEditors">
           <div class="custom-editor-chip" *ngFor="let servant of selectedCustomEventEditors()">
             <span>{{ servant.fullName }}</span>
@@ -897,4 +990,3 @@
     </div>
   </ng-template>
 </p-dialog>
-

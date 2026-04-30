@@ -19,9 +19,12 @@
 
   <div class="top" *ngIf="canSelectFamily() && families?.length">
     <label>الأسرة</label>
-    <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+    <select *ngIf="families.length > 1; else singleFamilyView" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
       <option *ngFor="let f of families" [value]="f">{{ f }}</option>
     </select>
+    <ng-template #singleFamilyView>
+      <div class="singleSelectValue">{{ selectedFamily || families[0] }}</div>
+    </ng-template>
   </div>
 
   <div class="actions">

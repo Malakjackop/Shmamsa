@@ -77,12 +77,18 @@ export type AttendanceAccessGrant = {
   familyId?: number | null;
   familyBase?: string | null;
   allowedTypes: AttendanceType[];
+  dayOfWeek?: number | null;
   note?: string | null;
   startsAt: string;
   endsAt: string;
   enabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  active?: boolean;
+  upcoming?: boolean;
+  ended?: boolean;
+  startsInSeconds?: number | null;
+  endsInSeconds?: number | null;
 };
 
 export type AttendanceContext = {
@@ -163,7 +169,8 @@ export class AttendanceService {
   daily(
     date: string,
     type: AttendanceType,
-    family?: string
+    family?: string,
+    customTitle?: string
   ): Observable<DailyAttendanceResponse> {
     if (!this.isBrowser) {
       return of({
@@ -182,14 +189,21 @@ export class AttendanceService {
     }
     const params: Record<string, string> = { date, type };
     if (family) params['family'] = family;
+    if (customTitle) params['customTitle'] = customTitle;
     return this.http.get<DailyAttendanceResponse>(`${this.baseUrl}/daily`, { params, withCredentials: true });
   }
 
-  markAbsent(userId: number, date: string, type: AttendanceType, family?: string): Observable<AttendanceMutationResponse> {
+  markAbsent(
+    userId: number,
+    date: string,
+    type: AttendanceType,
+    family?: string,
+    customTitle?: string
+  ): Observable<AttendanceMutationResponse> {
     if (!this.isBrowser) return of(null);
     return this.http.post<AttendanceMutationResponse>(
       `${this.baseUrl}/mark-absent`,
-      { userId, date, type, family },
+      { userId, date, type, family, customTitle },
       { withCredentials: true }
     );
   }

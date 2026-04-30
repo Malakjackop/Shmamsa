@@ -8,7 +8,7 @@ import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { hasRole, normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
 import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
-import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
+import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
 import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
@@ -738,7 +738,7 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   private isKhorsFamilySelected(): boolean {
-    return !!this.getSelectedKhorsCode();
+    return !!this.selectedKhorsCode();
   }
 
   private getSelectedKhorsCode(): 'MARMARKOS' | 'ATHANASIUS' | '' {
@@ -756,9 +756,17 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   private filterRequestsBySelectedKhors(list: KhorsJoinRequestView[]): KhorsJoinRequestView[] {
-    const selected = this.getSelectedKhorsCode();
+    const selected = this.selectedKhorsCode();
     if (!selected) return [];
     return (list || []).filter((x) => String(x?.requestedKhors || '').toUpperCase() === selected);
+  }
+
+  private selectedKhorsCode(): 'MARMARKOS' | 'ATHANASIUS' | '' {
+    const fam = canonicalFamilyName(String(this.selectedFamily || '').trim());
+    if (!fam) return '';
+    if (fam.includes('مارمرقس')) return 'MARMARKOS';
+    if (fam.includes('اثناسيوس') || fam.includes('أثناسيوس')) return 'ATHANASIUS';
+    return '';
   }
 }
 

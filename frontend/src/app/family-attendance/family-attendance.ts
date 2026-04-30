@@ -2,7 +2,7 @@
 import { FamilyService } from '../services/family.service';
 import { AuthService, AuthUser } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
-import { AttendanceService, type AttendanceType, type DailyAttendanceResponse } from '../services/attendance.service';
+import { AttendanceService, type AttendanceType, type DailyAttendanceResponse, type AttendanceCustomEvent } from '../services/attendance.service';
 import { IftekadService, type IftekadVisitRecord } from '../services/iftekad.service';
 import { normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
 import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
@@ -59,6 +59,8 @@ type AttendanceRow = {
   createdAt?: string;
   status?: 'PRESENT' | 'ABSENT';
   takenBy?: { id: number; fullName: string; role: string } | null;
+  customTitle?: string;
+  title?: string;
 };
 
 type IftekadVisitView = {
@@ -128,7 +130,8 @@ export class FamilyAttendanceComponent implements OnInit {
     'FRIDAY_LITURGY',
     'MARMARKOS_KHORS',
     'ATHANASIUS_KHORS',
-    'FAMILY_MEETING'
+    'FAMILY_MEETING',
+    'CUSTOM_EVENT'
   ];
 
   private familySvc = inject(FamilyService);
@@ -171,6 +174,9 @@ export class FamilyAttendanceComponent implements OnInit {
   dailyAbsent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
   dailyMaxDate: Date = this.buildDailyMaxDate();
   dailyDisabledWeekDays: number[] = [0, 1, 2, 3]; // الأحد - الاثنين - الثلاثاء - الأربعاء
+  familyCustomEvents: AttendanceCustomEvent[] = [];
+  availableDailyCustomEvents: AttendanceCustomEvent[] = [];
+  selectedDailyCustomEventId: number | '' = '';
 
   arDatePickerLocale = {
     firstDayOfWeek: 1,
@@ -257,6 +263,22 @@ export class FamilyAttendanceComponent implements OnInit {
     return normalizeRole(this.me?.role) === 'KHADIM';
   }
 
+  private mainFamily(name: string): string {
+    if (!name) return '';
+    const f = String(name).trim();
+    if (f.endsWith(' أ')) return f.slice(0, -2).trim();
+    if (f.endsWith(' ب')) return f.slice(0, -2).trim();
+    return f;
+  }
+
+  private hasAminOsraScopeForFamily(family: string): boolean {
+    const target = this.mainFamily(String(family || '').trim()).toUpperCase();
+    if (!target) return false;
+    return this.assignmentsOf(this.me).some((x) =>
+      x.role === 'AMIN_OSRA' && this.mainFamily(String(x.familyName || '').trim()).toUpperCase() === target
+    );
+  }
+
   private assignmentsOf(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): Array<{ familyName: string; role: string }> {
     const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
     return assignments
@@ -282,22 +304,26 @@ export class FamilyAttendanceComponent implements OnInit {
           this.families = sortFamiliesByPreferredOrder(f || [], this.preferredFamilyOrder);
           if (this.families.length) {
             this.selectedFamily = this.families[0];
+            this.loadFamilyCustomEvents();
             this.loadMembers();
           }
         },
         error: () => {
           this.families = [];
           this.selectedFamily = '';
+          this.loadFamilyCustomEvents();
           this.loadMembers();
         }
       });
     } else {
       this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
+      this.loadFamilyCustomEvents();
       this.loadMembers();
     }
   }
 
   onFamilyChange() {
+    this.loadFamilyCustomEvents();
     this.loadMembers();
   }
 
@@ -397,13 +423,31 @@ export class FamilyAttendanceComponent implements OnInit {
     const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
 
     this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
-      next: (d) => (this.details = this.filterOutArchivedRows((d || []) as AttendanceRow[])),
+      next: (d) => (this.details = this.mapAttendanceRows(d || [])),
       error: () => (this.details = [])
     });
   }
 
-  private filterOutArchivedRows(rows: AttendanceRow[]): AttendanceRow[] {
-    return (Array.isArray(rows) ? rows : []).filter((r) => !this.isArchivedRow(r)) as AttendanceRow[];
+  private mapAttendanceRows(rows: any[]): AttendanceRow[] {
+    return (Array.isArray(rows) ? rows : [])
+      .filter((r) => !this.isArchivedRow(r))
+      .map((row) => ({
+        id: Number(row?.id ?? row?.attendanceId ?? 0),
+        type: String(row?.type ?? row?.attendanceType ?? 'FAMILY_MEETING') as AttendanceType,
+        date: String(row?.date ?? row?.attendanceDate ?? row?.day ?? ''),
+        time: row?.time ? String(row.time) : row?.attendanceTime ? String(row.attendanceTime) : undefined,
+        createdAt: row?.createdAt ? String(row.createdAt) : undefined,
+        status: row?.status === 'ABSENT' ? 'ABSENT' : row?.status === 'PRESENT' ? 'PRESENT' : undefined,
+        takenBy: row?.takenBy && typeof row.takenBy === 'object'
+          ? {
+              id: Number(row.takenBy.id ?? 0),
+              fullName: String(row.takenBy.fullName ?? ''),
+              role: String(row.takenBy.role ?? '')
+            }
+          : null,
+        customTitle: String(row?.customTitle ?? row?.title ?? '').trim() || undefined,
+        title: String(row?.title ?? row?.customTitle ?? '').trim() || undefined
+      }));
   }
 
   private isArchivedRow(row: AttendanceRow & AttendanceArchiveLike): boolean {
@@ -473,7 +517,15 @@ export class FamilyAttendanceComponent implements OnInit {
     if (t === 'FRIDAY_LITURGY') return 'قداس الجمعة';
     if (t === 'MARMARKOS_KHORS') return 'خورس مارمرقس';
     if (t === 'ATHANASIUS_KHORS') return 'خورس البابا اثناسيوس';
+    if (t === 'CUSTOM_EVENT') return 'مناسبة مخصصة';
     return 'اجتماع الأسرة';
+  }
+
+  attendanceRowLabel(row: AttendanceRow): string {
+    if (row.type === 'CUSTOM_EVENT') {
+      return String(row.customTitle || row.title || '').trim() || 'مناسبة مخصصة';
+    }
+    return this.titleForType(row.type);
   }
 
   private statusAr(v?: AttendanceRow['status'] | string): string {
@@ -682,6 +734,8 @@ export class FamilyAttendanceComponent implements OnInit {
     this.dailyPresentCount = 0;
     this.dailyAbsentCount = 0;
     this.dailyRecordsCount = 0;
+    this.availableDailyCustomEvents = [];
+    this.selectedDailyCustomEventId = '';
     this.showDailyRemoveConfirm = false;
     this.dailyRemoveTarget = null;
     this.dailyRemoveSaving = false;
@@ -805,6 +859,61 @@ export class FamilyAttendanceComponent implements OnInit {
     return this.assignmentsOf(this.me)[0]?.familyName;
   }
 
+  private loadFamilyCustomEvents(): void {
+    const familyBase = this.dailyFamilyParam();
+    if (!familyBase) {
+      this.familyCustomEvents = [];
+      this.refreshDailyCustomEvents();
+      return;
+    }
+
+    this.attendanceSvc.listCustomEvents(familyBase).subscribe({
+      next: (events) => {
+        this.familyCustomEvents = (events || []).filter((event) => this.canManageCustomEvent(event));
+        this.refreshDailyCustomEvents();
+      },
+      error: () => {
+        this.familyCustomEvents = [];
+        this.refreshDailyCustomEvents();
+      }
+    });
+  }
+
+  private canManageCustomEvent(event: AttendanceCustomEvent | null | undefined): boolean {
+    if (!event) return false;
+    if (this.isAminKhedmaOrDev()) return true;
+
+    const myId = Number(this.me?.['id'] || 0);
+    if (Number(event.createdById || 0) === myId) return true;
+    if (Number(event.permittedEditorId || 0) === myId) return true;
+    if ((event.permittedEditorIds || []).includes(myId)) return true;
+    if ((event.permittedEditors || []).some((editor) => Number(editor?.id || 0) === myId)) return true;
+
+    const familyBase = String(event.familyBase || this.dailyFamilyParam() || '').trim();
+    return this.hasAminOsraScopeForFamily(familyBase);
+  }
+
+  private refreshDailyCustomEvents(): void {
+    const selectedDate = this.toDateValue(this.dailyDate);
+    const dayOfWeek = selectedDate?.getDay();
+    const currentId = Number(this.selectedDailyCustomEventId || 0);
+
+    this.availableDailyCustomEvents = (this.familyCustomEvents || []).filter((event) => {
+      if (!event || event.enabled === false) return false;
+      if (dayOfWeek === undefined || dayOfWeek === null) return true;
+      return Number(event.dayOfWeek) === dayOfWeek;
+    });
+
+    const currentStillAvailable = this.availableDailyCustomEvents.some((event) => Number(event.id || 0) === currentId);
+    this.selectedDailyCustomEventId = currentStillAvailable ? currentId : (this.availableDailyCustomEvents[0]?.id || '');
+  }
+
+  selectedDailyCustomEvent(): AttendanceCustomEvent | null {
+    const id = Number(this.selectedDailyCustomEventId || 0);
+    if (!id) return null;
+    return this.availableDailyCustomEvents.find((event) => Number(event.id || 0) === id) || null;
+  }
+
   private canShowDailyKhorsTypes(): boolean {
     const selected = String(this.selectedFamily || '').trim();
     if (selected === 'خورس مارمرقس' || selected === 'خورس البابا اثناسيوس') return true;
@@ -823,6 +932,9 @@ export class FamilyAttendanceComponent implements OnInit {
     const base: AttendanceType[] = this.showFamilyMeetingColumn
       ? ['FRIDAY_LITURGY', 'TASBEEHA', 'FAMILY_MEETING']
       : ['FRIDAY_LITURGY', 'TASBEEHA'];
+    if (this.availableDailyCustomEvents.length) {
+      base.push('CUSTOM_EVENT');
+    }
     if (this.canShowDailyKhorsTypes()) {
       base.push('MARMARKOS_KHORS', 'ATHANASIUS_KHORS');
     }
@@ -855,14 +967,20 @@ export class FamilyAttendanceComponent implements OnInit {
     if (t === 'ATHANASIUS_KHORS') return 'خورس البابا اثناسيوس';
     if (t === 'TASBEEHA') return 'تسبحة';
     if (t === 'FAMILY_MEETING') return 'اجتماع الأسرة';
+    if (t === 'CUSTOM_EVENT') return 'مناسبة مخصصة';
     return t;
   }
 
   onDailyDateChange() {
+    this.refreshDailyCustomEvents();
     this.reloadDaily();
   }
 
   onDailyTypeChange() {
+    this.reloadDaily();
+  }
+
+  onDailyCustomEventChange() {
     this.reloadDaily();
   }
 
@@ -886,10 +1004,24 @@ export class FamilyAttendanceComponent implements OnInit {
       return;
     }
 
+    const customTitle = this.dailyType === 'CUSTOM_EVENT'
+      ? String(this.selectedDailyCustomEvent()?.title || '').trim()
+      : undefined;
+
+    if (this.dailyType === 'CUSTOM_EVENT' && !customTitle) {
+      this.clearDailyAttendanceData();
+      this.message.add({
+        severity: 'warn',
+        summary: 'تنبيه',
+        detail: 'اختر المناسبة المخصصة أولًا.'
+      });
+      return;
+    }
+
     this.dailyLoading = true;
     const fam = this.dailyFamilyParam();
 
-    this.attendanceSvc.daily(isoDate, this.dailyType, fam).subscribe({
+    this.attendanceSvc.daily(isoDate, this.dailyType, fam, customTitle).subscribe({
       next: (res: DailyAttendanceResponse) => {
         const familyTotal = Number(this.members?.length || 0);
 
@@ -923,6 +1055,7 @@ export class FamilyAttendanceComponent implements OnInit {
     const isoDate = this.toIsoDateOnly(this.dailyDate);
     if (!this.dailyType || !isoDate) return;
     if (!this.canEditDailyAttendance()) return;
+    if (this.dailyType === 'CUSTOM_EVENT' && !this.selectedDailyCustomEvent()) return;
     this.dailyRemoveTarget = { id: p.id, fullName: p.fullName };
     this.showDailyRemoveConfirm = true;
   }
@@ -937,8 +1070,11 @@ export class FamilyAttendanceComponent implements OnInit {
     const isoDate = this.toIsoDateOnly(this.dailyDate);
     if (!this.dailyType || !isoDate || !this.dailyRemoveTarget) return;
     const fam = this.dailyFamilyParam();
+    const customTitle = this.dailyType === 'CUSTOM_EVENT'
+      ? String(this.selectedDailyCustomEvent()?.title || '').trim()
+      : undefined;
     this.dailyRemoveSaving = true;
-    this.attendanceSvc.markAbsent(this.dailyRemoveTarget.id, isoDate, this.dailyType, fam).subscribe({
+    this.attendanceSvc.markAbsent(this.dailyRemoveTarget.id, isoDate, this.dailyType, fam, customTitle).subscribe({
       next: () => {
         this.dailyRemoveSaving = false;
         this.cancelDailyRemove();

@@ -2,6 +2,7 @@
 .page{padding:16px;max-width:1100px;margin:0 auto; color: black;}
 .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 select{padding:8px;border-radius:8px;border:1px solid #ccc;}
+.singleSelectValue{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#f7f7f7;min-width:220px;font-weight:600;}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
 .tableWrap{overflow:auto;border:1px solid #eee;border-radius:12px;}
 .tbl{width:100%;border-collapse:collapse;min-width:900px;}

@@ -1,7 +1,9 @@
 package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
+import com.shmamsa.model.AttendanceAccessGrant;
 import com.shmamsa.model.AttendanceType;
+import com.shmamsa.model.AttendanceGrantKind;
 import com.shmamsa.model.CustomFieldValue;
 import com.shmamsa.model.CustomRegistrationField;
 import com.shmamsa.model.FamilyCatalog;
@@ -14,6 +16,7 @@ import com.shmamsa.repository.CustomRegistrationFieldRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.AttendanceBackfillService;
+import com.shmamsa.service.AttendanceAccessGrantService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.FamilyCatalogService;
 import com.shmamsa.service.KhorsJoinRequestService;
@@ -35,6 +38,7 @@ public class  FamilyController {
     private final AttendanceRepository attendanceRepo;
     private final KhorsJoinRequestService khorsReqService;
     private final AttendanceBackfillService attendanceBackfillService;
+    private final AttendanceAccessGrantService attendanceAccessGrantService;
     private final FamilyAccessService familyAccessService;
     private final FamilyCatalogService familyCatalogService;
     private final UserFamilyRoleService userFamilyRoleService;
@@ -95,8 +99,137 @@ public class  FamilyController {
         return familyAccessService.servingBasesOf(u);
     }
 
+    private String normalizeArabicFamilyKey(String value) {
+        return String.valueOf(value == null ? "" : value)
+                .replaceAll("[\\u064B-\\u065F\\u0670\\u0640]", "")
+                .replace("أ", "ا")
+                .replace("إ", "ا")
+                .replace("آ", "ا")
+                .replace("ة", "ه")
+                .replaceAll("\\s+", " ")
+                .trim()
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private String looseBaseNameForName(String familyName) {
+        String raw = String.valueOf(familyName == null ? "" : familyName).trim();
+        if (raw.isBlank()) return null;
+
+        String direct = familyCatalogService.baseNameForName(raw);
+        if (direct != null && !direct.isBlank()) return direct.trim();
+
+        String wanted = normalizeArabicFamilyKey(raw);
+        for (String candidate : familyCatalogService.listSelectableBaseNames()) {
+            String key = normalizeArabicFamilyKey(candidate);
+            if (key.equals(wanted) || key.contains(wanted) || wanted.contains(key)) {
+                return candidate;
+            }
+        }
+
+        // Common UI display values are shortened, for example "البابا كيرلس".
+        String withoutPrefixes = wanted
+                .replace("اسره ", "")
+                .replace("القديس ", "")
+                .replace("الانبا ", "")
+                .trim();
+        for (String candidate : familyCatalogService.listSelectableBaseNames()) {
+            String key = normalizeArabicFamilyKey(candidate)
+                    .replace("اسره ", "")
+                    .replace("القديس ", "")
+                    .replace("الانبا ", "")
+                    .trim();
+            if (key.equals(withoutPrefixes) || key.contains(withoutPrefixes) || withoutPrefixes.contains(key)) {
+                return candidate;
+            }
+        }
+
+        return raw;
+    }
+
     private List<Long> relatedFamilyIds(String familyName) {
-        return familyCatalogService.relatedIdsForSelection(familyCatalogService.baseNameForName(familyName));
+        String base = looseBaseNameForName(familyName);
+        if (base == null || base.isBlank()) return List.of();
+        return familyCatalogService.relatedIdsForSelection(base);
+    }
+
+    private String normalizedBaseKey(String familyName) {
+        String base = looseBaseNameForName(familyName);
+        if (base == null || base.isBlank()) base = String.valueOf(familyName == null ? "" : familyName).trim();
+        return normalizeArabicFamilyKey(base);
+    }
+
+    private boolean sameFamilyBaseLoose(String a, String b) {
+        String ak = normalizedBaseKey(a);
+        String bk = normalizedBaseKey(b);
+        return !ak.isBlank() && !bk.isBlank() && ak.equals(bk);
+    }
+
+    private boolean isDeveloperUser(User u) {
+        return "DEVELOPER".equalsIgnoreCase(normRole(u == null ? null : u.getRole()))
+                || "DEV".equalsIgnoreCase(normRole(u == null ? null : u.getRole()));
+    }
+
+    private String roleForSelectedFamily(User u, String base) {
+        String scoped = (base == null || base.isBlank()) ? null : familyAccessService.scopedRole(u, base);
+        return (scoped == null || scoped.isBlank()) ? u.getRole() : scoped;
+    }
+
+    private List<User> attendanceUsersForFamily(String base, List<String> roleFallback) {
+        if (base == null || base.isBlank()) return List.of();
+
+        List<User> users;
+        if (isChoirBucket(base)) {
+            String code = choirCodeFromBucket(base);
+            if (code == null || code.isBlank()) return List.of();
+
+            Map<Long, User> map = new LinkedHashMap<>();
+            for (User u : userRepo.findByKhorsAndRoleIn(code, roleFallback)) {
+                if (u != null && u.getId() != null) map.put(u.getId(), u);
+            }
+            for (User u : userRepo.findByAttendKhorsAndRoleIn(code, roleFallback)) {
+                if (u != null && u.getId() != null) map.put(u.getId(), u);
+            }
+            users = new ArrayList<>(map.values());
+        } else {
+            List<Long> ids = relatedFamilyIds(base);
+            users = ids.isEmpty() ? List.of() : userRepo.findByAnyFamilyIdIn(ids);
+        }
+
+        return users.stream()
+                .filter(Objects::nonNull)
+                .filter(u -> u.getId() != null)
+                .filter(u -> !isDeveloperUser(u))
+                .toList();
+    }
+
+    private List<String> grantFamilyList(String familyBase) {
+        String raw = String.valueOf(familyBase == null ? "" : familyBase).trim();
+        if (raw.isBlank() || "ALL".equalsIgnoreCase(raw)) return List.of();
+
+        return Arrays.stream(raw.split("[,،;|]+"))
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .map(this::looseBaseNameForName)
+                .filter(Objects::nonNull)
+                .filter(x -> !x.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private boolean grantFamilyMatches(String grantFamilyBase, String selectedFamily) {
+        String selectedBase = looseBaseNameForName(selectedFamily);
+        List<String> grantFamilies = grantFamilyList(grantFamilyBase);
+        if (grantFamilies.isEmpty()) return true;
+        if (selectedBase == null || selectedBase.isBlank()) return true;
+        return grantFamilies.stream().anyMatch(x -> sameFamilyBaseLoose(x, selectedBase));
+    }
+
+    private boolean attendanceGrantAllowsSelectedFamily(User user, String selectedFamily) {
+        if (user == null || user.getId() == null) return false;
+        return attendanceAccessGrantService.visibleGrantsForUser(user.getId()).stream()
+                .filter(g -> g.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE
+                        || g.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN)
+                .anyMatch(g -> grantFamilyMatches(g.getFamilyBase(), selectedFamily));
     }
 
     private static boolean isChoirBucket(String base) {
@@ -114,33 +247,57 @@ public class  FamilyController {
     }
 
     @GetMapping("/families")
-public ResponseEntity<?> families(
-        @RequestParam(required = false) String context,
-        Authentication auth
-) {
-    if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+    public ResponseEntity<?> families(
+            @RequestParam(required = false) String context,
+            Authentication auth
+    ) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
-    User me = userRepo.findByUsername(auth.getName()).orElse(null);
+        User me = userRepo.findByUsername(auth.getName()).orElse(null);
 
         String role = normRole(me == null ? null : me.getRole());
         boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
         boolean isKhadim = "KHADIM".equals(role);
         boolean isAminOsra = "AMIN_OSRA".equals(role);
 
-       boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+        boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
 
-    if (isKhadim && !attendanceContext) {
-        List<String> out = servingBasesOf(me);
-        out.sort(String::compareTo);
-        return ResponseEntity.ok(out);
+        if (isKhadim && !attendanceContext) {
+            List<String> out = servingBasesOf(me);
+            out.sort(String::compareTo);
+            return ResponseEntity.ok(out);
+        }
+
+
+        return ResponseEntity.ok(familyCatalogService.listSelectableBaseNames());
     }
 
 
-    return ResponseEntity.ok(familyCatalogService.listSelectableBaseNames());
-}
+    private List<Map<String, Object>> toMemberRows(List<User> members, User me, boolean includeSelf, String base) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (User u : members == null ? List.<User>of() : members) {
+            if (u == null || u.getId() == null) continue;
+            if (!includeSelf && me != null && me.getId() != null && me.getId().equals(u.getId())) continue;
 
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", u.getId());
+            row.put("fullName", u.getFullName());
+            row.put("role", roleForSelectedFamily(u, base));
+            row.put("deaconFamily", familyAccessService.primaryFamilyName(u));
+            row.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
+            row.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
+            row.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
+            row.put("deaconFamilyRole", familyAccessService.primaryFamilyRole(u));
+            row.put("deaconFamilyRole2", familyAccessService.secondaryFamilyRole(u));
+            row.put("deaconFamilyRole3", familyAccessService.thirdFamilyRole(u));
+            row.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(u));
+            row.put("familyAssignments", userFamilyRoleService.getAssignments(u));
+            out.add(row);
+        }
+        return out;
+    }
 
-@GetMapping("/members")
+    @GetMapping("/members")
 
     public ResponseEntity<?> members(
             @RequestParam(required = false) String family,
@@ -153,91 +310,114 @@ public ResponseEntity<?> families(
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-    String role = normRole(me.getRole());
-    boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
-    boolean isAminOsra = "AMIN_OSRA".equals(role);
-    boolean isKhadim = "KHADIM".equals(role);
+        String role = normRole(me.getRole());
+        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
+        boolean isAminOsra = "AMIN_OSRA".equals(role);
+        boolean isKhadim = "KHADIM".equals(role);
 
         boolean servantsBucket = isAminKhedmaOrDev && family != null && "SERVANTS".equalsIgnoreCase(family.trim());
 
 
-boolean hasFamilySelection = family != null && !family.isBlank();
+        boolean hasFamilySelection = family != null && !family.isBlank();
 
-String effectiveRole = hasFamilySelection ? effectiveRoleIn(me, family) : role;
-boolean effIsAminOsra = "AMIN_OSRA".equals(effectiveRole);
+        String effectiveRole = hasFamilySelection ? effectiveRoleIn(me, family) : role;
+        boolean effIsAminOsra = "AMIN_OSRA".equals(effectiveRole);
 
-boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
-boolean aminOsraAttendanceContext = effIsAminOsra && hasFamilySelection && attendanceContext;
+        boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+        boolean hasTakeAttendanceGrant = attendanceContext && attendanceAccessGrantService.hasVisibleGrant(me.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
+        boolean hasSelfAttendanceGrant = attendanceContext && attendanceAccessGrantService.hasVisibleGrant(me.getId(), AttendanceGrantKind.SELF_CHECKIN);
+        boolean hasAnyAttendanceGrant = hasTakeAttendanceGrant || hasSelfAttendanceGrant;
+        boolean grantSelectedContext = attendanceContext && hasFamilySelection && attendanceGrantAllowsSelectedFamily(me, family);
+        boolean delegatedTakeAttendanceContext = attendanceContext && hasFamilySelection && hasTakeAttendanceGrant && attendanceGrantAllowsSelectedFamily(me, family);
+        boolean aminOsraAttendanceContext = effIsAminOsra && hasFamilySelection && attendanceContext;
 
-if (isKhadim && hasFamilySelection && !attendanceContext) {
-    String selectedBase = familyCatalogService.baseNameForName(family);
-    List<String> myBases = servingBasesOf(me);
-    if (selectedBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(selectedBase))) {
-        throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-    }
-}
+        if (isKhadim && hasFamilySelection && !attendanceContext) {
+            String selectedBase = looseBaseNameForName(family);
+            List<String> myBases = servingBasesOf(me);
+            if (selectedBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(selectedBase))) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            }
+        }
 
-    boolean khadimSelectedContext = isKhadim && hasFamilySelection;
+        boolean khadimSelectedContext = isKhadim && hasFamilySelection;
 
-    boolean canSelectFamily = isAminKhedmaOrDev || khadimSelectedContext || aminOsraAttendanceContext || effIsAminOsra;
+        boolean canSelectFamily = isAminKhedmaOrDev || khadimSelectedContext || aminOsraAttendanceContext || effIsAminOsra || grantSelectedContext || delegatedTakeAttendanceContext;
 
-    String target = (canSelectFamily && hasFamilySelection)
-            ? family
-            : baseFamilyOf(me);
-    String base = servantsBucket ? null : familyCatalogService.baseNameForName(target);
+        // Attendance grants for normal members should behave like a delegated attendance page:
+        // allow loading the selected family members (makhdomeen + servants + family leaders)
+        // only when the selected family is covered by the grant scope.
+        if (delegatedTakeAttendanceContext && !isAminKhedmaOrDev && !isKhadim && !effIsAminOsra) {
+            String grantBase = looseBaseNameForName(family);
+            List<String> allRoles = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+            List<User> grantMembers = attendanceUsersForFamily(grantBase, allRoles);
+            return ResponseEntity.ok(toMemberRows(grantMembers, me, includeSelf, grantBase));
+        }
 
-    if (base != null) base = base.trim();
-    List<String> rolesToShow;
-    if (isAminKhedmaOrDev) {
-        rolesToShow = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
-    } else if (effIsAminOsra) {
-        rolesToShow = attendanceContext
-                ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
-                : expandRoles(List.of("MAKHDOM", "KHADIM"));
-    } else if (isKhadim) {
-        rolesToShow = attendanceContext
-                ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
-                : expandRoles(List.of("MAKHDOM"));
-    } else {
-        rolesToShow = expandRoles(List.of("MAKHDOM"));
-    }
+        String target = (canSelectFamily && hasFamilySelection)
+                ? family
+                : baseFamilyOf(me);
+        String base = servantsBucket ? null : looseBaseNameForName(target);
 
-    // ✅ If viewing a choir bucket explicitly (Mar Markos / Baba Athanasius), show ALL account roles
-    //    (KHADIM + MAKHDOM + AMIN_OSRA + AMIN_KHEDMA) regardless of viewer role/mode.
-    if (!servantsBucket && hasFamilySelection && isChoirBucket(base)) {
-        rolesToShow = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
-    }
+        if (base != null) base = base.trim();
+        List<String> rolesToShow;
+        if (isAminKhedmaOrDev) {
+            rolesToShow = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+        } else if (effIsAminOsra) {
+            rolesToShow = attendanceContext
+                    ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
+                    : expandRoles(List.of("MAKHDOM", "KHADIM"));
+        } else if (isKhadim) {
+            rolesToShow = attendanceContext
+                    ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
+                    : expandRoles(List.of("MAKHDOM"));
+        } else {
+            rolesToShow = hasAnyAttendanceGrant
+                    ? expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"))
+                    : expandRoles(List.of("MAKHDOM"));
+        }
+
+        // ✅ If viewing a choir bucket explicitly (Mar Markos / Baba Athanasius), show ALL account roles
+        //    (KHADIM + MAKHDOM + AMIN_OSRA + AMIN_KHEDMA) regardless of viewer role/mode.
+        if (!servantsBucket && hasFamilySelection && isChoirBucket(base)) {
+            rolesToShow = expandRoles(List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+        }
 
         List<User> members;
-if (servantsBucket) {
-    members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
-} else if (isKhadim && !hasFamilySelection) {
-    List<String> myBases = servingBasesOf(me);
-    Map<Long, User> uniq = new LinkedHashMap<>();
-    for (String b : myBases) {
-        List<Long> ids = relatedFamilyIds(b);
-        for (User u : userRepo.findByAnyFamilyIdInAndRoleIn(ids, rolesToShow)) {
-            if (u.getId() != null) uniq.put(u.getId(), u);
+        if (servantsBucket) {
+            members = userRepo.findByRoleIn(List.of("KHADIM", "AMIN_OSRA", "AMIN_KHEDMA"));
+        } else if (isKhadim && !hasFamilySelection) {
+            List<String> myBases = servingBasesOf(me);
+            Map<Long, User> uniq = new LinkedHashMap<>();
+            for (String b : myBases) {
+                List<Long> ids = relatedFamilyIds(b);
+                for (User u : userRepo.findByAnyFamilyIdInAndRoleIn(ids, rolesToShow)) {
+                    if (u.getId() != null) uniq.put(u.getId(), u);
+                }
+            }
+            members = new ArrayList<>(uniq.values());
+        } else {
+            if (isChoirBucket(base)) {
+                String code = choirCodeFromBucket(base);
+
+                List<User> a = userRepo.findByKhorsAndRoleIn(code, rolesToShow);
+                List<User> b = userRepo.findByAttendKhorsAndRoleIn(code, rolesToShow);
+
+                Map<Long, User> map = new LinkedHashMap<>();
+                for (User u : a) map.put(u.getId(), u);
+                for (User u : b) map.put(u.getId(), u);
+
+                members = new ArrayList<>(map.values());
+            } else {
+                List<Long> ids = relatedFamilyIds(base);
+                boolean useAssignmentRoles = attendanceContext
+                        && (isAminKhedmaOrDev || isKhadim || effIsAminOsra || hasAnyAttendanceGrant);
+                members = ids.isEmpty()
+                        ? List.of()
+                        : (useAssignmentRoles
+                        ? attendanceUsersForFamily(base, rolesToShow)
+                        : userRepo.findByAnyFamilyIdInAndRoleIn(ids, rolesToShow));
+            }
         }
-    }
-    members = new ArrayList<>(uniq.values());
-} else {
-    if (isChoirBucket(base)) {
-        String code = choirCodeFromBucket(base);
-
-        List<User> a = userRepo.findByKhorsAndRoleIn(code, rolesToShow);
-        List<User> b = userRepo.findByAttendKhorsAndRoleIn(code, rolesToShow);
-
-        Map<Long, User> map = new LinkedHashMap<>();
-        for (User u : a) map.put(u.getId(), u);
-        for (User u : b) map.put(u.getId(), u);
-
-        members = new ArrayList<>(map.values());
-    } else {
-        List<Long> ids = relatedFamilyIds(base);
-        members = userRepo.findByAnyFamilyIdInAndRoleIn(ids, rolesToShow);
-    }
-}
 
         // ✅ عند اختيار خورس اثناسيوس (البابا/الانبا): استبعد زوار النقل (علشان العدد كبير)
         if (!servantsBucket && hasFamilySelection && base != null &&
@@ -274,7 +454,7 @@ if (servantsBucket) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", u.getId());
             row.put("fullName", u.getFullName());
-            row.put("role", u.getRole());
+            row.put("role", roleForSelectedFamily(u, base));
             row.put("deaconFamily", familyAccessService.primaryFamilyName(u));
             row.put("deaconFamily2", familyAccessService.secondaryFamilyName(u));
             row.put("deaconFamily3", familyAccessService.thirdFamilyName(u));
@@ -333,17 +513,17 @@ if (servantsBucket) {
         String uBase = familyBaseMatch(u, base);
 
         if (!isAminKhedmaOrDev) {
-    if (isKhadim) {
-        List<String> myBases = servingBasesOf(me);
-        if (uBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(uBase))) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+            if (isKhadim) {
+                List<String> myBases = servingBasesOf(me);
+                if (uBase == null || myBases.stream().noneMatch(b -> b.equalsIgnoreCase(uBase))) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+                }
+            } else {
+                if (base == null || uBase == null || !base.equals(uBase)) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+                }
+            }
         }
-    } else {
-        if (base == null || uBase == null || !base.equals(uBase)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-        }
-    }
-}
 
         boolean includeSensitive = canViewSensitiveMemberDetails(me, u);
         Map<String, Object> dto = new LinkedHashMap<>();
@@ -1068,5 +1248,5 @@ if (servantsBucket) {
         FamilyCatalog family = familyCatalogService.findByName(name);
         return family == null ? null : family.getId();
     }
-    
+
 }

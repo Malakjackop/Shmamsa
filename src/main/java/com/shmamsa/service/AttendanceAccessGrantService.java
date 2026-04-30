@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,6 +18,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AttendanceAccessGrantService {
+
+    private static final long GRANT_VISIBILITY_HOURS = 48L;
 
     private final AttendanceAccessGrantRepository grantRepository;
     private final UserRepository userRepository;
@@ -34,6 +37,7 @@ public class AttendanceAccessGrantService {
         private Long familyId;
         private String familyBase;
         private List<String> allowedTypes;
+        private Integer dayOfWeek;
         private String note;
         private LocalDateTime startsAt;
         private LocalDateTime endsAt;
@@ -54,6 +58,31 @@ public class AttendanceAccessGrantService {
                 .toList();
     }
 
+    public List<AttendanceAccessGrant> visibleGrantsForUser(Long userId) {
+        return displayGrantsForUser(userId);
+    }
+
+    /**
+     * Grants that should be shown to the target user on the attendance page.
+     * Current/future grants stay visible so the page can open and show locked types
+     * with their configured times.
+     * Recently ended grants stay visible for a longer grace period so the member can
+     * still understand why one type is closed while another type is currently open.
+     */
+    public List<AttendanceAccessGrant> displayGrantsForUser(Long userId) {
+        if (userId == null) return List.of();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime earliestEndedAt = now.minusHours(GRANT_VISIBILITY_HOURS);
+        return grantsForUser(userId).stream()
+                .filter(g -> g.getStartsAt() != null && g.getEndsAt() != null)
+                .filter(g -> !g.getEndsAt().isBefore(earliestEndedAt))
+                .toList();
+    }
+
+    public boolean hasDisplayGrant(Long userId, AttendanceGrantKind kind) {
+        return displayGrantsForUser(userId).stream().anyMatch(g -> g.getGrantKind() == kind);
+    }
+
     public boolean hasConfiguredGrant(Long userId, AttendanceGrantKind kind) {
         return grantsForUser(userId).stream().anyMatch(g -> g.getGrantKind() == kind);
     }
@@ -71,6 +100,19 @@ public class AttendanceAccessGrantService {
         return out;
     }
 
+    public Set<AttendanceType> visibleAllowedTypes(Long userId, AttendanceGrantKind kind) {
+        Set<AttendanceType> out = new LinkedHashSet<>();
+        for (AttendanceAccessGrant g : visibleGrantsForUser(userId)) {
+            if (g.getGrantKind() != kind) continue;
+            out.addAll(parseTypes(g.getAllowedTypesCsv()));
+        }
+        return out;
+    }
+
+    public boolean hasVisibleGrant(Long userId, AttendanceGrantKind kind) {
+        return visibleGrantsForUser(userId).stream().anyMatch(g -> g.getGrantKind() == kind);
+    }
+
     public List<AttendanceAccessGrant> listManageableGrants(User actor) {
         if (actor == null || actor.getId() == null) return List.of();
         validateActorCanManage(actor);
@@ -78,7 +120,19 @@ public class AttendanceAccessGrantService {
         if ("DEVELOPER".equals(role) || "AMIN_KHEDMA".equals(role)) {
             return grantRepository.findByOrderByCreatedAtDesc();
         }
-        return grantRepository.findByCreatedBy_IdOrderByCreatedAtDesc(actor.getId());
+
+        List<String> actorBases = familyAccessService.servingBasesOf(actor).stream()
+                .map(this::clean)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (actorBases.isEmpty()) {
+            return grantRepository.findByCreatedBy_IdOrderByCreatedAtDesc(actor.getId());
+        }
+
+        return grantRepository.findByOrderByCreatedAtDesc().stream()
+                .filter(grant -> grantIsManageableInsideActorScope(actor, actorBases, grant))
+                .toList();
     }
 
     public AttendanceAccessGrant getGrantOrThrow(Long id) {
@@ -100,6 +154,7 @@ public class AttendanceAccessGrantService {
                 .familyId(req.getFamilyId())
                 .familyBase(clean(req.getFamilyBase()))
                 .allowedTypesCsv(toCsv(req.getAllowedTypes()))
+                .dayOfWeek(req.getDayOfWeek())
                 .note(clean(req.getNote()))
                 .startsAt(req.getStartsAt())
                 .endsAt(req.getEndsAt())
@@ -126,6 +181,7 @@ public class AttendanceAccessGrantService {
         if (req.getFamilyId() != null) grant.setFamilyId(req.getFamilyId());
         if (req.getFamilyBase() != null) grant.setFamilyBase(clean(req.getFamilyBase()));
         if (req.getAllowedTypes() != null) grant.setAllowedTypesCsv(toCsv(req.getAllowedTypes()));
+        if (req.getDayOfWeek() != null) grant.setDayOfWeek(req.getDayOfWeek());
         if (req.getNote() != null) grant.setNote(clean(req.getNote()));
         if (req.getStartsAt() != null) grant.setStartsAt(req.getStartsAt());
         if (req.getEndsAt() != null) grant.setEndsAt(req.getEndsAt());
@@ -150,12 +206,23 @@ public class AttendanceAccessGrantService {
         out.put("familyId", grant.getFamilyId());
         out.put("familyBase", grant.getFamilyBase());
         out.put("allowedTypes", parseTypes(grant.getAllowedTypesCsv()).stream().map(Enum::name).toList());
+        out.put("dayOfWeek", grant.getDayOfWeek());
         out.put("note", grant.getNote());
         out.put("startsAt", grant.getStartsAt());
         out.put("endsAt", grant.getEndsAt());
         out.put("enabled", Boolean.TRUE.equals(grant.getEnabled()));
         out.put("createdAt", grant.getCreatedAt());
         out.put("updatedAt", grant.getUpdatedAt());
+        LocalDateTime now = LocalDateTime.now();
+        boolean active = grant.getStartsAt() != null && grant.getEndsAt() != null
+                && !now.isBefore(grant.getStartsAt()) && !now.isAfter(grant.getEndsAt());
+        boolean upcoming = grant.getStartsAt() != null && now.isBefore(grant.getStartsAt());
+        boolean ended = grant.getEndsAt() != null && now.isAfter(grant.getEndsAt());
+        out.put("active", active);
+        out.put("upcoming", upcoming);
+        out.put("ended", ended);
+        out.put("startsInSeconds", grant.getStartsAt() == null ? null : Duration.between(now, grant.getStartsAt()).getSeconds());
+        out.put("endsInSeconds", grant.getEndsAt() == null ? null : Duration.between(now, grant.getEndsAt()).getSeconds());
         if (grant.getTargetUser() != null) {
             out.put("targetUserId", grant.getTargetUser().getId());
             out.put("targetUserName", grant.getTargetUser().getFullName());
@@ -166,6 +233,34 @@ public class AttendanceAccessGrantService {
             out.put("createdByName", grant.getCreatedBy().getFullName());
         }
         return out;
+    }
+
+    private boolean grantIsManageableInsideActorScope(User actor, List<String> actorBases, AttendanceAccessGrant grant) {
+        if (grant == null) return false;
+        if (grant.getCreatedBy() != null && actor.getId() != null && actor.getId().equals(grant.getCreatedBy().getId())) {
+            return true;
+        }
+
+        String grantBase = clean(grant.getFamilyBase());
+        if (grantBase != null) {
+            List<String> grantBases = Arrays.stream(grantBase.split(","))
+                    .map(this::clean)
+                    .filter(Objects::nonNull)
+                    .toList();
+            if (!grantBases.isEmpty() && grantBases.stream().anyMatch(actorBases::contains)) {
+                return true;
+            }
+        }
+
+        User target = grant.getTargetUser();
+        if (target != null) {
+            List<String> targetBases = familyAccessService.servingBasesOf(target).stream()
+                    .map(this::clean)
+                    .filter(Objects::nonNull)
+                    .toList();
+            return targetBases.stream().anyMatch(actorBases::contains);
+        }
+        return false;
     }
 
     private void validateActorCanManage(User actor) {
@@ -181,6 +276,11 @@ public class AttendanceAccessGrantService {
         String role = familyAccessService.normalizeRole(actor.getRole());
         if ("DEVELOPER".equals(role) || "AMIN_KHEDMA".equals(role)) return;
         if (grant.getCreatedBy() != null && actor.getId() != null && actor.getId().equals(grant.getCreatedBy().getId())) return;
+        List<String> actorBases = familyAccessService.servingBasesOf(actor).stream()
+                .map(this::clean)
+                .filter(Objects::nonNull)
+                .toList();
+        if (!actorBases.isEmpty() && grantIsManageableInsideActorScope(actor, actorBases, grant)) return;
         throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "You can only edit your own grants");
     }
 
@@ -221,6 +321,10 @@ public class AttendanceAccessGrantService {
         grant.setFamilyBase(familyBase);
     }
 
+    // dayOfWeek describes the attendance occasion day (the day being recorded),
+    // while startsAt/endsAt describe the time window when recording is allowed.
+    // Do not use dayOfWeek to close an otherwise active time window.
+
     private void validateGrant(AttendanceAccessGrant grant) {
         if (grant.getTargetUser() == null || grant.getTargetUser().getId() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "TARGET_REQUIRED", "Target user is required");
@@ -230,6 +334,10 @@ public class AttendanceAccessGrantService {
         }
         if (!grant.getEndsAt().isAfter(grant.getStartsAt())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_WINDOW", "End time must be after start time");
+        }
+        Integer day = grant.getDayOfWeek();
+        if (day != null && (day < 0 || day > 6)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DAY", "Day of week must be between 0 and 6");
         }
         Set<AttendanceType> types = parseTypes(grant.getAllowedTypesCsv());
         if (types.isEmpty()) {

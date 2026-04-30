@@ -31,4 +31,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     java.util.List<User> findByAnyFamilyIdInAndRoleIn(@Param("familyIds") java.util.List<Long> familyIds,
                                                       @Param("roles") java.util.List<String> roles);
 
+    @Query("""
+            select distinct u from User u
+            join UserFamilyRole ufr on ufr.user.id = u.id
+            where ufr.familyId in :familyIds
+            """)
+    java.util.List<User> findByAnyFamilyIdIn(@Param("familyIds") java.util.List<Long> familyIds);
+
 }
