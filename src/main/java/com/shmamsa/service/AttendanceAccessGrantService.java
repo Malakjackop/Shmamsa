@@ -162,6 +162,7 @@ public class AttendanceAccessGrantService {
                 .build();
 
         normalizeGrantFamilyScope(grant);
+        normalizeCustomEventGrantKind(grant);
         validateGrant(grant);
         return grantRepository.save(grant);
     }
@@ -188,6 +189,7 @@ public class AttendanceAccessGrantService {
         if (req.getEnabled() != null) grant.setEnabled(req.getEnabled());
 
         normalizeGrantFamilyScope(grant);
+        normalizeCustomEventGrantKind(grant);
         validateGrant(grant);
         return grantRepository.save(grant);
     }
@@ -199,10 +201,20 @@ public class AttendanceAccessGrantService {
         grantRepository.delete(grant);
     }
 
+    private AttendanceGrantKind effectiveGrantKind(AttendanceAccessGrant grant) {
+        if (grant == null) return null;
+        Set<AttendanceType> types = parseTypes(grant.getAllowedTypesCsv());
+        if (grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN && types.contains(AttendanceType.CUSTOM_EVENT)) {
+            return AttendanceGrantKind.TAKE_ATTENDANCE;
+        }
+        return grant.getGrantKind();
+    }
+
     public Map<String, Object> toView(AttendanceAccessGrant grant) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", grant.getId());
-        out.put("grantKind", grant.getGrantKind() == null ? null : grant.getGrantKind().name());
+        AttendanceGrantKind viewKind = effectiveGrantKind(grant);
+        out.put("grantKind", viewKind == null ? null : viewKind.name());
         out.put("familyId", grant.getFamilyId());
         out.put("familyBase", grant.getFamilyBase());
         out.put("allowedTypes", parseTypes(grant.getAllowedTypesCsv()).stream().map(Enum::name).toList());
@@ -344,7 +356,19 @@ public class AttendanceAccessGrantService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "TYPE_REQUIRED", "Select at least one attendance type");
         }
         if (grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN && types.contains(AttendanceType.CUSTOM_EVENT)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Custom events are not allowed for self check-in");
+            // A custom event is not a personal/self check-in flow.
+            // When the UI saves a custom-event delegation while the audience is still
+            // on members, treat it as attendance-taking so MAKHDOM can record
+            // presence/absence for the assigned family instead of failing the save.
+            grant.setGrantKind(AttendanceGrantKind.TAKE_ATTENDANCE);
+        }
+    }
+
+    private void normalizeCustomEventGrantKind(AttendanceAccessGrant grant) {
+        if (grant == null) return;
+        Set<AttendanceType> types = parseTypes(grant.getAllowedTypesCsv());
+        if (grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN && types.contains(AttendanceType.CUSTOM_EVENT)) {
+            grant.setGrantKind(AttendanceGrantKind.TAKE_ATTENDANCE);
         }
     }
 

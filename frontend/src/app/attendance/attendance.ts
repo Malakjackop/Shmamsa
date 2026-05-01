@@ -298,6 +298,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return !!this.attendanceContext?.canUseCustomEvent && !this.isKhadim();
   }
 
+  private hasVisibleCustomEventAttendanceGrant(): boolean {
+    return this.relevantScopeGrants().some((grant) =>
+      grant.grantKind === 'TAKE_ATTENDANCE'
+      && grant.enabled !== false
+      && (grant.allowedTypes || []).includes('CUSTOM_EVENT')
+    );
+  }
+
+  private canSelectCustomEventForAttendance(): boolean {
+    return this.canUseCustomEvent() || this.hasVisibleCustomEventAttendanceGrant();
+  }
+
   canManageAccessGrants(): boolean {
     return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm()) || this.hasAnyAminPrivilegeScope();
   }
@@ -691,18 +703,29 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   dialogExistingGrantTitle(): string {
     return this.grantAudience === 'SERVANTS'
-      ? 'تخصيصات الخدام الموجودة'
+      ? 'تخصيصات أخذ الحضور الموجودة'
       : 'تخصيصات المخدومين الموجودة';
   }
 
   dialogExistingGrantHint(): string {
     return this.grantAudience === 'SERVANTS'
-      ? 'لا توجد تخصيصات خدام محفوظة حالياً.'
+      ? 'لا توجد تخصيصات أخذ حضور محفوظة حالياً.'
       : 'لا توجد تخصيصات مخدومين محفوظة حالياً.';
   }
 
   grantFamilyList(value?: string | null): string[] {
     return String(value || '').split(/[,،;|]+/).map((item) => item.trim()).filter(Boolean);
+  }
+
+  private sameGrantFamily(a?: string | null, b?: string | null): boolean {
+    const left = canonicalFamilyName(a || '').trim();
+    const right = canonicalFamilyName(b || '').trim();
+    return !!left && !!right && left === right;
+  }
+
+  private grantFamiliesOverlap(grantFamilies: string[], selectedFamilies: string[]): boolean {
+    if (!grantFamilies.length || !selectedFamilies.length) return true;
+    return selectedFamilies.some((selected) => grantFamilies.some((grantFamily) => this.sameGrantFamily(grantFamily, selected)));
   }
 
   grantFamilyLabel(value?: string | null): string {
@@ -911,7 +934,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   private relevantScopeGrants(): AttendanceAccessGrant[] {
     const grants = this.attendanceContext?.activeGrants || [];
     const wantedKind = this.grantKindForCurrentUser();
-    return grants.filter((grant) => grant.grantKind === wantedKind && grant.enabled !== false);
+
+    // Backward compatibility for old MAKHDOM assignments:
+    // Some standard attendance grants were saved as SELF_CHECKIN.
+    // When the same MAKHDOM also has a TAKE_ATTENDANCE grant, keep the old
+    // SELF_CHECKIN standard grants visible/usable as attendance-taking grants.
+    // Without this, adding a custom-event grant makes قداس/تسبحة/اجتماع الأسرة look locked.
+    const includeLegacySelfCheckinAsTakeAttendance = wantedKind === 'TAKE_ATTENDANCE'
+      && !this.isServantOrAbove()
+      && grants.some((grant) => grant.grantKind === 'TAKE_ATTENDANCE' && grant.enabled !== false);
+
+    return grants.filter((grant) => {
+      if (grant.enabled === false) return false;
+      if (grant.grantKind === wantedKind) return true;
+      return includeLegacySelfCheckinAsTakeAttendance && grant.grantKind === 'SELF_CHECKIN';
+    });
   }
 
   private isGrantActive(grant: AttendanceAccessGrant, now = new Date()): boolean {
@@ -929,7 +966,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private grantedFamiliesFrom(grants: AttendanceAccessGrant[]): string[] {
     if (grants.some((grant) => this.grantFamilyList(grant.familyBase).length === 0)) return [];
-    return Array.from(new Set(grants.flatMap((grant) => this.grantFamilyList(grant.familyBase)).filter(Boolean)));
+    return Array.from(new Set(
+      grants
+        .flatMap((grant) => this.grantFamilyList(grant.familyBase))
+        .map((family) => canonicalFamilyName(family))
+        .filter(Boolean)
+    ));
   }
 
   private isGroupedMemberFamilyMode(): boolean {
@@ -988,7 +1030,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const familyScoped = selectedFamilies.length
       ? grants.filter((grant) => {
           const families = this.grantFamilyList(grant.familyBase);
-          return !families.length || selectedFamilies.some((item) => families.includes(item));
+          return this.grantFamiliesOverlap(families, selectedFamilies);
         })
       : grants;
     const source = familyScoped.length ? familyScoped : grants;
@@ -1051,7 +1093,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         : [];
       if (selectedFamilies.length && grant.familyBase) {
         const grantFamilies = this.grantFamilyList(grant.familyBase);
-        if (!selectedFamilies.some((family) => grantFamilies.includes(family))) return false;
+        if (!this.grantFamiliesOverlap(grantFamilies, selectedFamilies)) return false;
       }
       const selectedType = this.selectedAttendanceType();
       if (selectedType && Array.isArray(grant.allowedTypes) && grant.allowedTypes.length && !grant.allowedTypes.includes(selectedType)) return false;
@@ -1148,7 +1190,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       if (!this.shouldRestrictFamilyScopeByGrant() || !this.selectedFamily) return true;
       const selectedFamilies = this.scopeFamiliesForSelection(this.selectedFamily);
       const grantFamilies = this.grantFamilyList(grant.familyBase);
-      return !grantFamilies.length || !selectedFamilies.length || selectedFamilies.some((family) => grantFamilies.includes(family));
+      return this.grantFamiliesOverlap(grantFamilies, selectedFamilies);
     });
   }
 
@@ -1373,7 +1415,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (this.configuredTypeHasDays('FRIDAY_LITURGY')) opts.push({ value: 'FRIDAY_LITURGY', type: 'FRIDAY_LITURGY', label: this.typeLabel('FRIDAY_LITURGY') });
     if (this.configuredTypeHasDays('TASBEEHA')) opts.push({ value: 'TASBEEHA', type: 'TASBEEHA', label: this.typeLabel('TASBEEHA') });
 
-    if (this.canUseCustomEvent() && this.selectableCustomEvents().length) {
+    if (this.canSelectCustomEventForAttendance() && this.selectableCustomEvents().length) {
       this.selectableCustomEvents().forEach((event) => {
         if (!event.id) return;
         opts.push({
@@ -1467,6 +1509,29 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return null;
   }
 
+  private customEventSelectableDateBounds(): { min?: Date; max?: Date } {
+    if (!this.isSelectedCustomEventType()) return {};
+    const selected = this.selectedCustomEvent();
+    if (!selected || selected.alwaysActive !== false) return {};
+
+    const bounds: { min?: Date; max?: Date } = {};
+    if (selected.activeFrom) {
+      const min = new Date(selected.activeFrom);
+      if (!Number.isNaN(min.getTime())) {
+        min.setHours(0, 0, 0, 0);
+        bounds.min = min;
+      }
+    }
+    if (selected.activeTo) {
+      const max = new Date(selected.activeTo);
+      if (!Number.isNaN(max.getTime())) {
+        max.setHours(0, 0, 0, 0);
+        bounds.max = max;
+      }
+    }
+    return bounds;
+  }
+
   private updateCalendarForSelectedType(keepCurrentDate = false): void {
     if (!this.typeOptions.length) {
       this.disabledDays = [...this.weekDays];
@@ -1502,12 +1567,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
 
     const typeDays = this.weekdaysForSelectedType();
-    const allowedAbsenceDays = this.canOverrideAbsenceOpenClose() ? this.weekDays : this.configAbsenceAllowedDays();
+    // Custom events must be selectable on the event's configured day, even if that
+    // day is not one of the normal weekly attendance/absence days.
+    const allowedAbsenceDays = this.isSelectedCustomEventType()
+      ? this.weekDays
+      : (this.canOverrideAbsenceOpenClose() ? this.weekDays : this.configAbsenceAllowedDays());
     const allowedDays = typeDays.filter((day) => allowedAbsenceDays.includes(day));
     this.disabledDays = this.weekDays.filter((day) => !allowedDays.includes(day));
 
-    const maxDate = this.maxDate || today;
-    const minDate = this.minDate || new Date(2000, 0, 1);
+    const bounds = this.customEventSelectableDateBounds();
+    let maxDate = this.maxDate || today;
+    let minDate = this.minDate || new Date(2000, 0, 1);
+    if (bounds.min && bounds.min > minDate) minDate = bounds.min;
+    if (bounds.max && bounds.max < maxDate) maxDate = bounds.max;
+    this.minDate = minDate;
+    this.maxDate = maxDate;
     if (keepCurrentDate && current && current >= minDate && current <= maxDate && this.dateMatchesSelectedType(current)) {
       this.refreshAvailableCustomEvents();
       return;
@@ -1801,6 +1875,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canPickDisplayedUser(u: PickUser): boolean {
+    if (this.isDelegatedAttendanceMode() || this.hasVisibleCustomEventAttendanceGrant()) return true;
     return !this.isSelfCheckinMode() || Number(u?.id) === Number(this.me?.id);
   }
 
@@ -2057,6 +2132,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private grantKindFromAudience(audience: GrantAudience): AttendanceAccessGrant['grantKind'] {
+    const selectedTypes = new Set(this.grantForm.allowedTypes || []);
+    // A custom event is always a delegation to take attendance for a family,
+    // never personal self check-in. This prevents the backend error and keeps
+    // the Add buttons enabled for all people in the assigned osra.
+    if (selectedTypes.has('CUSTOM_EVENT')) return 'TAKE_ATTENDANCE';
     return audience === 'SERVANTS' ? 'TAKE_ATTENDANCE' : 'SELF_CHECKIN';
   }
 
@@ -2293,6 +2373,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   selectGrantOccasion(option: GrantOccasionOption): void {
     this.grantSelectedOccasionKey = option.key;
     this.grantForm.allowedTypes = [option.type];
+    this.grantForm.grantKind = this.grantKindFromAudience(option.type === 'CUSTOM_EVENT' ? 'SERVANTS' : this.grantAudience);
+    if (option.type === 'CUSTOM_EVENT' && this.grantAudience !== 'SERVANTS') {
+      this.grantAudience = 'SERVANTS';
+      this.lastGrantAudience = 'SERVANTS';
+      this.grantForm.grantKind = 'TAKE_ATTENDANCE';
+      this.selectedGrantTargetIds = [];
+      this.grantTargetSearch = '';
+      this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
+    }
     this.grantSelectedWeekday = option.days[0] ?? null;
     this.grantForm.dayOfWeek = this.grantSelectedWeekday;
     this.syncGrantDatesForSelection(true);
@@ -2495,7 +2584,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             .flatMap((pair: any) => [...(pair?.[0] || []), ...(pair?.[1] || [])])
             .map((x: any) => this.toPickUser(x));
           const unique = merged.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
-          this.grantTargets = unique.filter((user) => this.isServantGrantTarget(user));
+          this.grantTargets = unique.filter((user) => this.isServantGrantTarget(user, true));
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
         },
@@ -2524,7 +2613,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             .map((x: any) => this.toPickUser(x));
           const unique = allTargets.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
           this.grantTargets = unique.filter((user) =>
-            this.isServantGrantTarget(user) && this.belongsToFamilyScope(user, scopeFamily)
+            this.isServantGrantTarget(user, true) && this.belongsToFamilyScope(user, scopeFamily)
           );
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
@@ -2542,8 +2631,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         const allTargets = (m || []).map((x: any) => this.toPickUser(x));
         this.grantTargets = allTargets.filter((user) =>
           this.grantAudience === 'SERVANTS'
-            ? this.isServantGrantTarget(user)
-            : !this.isServantGrantTarget(user)
+            ? this.isServantGrantTarget(user, true)
+            : !this.isServantGrantTarget(user, true)
         );
         this.syncSelectedGrantTargets();
         this.refreshGrantTargetLists();
@@ -2834,7 +2923,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
     const basePayload = {
       ...this.grantForm,
-      grantKind: this.grantKindFromAudience(this.grantAudience),
+      grantKind: this.grantKindFromAudience((this.grantForm.allowedTypes || []).includes('CUSTOM_EVENT') ? 'SERVANTS' : this.grantAudience),
       familyBase: this.canChooseGrantFamily()
         ? (this.grantForm.familyBase || undefined)
         : (this.defaultGrantScopeFamily() || undefined)
@@ -3011,7 +3100,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private loadCustomEventsForFamily(): void {
-    if (!this.canUseCustomEvent()) {
+    if (!this.canSelectCustomEventForAttendance()) {
       this.familyCustomEvents = [];
       this.availableCustomEvents = [];
       return;

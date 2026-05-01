@@ -1,12 +1,16 @@
 package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
+import com.shmamsa.model.AttendanceAccessGrant;
+import com.shmamsa.model.AttendanceGrantKind;
+import com.shmamsa.model.AttendanceType;
 import com.shmamsa.model.CustomAttendanceEvent;
 import com.shmamsa.model.FamilyRoleCode;
 import com.shmamsa.model.User;
 import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.CustomAttendanceEventRepository;
 import com.shmamsa.repository.UserRepository;
+import com.shmamsa.service.AttendanceAccessGrantService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.UserFamilyRoleService;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +48,7 @@ public class CustomAttendanceEventController {
     private final UserRepository userRepo;
     private final UserFamilyRoleService userFamilyRoleService;
     private final FamilyAccessService familyAccessService;
+    private final AttendanceAccessGrantService attendanceAccessGrantService;
 
     private User requireUser(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) {
@@ -239,6 +244,94 @@ public class CustomAttendanceEventController {
                 .toList();
     }
 
+
+    private Set<AttendanceType> parseAttendanceTypesCsv(String csv) {
+        Set<AttendanceType> out = new LinkedHashSet<>();
+        if (csv == null || csv.isBlank()) return out;
+        for (String part : csv.split(",")) {
+            String value = String.valueOf(part == null ? "" : part).trim();
+            if (value.isBlank()) continue;
+            try {
+                out.add(AttendanceType.valueOf(value.toUpperCase(Locale.ROOT)));
+            } catch (Exception ignored) {
+            }
+        }
+        return out;
+    }
+
+    private boolean grantAllowsCustomEvent(AttendanceAccessGrant grant) {
+        if (grant == null) return false;
+        Set<AttendanceType> types = parseAttendanceTypesCsv(grant.getAllowedTypesCsv());
+        boolean customEventGrant = types.isEmpty() || types.contains(AttendanceType.CUSTOM_EVENT);
+        if (!customEventGrant) return false;
+        return grant.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE
+                // Backward compatibility with old/wrong saved payloads.
+                || grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN;
+    }
+
+    private String normalizeFamilyKey(String familyName) {
+        String base = familyAccessService.baseNameForName(familyName);
+        if (base == null || base.isBlank()) {
+            base = String.valueOf(familyName == null ? "" : familyName).trim();
+        }
+        return base
+                .replaceAll("[\u064B-\u065F\u0670\u0640]", "")
+                .replace("أ", "ا")
+                .replace("إ", "ا")
+                .replace("آ", "ا")
+                .replace("ة", "ه")
+                .replaceAll("\\s+", " ")
+                .trim()
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private boolean sameFamilyBaseLoose(String a, String b) {
+        String ak = normalizeFamilyKey(a);
+        String bk = normalizeFamilyKey(b);
+        return !ak.isBlank() && !bk.isBlank() && ak.equals(bk);
+    }
+
+    private List<String> grantFamilyParts(String rawValue) {
+        String raw = String.valueOf(rawValue == null ? "" : rawValue).trim();
+        if (raw.isBlank() || "ALL".equalsIgnoreCase(raw)) return List.of();
+        return java.util.Arrays.stream(raw.split("[,،;|]+"))
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .toList();
+    }
+
+    private boolean grantAllowsEventFamily(AttendanceAccessGrant grant, String eventFamily) {
+        if (grant == null) return false;
+        List<String> grantFamilies = grantFamilyParts(grant.getFamilyBase());
+        if (grantFamilies.isEmpty()) return true;
+        String eventBase = String.valueOf(eventFamily == null ? "" : eventFamily).trim();
+        if (eventBase.isBlank()) return true;
+        return grantFamilies.stream().anyMatch(family -> sameFamilyBaseLoose(family, eventBase));
+    }
+
+    private boolean eventMatchesRequestedFamily(CustomAttendanceEvent event, String requestedFamily) {
+        String requested = String.valueOf(requestedFamily == null ? "" : requestedFamily).trim();
+        if (requested.isBlank()) return true;
+        String eventFamily = event == null ? null : event.getFamilyBase();
+        if (eventFamily == null || eventFamily.isBlank()) return true;
+        return sameFamilyBaseLoose(eventFamily, requested);
+    }
+
+    private List<CustomAttendanceEvent> delegatedVisibleEvents(User user, String familyBase) {
+        if (user == null || user.getId() == null) return List.of();
+        List<AttendanceAccessGrant> customEventGrants = attendanceAccessGrantService.visibleGrantsForUser(user.getId()).stream()
+                .filter(this::grantAllowsCustomEvent)
+                .toList();
+        if (customEventGrants.isEmpty()) return List.of();
+
+        return repo.findByEnabledTrueOrderByDayOfWeekAscTitleAsc().stream()
+                .filter(event -> eventMatchesRequestedFamily(event, familyBase))
+                .filter(event -> customEventGrants.stream().anyMatch(grant -> grantAllowsEventFamily(grant, event.getFamilyBase())))
+                .sorted(Comparator.comparing(CustomAttendanceEvent::getDayOfWeek)
+                        .thenComparing(CustomAttendanceEvent::getTitle))
+                .toList();
+    }
+
     private Map<String, Object> toMap(CustomAttendanceEvent e, User viewer) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", e.getId());
@@ -284,10 +377,13 @@ public class CustomAttendanceEventController {
         User user = requireUser(auth);
 
         if (!canManage(user)) {
-            List<CustomAttendanceEvent> permittedEvents = repo.findByOrderByDayOfWeekAscTitleAsc().stream()
+            Map<Long, CustomAttendanceEvent> visible = new LinkedHashMap<>();
+            repo.findByOrderByDayOfWeekAscTitleAsc().stream()
                     .filter(e -> isPermittedEditor(user, e))
-                    .toList();
-            return ResponseEntity.ok(permittedEvents.stream().map(e -> toMap(e, user)).toList());
+                    .filter(e -> eventMatchesRequestedFamily(e, familyBase))
+                    .forEach(e -> visible.put(e.getId(), e));
+            delegatedVisibleEvents(user, familyBase).forEach(e -> visible.put(e.getId(), e));
+            return ResponseEntity.ok(visible.values().stream().map(e -> toMap(e, user)).toList());
         }
 
         List<CustomAttendanceEvent> events;

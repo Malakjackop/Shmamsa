@@ -49,6 +49,12 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/attendance/**")
                         .authenticated()
+
+                        // Makhdom with an attendance assignment must be able to load
+                        // the assigned family list from the attendance page.
+                        // Write/delete family operations remain restricted by the rule below.
+                        .requestMatchers(HttpMethod.GET, "/api/family/families", "/api/family/members")
+                        .authenticated()
                         .requestMatchers("/api/family/**")
                         .hasAnyRole("KHADIM","AMIN_OSRA","AMIN_KHEDMA","DEVELOPER")
 

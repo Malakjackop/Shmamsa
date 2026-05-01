@@ -115,14 +115,21 @@ public class  FamilyController {
         String raw = String.valueOf(familyName == null ? "" : familyName).trim();
         if (raw.isBlank()) return null;
 
-        String direct = familyCatalogService.baseNameForName(raw);
-        if (direct != null && !direct.isBlank()) return direct.trim();
+        // familyCatalogService.baseNameForName(raw) returns raw again when it cannot
+        // find the value in the catalog. Do not stop there, because the attendance UI
+        // sometimes sends short labels such as "البابا كيرلس" while the catalog stores
+        // "اسرة القديس البابا كيرلس".
+        FamilyCatalog exact = familyCatalogService.findByName(raw);
+        if (exact != null) {
+            String direct = familyCatalogService.baseNameForName(raw);
+            if (direct != null && !direct.isBlank()) return direct.trim();
+        }
 
         String wanted = normalizeArabicFamilyKey(raw);
         for (String candidate : familyCatalogService.listSelectableBaseNames()) {
             String key = normalizeArabicFamilyKey(candidate);
             if (key.equals(wanted) || key.contains(wanted) || wanted.contains(key)) {
-                return candidate;
+                return familyCatalogService.baseNameForName(candidate);
             }
         }
 
@@ -139,7 +146,7 @@ public class  FamilyController {
                     .replace("الانبا ", "")
                     .trim();
             if (key.equals(withoutPrefixes) || key.contains(withoutPrefixes) || withoutPrefixes.contains(key)) {
-                return candidate;
+                return familyCatalogService.baseNameForName(candidate);
             }
         }
 
@@ -220,16 +227,44 @@ public class  FamilyController {
         String selectedBase = looseBaseNameForName(selectedFamily);
         List<String> grantFamilies = grantFamilyList(grantFamilyBase);
         if (grantFamilies.isEmpty()) return true;
-        if (selectedBase == null || selectedBase.isBlank()) return true;
+        if (selectedBase == null || selectedBase.isBlank()) return false;
         return grantFamilies.stream().anyMatch(x -> sameFamilyBaseLoose(x, selectedBase));
     }
 
-    private boolean attendanceGrantAllowsSelectedFamily(User user, String selectedFamily) {
-        if (user == null || user.getId() == null) return false;
+    private List<AttendanceAccessGrant> visibleGrantsForKind(User user, AttendanceGrantKind kind) {
+        if (user == null || user.getId() == null || kind == null) return List.of();
         return attendanceAccessGrantService.visibleGrantsForUser(user.getId()).stream()
-                .filter(g -> g.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE
-                        || g.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN)
-                .anyMatch(g -> grantFamilyMatches(g.getFamilyBase(), selectedFamily));
+                .filter(g -> g.getGrantKind() == kind)
+                .toList();
+    }
+
+    private boolean attendanceGrantAllowsSelectedFamily(User user, String selectedFamily, AttendanceGrantKind kind) {
+        String selectedBase = looseBaseNameForName(selectedFamily);
+        if (selectedBase == null || selectedBase.isBlank()) return false;
+        return visibleGrantsForKind(user, kind).stream()
+                .anyMatch(g -> grantFamilyMatches(g.getFamilyBase(), selectedBase));
+    }
+
+    private boolean takeAttendanceGrantAllowsSelectedFamily(User user, String selectedFamily) {
+        return attendanceGrantAllowsSelectedFamily(user, selectedFamily, AttendanceGrantKind.TAKE_ATTENDANCE);
+    }
+
+    private List<String> visibleTakeAttendanceGrantFamilies(User user) {
+        List<AttendanceAccessGrant> grants = visibleGrantsForKind(user, AttendanceGrantKind.TAKE_ATTENDANCE);
+        if (grants.isEmpty()) return List.of();
+
+        // Empty/ALL family scope means the grant is intentionally open for all selectable bases.
+        if (grants.stream().anyMatch(g -> grantFamilyList(g.getFamilyBase()).isEmpty())) {
+            return familyCatalogService.listSelectableBaseNames();
+        }
+
+        return grants.stream()
+                .flatMap(g -> grantFamilyList(g.getFamilyBase()).stream())
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .distinct()
+                .toList();
     }
 
     private static boolean isChoirBucket(String base) {
@@ -259,15 +294,18 @@ public class  FamilyController {
         boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
         boolean isKhadim = "KHADIM".equals(role);
         boolean isAminOsra = "AMIN_OSRA".equals(role);
-
         boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
+
+        if (attendanceContext && me != null && !isAminKhedmaOrDev && !isKhadim && !isAminOsra) {
+            List<String> grantFamilies = visibleTakeAttendanceGrantFamilies(me);
+            return ResponseEntity.ok(grantFamilies);
+        }
 
         if (isKhadim && !attendanceContext) {
             List<String> out = servingBasesOf(me);
             out.sort(String::compareTo);
             return ResponseEntity.ok(out);
         }
-
 
         return ResponseEntity.ok(familyCatalogService.listSelectableBaseNames());
     }
@@ -327,8 +365,8 @@ public class  FamilyController {
         boolean hasTakeAttendanceGrant = attendanceContext && attendanceAccessGrantService.hasVisibleGrant(me.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
         boolean hasSelfAttendanceGrant = attendanceContext && attendanceAccessGrantService.hasVisibleGrant(me.getId(), AttendanceGrantKind.SELF_CHECKIN);
         boolean hasAnyAttendanceGrant = hasTakeAttendanceGrant || hasSelfAttendanceGrant;
-        boolean grantSelectedContext = attendanceContext && hasFamilySelection && attendanceGrantAllowsSelectedFamily(me, family);
-        boolean delegatedTakeAttendanceContext = attendanceContext && hasFamilySelection && hasTakeAttendanceGrant && attendanceGrantAllowsSelectedFamily(me, family);
+        boolean grantSelectedContext = attendanceContext && hasFamilySelection && takeAttendanceGrantAllowsSelectedFamily(me, family);
+        boolean delegatedTakeAttendanceContext = attendanceContext && hasFamilySelection && hasTakeAttendanceGrant && takeAttendanceGrantAllowsSelectedFamily(me, family);
         boolean aminOsraAttendanceContext = effIsAminOsra && hasFamilySelection && attendanceContext;
 
         if (isKhadim && hasFamilySelection && !attendanceContext) {

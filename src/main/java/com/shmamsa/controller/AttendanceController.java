@@ -147,7 +147,10 @@ public class AttendanceController {
         }
 
         AttendanceType type = AttendanceType.valueOf(typeObj.toString());
-        enforceTakeAttendanceGrantIfNeeded(servant, type);
+        boolean customEventManager = type == AttendanceType.CUSTOM_EVENT && canUseCustomEvent(servant);
+        if (!customEventManager) {
+            enforceTakeAttendanceGrantIfNeeded(servant, type);
+        }
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> users = (List<Map<String, Object>>) usersObj;
@@ -168,8 +171,8 @@ public class AttendanceController {
 
         String customTitle = body.get("customTitle") == null ? null : String.valueOf(body.get("customTitle")).trim();
         if (type == AttendanceType.CUSTOM_EVENT) {
-            if (!canUseCustomEvent(servant)) {
-                return ResponseEntity.status(403).body(Map.of("error", "Only amin/developer can create custom attendance events"));
+            if (!customEventManager && !hasActiveTakeAttendanceGrantForType(servant, AttendanceType.CUSTOM_EVENT)) {
+                return ResponseEntity.status(403).body(Map.of("error", "لا يوجد تخصيص مفتوح لهذه المناسبة الآن"));
             }
             if (customTitle == null || customTitle.isBlank()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "customTitle is required for custom events"));
@@ -202,7 +205,9 @@ public class AttendanceController {
 
 
         String selectedFamily = familyObj == null ? null : String.valueOf(familyObj);
-        enforceTakeAttendanceGrantFamilyIfNeeded(servant, type, selectedFamily);
+        if (!customEventManager) {
+            enforceTakeAttendanceGrantFamilyIfNeeded(servant, type, selectedFamily);
+        }
         ScopeResult scopeResult = resolveScopeUsers(servant, type, selectedFamily);
         List<User> scope = scopeResult.users;
         String meetingBase = scopeResult.familyBase;
@@ -960,31 +965,56 @@ public class AttendanceController {
     }
 
     private boolean grantAllowsType(AttendanceAccessGrant grant, AttendanceType type) {
-        if (grant == null || type == null) return false;
+        if (grant == null) return false;
+        if (type == null) return true;
         Set<AttendanceType> types = parseAttendanceTypesCsv(grant.getAllowedTypesCsv());
         return types.isEmpty() || types.contains(type);
     }
 
+    private boolean isAttendanceTakingGrant(AttendanceAccessGrant grant) {
+        if (grant == null) return false;
+        if (grant.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE) return true;
+        // Backward compatibility: previous UI versions could try to save custom-event grants
+        // as SELF_CHECKIN. Treat those as TAKE_ATTENDANCE so assigned MAKHDOM can record
+        // attendance/absence for the whole family.
+        return grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN
+                && grantAllowsType(grant, AttendanceType.CUSTOM_EVENT);
+    }
+
     private boolean hasActiveTakeAttendanceGrantForType(User servant, AttendanceType type) {
-        return servant != null && servant.getId() != null
-                && attendanceAccessGrantService.activeGrantsForUser(servant.getId()).stream()
-                .filter(g -> g.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE)
-                .anyMatch(g -> grantAllowsType(g, type));
+        return activeAttendanceTakingGrantsFor(servant, type).stream().anyMatch(g -> grantAllowsType(g, type));
+    }
+
+    private boolean hasNativeActiveTakeAttendanceGrant(User actor) {
+        return actor != null && actor.getId() != null
+                && attendanceAccessGrantService.activeGrantsForUser(actor.getId()).stream()
+                .anyMatch(this::isAttendanceTakingGrant);
+    }
+
+    private boolean shouldTreatLegacySelfCheckinAsTakeAttendance(User actor) {
+        if (actor == null || actor.getId() == null) return false;
+        if (isPrivilegedAttendanceActor(actor)) return false;
+        // Backward compatibility: if a MAKHDOM already has at least one active
+        // attendance-taking grant, do not let older SELF_CHECKIN grants disappear.
+        // Treat them as TAKE_ATTENDANCE too so adding a custom event does not close
+        // the existing قداس/تسبحة/اجتماع الأسرة grants.
+        return hasNativeActiveTakeAttendanceGrant(actor);
     }
 
     private List<AttendanceAccessGrant> activeAttendanceTakingGrantsFor(User actor, AttendanceType type) {
         if (actor == null || actor.getId() == null) return List.of();
 
+        boolean includeLegacySelfCheckin = shouldTreatLegacySelfCheckinAsTakeAttendance(actor);
         return attendanceAccessGrantService.activeGrantsForUser(actor.getId()).stream()
-                .filter(g -> g.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE)
+                .filter(g -> isAttendanceTakingGrant(g)
+                        || (includeLegacySelfCheckin && g.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN))
                 .filter(g -> grantAllowsType(g, type))
                 .toList();
     }
 
     private boolean hasActiveAttendanceTakingGrant(User actor) {
         return actor != null && actor.getId() != null
-                && attendanceAccessGrantService.activeGrantsForUser(actor.getId()).stream()
-                .anyMatch(g -> g.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE);
+                && !activeAttendanceTakingGrantsFor(actor, null).isEmpty();
     }
 
     private String detectScanEffectiveFamily(User target, AttendanceType type, String requestedFamily) {
