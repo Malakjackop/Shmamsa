@@ -91,14 +91,18 @@
 
 
   <!-- Daily attendance modal (حضور اليوم) -->
-  <div class="modal" *ngIf="showDaily">
+  <div class="modal legacy-modal" *ngIf="showDaily">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <div class="title">حضور اليوم</div>
           <div class="sub" *ngIf="dailyType">النوع: {{ dailyTypeLabel(dailyType) }}</div>
         </div>
-        <button pButton type="button" icon="pi pi-times" (click)="closeDailyAttendance()">➖</button>
+        <div class="legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeDailyAttendance()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
       </div>
 
       <div class="dailyControls">
@@ -228,7 +232,7 @@
   </div>
 
   <!-- Attendance details modal -->
-<div class="modal" *ngIf="detailsFor">
+<div class="modal legacy-modal" *ngIf="detailsFor">
   <div class="modalCard">
     <div class="modalHead">
       <div>
@@ -236,30 +240,33 @@
         <div class="sub">{{ detailsFor.role | roleLabel }}</div>
       </div>
 
-      <div class="filters detailsFilters">
-        <label>فلتر</label>
-        <select [(ngModel)]="detailsType" (change)="reloadDetails()">
-          <option value="">الكل</option>
-          <option value="FRIDAY_LITURGY">قداس الجمعة</option>
-          <option
-            value="MARMARKOS_KHORS"
-            *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'MARMARKOS_KHORS')"
-          >
-            خورس مارمرقس
-          </option>
-          <option
-            value="ATHANASIUS_KHORS"
-            *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'ATHANASIUS_KHORS')"
-          >
-            خورس البابا اثناسيوس
-          </option>
-          <option value="TASBEEHA">تسبحة</option>
-          <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
-          <option value="CUSTOM_EVENT">مناسبة مخصصة</option>
-        </select>
+      <div class="legacy-modal__head-actions">
+        <div class="filters detailsFilters">
+          <label>فلتر</label>
+          <select [(ngModel)]="detailsType" (change)="reloadDetails()">
+            <option value="">الكل</option>
+            <option value="FRIDAY_LITURGY">قداس الجمعة</option>
+            <option
+              value="MARMARKOS_KHORS"
+              *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'MARMARKOS_KHORS')"
+            >
+              خورس مارمرقس
+            </option>
+            <option
+              value="ATHANASIUS_KHORS"
+              *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'ATHANASIUS_KHORS')"
+            >
+              خورس البابا اثناسيوس
+            </option>
+            <option value="TASBEEHA">تسبحة</option>
+            <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
+            <option value="CUSTOM_EVENT">مناسبة مخصصة</option>
+          </select>
+        </div>
+        <button type="button" class="legacy-modal__close" (click)="closeDetails()" aria-label="إغلاق">
+          <i class="pi pi-times"></i>
+        </button>
       </div>
-
-      <button pButton type="button" icon="pi pi-times" (click)="closeDetails()">➖</button>
     </div>
 
     <!-- لو الفلتر = الكل -->
@@ -325,14 +332,18 @@
 </div>
 
   <!-- Profile modal -->
-  <div class="modal" *ngIf="profileFor">
+  <div class="modal legacy-modal" *ngIf="profileFor">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <div class="title">{{ profileFor.fullName }}</div>
           <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
-        <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
+        <div class="legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeProfile()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
       </div>
 
       <div *ngIf="profile; else loadingProfile" class="profileGrid">
@@ -366,14 +377,18 @@
   </div>
 
   <!-- Iftekad modal -->
-  <div class="modal" *ngIf="iftekadFor">
+  <div class="modal legacy-modal" *ngIf="iftekadFor">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <div class="title">افتقاد - {{ iftekadFor.fullName }}</div>
           <div class="sub">اختار التاريخ وسجّل الافتقاد</div>
         </div>
-        <button pButton type="button" icon="pi pi-times" (click)="closeIftekad()">➖</button>
+        <div class="legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeIftekad()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
       </div>
 
       <div class="iftekadForm">

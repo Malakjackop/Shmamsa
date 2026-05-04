@@ -932,7 +932,7 @@ textarea {
 }
 
 ::ng-deep .grant-dialog .p-dialog-content {
-  background: #18181a;
+  background: #ffffff;
 }
 
 ::ng-deep .grant-dialog .p-dialog-footer {
@@ -940,8 +940,8 @@ textarea {
   bottom: 0;
   z-index: 6;
   padding: 12px 24px;
-  background: #18181a;
-  border-top: 1px solid rgba(255, 244, 236, 0.08);
+  background: #ffffff;
+  border-top: 1px solid #efe4de;
 }
 
 .dialog-grid {

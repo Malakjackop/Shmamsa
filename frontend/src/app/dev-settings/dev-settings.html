@@ -102,7 +102,7 @@
   [baseZIndex]="10000"
   [draggable]="false"
   [resizable]="false"
-  styleClass="dev-dialog"
+  styleClass="dev-dialog app-surface-dialog"
   dir="rtl">
 
   <div class="dialog-body">
@@ -218,9 +218,13 @@
     <!-- Show In -->
     <div class="form-group">
       <label>يعرض فين بعد التسجيل؟</label>
-      <select [(ngModel)]="editingField.showIn">
+      <select [(ngModel)]="editingField.showIn" (ngModelChange)="onShowInChange($event)">
         <option *ngFor="let opt of showInOptions" [value]="opt.value">{{ opt.label }}</option>
       </select>
+      <label class="checkbox-label" *ngIf="showInIncludesProfile(editingField.showIn)">
+        <input type="checkbox" [(ngModel)]="editingField.profileEditable" />
+        <span>يسمح بالتعديل من الصفحة الشخصية</span>
+      </label>
     </div>
 
     <!-- Required -->

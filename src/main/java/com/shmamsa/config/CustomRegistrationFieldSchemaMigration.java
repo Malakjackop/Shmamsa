@@ -11,6 +11,7 @@ public class CustomRegistrationFieldSchemaMigration implements CommandLineRunner
 
     private static final int REQUIRED_RULE_COLUMN_LENGTH = 255;
     private static final int VISIBILITY_CONDITIONS_COLUMN_LENGTH = 4000;
+    private static final String PROFILE_EDITABLE_SYSTEM_KEYS_SQL = "'email','phoneNumber','address','guardiansPhone','guardianRelation','schoolName','schoolGrade','universityName','faculty','universityGrade','graduatedFrom','graduateJob','workDetails'";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -80,5 +81,36 @@ public class CustomRegistrationFieldSchemaMigration implements CommandLineRunner
         jdbcTemplate.execute(
                 "update custom_registration_fields set show_in_configured = false where show_in_configured is null"
         );
+
+        Integer profileEditableExists = jdbcTemplate.query(
+                """
+                select 1
+                from information_schema.columns
+                where table_schema = current_schema()
+                  and table_name = 'custom_registration_fields'
+                  and column_name = 'profile_editable'
+                """,
+                rs -> rs.next() ? 1 : null
+        );
+
+        boolean profileEditableColumnCreated = false;
+        if (profileEditableExists == null) {
+            jdbcTemplate.execute(
+                    "alter table custom_registration_fields add column profile_editable boolean default false"
+            );
+            profileEditableColumnCreated = true;
+        }
+
+        jdbcTemplate.execute(
+                "update custom_registration_fields set profile_editable = false where profile_editable is null"
+        );
+
+        if (profileEditableColumnCreated) {
+            jdbcTemplate.execute(
+                    "update custom_registration_fields " +
+                            "set profile_editable = true " +
+                            "where is_system = true and field_key in (" + PROFILE_EDITABLE_SYSTEM_KEYS_SQL + ")"
+            );
+        }
     }
 }

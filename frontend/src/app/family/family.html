@@ -86,25 +86,29 @@
     </table>
   </div>
 
-  <div class="modal" *ngIf="detailsFor">
+  <div class="modal legacy-modal" *ngIf="detailsFor">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <div class="title">{{ detailsFor.fullName }}</div>
           <div class="sub">{{ detailsFor.role | roleLabel }}</div>
         </div>
-        <div class="filters">
-          <label>فلتر</label>
-          <select [(ngModel)]="detailsType" (change)="reloadDetails()">
-            <option value="">الكل</option>
-            <option value="FRIDAY_LITURGY">قداس الجمعة</option>
-            <option value="MARMARKOS_KHORS">خورس مارمرقس</option>
-            <option value="ATHANASIUS_KHORS">خورس البابا اثناسيوس</option>
-            <option value="TASBEEHA">تسبحة</option>
-            <option value="FAMILY_MEETING">اجتماع الأسرة</option>
-          </select>
+        <div class="legacy-modal__head-actions">
+          <div class="filters">
+            <label>فلتر</label>
+            <select [(ngModel)]="detailsType" (change)="reloadDetails()">
+              <option value="">الكل</option>
+              <option value="FRIDAY_LITURGY">قداس الجمعة</option>
+              <option value="MARMARKOS_KHORS">خورس مارمرقس</option>
+              <option value="ATHANASIUS_KHORS">خورس البابا اثناسيوس</option>
+              <option value="TASBEEHA">تسبحة</option>
+              <option value="FAMILY_MEETING">اجتماع الأسرة</option>
+            </select>
+          </div>
+          <button type="button" class="legacy-modal__close" (click)="closeDetails()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
         </div>
-        <button pButton type="button" icon="pi pi-times" (click)="closeDetails()">➖</button>
       </div>
 
       <ng-container *ngIf="detailsType === ''; else singleType">
@@ -154,14 +158,18 @@
     </div>
   </div>
 
-  <div class="modal" *ngIf="profileFor">
+  <div class="modal legacy-modal" *ngIf="profileFor">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <div class="title">{{ profileFor.fullName }}</div>
           <div class="sub">{{ profileFor.role }}</div>
         </div>
-        <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
+        <div class="legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeProfile()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
       </div>
 
       <div *ngIf="profile; else loadingProfile" class="profileGrid">

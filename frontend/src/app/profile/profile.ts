@@ -5,7 +5,16 @@ import { MessageService } from 'primeng/api';
 import { Router } from '@angular/router';
 import { normalizeRole } from '../shared/role-utils';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
-import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
+import { customFieldHasTarget, effectiveProfileEditable, effectiveShowInTargets, getSystemFieldDefaultProfileEditable } from '../shared/custom-field-display';
+
+type ProfileCustomEntry = {
+  fieldKey: string;
+  label: string;
+  value: string;
+  fieldType: 'TEXT' | 'SELECT';
+  editable: boolean;
+  options: string[];
+};
 
 @Component({
   selector: 'app-profile',
@@ -26,6 +35,26 @@ export class ProfileComponent implements OnInit {
   user: any;
   profileDisplayFields: CustomField[] = [];
   profileDisplayFieldsLoaded = false;
+  profileCustomFieldValues: Record<string, string> = {};
+
+  private readonly editableProfileControlNames = [
+    'email',
+    'phoneNumber',
+    'address',
+    'guardiansPhone',
+    'guardianRelation',
+    'deaconDegree',
+    'status',
+    'studyType',
+    'schoolName',
+    'schoolGrade',
+    'universityName',
+    'faculty',
+    'universityGrade',
+    'graduatedFrom',
+    'graduateJob',
+    'workDetails'
+  ];
 
   readonly deaconDegreeOptions = [
     'مش مرشوم',
@@ -91,22 +120,7 @@ export class ProfileComponent implements OnInit {
           return;
         }
 
-        const normalizedUser = {
-          ...user,
-          status: this.normalizeStatus(user?.status),
-          studyType: this.normalizeStudyType(user?.studyType),
-          khors: this.normalizeKhors(user?.khors),
-          khorsYear: user?.khorsYear ? Number(user.khorsYear) : null
-        };
-
-        this.user = normalizedUser;
-        this.profileForm.patchValue(normalizedUser, { emitEvent: false });
-        this.profileForm.get('isWorking')?.setValue(!!user?.workDetails, { emitEvent: false });
-        this.profileForm.disable({ emitEvent: false });
-
-        this.applyStatusRules();
-        this.applyStudyTypeRules();
-        this.applyKhorsRules();
+        this.applyUserData(user);
       },
       error: () =>
         this.messageService.add({
@@ -117,12 +131,24 @@ export class ProfileComponent implements OnInit {
     });
   }
 
-  profileCustomEntries(): Array<{ label: string; value: string }> {
-    return buildVisibleCustomFieldEntries(
-      this.profileDisplayFields,
-      this.user?.customFields as Record<string, unknown> | undefined,
-      'PROFILE'
-    );
+  profileCustomEntries(): ProfileCustomEntry[] {
+    return (this.profileDisplayFields || [])
+      .filter(field => !field.isSystem)
+      .filter(field => customFieldHasTarget(field, 'PROFILE'))
+      .map(field => {
+        const fieldKey = String(field.fieldKey || '').trim();
+        const value = String(this.profileCustomFieldValues[fieldKey] ?? '').trim();
+        const editable = effectiveProfileEditable(field);
+        return {
+          fieldKey,
+          label: field.labelAr,
+          value,
+          fieldType: field.fieldType,
+          editable,
+          options: this.parseCustomFieldOptions(field.options)
+        };
+      })
+      .filter(entry => this.editMode || entry.value !== '');
   }
 
   isServantOrAbove(): boolean {
@@ -203,8 +229,8 @@ export class ProfileComponent implements OnInit {
       this.profileForm.get('faculty')?.disable({ emitEvent: false });
       this.profileForm.get('universityGrade')?.disable({ emitEvent: false });
       if (this.editMode) {
-        this.profileForm.get('graduatedFrom')?.enable({ emitEvent: false });
-        this.profileForm.get('graduateJob')?.enable({ emitEvent: false });
+        this.enableProfileControlIfEditable('graduatedFrom');
+        this.enableProfileControlIfEditable('graduateJob');
       } else {
         this.profileForm.get('graduatedFrom')?.disable({ emitEvent: false });
         this.profileForm.get('graduateJob')?.disable({ emitEvent: false });
@@ -229,14 +255,14 @@ export class ProfileComponent implements OnInit {
     const type = this.profileForm.get('studyType')?.value;
 
     if (type === 'school') {
-      this.profileForm.get('schoolName')?.enable({ emitEvent: false });
-      this.profileForm.get('schoolGrade')?.disable({ emitEvent: false });
+      this.enableProfileControlIfEditable('schoolName');
+      this.enableProfileControlIfEditable('schoolGrade');
     }
 
     if (type === 'university') {
-      this.profileForm.get('universityName')?.enable({ emitEvent: false });
-      this.profileForm.get('faculty')?.enable({ emitEvent: false });
-      this.profileForm.get('universityGrade')?.enable({ emitEvent: false });
+      this.enableProfileControlIfEditable('universityName');
+      this.enableProfileControlIfEditable('faculty');
+      this.enableProfileControlIfEditable('universityGrade');
     }
   }
 
@@ -244,7 +270,7 @@ export class ProfileComponent implements OnInit {
     const kh = this.normalizeKhors(this.profileForm.get('khors')?.value);
 
     if (kh === 'MARMARKOS') {
-      this.profileForm.get('khorsYear')?.enable({ emitEvent: false });
+      this.enableProfileControlIfEditable('khorsYear');
       return;
     }
 
@@ -258,6 +284,7 @@ export class ProfileComponent implements OnInit {
     if (!this.editMode) {
       this.profileForm.disable({ emitEvent: false });
       this.profileForm.patchValue(this.user, { emitEvent: false });
+      this.syncProfileCustomFieldValues();
       this.applyStatusRules();
       this.applyStudyTypeRules();
       this.applyKhorsRules();
@@ -265,20 +292,7 @@ export class ProfileComponent implements OnInit {
     }
 
     this.profileForm.disable({ emitEvent: false });
-
-    this.profileForm.get('email')?.enable({ emitEvent: false });
-    this.profileForm.get('phoneNumber')?.enable({ emitEvent: false });
-    this.profileForm.get('address')?.enable({ emitEvent: false });
-    this.profileForm.get('guardiansPhone')?.enable({ emitEvent: false });
-    this.profileForm.get('guardianRelation')?.enable({ emitEvent: false });
-    this.profileForm.get('workDetails')?.enable({ emitEvent: false });
-    this.profileForm.get('schoolName')?.enable({ emitEvent: false });
-    this.profileForm.get('schoolGrade')?.enable({ emitEvent: false });
-    this.profileForm.get('universityName')?.enable({ emitEvent: false });
-    this.profileForm.get('faculty')?.enable({ emitEvent: false });
-    this.profileForm.get('universityGrade')?.enable({ emitEvent: false });
-    this.profileForm.get('graduatedFrom')?.enable({ emitEvent: false });
-    this.profileForm.get('graduateJob')?.enable({ emitEvent: false });
+    this.editableProfileControlNames.forEach(controlName => this.enableProfileControlIfEditable(controlName));
 
     this.applyStatusRules();
     this.applyStudyTypeRules();
@@ -288,12 +302,14 @@ export class ProfileComponent implements OnInit {
   saveChanges() {
     const raw = this.profileForm.getRawValue();
     const payload: any = {
-      fullName: raw.fullName,
       email: raw.email,
       phoneNumber: raw.phoneNumber,
       address: raw.address,
       guardiansPhone: raw.guardiansPhone,
       guardianRelation: raw.guardianRelation,
+      deaconDegree: raw.deaconDegree,
+      status: raw.status,
+      studyType: raw.studyType,
       schoolName: raw.schoolName,
       schoolGrade: raw.schoolGrade,
       universityName: raw.universityName,
@@ -301,11 +317,12 @@ export class ProfileComponent implements OnInit {
       universityGrade: raw.universityGrade,
       graduatedFrom: raw.graduatedFrom,
       graduateJob: raw.graduateJob,
-      workDetails: raw.isWorking ? raw.workDetails : ''
+      workDetails: raw.workDetails,
+      customFields: this.collectEditableCustomFieldPayload()
     };
 
     this.authService.updateProfile(payload).subscribe({
-      next: () => {
+      next: (user) => {
         this.messageService.add({
           severity: 'success',
           summary: 'حفظ',
@@ -313,11 +330,7 @@ export class ProfileComponent implements OnInit {
         });
         this.profileForm.disable({ emitEvent: false });
         this.editMode = false;
-        this.user = { ...this.user, ...payload };
-        this.profileForm.patchValue(this.user, { emitEvent: false });
-        this.applyStatusRules();
-        this.applyStudyTypeRules();
-        this.applyKhorsRules();
+        this.applyUserData(user);
       },
       error: (err) =>
         this.messageService.add({
@@ -365,10 +378,12 @@ export class ProfileComponent implements OnInit {
       next: (fields) => {
         this.profileDisplayFields = fields || [];
         this.profileDisplayFieldsLoaded = true;
+        this.syncProfileCustomFieldValues();
       },
       error: () => {
         this.profileDisplayFields = [];
         this.profileDisplayFieldsLoaded = true;
+        this.syncProfileCustomFieldValues();
       }
     });
   }
@@ -393,5 +408,93 @@ export class ProfileComponent implements OnInit {
       isSystem: true,
       showIn: ''
     }).includes('PROFILE');
+  }
+
+  isProfileFieldEditable(fieldKey: string): boolean {
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    if (!normalizedFieldKey) {
+      return false;
+    }
+
+    const configuredField = this.profileDisplayFields.find(field => field.fieldKey === normalizedFieldKey);
+    if (configuredField) {
+      return customFieldHasTarget(configuredField, 'PROFILE') && effectiveProfileEditable(configuredField);
+    }
+
+    if (this.profileDisplayFieldsLoaded) {
+      return false;
+    }
+
+    return effectiveShowInTargets({
+      fieldKey: normalizedFieldKey,
+      isSystem: true,
+      showIn: ''
+    }).includes('PROFILE') && getSystemFieldDefaultProfileEditable(normalizedFieldKey);
+  }
+
+  customFieldOptionLabel(value: string): string {
+    return String(value || '').trim();
+  }
+
+  private applyUserData(user: any): void {
+    const normalizedUser = {
+      ...user,
+      status: this.normalizeStatus(user?.status),
+      studyType: this.normalizeStudyType(user?.studyType),
+      khors: this.normalizeKhors(user?.khors),
+      khorsYear: user?.khorsYear ? Number(user.khorsYear) : null
+    };
+
+    this.user = normalizedUser;
+    this.profileForm.patchValue(normalizedUser, { emitEvent: false });
+    this.profileForm.get('isWorking')?.setValue(!!user?.workDetails, { emitEvent: false });
+    this.profileForm.disable({ emitEvent: false });
+    this.syncProfileCustomFieldValues();
+    this.applyStatusRules();
+    this.applyStudyTypeRules();
+    this.applyKhorsRules();
+  }
+
+  private enableProfileControlIfEditable(controlName: string): void {
+    if (!this.editMode || !this.isProfileFieldEditable(controlName)) {
+      return;
+    }
+
+    this.profileForm.get(controlName)?.enable({ emitEvent: false });
+  }
+
+  private syncProfileCustomFieldValues(): void {
+    const nextValues: Record<string, string> = {};
+    const userValues = (this.user?.customFields || {}) as Record<string, unknown>;
+
+    for (const field of this.profileDisplayFields || []) {
+      if (field.isSystem || !customFieldHasTarget(field, 'PROFILE')) {
+        continue;
+      }
+      nextValues[field.fieldKey] = String(userValues[field.fieldKey] ?? '');
+    }
+
+    this.profileCustomFieldValues = nextValues;
+  }
+
+  private collectEditableCustomFieldPayload(): Record<string, string> {
+    const payload: Record<string, string> = {};
+
+    for (const field of this.profileDisplayFields || []) {
+      if (field.isSystem || !customFieldHasTarget(field, 'PROFILE') || !effectiveProfileEditable(field)) {
+        continue;
+      }
+
+      payload[field.fieldKey] = String(this.profileCustomFieldValues[field.fieldKey] ?? '').trim();
+    }
+
+    return payload;
+  }
+
+  private parseCustomFieldOptions(options?: string | null): string[] {
+    return String(options || '')
+      .split(',')
+      .map(option => option.trim())
+      .filter(Boolean);
   }
 }

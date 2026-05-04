@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -17,6 +18,21 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
 
     private final CustomRegistrationFieldRepository fieldRepository;
     private static final Map<String, String> DEFAULT_SELECT_OPTIONS = buildDefaultSelectOptions();
+    private static final Set<String> DEFAULT_PROFILE_EDITABLE_FIELDS = Set.of(
+            "email",
+            "phoneNumber",
+            "address",
+            "guardiansPhone",
+            "guardianRelation",
+            "schoolName",
+            "schoolGrade",
+            "universityName",
+            "faculty",
+            "universityGrade",
+            "graduatedFrom",
+            "graduateJob",
+            "workDetails"
+    );
 
     @Override
     @Transactional
@@ -83,6 +99,7 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
                 .displayOrder(order)
                 .visibilityRule("ALWAYS") // Specialized UI handles real visibility
                 .showIn("NONE")
+                .profileEditable(DEFAULT_PROFILE_EDITABLE_FIELDS.contains(key))
                 .enabled(true)
                 .build();
         fieldRepository.save(field);

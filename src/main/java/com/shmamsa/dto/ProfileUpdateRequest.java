@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Map;
+
 @Getter
 @Setter
 @DifferentParentPhones(message = "رقم ولي الأمر يجب أن يكون مختلفًا عن الرقم الشخصي")
@@ -35,4 +37,5 @@ public class ProfileUpdateRequest implements HasParentPhones {
     private String graduatedFrom;
     private String graduateJob;
     private String workDetails;
+    private Map<String, String> customFields;
 }

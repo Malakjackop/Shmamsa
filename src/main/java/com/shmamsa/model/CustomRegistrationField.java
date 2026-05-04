@@ -94,6 +94,10 @@ public class CustomRegistrationField {
     @Builder.Default
     private Boolean showInConfigured = false;
 
+    @Column(name = "profile_editable")
+    @Builder.Default
+    private Boolean profileEditable = false;
+
     /** Display order in the registration form */
     @Column(name = "display_order")
     @Builder.Default
@@ -138,11 +142,24 @@ public class CustomRegistrationField {
         this.showInConfigured = Boolean.TRUE.equals(showInConfigured);
     }
 
+    @JsonProperty("profileEditable")
+    public Boolean getProfileEditable() {
+        return Boolean.TRUE.equals(profileEditable);
+    }
+
+    @JsonProperty("profileEditable")
+    public void setProfileEditable(Boolean profileEditable) {
+        this.profileEditable = Boolean.TRUE.equals(profileEditable);
+    }
+
     @PrePersist
     @PreUpdate
     private void normalizeDefaults() {
         if (showInConfigured == null) {
             showInConfigured = false;
+        }
+        if (profileEditable == null) {
+            profileEditable = false;
         }
     }
 

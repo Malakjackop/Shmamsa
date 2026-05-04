@@ -109,3 +109,477 @@ textarea {
 .attendanceDatePanel .p-datepicker-next-button svg {
   transform: scaleX(-1) !important;
 }
+
+.modal.legacy-modal {
+  z-index: 1200;
+  padding: 32px 16px;
+  align-items: flex-start;
+  background: rgba(20, 14, 11, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.modal.legacy-modal .modalCard {
+  width: min(100%, 820px);
+  margin: auto;
+  padding: 24px;
+  border-radius: 24px;
+  background: #ffffff;
+  color: #2f2723;
+  border: 1px solid #eadfd8;
+  box-shadow: 0 24px 80px rgba(52, 28, 20, 0.18);
+}
+
+.modal.legacy-modal .modalCard.wide {
+  width: min(100%, 920px);
+}
+
+.modal.legacy-modal .modalHead {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #efe4de;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.modal.legacy-modal .modalHead > :first-child {
+  min-width: 0;
+}
+
+.modal.legacy-modal .title {
+  color: #5e2b20;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.modal.legacy-modal .sub {
+  color: #7d6f69;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-top: 0.35rem;
+}
+
+.modal.legacy-modal .modalActions,
+.modal.legacy-modal .legacy-modal__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+
+.modal.legacy-modal .legacy-modal__close {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #8b4533;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.modal.legacy-modal .legacy-modal__close:hover {
+  background: linear-gradient(135deg, #4a2018, #753a2a);
+  border-color: #753a2a;
+  color: #ffffff;
+}
+
+.modal.legacy-modal .legacy-modal__close .pi {
+  font-size: 1rem;
+}
+
+.modal.legacy-modal .filters {
+  gap: 10px;
+}
+
+.modal.legacy-modal .filters label {
+  color: #7d6f69;
+  font-size: 0.82rem;
+}
+
+.modal.legacy-modal input:not([type='checkbox']),
+.modal.legacy-modal select,
+.modal.legacy-modal textarea,
+.modal.legacy-modal .singleSelectValue,
+.modal.legacy-modal .readonly-box,
+.modal.legacy-modal .p-inputtext {
+  color: #2f2723;
+  background: #ffffff;
+  border: 1px solid #e4dad3;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.modal.legacy-modal input:not([type='checkbox']),
+.modal.legacy-modal select,
+.modal.legacy-modal textarea,
+.modal.legacy-modal .singleSelectValue,
+.modal.legacy-modal .readonly-box {
+  padding: 12px 14px;
+}
+
+.modal.legacy-modal textarea {
+  resize: vertical;
+}
+
+.modal.legacy-modal input:not([type='checkbox'])::placeholder,
+.modal.legacy-modal textarea::placeholder {
+  color: #8f827b;
+}
+
+.modal.legacy-modal .profileGrid > div,
+.modal.legacy-modal .detailRow,
+.modal.legacy-modal .typeCard,
+.modal.legacy-modal .reqRow,
+.modal.legacy-modal .histItem,
+.modal.legacy-modal .stat,
+.modal.legacy-modal .attBox,
+.modal.legacy-modal .confirmBox {
+  background: #ffffff;
+  color: #2f2723;
+  border: 1px solid #ebe1db;
+  box-shadow: none;
+}
+
+.modal.legacy-modal .attBoxHead,
+.modal.legacy-modal .confirmTitle,
+.modal.legacy-modal .cardTitle,
+.modal.legacy-modal .dTitle,
+.modal.legacy-modal .reqName,
+.modal.legacy-modal .histTitle,
+.modal.legacy-modal .statNum {
+  color: #6a3627;
+}
+
+.modal.legacy-modal .detailRow,
+.modal.legacy-modal .typeCard,
+.modal.legacy-modal .histItem,
+.modal.legacy-modal .attRow {
+  border-radius: 16px;
+}
+
+.modal.legacy-modal .dSub,
+.modal.legacy-modal .reqMeta,
+.modal.legacy-modal .histBy,
+.modal.legacy-modal .histHint,
+.modal.legacy-modal .confirmText,
+.modal.legacy-modal .attEmpty,
+.modal.legacy-modal .statLbl,
+.modal.legacy-modal .statExtra {
+  color: #6c635d;
+}
+
+.modal.legacy-modal > .hint,
+.modal.legacy-modal .modalCard > .hint,
+.modal.legacy-modal .modalCard > div > .hint {
+  color: #6c635d;
+}
+
+.modal.legacy-modal .typeCard .hint,
+.modal.legacy-modal .histItem .hint,
+.modal.legacy-modal .attBox .hint {
+  color: #6c635d;
+}
+
+.modal.legacy-modal .copyPhoneBtn {
+  color: #8b4533;
+}
+
+.modal.legacy-modal .copyPhoneBtn:hover {
+  color: #5e2b20;
+}
+
+.modal.legacy-modal .iftekadHistory {
+  border-top-color: #efe4de;
+}
+
+.modal.legacy-modal .confirmOverlay {
+  background: rgba(6, 6, 8, 0.5);
+}
+
+.modal.legacy-modal .attBoxHead,
+.modal.legacy-modal .dailySummaryLine,
+.modal.legacy-modal .boxRow,
+.modal.legacy-modal .attRow {
+  background: #fffaf8;
+}
+
+.modal.legacy-modal .iftekadField label,
+.modal.legacy-modal .dailyField label,
+.modal.legacy-modal .editField label {
+  color: #7d6f69;
+}
+
+.modal.legacy-modal .histIcon {
+  border-color: #8b4533;
+  background: #ffffff;
+  color: #8b4533;
+}
+
+.modal.legacy-modal .histIcon:hover {
+  background: #f7ede8;
+}
+
+.modal.legacy-modal .p-button {
+  background: linear-gradient(135deg, #5e2b20, #8b4533) !important;
+  border-color: #8b4533 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.modal.legacy-modal .p-button:hover {
+  background: linear-gradient(135deg, #4a2018, #753a2a) !important;
+  border-color: #753a2a !important;
+}
+
+.app-surface-dialog {
+  border-radius: 24px !important;
+  overflow: hidden;
+  border: 1px solid #eadfd8 !important;
+  background: #ffffff !important;
+  color: #2f2723 !important;
+  box-shadow: 0 24px 80px rgba(52, 28, 20, 0.18) !important;
+}
+
+.app-surface-dialog .p-dialog-header,
+.app-surface-dialog .p-dialog-content,
+.app-surface-dialog .p-dialog-footer {
+  background: #ffffff !important;
+  color: #2f2723 !important;
+}
+
+.app-surface-dialog .p-dialog-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #efe4de !important;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.app-surface-dialog .p-dialog-content {
+  padding: 20px 24px 24px;
+}
+
+.app-surface-dialog .p-dialog-footer {
+  padding: 16px 24px 24px;
+  border-top: 1px solid #efe4de !important;
+}
+
+.app-surface-dialog .p-dialog-title {
+  color: #5e2b20;
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.app-surface-dialog .p-dialog-header-actions,
+.app-surface-dialog .p-dialog-header-icons {
+  margin-inline-start: auto;
+}
+
+.app-surface-dialog .p-dialog-header .p-button,
+.app-surface-dialog .p-button {
+  background: linear-gradient(135deg, #5e2b20, #8b4533) !important;
+  border-color: #8b4533 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.app-surface-dialog .p-dialog-header .p-button:hover,
+.app-surface-dialog .p-button:hover {
+  background: linear-gradient(135deg, #4a2018, #753a2a) !important;
+  border-color: #753a2a !important;
+}
+
+.app-surface-dialog .p-dialog-header-close-button,
+.app-surface-dialog .p-dialog-close-button,
+.app-surface-dialog .p-dialog-header-icon {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 12px !important;
+}
+
+.app-surface-dialog label,
+.app-surface-dialog .form-group label {
+  color: #7d6f69;
+  font-weight: 700;
+}
+
+.app-surface-dialog small,
+.app-surface-dialog .hint {
+  color: #6c635d;
+}
+
+.app-surface-dialog input:not([type='checkbox']),
+.app-surface-dialog select,
+.app-surface-dialog textarea,
+.app-surface-dialog .p-inputtext,
+.app-surface-dialog .p-select,
+.app-surface-dialog .readonly-box {
+  width: 100%;
+  color: #2f2723;
+  background: #ffffff;
+  border: 1px solid #e4dad3;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.app-surface-dialog input:not([type='checkbox']),
+.app-surface-dialog select,
+.app-surface-dialog textarea,
+.app-surface-dialog .readonly-box {
+  padding: 12px 14px;
+}
+
+.app-surface-dialog input:not([type='checkbox'])::placeholder,
+.app-surface-dialog textarea::placeholder {
+  color: #8f827b;
+}
+
+.app-surface-dialog .btn-save,
+.app-surface-dialog .btn-cancel,
+.app-surface-dialog .action-btn,
+.app-surface-dialog .mini-btn,
+.app-surface-dialog .option-add-btn {
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+  border: 1px solid #8b4533;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.app-surface-dialog .btn-save:hover,
+.app-surface-dialog .btn-cancel:hover,
+.app-surface-dialog .action-btn:hover,
+.app-surface-dialog .mini-btn:hover,
+.app-surface-dialog .option-add-btn:hover {
+  background: linear-gradient(135deg, #4a2018, #753a2a);
+  border-color: #753a2a;
+}
+
+.app-surface-dialog .dialog-footer {
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.app-surface-dialog .grant-dialog-existing,
+.app-surface-dialog .grant-target-option,
+.app-surface-dialog .custom-editor-option,
+.app-surface-dialog .visibility-condition-card,
+.app-surface-dialog .visibility-empty-state {
+  background: #fffaf8;
+  border-color: #ebe1db;
+}
+
+@media (max-width: 700px) {
+  .app-surface-dialog .p-dialog-header {
+    padding: 18px 18px 14px;
+  }
+
+  .app-surface-dialog .p-dialog-content,
+  .app-surface-dialog .p-dialog-footer {
+    padding-inline: 18px;
+  }
+
+  .app-surface-dialog .p-dialog-title {
+    font-size: 1.3rem;
+  }
+}
+
+.modal.legacy-modal .iftekadSave,
+.modal.legacy-modal .editBtn {
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+  color: #ffffff;
+}
+
+.modal.legacy-modal .iftekadBtn {
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+}
+
+.modal.legacy-modal .cancelBtn,
+.modal.legacy-modal .cancelBtn2 {
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+  color: #ffffff;
+}
+
+.modal.legacy-modal .dangerBtn,
+.modal.legacy-modal .miniDanger {
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+  color: #ffffff;
+}
+
+.modal.legacy-modal .iftekadSave,
+.modal.legacy-modal .editBtn,
+.modal.legacy-modal .cancelBtn,
+.modal.legacy-modal .cancelBtn2,
+.modal.legacy-modal .dangerBtn,
+.modal.legacy-modal .miniDanger,
+.modal.legacy-modal .iftekadBtn {
+  border: none;
+  box-shadow: none;
+}
+
+.modal.legacy-modal .profileGrid,
+.modal.legacy-modal .detailList,
+.modal.legacy-modal .reqList,
+.modal.legacy-modal .iftekadHistory,
+.modal.legacy-modal .attBoxBody,
+.modal.legacy-modal .cards {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.modal.legacy-modal .profileGrid::-webkit-scrollbar,
+.modal.legacy-modal .detailList::-webkit-scrollbar,
+.modal.legacy-modal .reqList::-webkit-scrollbar,
+.modal.legacy-modal .iftekadHistory::-webkit-scrollbar,
+.modal.legacy-modal .attBoxBody::-webkit-scrollbar,
+.modal.legacy-modal .cards::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.modal.legacy-modal .profileGrid::-webkit-scrollbar-thumb,
+.modal.legacy-modal .detailList::-webkit-scrollbar-thumb,
+.modal.legacy-modal .reqList::-webkit-scrollbar-thumb,
+.modal.legacy-modal .iftekadHistory::-webkit-scrollbar-thumb,
+.modal.legacy-modal .attBoxBody::-webkit-scrollbar-thumb,
+.modal.legacy-modal .cards::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 51, 0.28);
+  border-radius: 999px;
+}
+
+@media (max-width: 700px) {
+  .modal.legacy-modal {
+    padding: 18px 10px;
+  }
+
+  .modal.legacy-modal .modalCard {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .modal.legacy-modal .modalHead {
+    gap: 12px;
+  }
+
+  .modal.legacy-modal .title {
+    font-size: 1.35rem;
+  }
+
+  .modal.legacy-modal .legacy-modal__head-actions,
+  .modal.legacy-modal .modalActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .modal.legacy-modal .filters {
+    flex: 1 1 auto;
+  }
+
+  .modal.legacy-modal .filters select {
+    width: 100%;
+  }
+}

@@ -123,6 +123,24 @@ public class DevSettingsController {
         return orderedTargets.isEmpty() ? "NONE" : String.join(",", orderedTargets);
     }
 
+    private boolean showInContainsProfile(String normalizedShowIn) {
+        if (normalizedShowIn == null || normalizedShowIn.isBlank()) {
+            return false;
+        }
+
+        for (String rawTarget : normalizedShowIn.split(",")) {
+            if ("PROFILE".equalsIgnoreCase(rawTarget.trim())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean normalizeProfileEditable(Boolean requestedEditable, String normalizedShowIn) {
+        return showInContainsProfile(normalizedShowIn) && Boolean.TRUE.equals(requestedEditable);
+    }
+
     // ── GET all fields ──────────────────────────────────────────────────
     @GetMapping("/custom-fields")
     public ResponseEntity<List<CustomRegistrationField>> getAll(Authentication auth) {
@@ -150,6 +168,7 @@ public class DevSettingsController {
             String visibilityDependsOn,
             String visibilityDependsValues,
             String showIn,
+            Boolean profileEditable,
             Integer displayOrder
     ) {}
 
@@ -179,6 +198,7 @@ public class DevSettingsController {
         }
         String requiredRule = normalizeRequiredRuleSet(req.requiredRule());
         String showIn = normalizeShowIn(req.showIn());
+        boolean profileEditable = normalizeProfileEditable(req.profileEditable(), showIn);
         List<VisibilityConditionConfig> visibilityConditions = req.visibilityConditions() != null
                 ? normalizeVisibilityConditions(key, req.visibilityConditions())
                 : null;
@@ -192,6 +212,7 @@ public class DevSettingsController {
                 .requiredRule(requiredRule)
                 .showIn(showIn)
                 .showInConfigured(req.showIn() != null)
+                .profileEditable(profileEditable)
                 .displayOrder(req.displayOrder() != null ? req.displayOrder() : 0)
                 .enabled(true)
                 .createdAt(LocalDateTime.now())
@@ -214,6 +235,7 @@ public class DevSettingsController {
             String visibilityDependsOn,
             String visibilityDependsValues,
             String showIn,
+            Boolean profileEditable,
             Integer displayOrder
     ) {}
 
@@ -245,6 +267,7 @@ public class DevSettingsController {
         if (req.requiredRule() != null) {
             field.setRequiredRule(normalizeRequiredRuleSet(req.requiredRule()));
         }
+        String normalizedShowIn = normalizeShowIn(field.getShowIn());
         if (req.visibilityConditions() != null || req.visibilityRule() != null || req.visibilityDependsOn() != null || req.visibilityDependsValues() != null) {
             applyVisibilityConfiguration(
                     field,
@@ -258,11 +281,18 @@ public class DevSettingsController {
             );
         }
         if (req.showIn() != null && !req.showIn().isBlank()) {
-            field.setShowIn(normalizeShowIn(req.showIn()));
+            normalizedShowIn = normalizeShowIn(req.showIn());
+            field.setShowIn(normalizedShowIn);
             field.setShowInConfigured(true);
         } else if (req.showIn() != null) {
+            normalizedShowIn = "NONE";
             field.setShowIn("NONE");
             field.setShowInConfigured(true);
+        }
+        if (req.profileEditable() != null) {
+            field.setProfileEditable(normalizeProfileEditable(req.profileEditable(), normalizedShowIn));
+        } else if (!showInContainsProfile(normalizedShowIn)) {
+            field.setProfileEditable(false);
         }
         if (req.displayOrder() != null) {
             field.setDisplayOrder(req.displayOrder());

@@ -130,15 +130,17 @@
     </table>
   </div>
 
-  <div class="modal" *ngIf="profileFor">
+  <div class="modal legacy-modal" *ngIf="profileFor">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <div class="title">{{ profileFor.fullName }}</div>
           <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
-        <div class="modalActions">
-          <button pButton type="button" icon="pi pi-times" (click)="closeProfile()">➖</button>
+        <div class="modalActions legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeProfile()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
         </div>
       </div>
 
@@ -172,7 +174,7 @@
     </div>
   </div>
 
-  <div class="modal" *ngIf="requestsOpen">
+  <div class="modal legacy-modal" *ngIf="requestsOpen">
     <div class="modalCard wide">
       <div class="modalHead">
         <div>
@@ -180,8 +182,10 @@
           <div class="sub" *ngIf="pendingRequestsCount > 0">عدد الطلبات: {{ pendingRequestsCount }}</div>
           <div class="sub" *ngIf="pendingRequestsCount === 0">لا يوجد طلبات حالياً</div>
         </div>
-        <div class="modalActions">
-          <button pButton type="button" icon="pi pi-times" (click)="closeKhorsRequests()">➖</button>
+        <div class="modalActions legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeKhorsRequests()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
         </div>
       </div>
 

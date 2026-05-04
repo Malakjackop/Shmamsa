@@ -1,7 +1,7 @@
 import { Injectable, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Observable, map, of } from 'rxjs';
 
 export interface CustomField {
   id?: number;
@@ -17,6 +17,7 @@ export interface CustomField {
   visibilityConditions?: VisibilityCondition[];
   showIn: string;
   showInConfigured?: boolean;
+  profileEditable?: boolean;
   displayOrder: number;
   enabled: boolean;
   isSystem?: boolean;
@@ -28,6 +29,32 @@ export interface VisibilityCondition {
   rule?: string;
   fieldKey?: string;
   values?: string[];
+}
+
+function showInIncludesProfile(showIn?: string | null): boolean {
+  return String(showIn || '')
+    .split(',')
+    .map(target => target.trim().toUpperCase())
+    .includes('PROFILE');
+}
+
+export function normalizeCustomFieldResponse(field: CustomField): CustomField {
+  if (!field) {
+    return field;
+  }
+
+  if (
+    !Object.prototype.hasOwnProperty.call(field, 'profileEditable') &&
+    field.showInConfigured === true &&
+    showInIncludesProfile(field.showIn)
+  ) {
+    return {
+      ...field,
+      profileEditable: false
+    };
+  }
+
+  return field;
 }
 
 @Injectable({
@@ -44,13 +71,17 @@ export class DevSettingsService {
   /* ── Public (no auth needed) ─────────────────────────────── */
   getEnabledFields(): Observable<CustomField[]> {
     if (!this.isBrowser) return of([]);
-    return this.http.get<CustomField[]>('/api/auth/custom-fields', { withCredentials: true });
+    return this.http
+      .get<CustomField[]>('/api/auth/custom-fields', { withCredentials: true })
+      .pipe(map((fields) => (fields || []).map(normalizeCustomFieldResponse)));
   }
 
   /* ── Developer-only ────────────────────────────────────────── */
   getAllFields(): Observable<CustomField[]> {
     if (!this.isBrowser) return of([]);
-    return this.http.get<CustomField[]>('/api/dev/custom-fields', { withCredentials: true });
+    return this.http
+      .get<CustomField[]>('/api/dev/custom-fields', { withCredentials: true })
+      .pipe(map((fields) => (fields || []).map(normalizeCustomFieldResponse)));
   }
 
   createField(field: Partial<CustomField>): Observable<CustomField> {

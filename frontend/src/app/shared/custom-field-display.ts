@@ -32,6 +32,22 @@ const SYSTEM_FIELD_DEFAULT_SHOW_IN: Record<string, string[]> = {
   guardianRelation: ['PROFILE', 'FAMILY_INFO']
 };
 
+const SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE = new Set([
+  'email',
+  'phoneNumber',
+  'address',
+  'guardiansPhone',
+  'guardianRelation',
+  'schoolName',
+  'schoolGrade',
+  'universityName',
+  'faculty',
+  'universityGrade',
+  'graduatedFrom',
+  'graduateJob',
+  'workDetails'
+]);
+
 export function parseShowInTargets(showIn?: string | null): string[] {
   return Array.from(new Set(
     String(showIn || '')
@@ -43,6 +59,10 @@ export function parseShowInTargets(showIn?: string | null): string[] {
 
 export function getSystemFieldDefaultShowIn(fieldKey?: string | null): string[] {
   return [...(SYSTEM_FIELD_DEFAULT_SHOW_IN[String(fieldKey || '').trim()] || [])];
+}
+
+export function getSystemFieldDefaultProfileEditable(fieldKey?: string | null): boolean {
+  return SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE.has(String(fieldKey || '').trim());
 }
 
 export function effectiveShowInTargets(
@@ -69,6 +89,20 @@ export function customFieldHasTarget(
   target: string
 ): boolean {
   return effectiveShowInTargets(fieldOrShowIn).includes(String(target || '').trim().toUpperCase());
+}
+
+export function effectiveProfileEditable(
+  field: Pick<CustomField, 'fieldKey' | 'isSystem' | 'profileEditable'> | null | undefined
+): boolean {
+  if (!field) {
+    return false;
+  }
+
+  if (typeof field.profileEditable === 'boolean') {
+    return field.profileEditable;
+  }
+
+  return !!field.isSystem && getSystemFieldDefaultProfileEditable(field.fieldKey);
 }
 
 export function buildVisibleCustomFieldEntries(

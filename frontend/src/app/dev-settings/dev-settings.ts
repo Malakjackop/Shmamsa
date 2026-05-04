@@ -16,7 +16,7 @@ import { forkJoin } from 'rxjs';
 
 import { DevSettingsService, CustomField, VisibilityCondition } from '../services/dev-settings.service';
 import { AuthService, FamilyOption } from '../services/auth.service';
-import { effectiveShowInTargets, parseShowInTargets } from '../shared/custom-field-display';
+import { effectiveProfileEditable, effectiveShowInTargets, parseShowInTargets } from '../shared/custom-field-display';
 
 interface FieldSection {
   id: string;
@@ -194,7 +194,8 @@ export class DevSettingsComponent implements OnInit {
       next: (data) => {
         this.fields = this.sortFields((data || []).map(field => ({
           ...field,
-          showIn: this.resolveEffectiveShowInValue(field.showIn, field)
+          showIn: this.resolveEffectiveShowInValue(field.showIn, field),
+          profileEditable: this.resolveEffectiveProfileEditable(field)
         })));
         this.rebuildSections();
         this.loading = false;
@@ -218,6 +219,7 @@ export class DevSettingsComponent implements OnInit {
       requiredRule: 'NEVER',
       visibilityRule: 'ALWAYS',
       showIn: 'NONE',
+      profileEditable: false,
       displayOrder: this.fields.length
     };
     this.optionInputs = [''];
@@ -235,6 +237,7 @@ export class DevSettingsComponent implements OnInit {
       required: this.isRequiredConfigured(f),
       requiredRule: this.serializeRequiredRules(this.selectedRequiredRules),
       showIn: this.resolveEffectiveShowInValue(f.showIn, f),
+      profileEditable: this.resolveEffectiveProfileEditable(f),
       visibilityRule: 'ALWAYS',
       visibilityDependsOn: '',
       visibilityDependsValues: ''
@@ -266,6 +269,7 @@ export class DevSettingsComponent implements OnInit {
       requiredRule: !!this.editingField.required ? this.serializeRequiredRules(this.selectedRequiredRules) : 'NEVER',
       showIn: this.normalizeConfiguredShowInValue(this.editingField.showIn),
       showInConfigured: true,
+      profileEditable: this.showInIncludesProfile(this.editingField.showIn) && !!this.editingField.profileEditable,
       visibilityRule: this.legacyVisibilityRule(visibilityConditions),
       visibilityDependsOn: this.legacyVisibilityDependsOn(visibilityConditions),
       visibilityDependsValues: this.legacyVisibilityDependsValues(visibilityConditions),
@@ -328,6 +332,17 @@ export class DevSettingsComponent implements OnInit {
     if (this.editingField.fieldType === 'SELECT' && !this.optionInputs.length) {
       this.optionInputs = [''];
     }
+  }
+
+  onShowInChange(showInValue: string): void {
+    this.editingField.showIn = showInValue;
+    if (!this.showInIncludesProfile(showInValue)) {
+      this.editingField.profileEditable = false;
+    }
+  }
+
+  showInIncludesProfile(showInValue?: string | null): boolean {
+    return parseShowInTargets(showInValue).includes('PROFILE');
   }
 
   usesManagedFamilyOptions(field: Partial<CustomField> = this.editingField): boolean {
@@ -912,5 +927,17 @@ export class DevSettingsComponent implements OnInit {
     const targets = parseShowInTargets(showIn);
     const orderedTargets = this.showInTargetOrder.filter(target => targets.includes(target));
     return orderedTargets.length ? orderedTargets.join(',') : 'NONE';
+  }
+
+  private resolveEffectiveProfileEditable(field?: Partial<CustomField> | null): boolean {
+    if (!field || !this.showInIncludesProfile(this.resolveEffectiveShowInValue(field.showIn, field))) {
+      return false;
+    }
+
+    return effectiveProfileEditable({
+      fieldKey: String(field.fieldKey || '').trim(),
+      isSystem: !!field.isSystem,
+      profileEditable: field.profileEditable
+    });
   }
 }

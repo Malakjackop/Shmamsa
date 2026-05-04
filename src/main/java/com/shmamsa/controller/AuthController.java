@@ -46,6 +46,22 @@ public class AuthController {
             "أولى ثانوي", "تانية ثانوي", "تالتة ثانوي",
             "other"
     );
+    private static final java.util.Map<String, java.util.Set<String>> SYSTEM_FIELD_DEFAULT_SHOW_IN = buildSystemFieldDefaultShowIn();
+    private static final java.util.Set<String> SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE = java.util.Set.of(
+            "email",
+            "phoneNumber",
+            "address",
+            "guardiansPhone",
+            "guardianRelation",
+            "schoolName",
+            "schoolGrade",
+            "universityName",
+            "faculty",
+            "universityGrade",
+            "graduatedFrom",
+            "graduateJob",
+            "workDetails"
+    );
 
 
     private final AuthService authService;
@@ -235,8 +251,14 @@ public class AuthController {
             throw new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
         }
 
-        // ✅ Allow updating email from profile (must be unique)
-        if (updated.getEmail() != null) {
+        Map<String, CustomRegistrationField> editableProfileFields = new LinkedHashMap<>();
+        for (CustomRegistrationField field : customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc()) {
+            if (isProfileEditableField(field)) {
+                editableProfileFields.put(field.getFieldKey(), field);
+            }
+        }
+
+        if (updated.getEmail() != null && editableProfileFields.containsKey("email")) {
             String newEmail = updated.getEmail().trim();
             if (!newEmail.isBlank() && !newEmail.equalsIgnoreCase(existingUser.getEmail())) {
                 if (authService.isEmailTakenByOther(newEmail, existingUser.getId())) {
@@ -246,21 +268,54 @@ public class AuthController {
             }
         }
 
-        existingUser.setFullName(updated.getFullName());
-        existingUser.setPhoneNumber(updated.getPhoneNumber());
-        existingUser.setAddress(updated.getAddress());
-        existingUser.setGuardiansPhone(updated.getGuardiansPhone());
-        existingUser.setGuardianRelation(updated.getGuardianRelation());
-        existingUser.setSchoolName(updated.getSchoolName());
-        existingUser.setSchoolGrade(updated.getSchoolGrade());
-        existingUser.setUniversityName(updated.getUniversityName());
-        existingUser.setFaculty(updated.getFaculty());
-        existingUser.setUniversityGrade(updated.getUniversityGrade());
-        existingUser.setGraduatedFrom(updated.getGraduatedFrom());
-        existingUser.setGraduateJob(updated.getGraduateJob());
-        existingUser.setWorkDetails(updated.getWorkDetails());
+        if (editableProfileFields.containsKey("phoneNumber")) {
+            existingUser.setPhoneNumber(updated.getPhoneNumber());
+        }
+        if (editableProfileFields.containsKey("address")) {
+            existingUser.setAddress(updated.getAddress());
+        }
+        if (editableProfileFields.containsKey("guardiansPhone")) {
+            existingUser.setGuardiansPhone(updated.getGuardiansPhone());
+        }
+        if (editableProfileFields.containsKey("guardianRelation")) {
+            existingUser.setGuardianRelation(updated.getGuardianRelation());
+        }
+        if (editableProfileFields.containsKey("deaconDegree")) {
+            existingUser.setDeaconDegree(updated.getDeaconDegree());
+        }
+        if (editableProfileFields.containsKey("status")) {
+            existingUser.setStatus(updated.getStatus());
+        }
+        if (editableProfileFields.containsKey("studyType")) {
+            existingUser.setStudyType(updated.getStudyType());
+        }
+        if (editableProfileFields.containsKey("schoolName")) {
+            existingUser.setSchoolName(updated.getSchoolName());
+        }
+        if (editableProfileFields.containsKey("schoolGrade")) {
+            existingUser.setSchoolGrade(updated.getSchoolGrade());
+        }
+        if (editableProfileFields.containsKey("universityName")) {
+            existingUser.setUniversityName(updated.getUniversityName());
+        }
+        if (editableProfileFields.containsKey("faculty")) {
+            existingUser.setFaculty(updated.getFaculty());
+        }
+        if (editableProfileFields.containsKey("universityGrade")) {
+            existingUser.setUniversityGrade(updated.getUniversityGrade());
+        }
+        if (editableProfileFields.containsKey("graduatedFrom")) {
+            existingUser.setGraduatedFrom(updated.getGraduatedFrom());
+        }
+        if (editableProfileFields.containsKey("graduateJob")) {
+            existingUser.setGraduateJob(updated.getGraduateJob());
+        }
+        if (editableProfileFields.containsKey("workDetails")) {
+            existingUser.setWorkDetails(updated.getWorkDetails());
+        }
 
         authService.saveUser(existingUser);
+        updateProfileCustomFieldValues(existingUser, updated.getCustomFields(), editableProfileFields);
 
         userFamilyRoleService.syncUser(existingUser);
         return ResponseEntity.ok(toCurrentUserView(existingUser));
@@ -288,6 +343,37 @@ public class AuthController {
                     .value(val.trim())
                     .build();
             customFieldValueRepo.save(cfv);
+        }
+    }
+
+    private void updateProfileCustomFieldValues(
+            User user,
+            Map<String, String> customFields,
+            Map<String, CustomRegistrationField> editableProfileFields
+    ) {
+        if (user == null || user.getId() == null || customFields == null || customFields.isEmpty()) {
+            return;
+        }
+
+        for (var entry : customFields.entrySet()) {
+            String key = safe(entry.getKey());
+            if (key.isBlank()) {
+                continue;
+            }
+
+            CustomRegistrationField field = editableProfileFields.get(key);
+            if (field == null || Boolean.TRUE.equals(field.getIsSystem())) {
+                continue;
+            }
+
+            String value = safe(entry.getValue());
+            CustomFieldValue customFieldValue = customFieldValueRepo.findByUserIdAndFieldKey(user.getId(), key)
+                    .orElseGet(() -> CustomFieldValue.builder()
+                            .userId(user.getId())
+                            .fieldKey(key)
+                            .build());
+            customFieldValue.setValue(value);
+            customFieldValueRepo.save(customFieldValue);
         }
     }
 
@@ -612,5 +698,80 @@ public class AuthController {
         }
         String derived = NationalIdUtils.extractGender(safe(nationalId));
         return derived == null ? "" : derived;
+    }
+
+    private boolean isProfileEditableField(CustomRegistrationField field) {
+        if (field == null || !Boolean.TRUE.equals(field.getEnabled())) {
+            return false;
+        }
+
+        if (!effectiveShowInTargets(field).contains("PROFILE")) {
+            return false;
+        }
+
+        Boolean configuredEditable = field.getProfileEditable();
+        if (configuredEditable != null) {
+            return configuredEditable;
+        }
+
+        return Boolean.TRUE.equals(field.getIsSystem())
+                && SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE.contains(field.getFieldKey());
+    }
+
+    private java.util.Set<String> effectiveShowInTargets(CustomRegistrationField field) {
+        if (field == null) {
+            return java.util.Set.of();
+        }
+
+        java.util.Set<String> configuredTargets = parseShowInTargets(field.getShowIn());
+        if (!configuredTargets.isEmpty()) {
+            return configuredTargets;
+        }
+
+        if (Boolean.TRUE.equals(field.getIsSystem()) && !Boolean.TRUE.equals(field.getShowInConfigured())) {
+            return SYSTEM_FIELD_DEFAULT_SHOW_IN.getOrDefault(field.getFieldKey(), java.util.Set.of());
+        }
+
+        return java.util.Set.of();
+    }
+
+    private java.util.Set<String> parseShowInTargets(String showIn) {
+        java.util.LinkedHashSet<String> targets = new java.util.LinkedHashSet<>();
+        for (String rawTarget : safe(showIn).split(",")) {
+            String normalized = rawTarget.trim().toUpperCase(Locale.ROOT);
+            if (!normalized.isBlank() && !"NONE".equals(normalized)) {
+                targets.add(normalized);
+            }
+        }
+        return targets;
+    }
+
+    private static java.util.Map<String, java.util.Set<String>> buildSystemFieldDefaultShowIn() {
+        java.util.Map<String, java.util.Set<String>> defaults = new java.util.LinkedHashMap<>();
+        defaults.put("fullName", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("username", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("email", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("phoneNumber", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("address", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("nationalId", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("dateOfBirth", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("gender", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("deaconDegree", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("deaconFamily", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("khors", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("status", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("studyType", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("schoolName", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("schoolGrade", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("universityName", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("faculty", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("universityGrade", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("graduatedFrom", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("graduateJob", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("isWorking", java.util.Set.of("FAMILY_INFO"));
+        defaults.put("workDetails", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("guardiansPhone", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        defaults.put("guardianRelation", java.util.Set.of("PROFILE", "FAMILY_INFO"));
+        return defaults;
     }
 }
