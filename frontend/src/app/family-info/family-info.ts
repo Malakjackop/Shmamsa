@@ -1,17 +1,49 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { FamilyService } from '../services/family.service';
-import { AdminService } from '../services/admin.service';
-import { AuthService, AuthUser } from '../services/auth.service';
-import { KhorsRequestsService, KhorsJoinRequestView } from '../services/khors-requests.service';
-import { MessageService, ConfirmationService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { hasRole, normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
-import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
-import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
-import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
+import { AdminService } from '../services/admin.service';
+import { AuthService, AuthUser } from '../services/auth.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
-import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
+import { FamilyMemberDetails, FamilyMemberSummary, FamilyService } from '../services/family.service';
+import { KhorsJoinRequestView, KhorsRequestsService } from '../services/khors-requests.service';
+import {
+  buildVisibleCustomFieldEntries,
+  customFieldHasTarget,
+  effectiveShowInTargets
+} from '../shared/custom-field-display';
+import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
+import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
+import { hasRole, normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
+
+type FamilyAssignmentLike = { familyName?: string; role?: string | number; roleCode?: number };
+
+type AttendanceCardKey =
+  | 'FRIDAY_LITURGY'
+  | 'TASBEEHA'
+  | 'FAMILY_MEETING'
+  | 'MARMARKOS_KHORS'
+  | 'ATHANASIUS_KHORS';
+
+type CardColorState = 'white' | 'green' | 'yellow' | 'red';
+
+type MemberAttendanceItem = {
+  key: AttendanceCardKey;
+  label: string;
+  present: number;
+  total: number;
+  text: string;
+};
+
+type MemberAttendanceVisual = {
+  present: number;
+  total: number;
+  percent: number | null;
+  percentText: string;
+  colorState: CardColorState;
+  fillRatio: number;
+  surfaceOpacity: number;
+};
 
 type Member = {
   id: number;
@@ -22,13 +54,34 @@ type Member = {
   address?: string;
   phoneNumber?: string;
   guardiansPhone?: string;
-  /** shown in table */
   schoolGrade?: string;
-  /** UI selection for export */
+  dateOfBirth?: string;
+  khors?: string;
+  khorsYear?: number | string | null;
+  servingScope?: string;
+  fridayLiturgy?: number;
+  tasbeeha?: number;
+  familyMeeting?: number;
+  fridayLiturgyPresent?: number;
+  fridayLiturgyTotal?: number;
+  tasbeehaPresent?: number;
+  tasbeehaTotal?: number;
+  familyMeetingPresent?: number;
+  familyMeetingTotal?: number;
+  marmarkosKhorsPresent?: number;
+  marmarkosKhorsTotal?: number;
+  athanasiusKhorsPresent?: number;
+  athanasiusKhorsTotal?: number;
   selected?: boolean;
+  uiDisplayPhone: string;
+  uiPhoneCaption: string;
+  uiGradeLabel: string;
+  uiBirthDateLabel: string;
+  uiBirthdayMonth: number | null;
+  uiBirthdayDay: number | null;
+  uiAttendanceItems: MemberAttendanceItem[];
+  uiAttendanceVisual: MemberAttendanceVisual;
 };
-
-type FamilyAssignmentLike = { familyName?: string; role?: string | number; roleCode?: number };
 
 type ProfileView = {
   username?: string;
@@ -62,6 +115,20 @@ type ProfileView = {
 
 type CurrentUser = AuthUser & { id?: number };
 
+type BirthdayMonthOption = {
+  value: number;
+  label: string;
+  count: number;
+  disabled: boolean;
+};
+
+type BirthdayDayOption = {
+  value: number;
+  label: string;
+  count: number;
+  disabled: boolean;
+};
+
 @Component({
   selector: 'app-family-info',
   standalone: false,
@@ -78,21 +145,47 @@ export class FamilyInfoComponent implements OnInit {
   private message = inject(MessageService);
   private confirm = inject(ConfirmationService);
 
+  readonly birthdayMonths = [
+    'يناير',
+    'فبراير',
+    'مارس',
+    'أبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر'
+  ];
+
   me: CurrentUser | null = null;
   members: Member[] = [];
+  filteredMembers: Member[] = [];
   families: string[] = [];
   selectedFamily = '';
   loading = false;
 
   selectAll = false;
-
   exportMode = false;
   pendingExport: 'pdf' | null = null;
 
+  selectedSchoolGrade = '';
+  gradeOptions: string[] = [];
+  birthdayPanelOpen = false;
+  birthdayFilterMode: 'DAY' | 'MONTH' = 'DAY';
+  selectedBirthdayMonth: number | null = null;
+  selectedBirthdayDay: number | null = null;
+  birthdayMonthOptions: BirthdayMonthOption[] = [];
+  birthdayDayOptions: BirthdayDayOption[] = [];
+
   profileFor: Member | null = null;
   profile: ProfileView | null = null;
+  profileLoading = false;
   familyInfoFields: CustomField[] = [];
   familyInfoFieldsLoaded = false;
+  private profileCache = new Map<number, ProfileView | null>();
 
   allRoles: string[] = [];
 
@@ -115,120 +208,14 @@ export class FamilyInfoComponent implements OnInit {
     });
   }
 
+  trackByMember = (_: number, member: Member) => member.id;
+
   isAminKhedmaOrDev(): boolean {
     return this.hasRole('AMIN_KHEDMA', 'DEVELOPER', 'DEV');
   }
 
   isKhadim(): boolean {
     return this.hasRole('KHADIM');
-  }
-
-  private isKhadimServingKhors(): boolean {
-    if (!this.isKhadim()) return false;
-    const scope = String(this.me?.servingScope || '').toUpperCase();
-    const khors = String(this.me?.khors || '').toUpperCase();
-    const scopeIncludesKhors = scope === 'KHORS_ONLY' || scope === 'BOTH';
-    const khorsSelectedFromList = !!khors && khors !== 'NONE';
-    return scopeIncludesKhors || khorsSelectedFromList;
-  }
-
-  canSeeKhorsRequests(): boolean {
-
-    if (!this.isKhorsFamilySelected()) return false;
-    return this.canDecideKhorsRequests();
-  }
-
-  canDecideKhorsRequests(): boolean {
-    return this.isAminKhedmaOrDev() || this.isKhadimServingKhors();
-  }
-
-  private normalizeRole(role: unknown): string {
-    return normalizeRole(role);
-  }
-
-  private assignmentsOf(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): Array<{ familyName: string; role: string }> {
-    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
-    return assignments
-      .map((x) => ({
-        familyName: String(x?.familyName || '').trim(),
-        role: normalizeAssignmentRole(x, entity?.role)
-      }))
-      .filter((x) => !!x.familyName);
-  }
-
-  familyLabel(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): string {
-    return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
-  }
-
-  private hasRole(...allowed: string[]): boolean {
-    return hasRole(this.me?.role, allowed);
-  }
-
-  private loadPendingRequestsCount() {
-    if (!this.canSeeKhorsRequests()) return;
-    this.khorsReq.pending().subscribe({
-      next: (list) => (this.pendingRequestsCount = this.filterRequestsBySelectedKhors(list || []).length),
-      error: () => (this.pendingRequestsCount = 0)
-    });
-  }
-
-  openKhorsRequests() {
-    if (!this.canSeeKhorsRequests()) return;
-    this.requestsOpen = true;
-    this.requestsLoading = true;
-    this.khorsReq.pending().subscribe({
-      next: (list) => {
-        this.requests = this.filterRequestsBySelectedKhors(list || []);
-        this.requestsLoading = false;
-        this.pendingRequestsCount = this.requests.length;
-      },
-      error: (err) => {
-        this.requestsLoading = false;
-        this.requests = [];
-        this.pendingRequestsCount = 0;
-        const isServerError = Number(err?.status) >= 500;
-        this.message.add({
-          severity: isServerError ? 'warn' : 'error',
-          summary: 'خطأ',
-          detail: isServerError
-            ? 'تعذر تحميل طلبات الخورس حاليًا. برجاء المحاولة لاحقًا.'
-            : (err?.error?.error || 'فشل تحميل طلبات الخورس')
-        });
-      }
-    });
-  }
-
-  closeKhorsRequests() {
-    this.requestsOpen = false;
-    this.requestsLoading = false;
-    this.requests = [];
-    this.loadPendingRequestsCount();
-  }
-
-  decideKhorsRequest(req: KhorsJoinRequestView, approved: boolean) {
-    if (!this.canDecideKhorsRequests()) return;
-    if (!req?.requestId) return;
-    this.khorsReq.decide(req.requestId, approved).subscribe({
-      next: () => {
-        this.requests = (this.requests || []).filter((x) => x.requestId !== req.requestId);
-        this.pendingRequestsCount = this.requests.length;
-        if (approved && this.isKhorsFamilySelected()) {
-          this.loadMembers();
-        }
-        this.message.add({
-          severity: 'success',
-          summary: 'تم',
-          detail: approved ? 'تم قبول الطلب' : 'تم رفض الطلب'
-        });
-      },
-      error: (err) => {
-        this.message.add({
-          severity: 'error',
-          summary: 'خطأ',
-          detail: err?.error?.error || 'فشل تنفيذ القرار'
-        });
-      }
-    });
   }
 
   canSelectFamily(): boolean {
@@ -239,12 +226,11 @@ export class FamilyInfoComponent implements OnInit {
     return hasRole(this.me?.role, ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER']);
   }
 
-  canDeleteMember(m: Member): boolean {
-    if (!this.canDeleteAccounts()) return false;
-    if (!m) return false;
-    const myId = Number(this.me?.['id'] || 0);
-    if (myId && m.id === myId) return false;
-    if (normalizeRole(m.role) === 'DEVELOPER') return false;
+  canDeleteMember(member: Member | null | undefined): boolean {
+    if (!this.canDeleteAccounts() || !member) return false;
+    const myId = Number(this.me?.id || 0);
+    if (myId && member.id === myId) return false;
+    if (normalizeRole(member.role) === 'DEVELOPER') return false;
     return true;
   }
 
@@ -252,32 +238,80 @@ export class FamilyInfoComponent implements OnInit {
     return this.isAminKhedmaOrDev();
   }
 
-  private initFamilyMode() {
-    if (this.canSelectFamily()) {
-      this.familySvc.families().subscribe({
-        next: (f) => {
-          this.families = sortFamiliesByPreferredOrder(f || [], this.preferredFamilyOrder);
-          if (this.families.length) {
-            this.selectedFamily = this.families[0];
-            this.loadMembers();
-            this.loadPendingRequestsCount();
-          }
-        },
-        error: () => {
-          this.families = [];
-          this.selectedFamily = '';
-          this.loadMembers();
-          this.pendingRequestsCount = 0;
-        }
-      });
-    } else {
-      this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
-      this.loadMembers();
-      this.loadPendingRequestsCount();
+  isCardExpanded(member: Member): boolean {
+    return this.profileFor?.id === member.id;
+  }
+
+  hasBirthdayFilter(): boolean {
+    if (this.birthdayFilterMode === 'MONTH') {
+      return this.selectedBirthdayMonth != null;
     }
+    return this.selectedBirthdayMonth != null && this.selectedBirthdayDay != null;
+  }
+
+  birthdayFilterLabel(): string {
+    if (this.birthdayFilterMode === 'MONTH' && this.selectedBirthdayMonth != null) {
+      return `مواليد ${this.monthLabel(this.selectedBirthdayMonth)}`;
+    }
+    if (
+      this.birthdayFilterMode === 'DAY' &&
+      this.selectedBirthdayMonth != null &&
+      this.selectedBirthdayDay != null
+    ) {
+      return `${this.selectedBirthdayDay} ${this.monthLabel(this.selectedBirthdayMonth)}`;
+    }
+    return this.birthdayFilterMode === 'MONTH' ? 'اختر الشهر' : 'اختر اليوم';
+  }
+
+  selectedMembersCount(): number {
+    return this.getSelectedMembers().length;
+  }
+
+  hasEnabledBirthdayDayOptions(): boolean {
+    return this.birthdayDayOptions.some((option) => !option.disabled);
+  }
+
+  toggleBirthdayPanel() {
+    this.birthdayPanelOpen = !this.birthdayPanelOpen;
+  }
+
+  setBirthdayFilterMode(mode: 'DAY' | 'MONTH') {
+    if (this.birthdayFilterMode === mode) return;
+    this.birthdayFilterMode = mode;
+    this.selectedBirthdayDay = null;
+    this.applyFilters();
+  }
+
+  selectBirthdayMonth(month: number) {
+    const option = this.birthdayMonthOptions.find((item) => item.value === month);
+    if (!option || option.disabled) return;
+    this.selectedBirthdayMonth = month;
+    this.selectedBirthdayDay = null;
+    this.rebuildBirthdayDayOptions();
+    this.applyFilters();
+  }
+
+  selectBirthdayDay(day: number) {
+    if (this.selectedBirthdayMonth == null) return;
+    const option = this.birthdayDayOptions.find((item) => item.value === day);
+    if (!option || option.disabled) return;
+    this.selectedBirthdayDay = day;
+    this.applyFilters();
+  }
+
+  clearBirthdayFilter() {
+    this.selectedBirthdayMonth = null;
+    this.selectedBirthdayDay = null;
+    this.rebuildBirthdayDayOptions();
+    this.applyFilters();
+  }
+
+  onSchoolGradeChange() {
+    this.applyFilters();
   }
 
   onFamilyChange() {
+    this.resetInteractiveStateForNewFamily();
     this.loadMembers();
     if (this.canSeeKhorsRequests()) {
       this.loadPendingRequestsCount();
@@ -289,55 +323,46 @@ export class FamilyInfoComponent implements OnInit {
     }
   }
 
-  loadMembers() {
-    this.loading = true;
-    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
-
-    this.familySvc.members(famParam).subscribe({
-      next: (m) => {
-        this.members = ((m || []) as FamilyMemberSummary[]).map((x) => ({ ...(x as Member), selected: false }));
-        this.selectAll = false;
-        this.loading = false;
-      },
-      error: (err) => {
-        this.loading = false;
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'Failed to load' });
-      }
-    });
-  }
-
-  toggleSelectAll() {
-    this.members.forEach((m) => (m.selected = this.selectAll));
-  }
-
-  onMemberSelectionChange() {
-    const any = this.members.some((m) => !!m.selected);
-    if (!any) {
-      this.selectAll = false;
+  openProfile(member: Member) {
+    if (this.profileFor?.id === member.id) {
+      this.closeProfile();
       return;
     }
-    this.selectAll = this.members.every((m) => !!m.selected);
-  }
 
-  private getSelectedMembers(): Member[] {
-    return (this.members || []).filter((m) => !!m.selected);
-  }
-
-  // ===== Profile =====
-  openProfile(member: Member) {
     this.profileFor = member;
     this.profile = null;
-    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
+    this.profileLoading = true;
 
+    if (this.profileCache.has(member.id)) {
+      this.profile = this.profileCache.get(member.id) || null;
+      this.profileLoading = false;
+      return;
+    }
+
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
     this.familySvc.memberDetails(member.id, famParam).subscribe({
-      next: (p) => (this.profile = (p as ProfileView | null)),
-      error: () => (this.profile = null)
+      next: (p) => {
+        const profile = (p as ProfileView | null) || null;
+        this.profileCache.set(member.id, profile);
+        if (this.profileFor?.id === member.id) {
+          this.profile = profile;
+          this.profileLoading = false;
+        }
+      },
+      error: () => {
+        this.profileCache.set(member.id, null);
+        if (this.profileFor?.id === member.id) {
+          this.profile = null;
+          this.profileLoading = false;
+        }
+      }
     });
   }
 
   closeProfile() {
     this.profileFor = null;
     this.profile = null;
+    this.profileLoading = false;
   }
 
   async copyPhone(value: unknown) {
@@ -365,39 +390,21 @@ export class FamilyInfoComponent implements OnInit {
     }
   }
 
-  private hasDisplayValue(v: unknown): boolean {
-    if (v === false || v === 0) return true;
-    return String(v ?? '').trim() !== '';
+  toggleSelectAll() {
+    this.members.forEach((member) => (member.selected = this.selectAll));
   }
 
-  private yesNoAr(v: unknown): string {
-    if (v === true) return 'نعم';
-    if (v === false) return 'لا';
-    return String(v ?? '').trim();
-  }
-
-  private khorsYearAr(year: unknown): string {
-    const y = Number(year || 0);
-    if (y === 1) return 'سنة أولى';
-    if (y === 2) return 'سنة ثانية';
-    if (y === 3) return 'سنة ثالثة';
-    if (y === 4) return 'سنة رابعة';
-    if (y === 5) return 'سنة خامسة';
-    return '';
-  }
-
-  private memberKhorsLabel(khors: unknown, khorsYear?: unknown): string {
-    const k = String(khors || '').trim().toUpperCase();
-
-    if (!k || k === 'NONE') return '';
-    if (k === 'MARMARKOS') {
-      const yearLabel = this.khorsYearAr(khorsYear);
-      return yearLabel ? `خورس مارمرقس - ${yearLabel}` : 'خورس مارمرقس';
+  onMemberSelectionChange() {
+    const anySelected = this.members.some((member) => !!member.selected);
+    if (!anySelected) {
+      this.selectAll = false;
+      return;
     }
-    if (k === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
-    if (k === 'BOTH') return 'خورس مارمرقس + خورس البابا اثناسيوس';
+    this.selectAll = this.members.every((member) => !!member.selected);
+  }
 
-    return String(khors || '').trim();
+  private getSelectedMembers(): Member[] {
+    return (this.members || []).filter((member) => !!member.selected);
   }
 
   profileEntries(): Array<{ label: string; value: string }> {
@@ -412,15 +419,23 @@ export class FamilyInfoComponent implements OnInit {
     const rows = [
       { label: 'اسم المستخدم', value: String(p.username ?? '').trim(), fieldKeys: ['username'] },
       { label: 'البريد الإلكتروني', value: String(p.email ?? '').trim(), fieldKeys: ['email'] },
-      { label: 'الأسرة', value: this.assignmentsOf(p).map((x) => x.familyName).join(' + '), fieldKeys: ['deaconFamily'] },
+      {
+        label: 'الأسرة',
+        value: this.assignmentsOf(p).map((x) => x.familyName).join(' + '),
+        fieldKeys: ['deaconFamily']
+      },
       { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear), fieldKeys: ['khors'] },
       { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim(), fieldKeys: ['deaconDegree'] },
       { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim(), fieldKeys: ['nationalId'] },
       { label: 'الهاتف', value: String(p.phoneNumber ?? '').trim(), fieldKeys: ['phoneNumber'] },
       { label: 'العنوان', value: String(p.address ?? '').trim(), fieldKeys: ['address'] },
-      { label: 'هاتف ولي الأمر', value: String(p.guardiansPhone ?? '').trim(), fieldKeys: ['guardiansPhone'] },
+      {
+        label: 'هاتف ولي الأمر',
+        value: String(p.guardiansPhone ?? '').trim(),
+        fieldKeys: ['guardiansPhone']
+      },
       { label: 'صلة القرابة', value: String(p.guardianRelation ?? '').trim(), fieldKeys: ['guardianRelation'] },
-      { label: 'تاريخ الميلاد', value: String(p.dateOfBirth ?? '').trim(), fieldKeys: ['dateOfBirth'] },
+      { label: 'تاريخ الميلاد', value: this.formatDateValue(p.dateOfBirth), fieldKeys: ['dateOfBirth'] },
       { label: 'النوع', value: String(p.gender ?? '').trim(), fieldKeys: ['gender'] },
       { label: 'الحالة', value: String(p.status ?? '').trim(), fieldKeys: ['status'] },
       { label: 'نوع الدراسة', value: String(p.studyType ?? '').trim(), fieldKeys: ['studyType'] },
@@ -452,46 +467,6 @@ export class FamilyInfoComponent implements OnInit {
     return label === 'الهاتف' || label === 'هاتف ولي الأمر';
   }
 
-  private loadRoles() {
-    if (!this.canEditRoles()) return;
-    this.adminSvc.roles().subscribe({ next: (r) => (this.allRoles = r || []) });
-  }
-
-  private loadCustomFieldDefinitions() {
-    this.devSettings.getEnabledFields().subscribe({
-      next: (fields) => {
-        this.familyInfoFields = fields || [];
-        this.familyInfoFieldsLoaded = true;
-      },
-      error: () => {
-        this.familyInfoFields = [];
-        this.familyInfoFieldsLoaded = true;
-      }
-    });
-  }
-
-  private showFamilyInfoField(fieldKey: string): boolean {
-    const normalizedFieldKey = String(fieldKey || '').trim();
-    if (!normalizedFieldKey) {
-      return false;
-    }
-
-    const configuredField = this.familyInfoFields.find(field => field.fieldKey === normalizedFieldKey);
-    if (configuredField) {
-      return customFieldHasTarget(configuredField, 'FAMILY_INFO');
-    }
-
-    if (this.familyInfoFieldsLoaded) {
-      return false;
-    }
-
-    return effectiveShowInTargets({
-      fieldKey: normalizedFieldKey,
-      isSystem: true,
-      showIn: ''
-    }).includes('FAMILY_INFO');
-  }
-
   rolesForMember(member: Member): string[] {
     const currentRole = normalizeRole(member?.role);
     return (this.allRoles || []).filter((role) => {
@@ -512,7 +487,7 @@ export class FamilyInfoComponent implements OnInit {
         member.role = newRole;
       },
       error: (err) => {
-        this.message.add({ severity: 'error', summary: 'Error', detail: err?.error?.error || 'خطاء' });
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل تحديث الدور' });
       }
     });
   }
@@ -521,26 +496,29 @@ export class FamilyInfoComponent implements OnInit {
     if (!this.canDeleteMember(member)) return;
 
     this.confirm.confirm({
-      header: 'تاكيد الحذف',
+      header: 'تأكيد الحذف',
       icon: 'pi pi-exclamation-triangle',
-      message: `هل تريد مسح اكونت ${member.fullName} ؟  `,
+      message: `هل تريد مسح اكونت ${member.fullName} ؟`,
       acceptLabel: 'حذف',
-      rejectLabel: 'الغاء',
+      rejectLabel: 'إلغاء',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.familySvc.deleteMember(member.id).subscribe({
           next: () => {
             this.message.add({ severity: 'success', summary: 'حذف', detail: 'تم حذف الاكونت' });
-            this.members = (this.members || []).filter((m) => m.id !== member.id);
+            this.members = this.members.filter((item) => item.id !== member.id);
+            this.profileCache.delete(member.id);
+            this.rebuildFilterOptions();
+            this.applyFilters();
             if (this.profileFor?.id === member.id) {
               this.closeProfile();
             }
           },
           error: (err) => {
             this.message.add({
-              severity: 'خطاء',
-              summary: 'خطاء',
-              detail: err?.error?.error || 'خطاء في مسح الاكونت'
+              severity: 'error',
+              summary: 'خطأ',
+              detail: err?.error?.error || 'خطأ في مسح الاكونت'
             });
           }
         });
@@ -549,7 +527,6 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   async exportPdf() {
-    // 1st click -> enter selection mode
     if (!this.exportMode) {
       this.exportMode = true;
       this.pendingExport = 'pdf';
@@ -557,7 +534,6 @@ export class FamilyInfoComponent implements OnInit {
       return;
     }
 
-    // in selection mode but another export is pending
     if (this.pendingExport && this.pendingExport !== 'pdf') {
       this.pendingExport = 'pdf';
       this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
@@ -577,9 +553,7 @@ export class FamilyInfoComponent implements OnInit {
       const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
       const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
 
-      // Use landscape layout and avoid a super-wide table (which breaks rendering).
       const doc = new jsPDF({ orientation: 'landscape' });
-
       await ensureDejaVuFont(doc);
       const pdfText = createPdfText(doc, jsPDF);
       const pageRight = doc.internal.pageSize.getWidth() - 14;
@@ -592,36 +566,29 @@ export class FamilyInfoComponent implements OnInit {
       }
 
       let y = 28;
-      selected.forEach((m, idx) => {
-        const d = (detailsArr[idx] || null) as ProfileView | null;
-        const detail = d || {};
+      selected.forEach((member, idx) => {
+        const detail = ((detailsArr[idx] || null) as ProfileView | null) || {};
 
         doc.setFontSize(12);
-        doc.text(pdfText(`${m.fullName} (${this.roleAr(m.role)})`), pageRight, y, { align: 'right' });
+        doc.text(pdfText(`${member.fullName} (${this.roleAr(member.role)})`), pageRight, y, { align: 'right' });
         y += 4;
 
-        const toYesNo = (v: unknown) => {
-          if (v === true) return 'نعم';
-          if (v === false) return 'لا';
-          return (v ?? '') + '';
-        };
-
-        const show = (v: unknown) => {
-          const s = String(v ?? '').trim();
-          return s ? s : '-';
+        const show = (value: unknown) => {
+          const text = String(value ?? '').trim();
+          return text ? text : '-';
         };
 
         const rows: [string, string][] = [
-          ['رقم الهاتف', String(detail.phoneNumber ?? m.phoneNumber ?? '')],
-          ['هاتف ولي الأمر', String(detail.guardiansPhone ?? m.guardiansPhone ?? '')],
-          ['العنوان', String(detail.address ?? m.address ?? '')],
-          ['الصف الدراسي', String(detail.schoolGrade ?? m.schoolGrade ?? '')],
+          ['رقم الهاتف', String(detail.phoneNumber ?? member.phoneNumber ?? '')],
+          ['هاتف ولي الأمر', String(detail.guardiansPhone ?? member.guardiansPhone ?? '')],
+          ['العنوان', String(detail.address ?? member.address ?? '')],
+          ['الصف الدراسي', String(detail.schoolGrade ?? member.schoolGrade ?? '')],
           ['اسم المستخدم', String(detail.username ?? '')],
           ['البريد الإلكتروني', String(detail.email ?? '')],
           ['الرقم القومي', String(detail.nationalId ?? '')],
           ['الرتبة', String(detail.deaconDegree ?? '')],
           ['صلة القرابة', this.guardianRelationAr(detail.guardianRelation)],
-          ['تاريخ الميلاد', String(detail.dateOfBirth ?? '')],
+          ['تاريخ الميلاد', this.formatDateValue(detail.dateOfBirth)],
           ['النوع', this.genderAr(detail.gender)],
           ['الحالة', this.statusAr(detail.status)],
           ['نوع الدراسة', this.studyTypeAr(detail.studyType)],
@@ -630,11 +597,10 @@ export class FamilyInfoComponent implements OnInit {
           ['الكلية', String(detail.faculty ?? '')],
           ['السنة الجامعية', String(detail.universityGrade ?? '')],
           ['الوظيفة', String(detail.graduateJob ?? '')],
-          ['هل يعمل', toYesNo(detail.isWorking)],
+          ['هل يعمل', this.yesNoAr(detail.isWorking)],
           ['تفاصيل العمل', String(detail.workDetails ?? '')]
         ];
 
-        // Always render every field row so table borders stay consistent.
         const kv: [string, string][] = rows.map(([k, v]) => [pdfText(show(v)), pdfText(k)]);
 
         autoTable(doc, {
@@ -650,10 +616,7 @@ export class FamilyInfoComponent implements OnInit {
           margin: { left: 14, right: 14 }
         });
 
-        // @ts-ignore (autotable attaches lastAutoTable)
         y = (doc as any).lastAutoTable.finalY + 10;
-
-        // New page if needed
         if (y > 180 && idx < selected.length - 1) {
           doc.addPage();
           y = 20;
@@ -661,11 +624,9 @@ export class FamilyInfoComponent implements OnInit {
       });
 
       doc.save(`family_${this.selectedFamily || 'my'}_members_info.pdf`);
-
-      // exit export mode after success
       this.exitExportMode();
     } catch {
-      this.message.add({ severity: 'error', summary: 'Export failed', detail: 'PDF export failed' });
+      this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تصدير PDF' });
     }
   }
 
@@ -677,64 +638,581 @@ export class FamilyInfoComponent implements OnInit {
     this.exportMode = false;
     this.pendingExport = null;
     this.selectAll = false;
-    this.members.forEach((m) => (m.selected = false));
+    this.members.forEach((member) => (member.selected = false));
+  }
+
+  canSeeKhorsRequests(): boolean {
+    if (!this.isKhorsFamilySelected()) return false;
+    return this.canDecideKhorsRequests();
+  }
+
+  canDecideKhorsRequests(): boolean {
+    return this.isAminKhedmaOrDev() || this.isKhadimServingKhors();
+  }
+
+  openKhorsRequests() {
+    if (!this.canSeeKhorsRequests()) return;
+    this.requestsOpen = true;
+    this.requestsLoading = true;
+    this.khorsReq.pending().subscribe({
+      next: (list) => {
+        this.requests = this.filterRequestsBySelectedKhors(list || []);
+        this.requestsLoading = false;
+        this.pendingRequestsCount = this.requests.length;
+      },
+      error: (err) => {
+        this.requestsLoading = false;
+        this.requests = [];
+        this.pendingRequestsCount = 0;
+        const isServerError = Number(err?.status) >= 500;
+        this.message.add({
+          severity: isServerError ? 'warn' : 'error',
+          summary: 'خطأ',
+          detail: isServerError
+            ? 'تعذر تحميل طلبات الخورس حاليًا. برجاء المحاولة لاحقًا.'
+            : err?.error?.error || 'فشل تحميل طلبات الخورس'
+        });
+      }
+    });
+  }
+
+  closeKhorsRequests() {
+    this.requestsOpen = false;
+    this.requestsLoading = false;
+    this.requests = [];
+    this.loadPendingRequestsCount();
+  }
+
+  decideKhorsRequest(req: KhorsJoinRequestView, approved: boolean) {
+    if (!this.canDecideKhorsRequests() || !req?.requestId) return;
+
+    this.khorsReq.decide(req.requestId, approved).subscribe({
+      next: () => {
+        this.requests = (this.requests || []).filter((item) => item.requestId !== req.requestId);
+        this.pendingRequestsCount = this.requests.length;
+        if (approved && this.isKhorsFamilySelected()) {
+          this.loadMembers();
+        }
+        this.message.add({
+          severity: 'success',
+          summary: 'تم',
+          detail: approved ? 'تم قبول الطلب' : 'تم رفض الطلب'
+        });
+      },
+      error: (err) => {
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'فشل تنفيذ القرار'
+        });
+      }
+    });
+  }
+
+  familyLabel(
+    entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined
+  ): string {
+    return this.assignmentsOf(entity).map((x) => x.familyName).join(' + ') || String(entity?.deaconFamily || '').trim();
+  }
+
+  private initFamilyMode() {
+    if (this.canSelectFamily()) {
+      this.familySvc.families().subscribe({
+        next: (families) => {
+          this.families = sortFamiliesByPreferredOrder(families || [], this.preferredFamilyOrder);
+          if (this.families.length) {
+            this.selectedFamily = this.families[0];
+            this.loadMembers();
+            this.loadPendingRequestsCount();
+          }
+        },
+        error: () => {
+          this.families = [];
+          this.selectedFamily = '';
+          this.loadMembers();
+          this.pendingRequestsCount = 0;
+        }
+      });
+    } else {
+      this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
+      this.loadMembers();
+      this.loadPendingRequestsCount();
+    }
+  }
+
+  private loadMembers() {
+    this.loading = true;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
+
+    this.familySvc.members(famParam).subscribe({
+      next: (rows) => {
+        this.members = ((rows || []) as FamilyMemberSummary[]).map((row) => this.prepareMember(row));
+        this.rebuildFilterOptions();
+        this.applyFilters();
+        this.loading = false;
+      },
+      error: (err) => {
+        this.loading = false;
+        this.members = [];
+        this.filteredMembers = [];
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل تحميل البيانات' });
+      }
+    });
+  }
+
+  private prepareMember(summary: FamilyMemberSummary): Member {
+    const base = summary as Member;
+    const displayPhone = String(base.phoneNumber || base.guardiansPhone || '').trim();
+    const birthdayParts = this.extractBirthdayParts(base.dateOfBirth);
+    const attendanceItems = this.buildAttendanceItems(base);
+    const attendanceVisual = this.buildAttendanceVisual(attendanceItems);
+
+    return {
+      ...base,
+      fullName: String(base.fullName || '').trim(),
+      role: String(base.role || '').trim(),
+      deaconFamily: String(base.deaconFamily || '').trim(),
+      selected: !!base.selected,
+      uiDisplayPhone: displayPhone,
+      uiPhoneCaption: base.phoneNumber ? 'الهاتف' : base.guardiansPhone ? 'هاتف ولي الأمر' : 'لا يوجد رقم',
+      uiGradeLabel: String(base.schoolGrade || '').trim() || 'غير مسجلة',
+      uiBirthDateLabel: this.formatDateValue(base.dateOfBirth),
+      uiBirthdayMonth: birthdayParts.month,
+      uiBirthdayDay: birthdayParts.day,
+      uiAttendanceItems: attendanceItems,
+      uiAttendanceVisual: attendanceVisual
+    };
+  }
+
+  private buildAttendanceItems(member: Member): MemberAttendanceItem[] {
+    const primaryKind = this.selectedFamilyAttendanceKind();
+    const keys: AttendanceCardKey[] = [primaryKind, 'FRIDAY_LITURGY', 'TASBEEHA'];
+
+    return keys.map((key) => {
+      const counts = this.attendanceCounts(member, key);
+      return {
+        key,
+        label: this.attendanceLabelForCard(key),
+        present: counts.present,
+        total: counts.total,
+        text: `${counts.present}/${counts.total}`
+      };
+    });
+  }
+
+  private buildAttendanceVisual(items: MemberAttendanceItem[]): MemberAttendanceVisual {
+    const present = items.reduce((sum, item) => sum + item.present, 0);
+    const total = items.reduce((sum, item) => sum + item.total, 0);
+
+    if (total <= 0) {
+      return {
+        present: 0,
+        total: 0,
+        percent: null,
+        percentText: 'بداية السنة',
+        colorState: 'white',
+        fillRatio: 0,
+        surfaceOpacity: 0
+      };
+    }
+
+    const rawPercent = (present / total) * 100;
+    const percent = Math.round(rawPercent);
+    const colorState: CardColorState = rawPercent >= 70 ? 'green' : rawPercent >= 40 ? 'yellow' : 'red';
+    const fillRatio = rawPercent <= 0 ? 1 : Math.max(0, Math.min(rawPercent / 100, 1));
+
+    let surfaceOpacity = 0.34;
+    if (colorState === 'green') {
+      surfaceOpacity = 0.38 + ((rawPercent - 70) / 30) * 0.18;
+    } else if (colorState === 'yellow') {
+      surfaceOpacity = 0.34 + ((rawPercent - 40) / 29) * 0.12;
+    } else {
+      surfaceOpacity = 0.42 + ((39 - Math.min(rawPercent, 39)) / 39) * 0.18;
+    }
+
+    return {
+      present,
+      total,
+      percent,
+      percentText: `${percent}%`,
+      colorState,
+      fillRatio,
+      surfaceOpacity: Math.max(0.32, Math.min(surfaceOpacity, 0.6))
+    };
+  }
+
+  private attendanceCounts(member: Member, key: AttendanceCardKey): { present: number; total: number } {
+    const fallback = (value: unknown) => Number(value || 0);
+
+    switch (key) {
+      case 'FRIDAY_LITURGY':
+        return {
+          present: fallback(member.fridayLiturgyPresent ?? member.fridayLiturgy),
+          total: fallback(member.fridayLiturgyTotal)
+        };
+      case 'TASBEEHA':
+        return {
+          present: fallback(member.tasbeehaPresent ?? member.tasbeeha),
+          total: fallback(member.tasbeehaTotal)
+        };
+      case 'MARMARKOS_KHORS':
+        return {
+          present: fallback(member.marmarkosKhorsPresent),
+          total: fallback(member.marmarkosKhorsTotal)
+        };
+      case 'ATHANASIUS_KHORS':
+        return {
+          present: fallback(member.athanasiusKhorsPresent),
+          total: fallback(member.athanasiusKhorsTotal)
+        };
+      default:
+        return {
+          present: fallback(member.familyMeetingPresent ?? member.familyMeeting),
+          total: fallback(member.familyMeetingTotal)
+        };
+    }
+  }
+
+  private attendanceLabelForCard(key: AttendanceCardKey): string {
+    switch (key) {
+      case 'FRIDAY_LITURGY':
+        return 'القداس';
+      case 'TASBEEHA':
+        return 'التسبحة';
+      case 'MARMARKOS_KHORS':
+      case 'ATHANASIUS_KHORS':
+        return 'الخورس';
+      default:
+        return 'الأسرة';
+    }
+  }
+
+  private selectedFamilyAttendanceKind(): AttendanceCardKey {
+    const selectedKhors = this.selectedKhorsCode();
+    if (selectedKhors === 'MARMARKOS') return 'MARMARKOS_KHORS';
+    if (selectedKhors === 'ATHANASIUS') return 'ATHANASIUS_KHORS';
+    return 'FAMILY_MEETING';
+  }
+
+  private rebuildFilterOptions() {
+    const grades = Array.from(
+      new Set(
+        this.members
+          .map((member) => String(member.schoolGrade || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ar'));
+
+    this.gradeOptions = grades;
+    if (this.selectedSchoolGrade && !grades.includes(this.selectedSchoolGrade)) {
+      this.selectedSchoolGrade = '';
+    }
+
+    this.rebuildBirthdayMonthOptions();
+    this.rebuildBirthdayDayOptions();
+  }
+
+  private rebuildBirthdayMonthOptions() {
+    const counts = new Map<number, number>();
+
+    this.members.forEach((member) => {
+      if (member.uiBirthdayMonth != null) {
+        counts.set(member.uiBirthdayMonth, (counts.get(member.uiBirthdayMonth) || 0) + 1);
+      }
+    });
+
+    this.birthdayMonthOptions = this.birthdayMonths.map((label, index) => {
+      const value = index + 1;
+      const count = counts.get(value) || 0;
+      return { value, label, count, disabled: count === 0 };
+    });
+
+    if (
+      this.selectedBirthdayMonth != null &&
+      !this.birthdayMonthOptions.some((option) => option.value === this.selectedBirthdayMonth && !option.disabled)
+    ) {
+      this.selectedBirthdayMonth = null;
+      this.selectedBirthdayDay = null;
+    }
+  }
+
+  private rebuildBirthdayDayOptions() {
+    if (this.selectedBirthdayMonth == null) {
+      this.birthdayDayOptions = [];
+      return;
+    }
+
+    const counts = new Map<number, number>();
+    this.members
+      .filter((member) => member.uiBirthdayMonth === this.selectedBirthdayMonth)
+      .forEach((member) => {
+        if (member.uiBirthdayDay != null) {
+          counts.set(member.uiBirthdayDay, (counts.get(member.uiBirthdayDay) || 0) + 1);
+        }
+      });
+
+    const daysInMonth = new Date(2024, this.selectedBirthdayMonth, 0).getDate();
+    this.birthdayDayOptions = Array.from({ length: daysInMonth }, (_, index) => {
+      const value = index + 1;
+      const count = counts.get(value) || 0;
+      return { value, label: String(value), count, disabled: count === 0 };
+    });
+
+    if (
+      this.selectedBirthdayDay != null &&
+      !this.birthdayDayOptions.some((option) => option.value === this.selectedBirthdayDay && !option.disabled)
+    ) {
+      this.selectedBirthdayDay = null;
+    }
+  }
+
+  private applyFilters() {
+    let result = [...this.members];
+
+    if (this.selectedSchoolGrade) {
+      result = result.filter((member) => String(member.schoolGrade || '').trim() === this.selectedSchoolGrade);
+    }
+
+    if (this.birthdayFilterMode === 'MONTH' && this.selectedBirthdayMonth != null) {
+      result = result.filter((member) => member.uiBirthdayMonth === this.selectedBirthdayMonth);
+    }
+
+    if (
+      this.birthdayFilterMode === 'DAY' &&
+      this.selectedBirthdayMonth != null &&
+      this.selectedBirthdayDay != null
+    ) {
+      result = result.filter(
+        (member) =>
+          member.uiBirthdayMonth === this.selectedBirthdayMonth && member.uiBirthdayDay === this.selectedBirthdayDay
+      );
+    }
+
+    this.filteredMembers = result;
+    this.selectAll = this.members.length > 0 && this.members.every((member) => !!member.selected);
+
+    if (this.profileFor && !result.some((member) => member.id === this.profileFor?.id)) {
+      this.closeProfile();
+    }
+  }
+
+  private resetInteractiveStateForNewFamily() {
+    this.selectedSchoolGrade = '';
+    this.selectedBirthdayMonth = null;
+    this.selectedBirthdayDay = null;
+    this.birthdayPanelOpen = false;
+    this.selectAll = false;
+    this.closeProfile();
+  }
+
+  private monthLabel(month: number): string {
+    return this.birthdayMonths[month - 1] || '';
+  }
+
+  private extractBirthdayParts(value?: string): { month: number | null; day: number | null } {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      return {
+        month: Number(match[2]),
+        day: Number(match[3])
+      };
+    }
+
+    const parsed = raw ? new Date(raw) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return { month: null, day: null };
+    }
+
+    return {
+      month: parsed.getMonth() + 1,
+      day: parsed.getDate()
+    };
+  }
+
+  private formatDateValue(value?: string): string {
+    const raw = String(value || '').trim();
+    if (!raw) return 'غير مسجل';
+
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return raw;
+
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  private isKhadimServingKhors(): boolean {
+    if (!this.isKhadim()) return false;
+    const scope = String(this.me?.servingScope || '').toUpperCase();
+    const khors = String(this.me?.khors || '').toUpperCase();
+    const scopeIncludesKhors = scope === 'KHORS_ONLY' || scope === 'BOTH';
+    const khorsSelectedFromList = !!khors && khors !== 'NONE';
+    return scopeIncludesKhors || khorsSelectedFromList;
+  }
+
+  private hasRole(...allowed: string[]): boolean {
+    return hasRole(this.me?.role, allowed);
+  }
+
+  private assignmentsOf(
+    entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined
+  ): Array<{ familyName: string; role: string }> {
+    const assignments = Array.isArray(entity?.familyAssignments) ? entity.familyAssignments : [];
+    return assignments
+      .map((assignment) => ({
+        familyName: String(assignment?.familyName || '').trim(),
+        role: normalizeAssignmentRole(assignment, entity?.role)
+      }))
+      .filter((item) => !!item.familyName);
+  }
+
+  private loadPendingRequestsCount() {
+    if (!this.canSeeKhorsRequests()) return;
+    this.khorsReq.pending().subscribe({
+      next: (list) => (this.pendingRequestsCount = this.filterRequestsBySelectedKhors(list || []).length),
+      error: () => (this.pendingRequestsCount = 0)
+    });
+  }
+
+  private hasDisplayValue(value: unknown): boolean {
+    if (value === false || value === 0) return true;
+    return String(value ?? '').trim() !== '';
+  }
+
+  private yesNoAr(value: unknown): string {
+    if (value === true) return 'نعم';
+    if (value === false) return 'لا';
+    return String(value ?? '').trim();
+  }
+
+  private khorsYearAr(year: unknown): string {
+    const numeric = Number(year || 0);
+    if (numeric === 1) return 'سنة أولى';
+    if (numeric === 2) return 'سنة ثانية';
+    if (numeric === 3) return 'سنة ثالثة';
+    if (numeric === 4) return 'سنة رابعة';
+    if (numeric === 5) return 'سنة خامسة';
+    return '';
+  }
+
+  private memberKhorsLabel(khors: unknown, khorsYear?: unknown): string {
+    const value = String(khors || '').trim().toUpperCase();
+
+    if (!value || value === 'NONE') return '';
+    if (value === 'MARMARKOS') {
+      const yearLabel = this.khorsYearAr(khorsYear);
+      return yearLabel ? `خورس مارمرقس - ${yearLabel}` : 'خورس مارمرقس';
+    }
+    if (value === 'ATHANASIUS') return 'خورس البابا اثناسيوس';
+    if (value === 'BOTH') return 'خورس مارمرقس + خورس البابا اثناسيوس';
+
+    return String(khors || '').trim();
+  }
+
+  private loadRoles() {
+    if (!this.canEditRoles()) return;
+    this.adminSvc.roles().subscribe({ next: (roles) => (this.allRoles = roles || []) });
+  }
+
+  private loadCustomFieldDefinitions() {
+    this.devSettings.getEnabledFields().subscribe({
+      next: (fields) => {
+        this.familyInfoFields = fields || [];
+        this.familyInfoFieldsLoaded = true;
+      },
+      error: () => {
+        this.familyInfoFields = [];
+        this.familyInfoFieldsLoaded = true;
+      }
+    });
+  }
+
+  private showFamilyInfoField(fieldKey: string): boolean {
+    const normalizedFieldKey = String(fieldKey || '').trim();
+    if (!normalizedFieldKey) return false;
+
+    const configuredField = this.familyInfoFields.find((field) => field.fieldKey === normalizedFieldKey);
+    if (configuredField) {
+      return customFieldHasTarget(configuredField, 'FAMILY_INFO');
+    }
+
+    if (this.familyInfoFieldsLoaded) {
+      return false;
+    }
+
+    return effectiveShowInTargets({
+      fieldKey: normalizedFieldKey,
+      isSystem: true,
+      showIn: ''
+    }).includes('FAMILY_INFO');
   }
 
   private fetchDetailsForMembers(list: Member[], famParam?: string): Promise<FamilyMemberDetails[]> {
     if (!list?.length) return Promise.resolve([]);
 
     return Promise.all(
-      list.map((mem) =>
-        new Promise<FamilyMemberDetails>((resolve) => {
-          this.familySvc.memberDetails(mem.id, famParam).pipe(catchError(() => of({}))).subscribe({
-            next: (details) => resolve((details || {}) as FamilyMemberDetails),
-            error: () => resolve({})
-          });
-        })
+      list.map(
+        (member) =>
+          new Promise<FamilyMemberDetails>((resolve) => {
+            this.familySvc
+              .memberDetails(member.id, famParam)
+              .pipe(catchError(() => of({})))
+              .subscribe({
+                next: (details) => resolve((details || {}) as FamilyMemberDetails),
+                error: () => resolve({})
+              });
+          })
       )
     );
   }
 
   private roleAr(role?: string): string {
-    const r = normalizeRole(role);
-    if (r === 'DEVELOPER') return 'مطوّر';
-    if (r === 'AMIN_KHEDMA') return 'أمين خدمة';
-    if (r === 'AMIN_OSRA') return 'أمين أسرة';
-    if (r === 'KHADIM') return 'خادم';
+    const normalized = normalizeRole(role);
+    if (normalized === 'DEVELOPER') return 'مطوّر';
+    if (normalized === 'AMIN_KHEDMA') return 'أمين خدمة';
+    if (normalized === 'AMIN_OSRA') return 'أمين أسرة';
+    if (normalized === 'KHADIM') return 'خادم';
     return role || '';
   }
 
-  private genderAr(v?: string): string {
-    const x = (v || '').toUpperCase();
-    if (x === 'MALE') return 'ذكر';
-    if (x === 'FEMALE') return 'أنثى';
-    return v || '';
+  private genderAr(value?: string): string {
+    const normalized = (value || '').toUpperCase();
+    if (normalized === 'MALE') return 'ذكر';
+    if (normalized === 'FEMALE') return 'أنثى';
+    return value || '';
   }
 
-  private studyTypeAr(v?: string): string {
-    const x = (v || '').toUpperCase();
-    if (x === 'SCHOOL') return 'مدرسي';
-    if (x === 'UNIVERSITY') return 'جامعي';
-    if (x === 'GRADUATE') return 'خريج';
-    return v || '';
+  private studyTypeAr(value?: string): string {
+    const normalized = (value || '').toUpperCase();
+    if (normalized === 'SCHOOL') return 'مدرسي';
+    if (normalized === 'UNIVERSITY') return 'جامعي';
+    if (normalized === 'GRADUATE') return 'خريج';
+    return value || '';
   }
 
-  private statusAr(v?: string): string {
-    const x = (v || '').toUpperCase();
-    if (x === 'ACTIVE') return 'نشط';
-    if (x === 'INACTIVE') return 'غير نشط';
-    if (x === 'SUSPENDED') return 'موقوف';
-    if (x === 'STUDENT') return 'طالب';
-    return v || '';
+  private statusAr(value?: string): string {
+    const normalized = (value || '').toUpperCase();
+    if (normalized === 'ACTIVE') return 'نشط';
+    if (normalized === 'INACTIVE') return 'غير نشط';
+    if (normalized === 'SUSPENDED') return 'موقوف';
+    if (normalized === 'STUDENT') return 'طالب';
+    return value || '';
   }
 
-  private guardianRelationAr(v?: string): string {
-    const x = (v || '').toUpperCase();
-    if (x === 'MOTHER' || x === 'MOM') return 'الأم';
-    if (x === 'FATHER' || x === 'DAD') return 'الأب';
-    if (x === 'BROTHER') return 'الأخ';
-    if (x === 'SISTER') return 'الأخت';
-    return v || '';
+  private guardianRelationAr(value?: string): string {
+    const normalized = (value || '').toUpperCase();
+    if (normalized === 'MOTHER' || normalized === 'MOM') return 'الأم';
+    if (normalized === 'FATHER' || normalized === 'DAD') return 'الأب';
+    if (normalized === 'BROTHER') return 'الأخ';
+    if (normalized === 'SISTER') return 'الأخت';
+    return value || '';
   }
 
   private isKhorsFamilySelected(): boolean {
@@ -742,15 +1220,15 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   private getSelectedKhorsCode(): 'MARMARKOS' | 'ATHANASIUS' | '' {
-    const famRaw = String(this.selectedFamily || '').trim();
-    const fam = famRaw.toUpperCase();
-    if (!fam) return '';
+    const familyRaw = String(this.selectedFamily || '').trim();
+    const family = familyRaw.toUpperCase();
+    if (!family) return '';
 
-    if (fam === 'MARMARKOS' || fam.includes('مارمر') || fam.includes('MARMARKOS')) return 'MARMARKOS';
-    if (fam === 'ATHANASIUS' || fam.includes('اثناس') || fam.includes('ATHANASIUS')) return 'ATHANASIUS';
-    if (fam.includes('KHORS')) {
-      if (fam.includes('MARMARKOS')) return 'MARMARKOS';
-      if (fam.includes('ATHANASIUS')) return 'ATHANASIUS';
+    if (family === 'MARMARKOS' || family.includes('مارمر') || family.includes('MARMARKOS')) return 'MARMARKOS';
+    if (family === 'ATHANASIUS' || family.includes('اثناس') || family.includes('ATHANASIUS')) return 'ATHANASIUS';
+    if (family.includes('KHORS')) {
+      if (family.includes('MARMARKOS')) return 'MARMARKOS';
+      if (family.includes('ATHANASIUS')) return 'ATHANASIUS';
     }
     return '';
   }
@@ -758,15 +1236,14 @@ export class FamilyInfoComponent implements OnInit {
   private filterRequestsBySelectedKhors(list: KhorsJoinRequestView[]): KhorsJoinRequestView[] {
     const selected = this.selectedKhorsCode();
     if (!selected) return [];
-    return (list || []).filter((x) => String(x?.requestedKhors || '').toUpperCase() === selected);
+    return (list || []).filter((item) => String(item?.requestedKhors || '').toUpperCase() === selected);
   }
 
   private selectedKhorsCode(): 'MARMARKOS' | 'ATHANASIUS' | '' {
-    const fam = canonicalFamilyName(String(this.selectedFamily || '').trim());
-    if (!fam) return '';
-    if (fam.includes('مارمرقس')) return 'MARMARKOS';
-    if (fam.includes('اثناسيوس') || fam.includes('أثناسيوس')) return 'ATHANASIUS';
+    const family = canonicalFamilyName(String(this.selectedFamily || '').trim());
+    if (!family) return '';
+    if (family.includes('مارمرقس')) return 'MARMARKOS';
+    if (family.includes('اثناسيوس') || family.includes('أثناسيوس')) return 'ATHANASIUS';
     return '';
   }
 }
-

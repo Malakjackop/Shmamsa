@@ -3,7 +3,10 @@
 
 <div class="page">
   <div class="pageHead">
-    <h1>بيانات الأعضاء</h1>
+    <div>
+      <h1>بيانات الأسرة</h1>
+      <div class="pageSub" *ngIf="selectedFamily">{{ selectedFamily }}</div>
+    </div>
 
     <button
       *ngIf="canSeeKhorsRequests()"
@@ -11,166 +14,244 @@
       class="notifBtn"
       (click)="openKhorsRequests()"
       [title]="'طلبات الانضمام للخورس'"
+      aria-label="طلبات الانضمام للخورس"
     >
-      <span class="bellEmoji">🔔</span>
+      <i class="pi pi-bell"></i>
       <span class="badge" *ngIf="pendingRequestsCount > 0">{{ pendingRequestsCount }}</span>
     </button>
   </div>
 
-  <div class="top" *ngIf="canSelectFamily() && families?.length">
-    <label>الأسرة</label>
-    <select *ngIf="families.length > 1; else singleFamilyView" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
-      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
-    </select>
-    <ng-template #singleFamilyView>
-      <div class="singleSelectValue">{{ selectedFamily || families[0] }}</div>
-    </ng-template>
-  </div>
+  <div class="filtersBar">
+    <div class="filterGroup" *ngIf="canSelectFamily() && families?.length">
+      <label>الأسرة</label>
+      <select *ngIf="families.length > 1; else singleFamilyView" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+        <option *ngFor="let family of families" [value]="family">{{ family }}</option>
+      </select>
+      <ng-template #singleFamilyView>
+        <div class="singleSelectValue">{{ selectedFamily || families[0] }}</div>
+      </ng-template>
+    </div>
 
-  <div class="actions">
-    <button
-      pButton
-      type="button"
-      [label]="exportMode && pendingExport === 'pdf' ? 'تصدير PDF (تأكيد)' : 'تحميل الملف PDF'"
-      (click)="exportPdf()"
-    ></button>
-    <button
-      *ngIf="exportMode"
-      pButton
-      type="button"
-      class="p-button-secondary"
-      label="إلغاء"
-      (click)="cancelExport()"
-    ></button>
-  </div>
+    <div class="filterGroup birthdayFilter">
+      <label>تاريخ الميلاد</label>
+      <button
+        type="button"
+        class="filterTrigger"
+        [class.filterTrigger--active]="birthdayPanelOpen || hasBirthdayFilter()"
+        (click)="toggleBirthdayPanel()"
+      >
+        <i class="pi pi-calendar"></i>
+        <span>{{ birthdayFilterLabel() }}</span>
+      </button>
 
-  <div *ngIf="loading" class="hint">جاري التحميل...</div>
+      <div class="birthdayPanel" *ngIf="birthdayPanelOpen">
+        <div class="birthdayModes">
+          <button
+            type="button"
+            class="modeBtn"
+            [class.modeBtn--active]="birthdayFilterMode === 'DAY'"
+            (click)="setBirthdayFilterMode('DAY')"
+          >
+            الأيام
+          </button>
+          <button
+            type="button"
+            class="modeBtn"
+            [class.modeBtn--active]="birthdayFilterMode === 'MONTH'"
+            (click)="setBirthdayFilterMode('MONTH')"
+          >
+            الشهور
+          </button>
+        </div>
 
-  <div class="tableWrap" *ngIf="!loading">
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th class="chk" *ngIf="exportMode">
-            <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" />
-          </th>
-          <th>الاسم</th>
-          <th>الدور</th>
-          <th>العنوان</th>
-          <th>الهاتف</th>
-          <th>رقم تليفون ولي الامر</th>
-          <th>السن الدراسي</th>
-          <th>الملف</th>
-          <th *ngIf="canDeleteAccounts()">حذف</th>
-          <th *ngIf="canEditRoles()">تغيير الدور</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let m of members">
-          <td class="chk" *ngIf="exportMode">
-            <input
-              type="checkbox"
-              [(ngModel)]="m.selected"
-              (ngModelChange)="onMemberSelectionChange()"
-              [ngModelOptions]="{ standalone: true }"
-            />
-          </td>
-          <td>{{m.fullName}}</td>
-          <td>{{ m.role | roleLabel }}</td>
-          <td>{{m.address}}</td>
-          <td>
-            <span class="phoneInline" *ngIf="m.phoneNumber; else emptyPhone">
-              <span>{{m.phoneNumber}}</span>
-              <button type="button" class="copyPhoneBtn" (click)="copyPhone(m.phoneNumber)" title="نسخ الرقم" aria-label="نسخ الرقم">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                  <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </button>
-            </span>
-            <ng-template #emptyPhone></ng-template>
-          </td>
-          <td>
-            <span class="phoneInline" *ngIf="m.guardiansPhone; else emptyGuardianPhone">
-              <span>{{m.guardiansPhone}}</span>
-              <button type="button" class="copyPhoneBtn" (click)="copyPhone(m.guardiansPhone)" title="نسخ الرقم" aria-label="نسخ الرقم">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                  <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </button>
-            </span>
-            <ng-template #emptyGuardianPhone></ng-template>
-          </td>
-          <td>{{m.schoolGrade}}</td>
-          <td><button pButton type="button" icon="pi pi-user" (click)="openProfile(m)">👤</button></td>
-
-          <td *ngIf="canDeleteAccounts()">
+        <div class="birthdaySection">
+          <div class="birthdaySection__title">الشهور</div>
+          <div class="monthGrid">
             <button
-              *ngIf="canDeleteMember(m)"
-              pButton
+              *ngFor="let month of birthdayMonthOptions"
               type="button"
-              class="p-button-danger"
-              (click)="deleteMember(m)"
-            >🗑️</button>
-          </td>
-
-          <td *ngIf="canEditRoles()">
-            <select
-              [ngModel]="m.role"
-              (ngModelChange)="changeRole(m, $event)"
-              [ngModelOptions]="{ standalone: true }"
+              class="calendarChip"
+              [disabled]="month.disabled"
+              [class.calendarChip--active]="selectedBirthdayMonth === month.value"
+              (click)="selectBirthdayMonth(month.value)"
             >
-              <option *ngFor="let r of rolesForMember(m)" [value]="r" [disabled]="r === 'DEVELOPER'">
-                {{ r | roleLabel }}
-              </option>
-            </select>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <span>{{ month.label }}</span>
+              <small *ngIf="month.count > 0">{{ month.count }}</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="birthdaySection" *ngIf="birthdayFilterMode === 'DAY'">
+          <div class="birthdaySection__title">الأيام</div>
+
+          <div class="birthdayHint" *ngIf="selectedBirthdayMonth == null">
+            اختر الشهر الأول، وبعدها الأيام التي فيها أعياد ميلاد فقط ستبقى متاحة.
+          </div>
+
+          <div class="dayGrid" *ngIf="selectedBirthdayMonth != null">
+            <button
+              *ngFor="let day of birthdayDayOptions"
+              type="button"
+              class="calendarChip calendarChip--day"
+              [disabled]="day.disabled"
+              [class.calendarChip--active]="selectedBirthdayDay === day.value"
+              (click)="selectBirthdayDay(day.value)"
+            >
+              <span>{{ day.label }}</span>
+              <small *ngIf="day.count > 0">{{ day.count }}</small>
+            </button>
+          </div>
+
+          <div class="birthdayHint" *ngIf="selectedBirthdayMonth != null && !hasEnabledBirthdayDayOptions()">
+            لا يوجد أعياد ميلاد مسجلة في هذا الشهر.
+          </div>
+        </div>
+
+        <div class="birthdayActions">
+          <button type="button" class="ghostBtn" (click)="clearBirthdayFilter()">مسح الفلتر</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="filterGroup">
+      <label>السنة الدراسية</label>
+      <select [(ngModel)]="selectedSchoolGrade" (change)="onSchoolGradeChange()">
+        <option value="">كل السنين</option>
+        <option *ngFor="let grade of gradeOptions" [value]="grade">{{ grade }}</option>
+      </select>
+    </div>
   </div>
 
-  <div class="modal legacy-modal" *ngIf="profileFor">
-    <div class="modalCard">
+  <div *ngIf="loading" class="emptyState">
+    جاري تحميل الأعضاء...
+  </div>
+
+  <div class="emptyState" *ngIf="!loading && !filteredMembers.length">
+    لا توجد نتائج مطابقة للفلاتر الحالية.
+  </div>
+
+  <div class="memberGrid" *ngIf="!loading && filteredMembers.length">
+    <article
+      *ngFor="let member of filteredMembers; let i = index; trackBy: trackByMember"
+      class="memberCard"
+      [class.memberCard--active]="isCardExpanded(member)"
+      [class.memberCard--white]="member.uiAttendanceVisual.colorState === 'white'"
+      [class.memberCard--green]="member.uiAttendanceVisual.colorState === 'green'"
+      [class.memberCard--yellow]="member.uiAttendanceVisual.colorState === 'yellow'"
+      [class.memberCard--red]="member.uiAttendanceVisual.colorState === 'red'"
+      [class.memberCard--selected]="exportMode && member.selected"
+      [style.--card-fill-ratio]="member.uiAttendanceVisual.fillRatio"
+      [style.--card-surface-opacity]="member.uiAttendanceVisual.surfaceOpacity"
+      [style.--card-fill-delay]="(i * 90) + 'ms'"
+      (click)="openProfile(member)"
+    >
+      <span class="memberCard__fill" *ngIf="member.uiAttendanceVisual.colorState !== 'white'"></span>
+
+      <div class="memberCard__content">
+        <h2 class="memberCard__name">{{ member.fullName }}</h2>
+
+        <div class="memberCard__phoneRow" *ngIf="member.uiDisplayPhone; else noPhoneValue">
+          <button
+            type="button"
+            class="memberCard__copy"
+            (click)="copyPhone(member.uiDisplayPhone); $event.stopPropagation()"
+            aria-label="نسخ الرقم"
+            title="نسخ الرقم"
+          >
+            <i class="pi pi-copy"></i>
+          </button>
+          <span class="memberCard__phoneValue">{{ member.uiDisplayPhone }}</span>
+        </div>
+
+        <ng-template #noPhoneValue>
+          <div class="memberCard__phoneRow memberCard__phoneRow--empty">
+            <span class="memberCard__phoneValue">غير مسجل</span>
+          </div>
+        </ng-template>
+
+        <div class="memberCard__grade">{{ member.uiGradeLabel }}</div>
+
+        <div class="memberCard__birthDate">{{ member.uiBirthDateLabel }}</div>
+
+        <div class="memberCard__attendanceLine" *ngIf="member.uiAttendanceVisual.total > 0; else noAttendanceYet">
+          حضور {{ member.uiAttendanceVisual.percentText }}
+        </div>
+
+        <ng-template #noAttendanceYet>
+          <div class="memberCard__attendanceLine">لا يوجد حضور بعد</div>
+        </ng-template>
+      </div>
+    </article>
+  </div>
+
+  <div class="modal legacy-modal" *ngIf="profileFor" (click)="closeProfile()">
+    <div class="modalCard profileModal" (click)="$event.stopPropagation()">
       <div class="modalHead">
         <div>
           <div class="title">{{ profileFor.fullName }}</div>
           <div class="sub">{{ profileFor.role | roleLabel }}</div>
         </div>
-        <div class="modalActions legacy-modal__head-actions">
-          <button type="button" class="legacy-modal__close" (click)="closeProfile()" aria-label="إغلاق">
+
+        <div class="modalActions">
+          <button type="button" class="detailsIconBtn" (click)="closeProfile()" aria-label="إغلاق">
             <i class="pi pi-times"></i>
           </button>
         </div>
       </div>
 
-      <div *ngIf="profile; else loadingProfile" class="profileGrid">
-        <ng-container *ngIf="profileEntries() as entries">
+      <div class="detailsPanel__admin" *ngIf="canEditRoles() || canDeleteAccounts()">
+        <div class="detailAdminField" *ngIf="canEditRoles()">
+          <label>تغيير الدور</label>
+          <select
+            [ngModel]="profileFor.role"
+            (ngModelChange)="changeRole(profileFor, $event)"
+            [ngModelOptions]="{ standalone: true }"
+          >
+            <option *ngFor="let role of rolesForMember(profileFor)" [value]="role" [disabled]="role === 'DEVELOPER'">
+              {{ role | roleLabel }}
+            </option>
+          </select>
+        </div>
+
+        <button
+          *ngIf="canDeleteMember(profileFor)"
+          pButton
+          type="button"
+          class="p-button-danger"
+          icon="pi pi-trash"
+          label="حذف الحساب"
+          (click)="deleteMember(profileFor)"
+        ></button>
+      </div>
+
+      <div *ngIf="profileLoading" class="hint">جاري تحميل باقي البيانات...</div>
+
+      <div *ngIf="!profileLoading && profileEntries() as entries" class="profileGrid">
+        <ng-container *ngIf="entries.length; else noProfileEntries">
           <div *ngFor="let item of entries">
             <b>{{ item.label }}:</b>
             <ng-container *ngIf="isPhoneLabel(item.label); else plainProfileValue">
               <span class="phoneInline">
                 <span>{{ item.value }}</span>
-                <button type="button" class="copyPhoneBtn" (click)="copyPhone(item.value)" title="نسخ الرقم" aria-label="نسخ الرقم">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                    <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
-                  </svg>
+                <button
+                  type="button"
+                  class="copyPhoneBtn"
+                  (click)="copyPhone(item.value)"
+                  title="نسخ الرقم"
+                  aria-label="نسخ الرقم"
+                >
+                  <i class="pi pi-copy"></i>
                 </button>
               </span>
             </ng-container>
             <ng-template #plainProfileValue>{{ item.value }}</ng-template>
           </div>
-
-          <div class="hint" *ngIf="entries.length === 0">
-            لا توجد بيانات متاحة.
-          </div>
         </ng-container>
-      </div>
 
-      <ng-template #loadingProfile>
-        <div class="hint">جاري التحميل...</div>
-      </ng-template>
+        <ng-template #noProfileEntries>
+          <div class="hint">لا توجد بيانات إضافية متاحة.</div>
+        </ng-template>
+      </div>
     </div>
   </div>
 
@@ -182,8 +263,8 @@
           <div class="sub" *ngIf="pendingRequestsCount > 0">عدد الطلبات: {{ pendingRequestsCount }}</div>
           <div class="sub" *ngIf="pendingRequestsCount === 0">لا يوجد طلبات حالياً</div>
         </div>
-        <div class="modalActions legacy-modal__head-actions">
-          <button type="button" class="legacy-modal__close" (click)="closeKhorsRequests()" aria-label="إغلاق">
+        <div class="modalActions">
+          <button type="button" class="detailsIconBtn" (click)="closeKhorsRequests()" aria-label="إغلاق">
             <i class="pi pi-times"></i>
           </button>
         </div>
@@ -192,19 +273,33 @@
       <div *ngIf="requestsLoading" class="hint">جاري التحميل...</div>
 
       <div *ngIf="!requestsLoading && requests?.length" class="reqList">
-        <div class="reqRow" *ngFor="let r of requests">
+        <div class="reqRow" *ngFor="let request of requests">
           <div class="reqInfo">
-            <div class="reqName">{{ r.fullName }}</div>
+            <div class="reqName">{{ request.fullName }}</div>
             <div class="reqMeta">
-              <span>الأسرة: {{ familyLabel(r) }}</span>
-              <span>الدور: {{ r.role | roleLabel }}</span>
-              <span>الخورس: {{ r.requestedKhors === 'MARMARKOS' ? 'مارمرقس' : 'الأنبا أثناسيوس' }}</span>
+              <span>الأسرة: {{ familyLabel(request) }}</span>
+              <span>الدور: {{ request.role | roleLabel }}</span>
+              <span>الخورس: {{ request.requestedKhors === 'MARMARKOS' ? 'مارمرقس' : 'الأنبا أثناسيوس' }}</span>
             </div>
           </div>
 
           <div class="reqActions">
-            <button *ngIf="canDecideKhorsRequests()" pButton type="button" class="p-button-success" (click)="decideKhorsRequest(r, true)">✅</button>
-            <button *ngIf="canDecideKhorsRequests()" pButton type="button" class="p-button-danger" (click)="decideKhorsRequest(r, false)">❌</button>
+            <button
+              *ngIf="canDecideKhorsRequests()"
+              pButton
+              type="button"
+              class="p-button-success"
+              icon="pi pi-check"
+              (click)="decideKhorsRequest(request, true)"
+            ></button>
+            <button
+              *ngIf="canDecideKhorsRequests()"
+              pButton
+              type="button"
+              class="p-button-danger"
+              icon="pi pi-times"
+              (click)="decideKhorsRequest(request, false)"
+            ></button>
           </div>
         </div>
       </div>

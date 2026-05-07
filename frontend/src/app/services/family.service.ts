@@ -11,6 +11,24 @@ export type FamilyMemberSummary = {
   familyName?: string;
   deaconFamily?: string;
   familyAssignments?: Array<Record<string, unknown>>;
+  phoneNumber?: string;
+  guardiansPhone?: string;
+  address?: string;
+  schoolGrade?: string;
+  dateOfBirth?: string;
+  fridayLiturgyPresent?: number;
+  fridayLiturgyTotal?: number;
+  tasbeehaPresent?: number;
+  tasbeehaTotal?: number;
+  familyMeetingPresent?: number;
+  familyMeetingTotal?: number;
+  marmarkosKhorsPresent?: number;
+  marmarkosKhorsTotal?: number;
+  athanasiusKhorsPresent?: number;
+  athanasiusKhorsTotal?: number;
+  khors?: string;
+  khorsYear?: number | string | null;
+  servingScope?: string;
   [key: string]: unknown;
 };
 

@@ -468,6 +468,7 @@ public class  FamilyController {
         for (User u : members) {
 
             if (!includeSelf && me.getId() != null && me.getId().equals(u.getId())) continue;
+            boolean includeSensitive = canViewSensitiveMemberDetails(me, u);
 
             long fridayTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FRIDAY_LITURGY);
             long tasbeehaTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.TASBEEHA);
@@ -518,6 +519,13 @@ public class  FamilyController {
             row.put("khors", u.getKhors());
             row.put("khorsYear", u.getKhorsYear());
             row.put("servingScope", u.getServingScope());
+            row.put("schoolGrade", u.getSchoolGrade());
+            if (includeSensitive) {
+                row.put("phoneNumber", u.getPhoneNumber());
+                row.put("guardiansPhone", u.getGuardiansPhone());
+                row.put("dateOfBirth", u.getDateOfBirth());
+                row.put("address", u.getAddress());
+            }
             out.add(row);
         }
 
