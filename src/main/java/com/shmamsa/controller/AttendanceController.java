@@ -172,7 +172,7 @@ public class AttendanceController {
         String customTitle = body.get("customTitle") == null ? null : String.valueOf(body.get("customTitle")).trim();
         if (type == AttendanceType.CUSTOM_EVENT) {
             if (!customEventManager && !hasActiveTakeAttendanceGrantForType(servant, AttendanceType.CUSTOM_EVENT)) {
-                return ResponseEntity.status(403).body(Map.of("error", "لا يوجد تخصيص مفتوح لهذه المناسبة الآن"));
+                return ResponseEntity.status(403).body(Map.of("error", "لا يوجد تخصيص محفوظ لهذه المناسبة"));
             }
             if (customTitle == null || customTitle.isBlank()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "customTitle is required for custom events"));
@@ -880,11 +880,9 @@ public class AttendanceController {
     private void enforceWeekClose(User servant, LocalDate selectedDate) {
         if (selectedDate == null) return;
 
-        // If a custom attendance grant is active now, the grant window is the only time limit.
-        // This lets a delegated user record the configured occasion day even if it is outside
-        // the normal weekly editing window.
-        if (servant != null && servant.getId() != null
-                && attendanceAccessGrantService.hasActiveGrant(servant.getId(), AttendanceGrantKind.TAKE_ATTENDANCE)) {
+        // If a custom attendance grant is configured, do not close the selected occasion day
+        // because of the normal weekly editing window.
+        if (hasConfiguredAttendanceTakingGrant(servant)) {
             return;
         }
 
@@ -907,8 +905,10 @@ public class AttendanceController {
         if (servant == null || servant.getId() == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
         }
-        if (hasActiveAttendanceTakingGrant(servant)) return;
-        throw new ApiException(HttpStatus.FORBIDDEN, "وقت أخذ الحضور غير متاح الآن");
+        // A saved attendance customization is enough to open attendance-taking.
+        // The start/end window is kept for display only and must not block the assigned user.
+        if (hasConfiguredAttendanceTakingGrant(servant)) return;
+        throw new ApiException(HttpStatus.FORBIDDEN, "لا يوجد تخصيص حضور محفوظ لهذا الحساب");
     }
 
     private Set<AttendanceType> parseAttendanceTypesCsv(String csv) {
@@ -974,47 +974,50 @@ public class AttendanceController {
     private boolean isAttendanceTakingGrant(AttendanceAccessGrant grant) {
         if (grant == null) return false;
         if (grant.getGrantKind() == AttendanceGrantKind.TAKE_ATTENDANCE) return true;
-        // Backward compatibility: previous UI versions could try to save custom-event grants
-        // as SELF_CHECKIN. Treat those as TAKE_ATTENDANCE so assigned MAKHDOM can record
-        // attendance/absence for the whole family.
-        return grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN
-                && grantAllowsType(grant, AttendanceType.CUSTOM_EVENT);
+        // Legacy compatibility: older UI versions saved assignments for MAKHDOM as SELF_CHECKIN.
+        // The current requirement is that any assigned khadim/makhdoum can take attendance
+        // for the configured family, not only record himself.
+        return grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN;
     }
 
     private boolean hasActiveTakeAttendanceGrantForType(User servant, AttendanceType type) {
-        return activeAttendanceTakingGrantsFor(servant, type).stream().anyMatch(g -> grantAllowsType(g, type));
+        return configuredAttendanceTakingGrantsFor(servant, type).stream().anyMatch(g -> grantAllowsType(g, type));
     }
 
-    private boolean hasNativeActiveTakeAttendanceGrant(User actor) {
+    private boolean hasNativeConfiguredTakeAttendanceGrant(User actor) {
         return actor != null && actor.getId() != null
-                && attendanceAccessGrantService.activeGrantsForUser(actor.getId()).stream()
+                && attendanceAccessGrantService.grantsForUser(actor.getId()).stream()
                 .anyMatch(this::isAttendanceTakingGrant);
     }
 
     private boolean shouldTreatLegacySelfCheckinAsTakeAttendance(User actor) {
         if (actor == null || actor.getId() == null) return false;
         if (isPrivilegedAttendanceActor(actor)) return false;
-        // Backward compatibility: if a MAKHDOM already has at least one active
-        // attendance-taking grant, do not let older SELF_CHECKIN grants disappear.
-        // Treat them as TAKE_ATTENDANCE too so adding a custom event does not close
-        // the existing قداس/تسبحة/اجتماع الأسرة grants.
-        return hasNativeActiveTakeAttendanceGrant(actor);
+        // Backward compatibility: old MAKHDOM assignments may be saved as SELF_CHECKIN.
+        // Treat them as TAKE_ATTENDANCE so saved قداس/تسبحة/اجتماع الأسرة
+        // customizations remain usable without requiring the time window to be open.
+        return hasNativeConfiguredTakeAttendanceGrant(actor);
     }
 
-    private List<AttendanceAccessGrant> activeAttendanceTakingGrantsFor(User actor, AttendanceType type) {
+    private List<AttendanceAccessGrant> configuredAttendanceTakingGrantsFor(User actor, AttendanceType type) {
         if (actor == null || actor.getId() == null) return List.of();
 
         boolean includeLegacySelfCheckin = shouldTreatLegacySelfCheckinAsTakeAttendance(actor);
-        return attendanceAccessGrantService.activeGrantsForUser(actor.getId()).stream()
+        return attendanceAccessGrantService.grantsForUser(actor.getId()).stream()
                 .filter(g -> isAttendanceTakingGrant(g)
                         || (includeLegacySelfCheckin && g.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN))
                 .filter(g -> grantAllowsType(g, type))
                 .toList();
     }
 
-    private boolean hasActiveAttendanceTakingGrant(User actor) {
+    private List<AttendanceAccessGrant> activeAttendanceTakingGrantsFor(User actor, AttendanceType type) {
+        // Keep the old method name for the existing call sites, but do not enforce the time window.
+        return configuredAttendanceTakingGrantsFor(actor, type);
+    }
+
+    private boolean hasConfiguredAttendanceTakingGrant(User actor) {
         return actor != null && actor.getId() != null
-                && !activeAttendanceTakingGrantsFor(actor, null).isEmpty();
+                && !configuredAttendanceTakingGrantsFor(actor, null).isEmpty();
     }
 
     private String detectScanEffectiveFamily(User target, AttendanceType type, String requestedFamily) {
@@ -1055,7 +1058,7 @@ public class AttendanceController {
         List<AttendanceAccessGrant> activeGrants = activeAttendanceTakingGrantsFor(servant, type);
 
         if (activeGrants.isEmpty()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "وقت أخذ الحضور غير متاح الآن");
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يوجد تخصيص حضور محفوظ لك");
         }
 
         boolean familyAllowed;
@@ -1076,7 +1079,7 @@ public class AttendanceController {
 
         List<AttendanceAccessGrant> activeGrants = activeAttendanceTakingGrantsFor(servant, type);
         if (activeGrants.isEmpty()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "وقت أخذ الحضور غير متاح الآن");
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يوجد تخصيص حضور محفوظ لك");
         }
     }
 
@@ -1088,7 +1091,7 @@ public class AttendanceController {
         String targetBase = normalizeFamilyBaseForGrant(familyBase);
         List<AttendanceAccessGrant> activeGrants = activeAttendanceTakingGrantsFor(servant, type);
         if (activeGrants.isEmpty()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "وقت أخذ الحضور غير متاح الآن");
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يوجد تخصيص حضور محفوظ لك");
         }
 
         boolean familyAllowed;

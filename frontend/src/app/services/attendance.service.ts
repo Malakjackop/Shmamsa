@@ -236,7 +236,8 @@ export class AttendanceService {
     token: string,
     date?: string,
     type?: AttendanceType,
-    family?: string
+    family?: string,
+    customTitle?: string
   ): Observable<{
     id: number;
     username: string;
@@ -267,7 +268,7 @@ export class AttendanceService {
       existingStatus?: 'PRESENT' | 'ABSENT' | null;
     }>(
       `${this.baseUrl}/scan-token`,
-      { token, date, type, family }
+      { token, date, type, family, customTitle }
     , { withCredentials: true });
   }
 

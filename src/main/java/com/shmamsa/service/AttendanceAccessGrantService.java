@@ -203,8 +203,9 @@ public class AttendanceAccessGrantService {
 
     private AttendanceGrantKind effectiveGrantKind(AttendanceAccessGrant grant) {
         if (grant == null) return null;
-        Set<AttendanceType> types = parseTypes(grant.getAllowedTypesCsv());
-        if (grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN && types.contains(AttendanceType.CUSTOM_EVENT)) {
+        // Legacy compatibility: previous screens saved MAKHDOM assignments as SELF_CHECKIN.
+        // In the current flow, any saved assignment opens delegated attendance-taking.
+        if (grant.getGrantKind() == AttendanceGrantKind.SELF_CHECKIN) {
             return AttendanceGrantKind.TAKE_ATTENDANCE;
         }
         return grant.getGrantKind();

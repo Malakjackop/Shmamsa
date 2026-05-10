@@ -14,7 +14,7 @@ import { MessageService } from 'primeng/api';
 import { assignmentRolesOf, normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
 import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, switchMap } from 'rxjs/operators';
 
 type PickUser = {
   id: number;
@@ -75,13 +75,43 @@ type GrantGroup = {
   targetNames: string;
   notes: string[];
 };
+type GrantScheduleGroup = {
+  key: string;
+  grants: AttendanceAccessGrant[];
+  first: AttendanceAccessGrant;
+  editGroup: GrantGroup;
+  typeLabel: string;
+  dayLabel: string;
+  familyLabel: string;
+  dateRangeText: string;
+  timeRangeText: string;
+  notesText: string;
+  enabled: boolean;
+};
+type PersonGrantGroup = {
+  key: string;
+  grants: AttendanceAccessGrant[];
+  first: AttendanceAccessGrant;
+  targetName: string;
+  kindLabel: string;
+  enabled: boolean;
+  schedules: GrantScheduleGroup[];
+};
 type CustomEventForm = Partial<AttendanceCustomEvent> & {
   familyBase: string;
   title: string;
   dayOfWeek: number;
+  dayOfWeeks: number[];
   enabled: boolean;
   alwaysActive: boolean;
   permittedEditorIds: number[];
+};
+type CustomEventGroup = {
+  key: string;
+  events: AttendanceCustomEvent[];
+  first: AttendanceCustomEvent;
+  days: number[];
+  enabled: boolean;
 };
 
 @Component({
@@ -138,6 +168,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   grantPopupVisible = false;
   grantSearchText = '';
   grantPopupFilter: GrantPopupFilter = 'ALL';
+  selectedGrantPersonKeys: string[] = [];
   grantDialogVisible = false;
   grantDialogMode: 'create' | 'edit' = 'create';
   grantForm: Partial<AttendanceAccessGrant> = this.defaultGrantForm();
@@ -146,8 +177,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   grantTargets: PickUser[] = [];
   selectedGrantTargetIds: number[] = [];
   grantTargetSearch = '';
-  grantAudience: GrantAudience = 'MEMBERS';
-  private lastGrantAudience: GrantAudience = 'MEMBERS';
+  grantAudience: GrantAudience = 'SERVANTS';
+  private lastGrantAudience: GrantAudience = 'SERVANTS';
   grantStartsAtDate: Date | null = null;
   grantEndsAtDate: Date | null = null;
   grantFamilySelections: string[] = [];
@@ -162,6 +193,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   selectedGrantTargetList: PickUser[] = [];
   grantSavedSummaries: GrantSavedSummary[] = [];
   readonly grantNoDisabledDays: number[] = [];
+  readonly grantMinDate: Date = this.startOfToday();
+  grantPermanentEnabled = false;
+  grantPermanentFromDate: Date | null = null;
+  grantPermanentToDate: Date | null = null;
 
   configEditor: AttendanceConfig = this.defaultAttendanceConfig();
   configSaving = false;
@@ -197,11 +232,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   customEventDialogMode: 'create' | 'edit' = 'create';
   customEventDialogVisible = false;
   customEventSaving = false;
+  private editingCustomEventGroupIds: number[] = [];
   customEventForm: CustomEventForm = this.defaultCustomEventForm();
   customEventActiveFromDate: Date | null = null;
   customEventActiveToDate: Date | null = null;
   customEventBlockedDates: Date[] = [];
   familyCustomEvents: AttendanceCustomEvent[] = [];
+  familyCustomEventGroups: CustomEventGroup[] = [];
   availableCustomEvents: AttendanceCustomEvent[] = [];
   selectedCustomEventId: number | '' = '';
   customEventsPopupVisible = false;
@@ -540,9 +577,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   closeGrantsPopup(): void {
     this.grantPopupVisible = false;
+    this.selectedGrantPersonKeys = [];
   }
 
   grantPopupFilterOptions(): Array<{ value: GrantPopupFilter; label: string }> {
+    if (!this.canFilterGrantFamilies()) {
+      return [
+        { value: 'ALL', label: 'كل التخصيصات' },
+        { value: 'SERVANTS_SCOPE', label: 'الخدام' },
+        { value: 'MEMBERS_SCOPE', label: 'المخدومين' }
+      ];
+    }
+
     const scopeLabel = this.selectedFamily || 'الأسرة الحالية';
     return [
       { value: 'ALL', label: 'كل التخصيصات' },
@@ -552,21 +598,44 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   popupGrantCountLabel(): string {
-    return `${this.filteredGrantGroups.length} تخصيص`;
+    return `${this.filteredPersonGrantGroups.length} تخصيص`;
+  }
+
+  personGrantGroupCount(): number {
+    return this.groupGrantsByPerson(this.visibleGrantsForCurrentManager(this.grants)).length;
   }
 
   private grantMatchesPopupFilter(grant: AttendanceAccessGrant): boolean {
-    const selected = String(this.selectedFamily || '').trim();
+    const selected = this.canFilterGrantFamilies() ? String(this.selectedFamily || '').trim() : '';
     const grantFamilies = this.grantFamilyList(grant.familyBase);
+    const targetAudience = this.grantTargetAudience(grant);
 
     switch (this.grantPopupFilter) {
       case 'SERVANTS_SCOPE':
-        return grant.grantKind === 'TAKE_ATTENDANCE' && (!!selected ? grantFamilies.includes(selected) : true);
+        return targetAudience === 'SERVANTS' && (!!selected ? grantFamilies.includes(selected) : true);
       case 'MEMBERS_SCOPE':
-        return grant.grantKind === 'SELF_CHECKIN' && (!!selected ? grantFamilies.includes(selected) : true);
+        return targetAudience === 'MEMBERS' && (!!selected ? grantFamilies.includes(selected) : true);
       default:
         return true;
     }
+  }
+
+  private managerGrantScopeFamilies(): string[] {
+    if (this.canFilterGrantFamilies()) return [];
+    const families = this.aminOsraFamilies();
+    if (families.length) return families;
+    return [this.defaultGrantScopeFamily()].filter(Boolean);
+  }
+
+  private grantBelongsToManagerScope(grant: AttendanceAccessGrant): boolean {
+    const scopeFamilies = this.managerGrantScopeFamilies();
+    if (!scopeFamilies.length) return true;
+    const grantFamilies = this.grantFamilyList(grant.familyBase);
+    return this.grantFamiliesOverlap(grantFamilies, scopeFamilies);
+  }
+
+  private visibleGrantsForCurrentManager(grants: AttendanceAccessGrant[]): AttendanceAccessGrant[] {
+    return (grants || []).filter((grant) => this.grantBelongsToManagerScope(grant));
   }
 
   grantFamilyFilterOptions(): string[] {
@@ -594,9 +663,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   get filteredGrants(): AttendanceAccessGrant[] {
-    const selected = String(this.grantsFilterFamily || '').trim();
+    const selected = this.canFilterGrantFamilies() ? String(this.grantsFilterFamily || '').trim() : '';
     const q = String(this.grantSearchText || '').trim().toLowerCase();
-    return this.grants.filter((grant) => {
+    return this.visibleGrantsForCurrentManager(this.grants).filter((grant) => {
       if (selected && !this.grantFamilyList(grant.familyBase).includes(selected)) return false;
       if (!this.grantMatchesPopupFilter(grant)) return false;
       if (!q) return true;
@@ -617,6 +686,241 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   get filteredGrantGroups(): GrantGroup[] {
     return this.groupAccessGrants(this.filteredGrants);
+  }
+
+  get filteredPersonGrantGroups(): PersonGrantGroup[] {
+    return this.groupGrantsByPerson(this.filteredGrants);
+  }
+
+  selectedGrantPersonCount(): number {
+    return this.selectedGrantPersonGroups().length;
+  }
+
+  selectedGrantPersonGroups(): PersonGrantGroup[] {
+    const selectedKeys = new Set(this.selectedGrantPersonKeys || []);
+    if (!selectedKeys.size) return [];
+    return this.filteredPersonGrantGroups.filter((group) => selectedKeys.has(group.key));
+  }
+
+  isGrantPersonSelected(group: PersonGrantGroup): boolean {
+    return (this.selectedGrantPersonKeys || []).includes(group.key);
+  }
+
+  toggleGrantPersonSelection(group: PersonGrantGroup, checked: boolean): void {
+    const selected = new Set(this.selectedGrantPersonKeys || []);
+    if (checked) selected.add(group.key);
+    else selected.delete(group.key);
+    this.selectedGrantPersonKeys = Array.from(selected);
+  }
+
+  allVisibleGrantPeopleSelected(): boolean {
+    const groups = this.filteredPersonGrantGroups;
+    return !!groups.length && groups.every((group) => this.isGrantPersonSelected(group));
+  }
+
+  toggleAllVisibleGrantPeople(checked: boolean): void {
+    const selected = new Set(this.selectedGrantPersonKeys || []);
+    for (const group of this.filteredPersonGrantGroups) {
+      if (checked) selected.add(group.key);
+      else selected.delete(group.key);
+    }
+    this.selectedGrantPersonKeys = Array.from(selected);
+  }
+
+  clearGrantPersonSelection(): void {
+    this.selectedGrantPersonKeys = [];
+  }
+
+  editSelectedGrantPeople(): void {
+    const groups = this.selectedGrantPersonGroups();
+    if (!groups.length) return;
+
+    const audiences = new Set(groups.map((group) => this.grantTargetAudience(group.first)));
+    if (audiences.size > 1) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار خدام فقط أو مخدومين فقط للتعديل الجماعي.' });
+      return;
+    }
+
+    const grants = groups.flatMap((group) => group.grants);
+    const first = grants[0];
+    if (!first) return;
+    this.openEditGrantGroup({
+      key: `bulk-${groups.map((group) => group.key).join('__')}`,
+      grants,
+      first,
+      targetNames: groups.map((group) => group.targetName).filter(Boolean).join(' + '),
+      notes: Array.from(new Set(grants.map((grant) => String(grant.note || '').trim()).filter(Boolean)))
+    });
+    this.grantPopupVisible = false;
+  }
+
+  deleteSelectedGrantPeople(): void {
+    if (!this.canManageAccessGrants()) return;
+    const groups = this.selectedGrantPersonGroups();
+    const ids = Array.from(new Set(groups.flatMap((group) => group.grants.map((grant) => Number(grant.id || 0))).filter(Boolean)));
+    if (!ids.length) return;
+
+    forkJoin(ids.map((id) => this.attendance.deleteAccessGrant(id))).subscribe({
+      next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: `تم حذف تخصيصات ${groups.length} شخص` });
+        const idSet = new Set(ids);
+        this.grantSavedSummaries = this.grantSavedSummaries.filter((item) =>
+          !(item.sourceGrants || (item.sourceGrant ? [item.sourceGrant] : []))
+            .some((grant) => idSet.has(Number(grant.id || 0)))
+        );
+        this.selectedGrantPersonKeys = [];
+        this.loadAccessGrants();
+      },
+      error: (err) => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل حذف التخصيصات' });
+      }
+    });
+  }
+
+  private groupGrantsByPerson(grants: AttendanceAccessGrant[]): PersonGrantGroup[] {
+    const people = new Map<string, AttendanceAccessGrant[]>();
+    for (const grant of grants || []) {
+      const key = this.personGrantGroupingKey(grant);
+      people.set(key, [...(people.get(key) || []), grant]);
+    }
+
+    return Array.from(people.entries())
+      .map(([key, items]) => {
+        const sorted = items.slice().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+        const first = sorted[0];
+        return {
+          key,
+          grants: sorted,
+          first,
+          targetName: first.targetUserName || this.grantTargetNameFor(first.targetUserId),
+          kindLabel: this.grantTargetAudience(first) === 'MEMBERS' ? 'مخدوم' : 'خادم',
+          enabled: sorted.some((grant) => grant.enabled !== false),
+          schedules: this.groupPersonGrantSchedules(sorted)
+        };
+      })
+      .sort((a, b) => a.targetName.localeCompare(b.targetName, 'ar'));
+  }
+
+  private personGrantGroupingKey(grant: AttendanceAccessGrant): string {
+    return [
+      this.grantTargetAudience(grant),
+      Number(grant.targetUserId || 0) || String(grant.targetUserName || '').trim()
+    ].join('|');
+  }
+
+  private grantTargetAudience(grant: Partial<AttendanceAccessGrant>): GrantAudience {
+    const role = normalizeRole(grant.targetUserRole);
+    if (role === 'MAKHDOM') return 'MEMBERS';
+    if (role === 'KHADIM' || role === 'AMIN_OSRA' || role === 'AMIN_KHEDMA' || role === 'DEVELOPER') return 'SERVANTS';
+
+    const roleText = String(grant.targetUserRole || '').trim();
+    if (roleText.includes('مخدوم')) return 'MEMBERS';
+    if (roleText.includes('خادم') || roleText.includes('امين') || roleText.includes('أمين')) return 'SERVANTS';
+
+    const name = String(grant.targetUserName || '').trim();
+    if (name.startsWith('مخدوم')) return 'MEMBERS';
+    if (name.startsWith('خادم')) return 'SERVANTS';
+
+    return this.grantAudienceFromKind(grant.grantKind);
+  }
+
+  private groupPersonGrantSchedules(grants: AttendanceAccessGrant[]): GrantScheduleGroup[] {
+    const schedules = new Map<string, AttendanceAccessGrant[]>();
+    for (const grant of grants || []) {
+      const key = this.grantScheduleGroupingKey(grant);
+      schedules.set(key, [...(schedules.get(key) || []), grant]);
+    }
+
+    return Array.from(schedules.entries())
+      .map(([key, items]) => {
+        const sorted = items.slice().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+        const first = sorted[0];
+        const notes = sorted
+          .map((grant) => String(grant.note || '').trim())
+          .filter((note, index, arr) => !!note && arr.indexOf(note) === index);
+        return {
+          key,
+          grants: sorted,
+          first,
+          editGroup: this.makeScheduleEditGroup(sorted, key),
+          typeLabel: this.grantTypeLabelFor(first),
+          dayLabel: this.grantDayLabel(first),
+          familyLabel: this.grantFamilyLabel(first.familyBase),
+          dateRangeText: this.grantScheduleDateRangeText(sorted),
+          timeRangeText: this.grantScheduleTimeRangeText(first),
+          notesText: notes.join(' + '),
+          enabled: sorted.some((grant) => grant.enabled !== false)
+        };
+      })
+      .sort((a, b) => new Date(a.first.startsAt).getTime() - new Date(b.first.startsAt).getTime());
+  }
+
+  private grantScheduleGroupingKey(grant: AttendanceAccessGrant): string {
+    const start = new Date(grant.startsAt);
+    const end = new Date(grant.endsAt);
+    const startTime = Number.isNaN(start.getTime()) ? '' : `${start.getHours()}:${start.getMinutes()}`;
+    const endTime = Number.isNaN(end.getTime()) ? '' : `${end.getHours()}:${end.getMinutes()}`;
+    return [
+      this.grantFamilyList(grant.familyBase).slice().sort().join(','),
+      (grant.allowedTypes || []).slice().sort().join(','),
+      this.grantDayFromGrant(grant) ?? '',
+      startTime,
+      endTime,
+      grant.enabled === false ? 'off' : 'on'
+    ].join('|');
+  }
+
+  private makeSingleGrantEditGroup(grant: AttendanceAccessGrant): GrantGroup {
+    return {
+      key: this.grantGroupingKey(grant),
+      grants: [grant],
+      first: grant,
+      targetNames: grant.targetUserName || this.grantTargetNameFor(grant.targetUserId),
+      notes: String(grant.note || '').trim() ? [String(grant.note || '').trim()] : []
+    };
+  }
+
+  private makeScheduleEditGroup(grants: AttendanceAccessGrant[], key: string): GrantGroup {
+    const sorted = grants.slice().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    const first = sorted[0];
+    const notes = sorted
+      .map((grant) => String(grant.note || '').trim())
+      .filter((note, index, arr) => !!note && arr.indexOf(note) === index);
+    const targetNames = sorted
+      .map((grant) => grant.targetUserName || this.grantTargetNameFor(grant.targetUserId))
+      .filter((name, index, arr) => !!name && arr.indexOf(name) === index)
+      .join(' + ');
+    return {
+      key,
+      grants: sorted,
+      first,
+      targetNames,
+      notes
+    };
+  }
+
+  private grantScheduleDateRangeText(grants: AttendanceAccessGrant[]): string {
+    const starts = grants
+      .map((grant) => new Date(grant.startsAt))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    const ends = grants
+      .map((grant) => new Date(grant.endsAt))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    const first = starts[0];
+    const last = ends[ends.length - 1] || starts[starts.length - 1];
+    if (!first || !last) return '';
+    const from = this.formatDateOnly(first);
+    const to = this.formatDateOnly(last);
+    return from === to ? from : `من ${from} إلى ${to}`;
+  }
+
+  private grantScheduleTimeRangeText(grant: AttendanceAccessGrant): string {
+    const start = this.formatTimeOnly(grant.startsAt);
+    const end = this.formatTimeOnly(grant.endsAt);
+    if (start && end) return `${start} إلى ${end}`;
+    return start || end || '';
   }
 
   private groupAccessGrants(grants: AttendanceAccessGrant[]): GrantGroup[] {
@@ -689,27 +993,45 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   dialogExistingGrantGroups(): GrantGroup[] {
     if (!this.grantDialogVisible) return [];
     const editingIds = new Set(this.editingGrantGroupIds.map((id) => Number(id || 0)).filter(Boolean));
-    const wantedKind = this.grantKindFromAudience(this.grantAudience);
+    const selectedTargetIds = new Set((this.selectedGrantTargetIds || []).map((id) => Number(id || 0)).filter(Boolean));
+    const wantedAudience = this.grantAudience;
     const editingKey = this.editingGrantGroup()?.key || '';
 
     return this.groupAccessGrants(
-      this.knownAccessGrants().filter((grant) => {
+      this.visibleGrantsForCurrentManager(this.knownAccessGrants()).filter((grant) => {
         const grantId = Number(grant.id || 0);
         if (grantId && editingIds.has(grantId)) return false;
-        return grant.grantKind === wantedKind;
+        if (selectedTargetIds.size && !selectedTargetIds.has(Number(grant.targetUserId || 0))) return false;
+        return this.grantTargetAudience(grant) === wantedAudience;
       })
     ).filter((group) => !editingKey || group.key !== editingKey);
   }
 
+  dialogExistingPersonGrantGroups(): PersonGrantGroup[] {
+    if (!this.grantDialogVisible) return [];
+    const editingIds = new Set(this.editingGrantGroupIds.map((id) => Number(id || 0)).filter(Boolean));
+    const selectedTargetIds = new Set((this.selectedGrantTargetIds || []).map((id) => Number(id || 0)).filter(Boolean));
+    const wantedAudience = this.grantAudience;
+
+    return this.groupGrantsByPerson(
+      this.visibleGrantsForCurrentManager(this.knownAccessGrants()).filter((grant) => {
+        const grantId = Number(grant.id || 0);
+        if (grantId && editingIds.has(grantId)) return false;
+        if (selectedTargetIds.size && !selectedTargetIds.has(Number(grant.targetUserId || 0))) return false;
+        return this.grantTargetAudience(grant) === wantedAudience;
+      })
+    );
+  }
+
   dialogExistingGrantTitle(): string {
     return this.grantAudience === 'SERVANTS'
-      ? 'تخصيصات أخذ الحضور الموجودة'
+      ? 'تخصيصات الخدام الموجودة'
       : 'تخصيصات المخدومين الموجودة';
   }
 
   dialogExistingGrantHint(): string {
     return this.grantAudience === 'SERVANTS'
-      ? 'لا توجد تخصيصات أخذ حضور محفوظة حالياً.'
+      ? 'لا توجد تخصيصات خدام محفوظة حالياً.'
       : 'لا توجد تخصيصات مخدومين محفوظة حالياً.';
   }
 
@@ -1283,6 +1605,53 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     };
   }
 
+  currentSelectedGrantNote(): string {
+    const selectedType = this.selectedAttendanceType();
+    const selectedDate = this.selectedDate ? new Date(this.selectedDate) : null;
+    const selectedFamilies = this.shouldRestrictFamilyScopeByGrant() && this.selectedFamily
+      ? this.scopeFamiliesForSelection(this.selectedFamily)
+      : [];
+
+    const notes = this.activeScopeGrants()
+      .filter((grant) => {
+        const grantTypes = grant.allowedTypes || [];
+        if (grantTypes.length && !grantTypes.includes(selectedType)) return false;
+
+        if (selectedFamilies.length && grant.familyBase) {
+          const grantFamilies = this.grantFamilyList(grant.familyBase);
+          if (!this.grantFamiliesOverlap(grantFamilies, selectedFamilies)) return false;
+        }
+
+        return !selectedDate || this.selectedDateMatchesGrantOccasion(grant, selectedDate);
+      })
+      .map((grant) => String(grant.note || '').trim())
+      .filter((note, index, arr) => !!note && arr.indexOf(note) === index);
+
+    return notes.join(' + ');
+  }
+
+  private selectedDateMatchesGrantOccasion(grant: AttendanceAccessGrant, selectedDate: Date): boolean {
+    const day = Number(grant.dayOfWeek);
+    if (this.weekDays.includes(day) && day !== selectedDate.getDay()) return false;
+
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+
+    const start = new Date(grant.startsAt);
+    if (!Number.isNaN(start.getTime())) {
+      start.setHours(0, 0, 0, 0);
+      if (selected < start) return false;
+    }
+
+    const end = new Date(grant.endsAt);
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(0, 0, 0, 0);
+      if (selected > end) return false;
+    }
+
+    return true;
+  }
+
   private hasAnyOpenGrantNow(now = new Date()): boolean {
     if (!this.shouldEnforceGrantWindow()) return true;
     return this.relevantScopeGrants().some((grant) => this.isGrantActive(grant, now));
@@ -1717,8 +2086,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return `${yyyy}-${mm}-${dd}`;
   }
 
+  private startOfToday(): Date {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }
+
+  private isBeforeToday(value: Date | null | undefined): boolean {
+    if (!value || Number.isNaN(value.getTime())) return false;
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime() < this.startOfToday().getTime();
+  }
+
   toggleScan() {
-    if (this.isSelfCheckinMode() || this.isSelectedCustomEventType() || !!this.blockedMessage) return;
+    if (this.isSelfCheckinMode() || !!this.blockedMessage) return;
     this.scanning = !this.scanning;
   }
 
@@ -1893,7 +2275,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   onCodeResult(resultString: string) {
-    if (this.isSelfCheckinMode() || this.isSelectedCustomEventType()) return;
+    if (this.isSelfCheckinMode()) return;
     const token = (resultString || '').trim();
     if (!token) return;
 
@@ -1911,7 +2293,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         ? requestedFamily
         : undefined);
 
-    this.attendance.scanToken(token, iso, selectedType, family).subscribe({
+    const customTitle = selectedType === 'CUSTOM_EVENT' ? this.customTitle.trim() || undefined : undefined;
+
+    this.attendance.scanToken(token, iso, selectedType, family, customTitle).subscribe({
       next: (u) => {
         const pu = this.toPickUser(u);
         if (!pu?.id) return;
@@ -2045,7 +2429,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   // ===== Grants management =====
   private defaultGrantForm(): Partial<AttendanceAccessGrant> {
     return {
-      grantKind: 'SELF_CHECKIN',
+      grantKind: 'TAKE_ATTENDANCE',
       allowedTypes: ['FRIDAY_LITURGY'],
       dayOfWeek: new Date().getDay(),
       startsAt: this.nowPlusHours(0),
@@ -2084,6 +2468,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
 
     return effectiveRoles.has('KHADIM');
+  }
+
+  private isMemberGrantTarget(user?: PickUser | null): boolean {
+    const role = normalizeRole(user?.role, user?.roleCode);
+    const assignmentRoles = this.assignmentsOf(user).map((x) => x.role);
+    const effectiveRoles = new Set([role, ...assignmentRoles].filter(Boolean));
+
+    if (user?.id && Number(user.id) === Number(this.me?.id || 0)) {
+      return false;
+    }
+
+    return effectiveRoles.has('MAKHDOM');
   }
 
   private primaryFamilyFor(user?: PickUser | null): string {
@@ -2174,6 +2570,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
     this.loadGrantCustomEvents();
     this.lastGrantAudience = this.grantAudience;
+  }
+
+  selectGrantAudience(audience: GrantAudience): void {
+    if (this.grantAudience === audience) return;
+    this.grantAudience = audience;
+    this.onGrantAudienceChange();
   }
 
   onGrantFamilyBaseChange(): void {
@@ -2299,11 +2701,99 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const target = this.grantDayWindows.find((item) => item.day === day);
     if (!target) return;
     const nextValue = this.normalizeGrantDateValue(value);
-    target.endsAt = nextValue;
+    const currentEndOffset = this.grantWindowEndOffset(target);
+    target.endsAt = this.grantPermanentEnabled && nextValue
+      ? this.dateForRelativeOffset(target.startsAt || this.nextMatchingWeekday(day, new Date()), currentEndOffset, nextValue)
+      : nextValue;
     if (this.grantSelectedWeekday === day) {
-      this.grantEndsAtDate = nextValue;
-      this.grantForm.endsAt = nextValue ? this.toDateTimeLocalValue(nextValue) : '';
+      this.grantEndsAtDate = target.endsAt;
+      this.grantForm.endsAt = target.endsAt ? this.toDateTimeLocalValue(target.endsAt) : '';
     }
+  }
+
+  grantWindowEndDay(window: GrantDayWindow): number {
+    const end = window.endsAt && !Number.isNaN(window.endsAt.getTime()) ? window.endsAt : null;
+    return end ? end.getDay() : window.day;
+  }
+
+  grantWindowEndOffset(window: GrantDayWindow): number {
+    const start = window.startsAt && !Number.isNaN(window.startsAt.getTime()) ? window.startsAt : null;
+    const end = window.endsAt && !Number.isNaN(window.endsAt.getTime()) ? window.endsAt : null;
+    if (!start || !end) return 0;
+    const startDay = new Date(start);
+    startDay.setHours(0, 0, 0, 0);
+    const endDay = new Date(end);
+    endDay.setHours(0, 0, 0, 0);
+    const diff = Math.round((endDay.getTime() - startDay.getTime()) / 86400000);
+    return Math.min(7, Math.max(0, diff));
+  }
+
+  grantWindowEndDayOptions(startDay: number): Array<{ offset: number; label: string }> {
+    return Array.from({ length: 8 }, (_, offset) => ({
+      offset,
+      label: offset === 0 ? `${this.dayLabel(startDay)} (نفس اليوم)` : this.dayLabel((startDay + offset) % 7)
+    }));
+  }
+
+  onGrantWindowEndDayChange(startDay: number, endDay: number): void {
+    const target = this.grantDayWindows.find((item) => item.day === startDay);
+    if (!target) return;
+    const start = target.startsAt || this.nextMatchingWeekday(startDay, new Date());
+    target.endsAt = this.dateForRelativeWeekday(start, Number(endDay), target.endsAt || start);
+    if (this.grantSelectedWeekday === startDay) {
+      this.grantEndsAtDate = target.endsAt;
+      this.grantForm.endsAt = target.endsAt ? this.toDateTimeLocalValue(target.endsAt) : '';
+    }
+  }
+
+  onGrantWindowEndOffsetChange(startDay: number, offset: number): void {
+    const target = this.grantDayWindows.find((item) => item.day === startDay);
+    if (!target) return;
+    const start = target.startsAt || this.nextMatchingWeekday(startDay, new Date());
+    const timeSource = target.endsAt || start;
+    const end = new Date(start);
+    end.setDate(end.getDate() + Math.min(7, Math.max(0, Number(offset) || 0)));
+    end.setHours(timeSource.getHours(), timeSource.getMinutes(), 0, 0);
+    target.endsAt = end;
+    if (this.grantSelectedWeekday === startDay) {
+      this.grantEndsAtDate = target.endsAt;
+      this.grantForm.endsAt = this.toDateTimeLocalValue(target.endsAt);
+    }
+  }
+
+  setGrantWindowStartNow(day: number): void {
+    const target = this.grantDayWindows.find((item) => item.day === day);
+    if (!target) return;
+    const now = new Date();
+    const base = target.startsAt || this.nextMatchingWeekday(day, now);
+    const next = new Date(base);
+    next.setHours(now.getHours(), now.getMinutes(), 0, 0);
+    this.onGrantWindowStartChange(day, this.grantPermanentEnabled ? next : now);
+  }
+
+  setGrantWindowEndNow(day: number): void {
+    const target = this.grantDayWindows.find((item) => item.day === day);
+    if (!target) return;
+    const now = new Date();
+    const base = target.endsAt || target.startsAt || this.nextMatchingWeekday(day, now);
+    const next = new Date(base);
+    next.setHours(now.getHours(), now.getMinutes(), 0, 0);
+    this.onGrantWindowEndChange(day, this.grantPermanentEnabled ? next : now);
+  }
+
+  private dateForRelativeWeekday(start: Date, targetDay: number, timeSource: Date): Date {
+    const out = new Date(start);
+    const diff = (targetDay - start.getDay() + 7) % 7;
+    out.setDate(out.getDate() + diff);
+    out.setHours(timeSource.getHours(), timeSource.getMinutes(), 0, 0);
+    return out;
+  }
+
+  private dateForRelativeOffset(start: Date, offset: number, timeSource: Date): Date {
+    const out = new Date(start);
+    out.setDate(out.getDate() + Math.min(7, Math.max(0, Number(offset) || 0)));
+    out.setHours(timeSource.getHours(), timeSource.getMinutes(), 0, 0);
+    return out;
   }
 
   private normalizeGrantDateValue(value: Date | null): Date | null {
@@ -2584,7 +3074,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             .flatMap((pair: any) => [...(pair?.[0] || []), ...(pair?.[1] || [])])
             .map((x: any) => this.toPickUser(x));
           const unique = merged.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
-          this.grantTargets = unique.filter((user) => this.isServantGrantTarget(user, true));
+          this.grantTargets = unique.filter((user) => this.isServantGrantTarget(user));
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
         },
@@ -2613,7 +3103,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             .map((x: any) => this.toPickUser(x));
           const unique = allTargets.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
           this.grantTargets = unique.filter((user) =>
-            this.isServantGrantTarget(user, true) && this.belongsToFamilyScope(user, scopeFamily)
+            this.isServantGrantTarget(user) && this.belongsToFamilyScope(user, scopeFamily)
           );
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
@@ -2631,8 +3121,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         const allTargets = (m || []).map((x: any) => this.toPickUser(x));
         this.grantTargets = allTargets.filter((user) =>
           this.grantAudience === 'SERVANTS'
-            ? this.isServantGrantTarget(user, true)
-            : !this.isServantGrantTarget(user, true)
+            ? this.isServantGrantTarget(user)
+            : this.isMemberGrantTarget(user)
         );
         this.syncSelectedGrantTargets();
         this.refreshGrantTargetLists();
@@ -2674,6 +3164,38 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.refreshGrantTargetLists();
   }
 
+  private grantTargetSelectionIds(): number[] {
+    const ids = [
+      ...this.grantTargets.map((user) => Number(user.id || 0)),
+      ...this.selectedGrantTargetList.map((user) => Number(user.id || 0))
+    ].filter(Boolean);
+    return Array.from(new Set(ids));
+  }
+
+  grantTargetSelectionTotal(): number {
+    return this.grantTargetSelectionIds().length;
+  }
+
+  areAllGrantTargetsSelected(): boolean {
+    const total = this.grantTargetSelectionTotal();
+    return total > 0 && this.selectedGrantTargetList.length === total;
+  }
+
+  selectAllGrantTargets(): void {
+    const ids = this.grantTargetSelectionIds();
+    this.selectedGrantTargetIds = Array.from(new Set(ids));
+    this.grantForm.targetUserId = this.selectedGrantTargetIds[0];
+    this.grantTargetSearch = '';
+    this.refreshGrantTargetLists();
+  }
+
+  clearGrantTargets(): void {
+    this.selectedGrantTargetIds = [];
+    this.grantForm.targetUserId = undefined;
+    this.grantTargetSearch = '';
+    this.refreshGrantTargetLists();
+  }
+
   addGrantTarget(id: number): void {
     const current = new Set(this.selectedGrantTargetIds || []);
     current.add(id);
@@ -2687,6 +3209,96 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.selectedGrantTargetIds = (this.selectedGrantTargetIds || []).filter((item) => item !== id);
     this.grantForm.targetUserId = this.selectedGrantTargetIds[0];
     this.refreshGrantTargetLists();
+  }
+
+  private resetPermanentGrantOptions(permanentByDefault = true): void {
+    this.grantPermanentEnabled = permanentByDefault;
+    this.grantPermanentFromDate = null;
+    this.grantPermanentToDate = null;
+  }
+
+  private isEditingRecurringGrant(): boolean {
+    return this.grantDialogMode === 'edit' && this.editingGrantGroupIds.length > 1;
+  }
+
+  private minGrantStartDate(grants: AttendanceAccessGrant[]): Date | null {
+    const dates = (grants || [])
+      .map((grant) => new Date(grant.startsAt))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    return dates[0] || null;
+  }
+
+  private maxGrantEndDate(grants: AttendanceAccessGrant[]): Date | null {
+    const dates = (grants || [])
+      .map((grant) => new Date(grant.endsAt))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    return dates[dates.length - 1] || null;
+  }
+
+  onGrantOneTimeToggle(enabled: boolean): void {
+    if (this.grantDialogMode !== 'create') {
+      this.grantPermanentEnabled = this.isEditingRecurringGrant();
+      return;
+    }
+    this.grantPermanentEnabled = !enabled;
+    this.syncGrantDatesForSelection(true);
+  }
+
+  private combineDateWithTime(datePart: Date, timeSource: Date | null | undefined): Date {
+    const out = new Date(datePart);
+    const source = timeSource && !Number.isNaN(timeSource.getTime()) ? timeSource : null;
+    if (source) {
+      out.setHours(source.getHours(), source.getMinutes(), 0, 0);
+    } else {
+      out.setHours(0, 0, 0, 0);
+    }
+    return out;
+  }
+
+  private buildPermanentGrantWindows(baseWindow: GrantDayWindow): GrantDayWindow[] {
+    if (!this.grantPermanentEnabled) return [baseWindow];
+    const rangeStart = this.normalizeGrantDateValue(this.grantPermanentFromDate);
+    const rangeEnd = this.normalizeGrantDateValue(this.grantPermanentToDate);
+    if (!rangeStart || !rangeEnd) return [];
+    rangeStart.setHours(0, 0, 0, 0);
+    rangeEnd.setHours(23, 59, 59, 999);
+    if (rangeEnd.getTime() <= rangeStart.getTime()) return [];
+
+    const templateStart = this.normalizeGrantDateValue(baseWindow.startsAt || null);
+    const templateEnd = this.normalizeGrantDateValue(baseWindow.endsAt || null);
+    if (!templateStart || !templateEnd) return [];
+    const templateStartDay = new Date(templateStart);
+    templateStartDay.setHours(0, 0, 0, 0);
+    const templateEndDay = new Date(templateEnd);
+    templateEndDay.setHours(0, 0, 0, 0);
+    const endDayOffset = Math.min(7, Math.max(0, Math.round((templateEndDay.getTime() - templateStartDay.getTime()) / 86400000)));
+
+    const out: GrantDayWindow[] = [];
+    let occurrence = this.nextMatchingWeekday(baseWindow.day, rangeStart);
+
+    while (occurrence.getTime() <= rangeEnd.getTime()) {
+      const start = this.combineDateWithTime(occurrence, templateStart);
+      let end = this.combineDateWithTime(occurrence, templateEnd);
+      end.setDate(end.getDate() + endDayOffset);
+      if (end.getTime() <= start.getTime()) {
+        end.setDate(end.getDate() + 1);
+      }
+      if (start.getTime() >= rangeStart.getTime() && start.getTime() <= rangeEnd.getTime()) {
+        out.push({ day: baseWindow.day, startsAt: start, endsAt: end });
+      }
+      occurrence = new Date(occurrence);
+      occurrence.setDate(occurrence.getDate() + 7);
+    }
+
+    return out;
+  }
+
+  private permanentGrantSummaryText(windows: GrantDayWindow[], targetCount: number): string {
+    if (!windows.length) return 'لم يتم إنشاء أي تخصيص.';
+    if (!this.grantPermanentEnabled) return `تم حفظ التخصيص غير الدائم بنجاح ليوم ${this.dayLabel(windows[0].day)}`;
+    return `تم حفظ ${windows.length} ميعاد متكرر لـ ${targetCount} شخص`;
   }
 
   private grantDayLabelFromValue(value?: string | Date | null): string {
@@ -2823,7 +3435,33 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       summary: 'تخصيص موجود',
       detail: `${targetName} معمول له تخصيص بالفعل لنفس النوع: ${typeLabel}`,
       life: 5000
-    });
+      });
+  }
+
+  private grantReplacementSlotKey(
+    targetUserId: number,
+    day: number,
+    payload: Partial<AttendanceAccessGrant>
+  ): string {
+    return [
+      Number(targetUserId || 0),
+      payload.grantKind || '',
+      this.grantFamilyList(payload.familyBase).map((family) => canonicalFamilyName(family)).sort().join(','),
+      (payload.allowedTypes || []).slice().sort().join(','),
+      day
+    ].join('|');
+  }
+
+  private existingGrantsForReplacement(
+    targetUserId: number,
+    day: number,
+    payload: Partial<AttendanceAccessGrant>
+  ): AttendanceAccessGrant[] {
+    const replacementKey = this.grantReplacementSlotKey(targetUserId, day, payload);
+    return this.knownAccessGrants().filter((grant) =>
+      Number(grant.id || 0)
+      && this.grantReplacementSlotKey(Number(grant.targetUserId || 0), this.grantDayFromGrant(grant) ?? -1, grant) === replacementKey
+    );
   }
 
   openCreateGrant(): void {
@@ -2837,6 +3475,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.selectedGrantTargetIds = [];
     this.grantTargetSearch = '';
     this.grantSavedSummaries = [];
+    this.resetPermanentGrantOptions(true);
     this.refreshGrantTargetLists();
     this.grantFamilySelections = this.grantForm.familyBase ? [this.grantForm.familyBase] : [];
     this.syncGrantFamilyFormFromSelections();
@@ -2844,6 +3483,25 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
     this.loadGrantCustomEvents();
     this.grantDialogVisible = true;
+  }
+
+  cancelGrantEdit(): void {
+    if (!this.canManageAccessGrants()) return;
+    this.grantDialogMode = 'create';
+    this.editingGrantGroupIds = [];
+    this.editingGrantTargetFallbacks = [];
+    this.grantForm = this.defaultGrantForm();
+    this.grantAudience = this.grantAudienceFromKind(this.grantForm.grantKind);
+    this.lastGrantAudience = this.grantAudience;
+    this.selectedGrantTargetIds = [];
+    this.grantTargetSearch = '';
+    this.resetPermanentGrantOptions(true);
+    this.refreshGrantTargetLists();
+    this.grantFamilySelections = this.grantForm.familyBase ? [this.grantForm.familyBase] : [];
+    this.syncGrantFamilyFormFromSelections();
+    this.syncGrantDateControls();
+    this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
+    this.loadGrantCustomEvents();
   }
 
   openEditGrant(grant: AttendanceAccessGrant): void {
@@ -2877,6 +3535,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.selectedGrantTargetIds = group.grants.map((item) => Number(item.targetUserId || 0)).filter(Boolean);
     this.grantTargetSearch = '';
     this.grantSavedSummaries = [];
+    this.resetPermanentGrantOptions(group.grants.length > 1);
+    if (group.grants.length > 1) {
+      this.grantPermanentFromDate = this.minGrantStartDate(group.grants);
+      this.grantPermanentToDate = this.maxGrantEndDate(group.grants);
+    }
     this.refreshGrantTargetLists();
     this.syncGrantFamilySelectionsFromForm();
     this.syncGrantDateControls();
@@ -2908,16 +3571,50 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
     const selectedWindow = this.selectedGrantWindowValue
       || (this.grantSelectedWeekday !== null ? this.buildGrantWindow(this.grantSelectedWeekday, this.grantStartsAtDate, this.grantEndsAtDate) : null);
-    const windows = selectedWindow && selectedWindow.startsAt && selectedWindow.endsAt ? [selectedWindow] : [];
+    const baseWindows = selectedWindow && selectedWindow.startsAt && selectedWindow.endsAt ? [selectedWindow] : [];
+
+    if (!baseWindows.length) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد وقت البداية والنهاية لليوم المختار' });
+      return;
+    }
+
+    const editingRecurringGrant = this.isEditingRecurringGrant();
+
+    if (this.grantPermanentEnabled && this.grantDialogMode !== 'create' && !editingRecurringGrant) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'التخصيص الدائم متاح عند إنشاء تخصيص جديد فقط.' });
+      return;
+    }
+
+    if (this.grantPermanentEnabled && this.grantDialogMode === 'create' && (!this.grantPermanentFromDate || !this.grantPermanentToDate)) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد فترة تشغيل التخصيص الدائم من وإلى.' });
+      return;
+    }
+
+    if (this.grantPermanentEnabled && this.grantDialogMode === 'create' && (this.isBeforeToday(this.grantPermanentFromDate) || this.isBeforeToday(this.grantPermanentToDate))) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن اختيار أيام سابقة في فترة التخصيص.' });
+      return;
+    }
+
+    const windows = this.grantPermanentEnabled && this.grantDialogMode === 'create'
+      ? this.buildPermanentGrantWindows(baseWindows[0])
+      : baseWindows;
 
     if (!windows.length) {
-      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد وقت البداية والنهاية لليوم المختار' });
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يوجد مواعيد متكررة داخل فترة التشغيل المحددة.' });
       return;
     }
 
     const invalidWindow = windows.find((item) => !item.startsAt || !item.endsAt || item.endsAt.getTime() <= item.startsAt.getTime());
     if (invalidWindow) {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: `وقت النهاية لازم يكون بعد البداية في ${this.dayLabel(invalidWindow.day)}` });
+      return;
+    }
+
+    const pastWindow = this.grantDialogMode === 'create'
+      ? windows.find((item) => this.isBeforeToday(item.startsAt) || this.isBeforeToday(item.endsAt))
+      : null;
+    if (pastWindow) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن حفظ تخصيص على يوم سابق.' });
       return;
     }
 
@@ -2933,7 +3630,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.message.add({
         severity: 'success',
         summary: 'تم',
-        detail: `تم حفظ التخصيص بنجاح ليوم ${this.dayLabel(windows[0].day)}`
+        detail: this.permanentGrantSummaryText(windows, this.selectedGrantTargetIds.length)
       });
       this.recordSavedGrantSummaries(windows, savedGrants);
       this.grantForm.note = '';
@@ -2947,22 +3644,32 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     };
 
     if (this.grantDialogMode === 'create') {
-      forkJoin(this.selectedGrantTargetIds.flatMap((targetUserId) =>
+      const replacementIds = new Set<number>();
+      for (const targetUserId of this.selectedGrantTargetIds) {
+        for (const day of Array.from(new Set(windows.map((window) => window.day)))) {
+          this.existingGrantsForReplacement(targetUserId, day, basePayload)
+            .forEach((grant) => replacementIds.add(Number(grant.id || 0)));
+        }
+      }
+
+      const deleteRequests = Array.from(replacementIds).map((id) => this.attendance.deleteAccessGrant(id));
+      const createRequests = this.selectedGrantTargetIds.flatMap((targetUserId) =>
         windows.map((window) => {
-          const exactGrant = this.findExactGrantForSave(targetUserId, window, basePayload);
           const payload = {
             ...basePayload,
             targetUserId,
             dayOfWeek: window.day,
-            note: exactGrant ? this.appendGrantNote(exactGrant.note, basePayload.note) : basePayload.note,
+            note: basePayload.note,
             startsAt: this.toDateTimeLocalValue(window.startsAt as Date),
             endsAt: this.toDateTimeLocalValue(window.endsAt as Date)
           };
-          return exactGrant?.id
-            ? this.attendance.updateAccessGrant(Number(exactGrant.id), payload)
-            : this.attendance.createAccessGrant(payload);
+          return this.attendance.createAccessGrant(payload);
         })
-      )).subscribe({
+      );
+
+      (deleteRequests.length ? forkJoin(deleteRequests) : of([])).pipe(
+        switchMap(() => forkJoin(createRequests))
+      ).subscribe({
         next: (savedGrants) => handleSuccess(savedGrants || []),
         error: handleError
       });
@@ -2971,27 +3678,60 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
     const editWindow = windows[0];
     const selectedIds = new Set(this.selectedGrantTargetIds.map((id) => Number(id || 0)).filter(Boolean));
-    const existingByTarget = new Map<number, AttendanceAccessGrant>();
+    const existingByTarget = new Map<number, AttendanceAccessGrant[]>();
     for (const grant of this.knownAccessGrants().filter((item) => this.editingGrantGroupIds.includes(Number(item.id || 0)))) {
-      existingByTarget.set(Number(grant.targetUserId || 0), grant);
+      const targetId = Number(grant.targetUserId || 0);
+      existingByTarget.set(targetId, [...(existingByTarget.get(targetId) || []), grant]);
     }
+
+    const buildEditedWindowForExisting = (existing: AttendanceAccessGrant, index: number, count: number): GrantDayWindow => {
+      if (count <= 1) return editWindow;
+      const existingStart = new Date(existing.startsAt);
+      const start = this.combineDateWithTime(
+        Number.isNaN(existingStart.getTime()) ? (editWindow.startsAt as Date) : existingStart,
+        editWindow.startsAt
+      );
+      const endOffset = this.grantWindowEndOffset(editWindow);
+      let end = this.dateForRelativeOffset(start, endOffset, editWindow.endsAt as Date);
+      if (end.getTime() <= start.getTime()) {
+        end = new Date(end);
+        end.setDate(end.getDate() + 1);
+      }
+      return {
+        day: this.grantDayFromGrant(existing) ?? editWindow.day,
+        startsAt: start,
+        endsAt: end
+      };
+    };
+
     const requests = [
       ...Array.from(selectedIds).map((targetUserId) => {
-        const existing = existingByTarget.get(targetUserId);
-        const payload = {
-          ...basePayload,
-          targetUserId,
-          dayOfWeek: editWindow.day,
-          startsAt: this.toDateTimeLocalValue(editWindow.startsAt as Date),
-          endsAt: this.toDateTimeLocalValue(editWindow.endsAt as Date)
-        };
-        return existing?.id
-          ? this.attendance.updateAccessGrant(Number(existing.id), payload)
-          : this.attendance.createAccessGrant(payload);
-      }),
+        const existingItems = existingByTarget.get(targetUserId) || [];
+        if (!existingItems.length) {
+          const payload = {
+            ...basePayload,
+            targetUserId,
+            dayOfWeek: editWindow.day,
+            startsAt: this.toDateTimeLocalValue(editWindow.startsAt as Date),
+            endsAt: this.toDateTimeLocalValue(editWindow.endsAt as Date)
+          };
+          return [this.attendance.createAccessGrant(payload)];
+        }
+        return existingItems.map((existing, index) => {
+          const windowForExisting = buildEditedWindowForExisting(existing, index, existingItems.length);
+          const payload = {
+            ...basePayload,
+            targetUserId,
+            dayOfWeek: windowForExisting.day,
+            startsAt: this.toDateTimeLocalValue(windowForExisting.startsAt as Date),
+            endsAt: this.toDateTimeLocalValue(windowForExisting.endsAt as Date)
+          };
+          return this.attendance.updateAccessGrant(Number(existing.id), payload);
+        });
+      }).flat(),
       ...Array.from(existingByTarget.entries())
         .filter(([targetUserId]) => !selectedIds.has(targetUserId))
-        .map(([, grant]) => this.attendance.deleteAccessGrant(Number(grant.id)))
+        .flatMap(([, grants]) => grants.map((grant) => this.attendance.deleteAccessGrant(Number(grant.id))))
     ];
     forkJoin(requests).subscribe({
       next: (results) => {
@@ -3042,6 +3782,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  deleteGrantSchedule(schedule: GrantScheduleGroup): void {
+    const group: GrantGroup = {
+      key: schedule.key,
+      grants: schedule.grants,
+      first: schedule.first,
+      targetNames: schedule.first.targetUserName || this.grantTargetNameFor(schedule.first.targetUserId),
+      notes: schedule.notesText ? [schedule.notesText] : []
+    };
+    this.deleteGrantGroup(group);
+  }
+
   editSavedGrant(item: GrantSavedSummary): void {
     const grants = item.sourceGrants || (item.sourceGrant ? [item.sourceGrant] : []);
     if (!grants.length) return;
@@ -3058,10 +3809,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   // ===== Custom Events =====
   private defaultCustomEventForm(): CustomEventForm {
+    const day = this.selectedDate?.getDay() ?? 5;
     return {
       familyBase: this.preferredCustomEventFamily(),
       title: '',
-      dayOfWeek: this.selectedDate?.getDay() ?? 5,
+      dayOfWeek: day,
+      dayOfWeeks: [day],
       enabled: true,
       alwaysActive: true,
       permittedEditorIds: []
@@ -3069,7 +3822,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   get visibleCustomEvents(): AttendanceCustomEvent[] {
-    return this.familyCustomEvents.slice(0, 2);
+    return this.displayCustomEventPreviewGroups.map((group) => group.first);
   }
 
   get currentFamilyCustomEvents(): AttendanceCustomEvent[] {
@@ -3077,7 +3830,56 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   get extraCustomEventsCount(): number {
-    return Math.max(0, this.currentFamilyCustomEvents.length - this.visibleCustomEvents.length);
+    return Math.max(0, this.displayCustomEventGroups.length - this.displayCustomEventPreviewGroups.length);
+  }
+
+  get displayCustomEventGroups(): CustomEventGroup[] {
+    return this.familyCustomEventGroups;
+  }
+
+  get displayCustomEventPreviewGroups(): CustomEventGroup[] {
+    return this.familyCustomEventGroups.slice(0, 2);
+  }
+
+  trackCustomEventGroup(_: number, group: CustomEventGroup): string {
+    return group.key;
+  }
+
+  private groupCustomEvents(events: AttendanceCustomEvent[]): CustomEventGroup[] {
+    const groups = new Map<string, AttendanceCustomEvent[]>();
+    for (const event of events || []) {
+      const key = this.customEventGroupKey(event);
+      groups.set(key, [...(groups.get(key) || []), event]);
+    }
+
+    return Array.from(groups.entries())
+      .map(([key, items]) => {
+        const sorted = items.slice().sort((a, b) => Number(a.dayOfWeek ?? 0) - Number(b.dayOfWeek ?? 0));
+        return {
+          key,
+          events: sorted,
+          first: sorted[0],
+          days: Array.from(new Set(sorted.map((event) => Number(event.dayOfWeek)).filter((day) => this.weekDays.includes(day)))),
+          enabled: sorted.some((event) => event.enabled !== false)
+        };
+      })
+      .sort((a, b) => String(a.first.title || '').localeCompare(String(b.first.title || ''), 'ar'));
+  }
+
+  private customEventGroupKey(event: AttendanceCustomEvent): string {
+    return this.normalizeCustomEventTitleKey(event.title);
+  }
+
+  private normalizeCustomEventTitleKey(value?: string | null): string {
+    return String(value || '')
+      .normalize('NFKC')
+      .replace(/[\u064B-\u065F\u0670\u0640\u200B-\u200F\uFEFF]/g, '')
+      .replace(/[إأآا]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/\s+/g, '')
+      .trim()
+      .toLowerCase();
   }
 
   isCustomEventFamilyLocked(): boolean {
@@ -3102,6 +3904,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   private loadCustomEventsForFamily(): void {
     if (!this.canSelectCustomEventForAttendance()) {
       this.familyCustomEvents = [];
+      this.familyCustomEventGroups = [];
       this.availableCustomEvents = [];
       return;
     }
@@ -3116,12 +3919,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
           ? merged.filter((event) => this.isCustomEventRelevantToFamily(event, familyBase))
           : merged.filter((event) => this.isGlobalCustomEvent(event));
         this.familyCustomEvents = this.filterAthanasiusVisibilityForEvents(this.uniqueCustomEvents(relevant));
+        this.familyCustomEventGroups = this.groupCustomEvents(this.familyCustomEvents);
         this.refreshTypeOptions();
         this.updateCalendarForSelectedType(true);
         this.refreshAvailableCustomEvents();
       },
       error: () => {
         this.familyCustomEvents = [];
+        this.familyCustomEventGroups = [];
         this.availableCustomEvents = [];
         this.refreshTypeOptions();
         this.updateCalendarForSelectedType(true);
@@ -3190,6 +3995,42 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (this.customEventForm.dayOfWeek === undefined || this.customEventForm.dayOfWeek === null) {
       this.customEventForm.dayOfWeek = this.selectedDate?.getDay() ?? 5;
     }
+    if (!this.customEventForm.dayOfWeeks?.length) {
+      this.customEventForm.dayOfWeeks = [Number(this.customEventForm.dayOfWeek)];
+    }
+  }
+
+  customEventSelectedDays(): number[] {
+    const days = (this.customEventForm.dayOfWeeks || [])
+      .map((day) => Number(day))
+      .filter((day) => this.weekDays.includes(day));
+    return Array.from(new Set(days));
+  }
+
+  hasCustomEventDay(day: number): boolean {
+    return this.customEventSelectedDays().includes(Number(day));
+  }
+
+  toggleCustomEventDay(day: number): void {
+    const value = Number(day);
+    if (!this.weekDays.includes(value)) return;
+    const current = new Set(this.customEventSelectedDays());
+    if (current.has(value)) {
+      if (current.size === 1) {
+        this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار يوم واحد على الأقل للمناسبة' });
+        return;
+      }
+      current.delete(value);
+    } else {
+      current.add(value);
+    }
+    const ordered = this.weekDays.filter((item) => current.has(item));
+    this.customEventForm.dayOfWeeks = ordered;
+    this.customEventForm.dayOfWeek = ordered[0] ?? (this.selectedDate?.getDay() ?? 5);
+  }
+
+  customEventSelectedDaysLabel(): string {
+    return this.customEventSelectedDays().map((day) => this.dayLabel(day)).join(' + ');
   }
 
   onCustomEventAlwaysActiveChange(): void {
@@ -3306,9 +4147,29 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return legacyName || 'بدون خدام محددين';
   }
 
+  customEventGroupDaysLabel(group: CustomEventGroup): string {
+    const days = Array.from(new Set(
+      this.customEventGroupEvents(group)
+        .map((event) => Number(event.dayOfWeek))
+        .filter((day) => this.weekDays.includes(day))
+    ));
+    return days.map((day) => this.dayLabel(day)).join(' + ');
+  }
+
+  canEditCustomEventGroup(group: CustomEventGroup): boolean {
+    return this.customEventGroupEvents(group).some((event) => this.canEditCustomEvent(event));
+  }
+
+  private customEventGroupEvents(group: CustomEventGroup): AttendanceCustomEvent[] {
+    const key = group.key || this.customEventGroupKey(group.first);
+    const fromCurrent = this.currentFamilyCustomEvents.filter((event) => this.customEventGroupKey(event) === key);
+    return fromCurrent.length ? fromCurrent : (group.events || []);
+  }
+
   openCreateCustomEvent(): void {
     if (!this.canUseCustomEvent()) return;
     this.customEventDialogMode = 'create';
+    this.editingCustomEventGroupIds = [];
     const options = this.customEventFamilyOptions();
     const preferredFamily = this.preferredCustomEventFamily();
     this.customEventForm = {
@@ -3325,13 +4186,31 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   openEditCustomEvent(event: AttendanceCustomEvent): void {
     if (!this.canEditCustomEvent(event)) return;
+    const group = this.groupCustomEvents(this.currentFamilyCustomEvents)
+      .find((item) => item.events.some((candidate) => Number(candidate.id || 0) === Number(event.id || 0)));
+    this.openEditCustomEventGroup(group || {
+      key: this.customEventGroupKey(event),
+      events: [event],
+      first: event,
+      days: this.weekDays.includes(Number(event.dayOfWeek)) ? [Number(event.dayOfWeek)] : [],
+      enabled: event.enabled !== false
+    });
+  }
+
+  openEditCustomEventGroup(group: CustomEventGroup): void {
+    const groupEvents = this.customEventGroupEvents(group);
+    const editableEvents = groupEvents.filter((event) => this.canEditCustomEvent(event));
+    if (!editableEvents.length) return;
+    const event = editableEvents[0];
     this.customEventDialogMode = 'edit';
+    this.editingCustomEventGroupIds = groupEvents.map((item) => Number(item.id || 0)).filter(Boolean);
     this.customEventForm = {
       ...event,
       id: event.id,
       familyBase: event.familyBase || '',
       title: event.title || '',
       dayOfWeek: Number(event.dayOfWeek ?? 5),
+      dayOfWeeks: Array.from(new Set(groupEvents.map((item) => Number(item.dayOfWeek)).filter((day) => this.weekDays.includes(day)))),
       enabled: event.enabled !== false,
       alwaysActive: event.alwaysActive !== false,
       permittedEditorIds: [...(event.permittedEditorIds || []), ...(event.permittedEditorId ? [event.permittedEditorId] : [])]
@@ -3345,7 +4224,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.customEventDialogVisible = true;
   }
 
-  private buildCustomEventPayload(): Partial<AttendanceCustomEvent> {
+  private buildCustomEventPayload(dayOfWeek = Number(this.customEventForm.dayOfWeek)): Partial<AttendanceCustomEvent> {
     const requestedFamily = String(this.customEventForm.familyBase || '').trim();
     const allowedFamilies = this.customEventFamilyOptions().map((option) => option.value);
     const matchedFamily = allowedFamilies.find((family) => canonicalFamilyName(family) === canonicalFamilyName(requestedFamily));
@@ -3355,7 +4234,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return {
       familyBase: scopedFamily || null,
       title: this.customEventForm.title.trim(),
-      dayOfWeek: Number(this.customEventForm.dayOfWeek),
+      dayOfWeek: Number(dayOfWeek),
       enabled: this.customEventForm.enabled !== false,
       alwaysActive: this.customEventForm.alwaysActive !== false,
       activeFrom: this.customEventForm.alwaysActive === false ? (this.customEventForm.activeFrom || null) : null,
@@ -3370,6 +4249,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (!this.canUseCustomEvent()) return;
     if (!this.customEventForm.title?.trim()) {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اكتب اسم المناسبة أولاً' });
+      return;
+    }
+    const selectedDays = this.customEventSelectedDays();
+    if (!selectedDays.length) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار يوم واحد على الأقل للمناسبة' });
       return;
     }
     const requiresFamilySelection = this.customEventDialogMode === 'create' && !this.isAminKhedmaOrDeveloper();
@@ -3396,16 +4280,39 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
 
     this.customEventSaving = true;
-    const payload = this.buildCustomEventPayload();
-    const req = this.customEventDialogMode === 'edit' && this.customEventForm.id
-      ? this.attendance.updateCustomEvent(Number(this.customEventForm.id), payload)
-      : this.attendance.createCustomEvent(payload);
+    const editingTitleKey = this.normalizeCustomEventTitleKey(this.customEventForm.title);
+    const editingEvents = this.customEventDialogMode === 'edit'
+      ? this.currentFamilyCustomEvents.filter((event) =>
+          this.editingCustomEventGroupIds.includes(Number(event.id || 0))
+          || this.customEventGroupKey(event) === editingTitleKey
+        )
+      : [];
+    const eventByDay = new Map(editingEvents.map((event) => [Number(event.dayOfWeek), event] as const));
+    const selectedDaySet = new Set(selectedDays);
+    const updateOrCreateRequests = selectedDays.map((day) => {
+      const payload = this.buildCustomEventPayload(day);
+      const existing = eventByDay.get(day);
+      if (existing?.id) {
+        return this.attendance.updateCustomEvent(Number(existing.id), payload);
+      }
+      return this.attendance.createCustomEvent(payload);
+    });
+    const deleteRemovedRequests = editingEvents
+      .filter((event) => event.id && !selectedDaySet.has(Number(event.dayOfWeek)))
+      .map((event) => this.attendance.deleteCustomEvent(Number(event.id)));
+    const requests = [...updateOrCreateRequests, ...deleteRemovedRequests];
 
-    req.subscribe({
+    forkJoin(requests).subscribe({
       next: () => {
         this.customEventSaving = false;
         this.customEventDialogVisible = false;
-        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ المناسبة بنجاح' });
+        this.message.add({
+          severity: 'success',
+          summary: 'تم',
+          detail: selectedDays.length > 1
+            ? `تم حفظ المناسبة لأيام: ${this.customEventSelectedDaysLabel()}`
+            : 'تم حفظ المناسبة بنجاح'
+        });
         this.loadCustomEventsForFamily();
         this.onDateChange();
       },
@@ -3419,6 +4326,25 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   deleteCustomEvent(event: AttendanceCustomEvent): void {
     if (!event.id || !this.canEditCustomEvent(event)) return;
     this.attendance.deleteCustomEvent(event.id).subscribe({
+      next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف المناسبة' });
+        this.loadCustomEventsForFamily();
+        this.onDateChange();
+      },
+      error: (err) => this.message.add({
+        severity: 'error',
+        summary: 'خطأ',
+        detail: err?.error?.error || err?.error?.message || 'فشل حذف المناسبة'
+      })
+    });
+  }
+
+  deleteCustomEventGroup(group: CustomEventGroup): void {
+    const ids = this.customEventGroupEvents(group)
+      .filter((event) => event.id && this.canEditCustomEvent(event))
+      .map((event) => Number(event.id));
+    if (!ids.length) return;
+    forkJoin(ids.map((id) => this.attendance.deleteCustomEvent(id))).subscribe({
       next: () => {
         this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف المناسبة' });
         this.loadCustomEventsForFamily();
@@ -3488,6 +4414,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
+    }).format(date);
+  }
+
+  private formatTimeOnly(value?: string | Date | null): string {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('ar-EG-u-nu-latn', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     }).format(date);
   }
 }

@@ -345,6 +345,12 @@ textarea {
   box-shadow: 0 24px 80px rgba(52, 28, 20, 0.18) !important;
 }
 
+.p-dialog-mask.p-overlay-mask {
+  background: rgba(24, 18, 14, 0.56) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 .app-surface-dialog .p-dialog-header,
 .app-surface-dialog .p-dialog-content,
 .app-surface-dialog .p-dialog-footer {
