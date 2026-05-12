@@ -73,6 +73,105 @@ textarea {
   transform: scaleX(-1) !important;
 }
 
+.dashboardDatePanel.p-datepicker,
+.dashboardDatePanel .p-datepicker {
+  border: 1px solid #eadfd8 !important;
+  border-radius: 18px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  box-shadow: 0 18px 48px rgba(52, 28, 20, 0.18) !important;
+  overflow: hidden;
+  direction: rtl;
+}
+
+.dashboardDatePanel .p-datepicker-header,
+.dashboardDatePanel .p-datepicker-calendar,
+.dashboardDatePanel .p-datepicker-time-picker,
+.dashboardDatePanel .p-datepicker-timepicker,
+.dashboardDatePanel .p-datepicker-buttonbar {
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+.dashboardDatePanel .p-datepicker-header {
+  border-bottom: 1px solid #eadfd8 !important;
+  padding: 12px 14px !important;
+}
+
+.dashboardDatePanel .p-datepicker-calendar th,
+.dashboardDatePanel .p-datepicker-calendar td {
+  color: #5e2b20 !important;
+}
+
+.dashboardDatePanel .p-datepicker-calendar th {
+  font-weight: 800;
+}
+
+.dashboardDatePanel .p-datepicker-day {
+  border-radius: 50% !important;
+  color: #6d3326 !important;
+}
+
+.dashboardDatePanel .p-datepicker-day:not(.p-disabled):hover {
+  background: #f1e5dc !important;
+}
+
+.dashboardDatePanel .p-datepicker-day-selected,
+.dashboardDatePanel .p-datepicker-today > .p-datepicker-day {
+  background: #8d5144 !important;
+  color: #ffffff !important;
+}
+
+.dashboardDatePanel .p-datepicker-time-picker,
+.dashboardDatePanel .p-datepicker-timepicker {
+  border-top: 1px solid #eadfd8 !important;
+}
+
+.dashboardDatePanel .p-datepicker-time-picker button,
+.dashboardDatePanel .p-datepicker-timepicker button,
+.dashboardDatePanel .p-datepicker-prev-button,
+.dashboardDatePanel .p-datepicker-next-button {
+  color: #8d5144 !important;
+}
+
+.dashboardDatePanel .p-datepicker-buttonbar {
+  border-top: 1px solid #eadfd8 !important;
+  padding: 12px 14px !important;
+}
+
+.dashboardDatePanel .p-datepicker-buttonbar > button {
+  display: none !important;
+}
+
+.dashboardDatePanel .dashboard-picker-actions {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  direction: rtl;
+}
+
+.dashboardDatePanel .dashboard-picker-btn {
+  min-width: 104px;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.dashboardDatePanel .dashboard-picker-btn--primary {
+  background: #8d5144;
+  color: #ffffff;
+}
+
+.dashboardDatePanel .dashboard-picker-btn--ghost {
+  background: #f7f1e8;
+  color: #6d3326;
+  border-color: #eadfd8;
+}
+
 .attendanceDatePanel .p-datepicker-header {
   direction: rtl;
   display: grid;

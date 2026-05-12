@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -19,7 +19,7 @@ public class EventUpsertRequest {
     private String description;
 
     @NotNull
-    private LocalDate eventAt;
+    private LocalDateTime eventAt;
 
     @NotBlank
     private String targetFamily;
@@ -28,5 +28,8 @@ public class EventUpsertRequest {
 
     private String targetAudience;
 
-    private LocalDate removeAt;
+    private LocalDateTime removeAt;
+
+    private Integer reminderBeforeMinutes;
 }
+

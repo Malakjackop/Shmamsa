@@ -50,6 +50,7 @@ describe('DashBoard', () => {
             createEvent: () => of({}),
             updateEvent: () => of({}),
             publishEvent: () => of({}),
+            unpublishEvent: () => of({}),
             deleteEvent: () => of({}),
             joinEvent: () => of({}),
             unjoinEvent: () => of({}),

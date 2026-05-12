@@ -3,7 +3,6 @@ package com.shmamsa.model;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -26,7 +25,7 @@ public class Event {
     private String description;
 
     @Column(nullable = false)
-    private LocalDate eventAt;
+    private LocalDateTime eventAt;
 
     @Column(nullable = false, length = 120)
     private String targetFamily;
@@ -41,7 +40,27 @@ public class Event {
     @Column(nullable = false, length = 20)
     private EventStatus status;
 
-    private LocalDate removeAt;
+    private LocalDateTime removeAt;
+
+    private Integer reminderBeforeMinutes;
+
+    @Column(length = 500)
+    private String imageStoredName;
+
+    @Column(length = 255)
+    private String imageOriginalName;
+
+    @Column(length = 120)
+    private String imageContentType;
+
+    private Long imageSize;
+
+    @Column(columnDefinition = "TEXT")
+    private String cancelMessage;
+
+    private LocalDateTime cancelNoticeUntil;
+
+    private LocalDateTime cancelledAt;
 
     private LocalDateTime publishedAt;
 

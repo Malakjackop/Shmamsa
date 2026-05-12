@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,17 +26,36 @@ public class EventPublishScheduler {
     @Scheduled(cron = "0 */10 * * * *")
     @Transactional
     public void autoCleanup() {
-        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
 
         Set<Long> idsToDelete = new LinkedHashSet<>();
 
-        List<Event> removeAtReached = eventRepo.findByRemoveAtLessThanEqual(today);
+        List<Event> removeAtReached = eventRepo.findByRemoveAtLessThanEqual(now);
         for (Event e : removeAtReached) {
             if (e.getId() != null) idsToDelete.add(e.getId());
         }
 
-        List<Event> pendingExpired = eventRepo.findByStatusAndEventAtBefore(EventStatus.PENDING, today);
+        List<Event> pendingExpired = eventRepo.findByStatusAndEventAtBefore(EventStatus.PENDING, now);
         for (Event e : pendingExpired) {
+            if (e.getId() == null) continue;
+
+            // Normal unpublished drafts can be removed when the event time passes.
+            // Cancelled notices are also stored as PENDING for DB compatibility, so keep
+            // them until the cancellation notice date has passed.
+            if (e.getCancelledAt() == null) {
+                idsToDelete.add(e.getId());
+                continue;
+            }
+
+            if (e.getCancelNoticeUntil() == null || e.getCancelNoticeUntil().isBefore(now)) {
+                idsToDelete.add(e.getId());
+            }
+        }
+
+        // Backward compatibility: if any database already accepted CANCELLED records,
+        // clean them up normally after the notice period.
+        List<Event> cancelledExpired = eventRepo.findByStatusAndCancelNoticeUntilBefore(EventStatus.CANCELLED, now);
+        for (Event e : cancelledExpired) {
             if (e.getId() != null) idsToDelete.add(e.getId());
         }
 

@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+﻿import { Component, OnDestroy, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
@@ -49,6 +49,8 @@ type EventForm = {
   description: string;
   eventAt: Date | null;
   removeAt: Date | null;
+  reminderBeforeValue: number | null;
+  imageUrl: string | null;
   targetFamily: string;
   targetAudience: string;
 };
@@ -61,6 +63,33 @@ type AnnouncementForm = {
   targetAudience: string;
 };
 
+type ServiceCardView = {
+  label: string;
+  value: string;
+};
+
+type HeroSlide = {
+  imageUrl: string;
+  eventId: number;
+};
+
+type UnpublishForm = {
+  event: EventView | null;
+  message: string;
+  noticeUntil: Date | null;
+};
+
+type ScopeSelectHandle = {
+  show?: () => void;
+  hide?: () => void;
+};
+
+type DatePickerHandle = {
+  hide?: () => void;
+  hideOverlay?: () => void;
+  overlayVisible?: boolean | null;
+};
+
 @Component({
   selector: 'app-dash-board',
   standalone: false,
@@ -68,7 +97,7 @@ type AnnouncementForm = {
   styleUrls: ['./dash-board.css'],
   providers: [MessageService]
 })
-export class DashBoard implements OnInit {
+export class DashBoard implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
   private familyService = inject(FamilyService);
@@ -95,6 +124,23 @@ export class DashBoard implements OnInit {
     attendKhors: ''
   };
   qrData = '';
+  showQrDialog = false;
+  readonly churchLogoUrl = 'assets/images/church-logo.png';
+
+  heroSlides: HeroSlide[] = [];
+  activeHeroSlide = 0;
+  private heroAutoTimer: ReturnType<typeof setInterval> | null = null;
+  readonly todayMinDate: Date = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+
+  get todayCalendarMinDate(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
 
   // ===== Roles =====
   private normRole(role: unknown): string {
@@ -111,16 +157,27 @@ export class DashBoard implements OnInit {
     ADMIN: 5
   };
 
+  private assignedRoles(): string[] {
+    return this.assignmentsOf(this.user).map((x) => x.role).filter(Boolean);
+  }
+
   isAtLeast(role: 'MAKHDOM' | 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'DEVELOPER' | 'ADMIN'): boolean {
+    const requiredRank = this.roleRank[role] ?? 0;
     const current = this.normRole(this.user?.role);
-    const currentRank = this.roleRank[current] ?? 0;
-    return currentRank >= (this.roleRank[role] ?? 0);
+    const directRank = this.roleRank[current] ?? 0;
+    const assignedRank = this.assignedRoles()
+      .map((x) => this.roleRank[this.normRole(x)] ?? 0)
+      .reduce((max, rank) => Math.max(max, rank), 0);
+
+    return Math.max(directRank, assignedRank) >= requiredRank;
   }
 
   // ===== UI State =====
   scopeOptions: Array<{ label: string; value: string }> = [];
   scopeFamily: string = 'FAMILY_ALL';
   scopeLocked: boolean = true;
+  private scopeSelectHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private scopePanelHoverBound = false;
 
   monthCursor: Date = new Date();
   events: EventView[] = [];
@@ -129,12 +186,27 @@ export class DashBoard implements OnInit {
   showEventDialog = false;
   showJoinDialog = false;
   showParticipantsDialog = false;
+  showUnpublishDialog = false;
   showAnnDialog = false;
   showAnnDetailsDialog = false;
 
   selectedJoinEvent: EventView | null = null;
   selectedAnn: AnnouncementView | null = null;
   participantsGroups: ParticipantGroup[] = [];
+  selectedEventImageFile: File | null = null;
+  selectedEventImageName = '';
+  isSavingEvent = false;
+  publishingEventIds = new Set<number>();
+  unpublishingEventIds = new Set<number>();
+  private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  countdownNow = new Date();
+
+
+  unpublishForm: UnpublishForm = {
+    event: null,
+    message: '',
+    noticeUntil: null
+  };
 
   eventForm: EventForm = {
     id: null,
@@ -142,6 +214,8 @@ export class DashBoard implements OnInit {
     description: '',
     eventAt: null,
     removeAt: null,
+    reminderBeforeValue: null,
+    imageUrl: null,
     targetFamily: 'ALL',
     targetAudience: 'EVERYONE'
   };
@@ -210,6 +284,106 @@ export class DashBoard implements OnInit {
     return `${present ?? 0}/${total}`;
   }
 
+  absenceLabel(present: number, total: number | null): string {
+    if (total == null) return `${present ?? 0}`;
+    const absent = Math.max((total || 0) - (present || 0), 0);
+    return `${absent}/${total}`;
+  }
+
+  get hasHeroSlides(): boolean {
+    return this.heroSlides.length > 0;
+  }
+
+  get showHeroControls(): boolean {
+    return this.heroSlides.length > 1;
+  }
+
+  get currentHeroSlide(): string {
+    return this.heroSlides[this.activeHeroSlide]?.imageUrl || '';
+  }
+
+  get removeCalendarMinDate(): Date {
+    const base = this.eventForm?.eventAt ? new Date(this.eventForm.eventAt) : new Date();
+    if (Number.isNaN(base.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return today;
+    }
+    base.setHours(0, 0, 0, 0);
+    return base;
+  }
+
+  previousHeroSlide(): void {
+    if (!this.showHeroControls) return;
+    this.activeHeroSlide =
+      (this.activeHeroSlide - 1 + this.heroSlides.length) % this.heroSlides.length;
+  }
+
+  nextHeroSlide(): void {
+    if (!this.showHeroControls) return;
+    this.activeHeroSlide = (this.activeHeroSlide + 1) % this.heroSlides.length;
+  }
+
+  setHeroSlide(index: number): void {
+    if (index < 0 || index >= this.heroSlides.length) return;
+    this.activeHeroSlide = index;
+    this.restartHeroAutoSlide();
+  }
+
+  private rebuildHeroSlides(): void {
+    this.heroSlides = (this.events || [])
+      .filter((e) => !!e?.id && !!e?.imageUrl)
+      .map((e) => ({ imageUrl: String(e.imageUrl), eventId: Number(e.id) }));
+
+    if (this.activeHeroSlide >= this.heroSlides.length) {
+      this.activeHeroSlide = 0;
+    }
+    this.restartHeroAutoSlide();
+  }
+
+  private restartHeroAutoSlide(): void {
+    this.stopHeroAutoSlide();
+    if (!isPlatformBrowser(this.platformId) || this.heroSlides.length <= 1) return;
+    this.heroAutoTimer = setInterval(() => this.nextHeroSlide(), 3000);
+  }
+
+  private stopHeroAutoSlide(): void {
+    if (this.heroAutoTimer) {
+      clearInterval(this.heroAutoTimer);
+      this.heroAutoTimer = null;
+    }
+  }
+
+
+  private startCountdownTimer(): void {
+    if (!isPlatformBrowser(this.platformId) || this.countdownTimer) return;
+    this.countdownTimer = setInterval(() => {
+      this.countdownNow = new Date();
+      this.pruneExpiredEvents();
+    }, 60000);
+  }
+
+  private stopCountdownTimer(): void {
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+  }
+
+  openHeroEvent(): void {
+    const slide = this.heroSlides[this.activeHeroSlide];
+    if (!slide?.eventId) return;
+
+    const event = this.events.find((e) => Number(e.id) === slide.eventId);
+    if (!event) return;
+
+    if (isPlatformBrowser(this.platformId)) {
+      document.getElementById(`event-${slide.eventId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    setTimeout(() => this.openEventDetails(event), 320);
+  }
+
   private rebuildFamilyMeetingCards(): void {
     const fams = this.userFamilies();
     this.familyMeetingCards = fams.map((f) => {
@@ -221,8 +395,7 @@ export class DashBoard implements OnInit {
     });
   }
 
-  // ✅ دي اللي كانت ناقصة عندك (LocalDate => YYYY-MM-DD)
-  private toYmd(d: string | number | Date | null | undefined): string | null {
+  private toLocalDateTimePayload(d: string | number | Date | null | undefined): string | null {
     if (!d) return null;
     const dt = (d instanceof Date) ? d : new Date(d);
     if (isNaN(dt.getTime())) return null;
@@ -230,7 +403,107 @@ export class DashBoard implements OnInit {
     const yyyy = dt.getFullYear();
     const mm = this.pad(dt.getMonth() + 1);
     const dd = this.pad(dt.getDate());
-    return `${yyyy}-${mm}-${dd}`;
+    const hh = this.pad(dt.getHours());
+    const min = this.pad(dt.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}:00`;
+  }
+
+  fixDatePickerOverlay(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    setTimeout(() => {
+      const panels = document.querySelectorAll<HTMLElement>('.dashboardDatePanel');
+
+      panels.forEach((panel) => {
+        panel.style.zIndex = '15000';
+        panel.style.pointerEvents = 'auto';
+
+        panel
+          .querySelectorAll<HTMLElement>(
+            'button, span, td, th, table, .p-datepicker-day, .p-datepicker-date, .p-datepicker-calendar, .p-datepicker-calendar-container, .p-datepicker-prev-button, .p-datepicker-next-button, .p-datepicker-increment-button, .p-datepicker-decrement-button'
+          )
+          .forEach((element) => {
+            element.style.pointerEvents = 'auto';
+          });
+
+        panel
+          .querySelectorAll<HTMLElement>('.p-disabled, [disabled], td.p-disabled, .p-datepicker-day.p-disabled, .p-datepicker-date.p-disabled')
+          .forEach((element) => {
+            element.style.pointerEvents = 'none';
+          });
+      });
+    }, 0);
+  }
+
+  private closeDatePicker(picker?: DatePickerHandle | null): void {
+    setTimeout(() => {
+      picker?.hideOverlay?.();
+      picker?.hide?.();
+    }, 0);
+  }
+
+  onPickerActionClick(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  onPickerActionPress(
+    event: Event,
+    action: 'now' | 'clear' | 'nowNotice' | 'clearNotice',
+    field: 'eventAt' | 'removeAt' | null,
+    picker?: DatePickerHandle | null
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (action === 'now' && field) {
+      this.setEventDateNow(field, picker);
+      return;
+    }
+
+    if (action === 'clear' && field) {
+      this.clearEventDate(field, picker);
+      return;
+    }
+
+    if (action === 'nowNotice') {
+      this.setUnpublishNoticeNow(picker);
+      return;
+    }
+
+    this.clearUnpublishNoticeDate(picker);
+  }
+
+  setEventDateNow(field: 'eventAt' | 'removeAt', picker?: DatePickerHandle | null): void {
+    const now = new Date();
+
+    if (field === 'eventAt') {
+      this.eventForm = { ...this.eventForm, eventAt: now };
+      this.closeDatePicker(picker);
+      return;
+    }
+
+    const minRemoveAt = this.removeCalendarMinDate;
+    const removeAt = now <= minRemoveAt ? new Date(minRemoveAt.getTime() + 60 * 60 * 1000) : now;
+    this.eventForm = { ...this.eventForm, removeAt };
+    this.closeDatePicker(picker);
+  }
+
+  clearEventDate(field: 'eventAt' | 'removeAt', picker?: DatePickerHandle | null): void {
+    this.eventForm = { ...this.eventForm, [field]: null };
+    this.closeDatePicker(picker);
+  }
+
+  setUnpublishNoticeNow(picker?: DatePickerHandle | null): void {
+    const minUntil = new Date();
+    minUntil.setHours(minUntil.getHours() + 1, 0, 0, 0);
+    this.unpublishForm = { ...this.unpublishForm, noticeUntil: minUntil };
+    this.closeDatePicker(picker);
+  }
+
+  clearUnpublishNoticeDate(picker?: DatePickerHandle | null): void {
+    this.unpublishForm = { ...this.unpublishForm, noticeUntil: null };
+    this.closeDatePicker(picker);
   }
 
   private monthParam(d: Date): string {
@@ -264,9 +537,11 @@ export class DashBoard implements OnInit {
           nameAr: String(x?.nameAr || '').trim(),
           baseName: String(x?.baseName || '').trim() || undefined
         })).filter((x) => !!x.id && !!x.nameAr);
+        this.loadScopeOptions();
       },
       error: () => {
         this.familyCatalog = [];
+        this.loadScopeOptions();
       }
     });
   }
@@ -281,8 +556,82 @@ export class DashBoard implements OnInit {
 
 
   get showScopeSelector(): boolean {
-    return this.isAtLeast('AMIN_OSRA');
+    return this.isAtLeast('AMIN_KHEDMA');
   }
+
+  get showTargetPreview(): boolean {
+    return this.isAtLeast('AMIN_KHEDMA');
+  }
+
+  canUnpublishEvent(e: EventView | null | undefined): boolean {
+    return String(e?.status || '').toUpperCase() === 'PUBLISHED'
+      && !!(e?.canUnpublish || e?.canEdit || e?.canDelete);
+  }
+
+  canSeeEventParticipants(e: EventView | null | undefined): boolean {
+    return !!e?.id && !!e?.canSeeParticipants;
+  }
+
+  isHotEvent(e: EventView | null | undefined): boolean {
+    return !!e?.reminderActive || !!e?.cancelNoticeActive || String(e?.status || '').toUpperCase() === 'CANCELLED';
+  }
+
+  isCancelledEvent(e: EventView | null | undefined): boolean {
+    return String(e?.status || '').toUpperCase() === 'CANCELLED';
+  }
+
+  isPendingEvent(e: EventView | null | undefined): boolean {
+    return String(e?.status || '').toUpperCase() === 'PENDING';
+  }
+
+  showEventStatusBadge(e: EventView | null | undefined): boolean {
+    return !!(e?.canPublish || e?.canUnpublish || e?.canEdit || e?.canDelete);
+  }
+
+  isPublishingEvent(e: EventView | null | undefined): boolean {
+    return !!e?.id && this.publishingEventIds.has(Number(e.id));
+  }
+
+  isUnpublishingEvent(e: EventView | null | undefined): boolean {
+    return !!e?.id && this.unpublishingEventIds.has(Number(e.id));
+  }
+
+  statusLabel(e: EventView | null | undefined): string {
+    const status = String(e?.status || '').toUpperCase();
+    if (status === 'CANCELLED') return 'ملغي';
+    if (status === 'PUBLISHED') return 'منشور';
+    return 'غير منشور';
+  }
+
+  reminderLabel(e: EventView | null | undefined): string {
+    const minutes = Number(e?.reminderBeforeMinutes || 0);
+    if (!minutes) return '';
+    const days = Math.max(1, Math.ceil(minutes / 1440));
+    return days === 1 ? 'تذكير قبل يوم' : `تذكير قبل ${days} يوم`;
+  }
+
+  countdownLabel(e: EventView | null | undefined): string {
+    if (!e?.eventAt) return '';
+    const target = new Date(e.eventAt);
+    if (Number.isNaN(target.getTime())) return '';
+
+    const diffMs = target.getTime() - this.countdownNow.getTime();
+    if (diffMs <= 0) return 'وقت الموعد بدأ';
+
+    const totalMinutes = Math.max(1, Math.ceil(diffMs / 60000));
+    const days = Math.floor(totalMinutes / 1440);
+    const remainingAfterDays = totalMinutes % 1440;
+    const hours = Math.floor(remainingAfterDays / 60);
+    const minutes = remainingAfterDays % 60;
+
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days} يوم`);
+    if (hours > 0) parts.push(`${hours} ساعة`);
+    if (minutes > 0 && days === 0) parts.push(`${minutes} دقيقة`);
+
+    return parts.length ? `باقي على الموعد: ${parts.join(' و ')}` : 'باقي أقل من دقيقة';
+  }
+
 
   private currentBaseFamily(): string {
     const fam = this.mainFamily(this.assignmentsOf(this.user)[0]?.familyName || '');
@@ -300,6 +649,15 @@ export class DashBoard implements OnInit {
           targetAudience: 'SERVANTS_ONLY',
           requestFamily: 'ALL',
           requestAudience: 'SERVANTS_ONLY'
+        };
+      }
+
+      if (scope === 'FAMILY_MEMBERS') {
+        return {
+          targetFamily: 'ALL',
+          targetAudience: 'EVERYONE',
+          requestFamily: 'ALL',
+          requestAudience: 'EVERYONE'
         };
       }
 
@@ -380,36 +738,32 @@ export class DashBoard implements OnInit {
 
   private loadScopeOptions(): void {
     if (this.isAtLeast('AMIN_KHEDMA')) {
-      this.familyService.families().subscribe({
-        next: (families) => {
-          const familyOptions = (families || [])
-            .filter((x) => !!x)
-            .map((x) => ({ label: x, value: `FAMILY::${x}` }));
+      const seenFamilies = new Set<string>();
+      const familyOptions = this.familyCatalog
+        .map((family) => {
+          const label = String(family.baseName || family.nameAr || '').trim();
+          return label ? { label, value: `FAMILY::${label}` } : null;
+        })
+        .filter((option): option is { label: string; value: string } => {
+          if (!option || seenFamilies.has(option.label)) return false;
+          seenFamilies.add(option.label);
+          return true;
+        });
 
-          this.scopeOptions = [
-            { label: 'كل الأسر (الجميع)', value: 'ALL_USERS' },
-            { label: 'الخدام فقط', value: 'ALL_SERVANTS' },
-            ...familyOptions
-          ];
-
-          this.ensureScopeValue();
-        },
-        error: () => {
-          this.scopeOptions = [
-            { label: 'كل الأسر (الجميع)', value: 'ALL_USERS' },
-            { label: 'الخدام فقط', value: 'ALL_SERVANTS' }
-          ];
-          this.ensureScopeValue();
-        }
-      });
+      this.scopeOptions = [
+        { label: 'كل الأسر', value: 'ALL_USERS' },
+        { label: 'الخدام', value: 'ALL_SERVANTS' },
+        ...familyOptions
+      ];
+      this.ensureScopeValue();
       return;
     }
 
     if (this.isAtLeast('AMIN_OSRA')) {
       this.scopeOptions = [
-        { label: 'الكل', value: 'FAMILY_ALL' },
-        { label: 'المخدومين', value: 'FAMILY_MEMBERS' },
-        { label: 'الخدام', value: 'FAMILY_SERVANTS' }
+        { label: 'كل الاسر', value: 'FAMILY_ALL' },
+        { label: 'الخدام', value: 'FAMILY_SERVANTS' },
+        { label: 'المخدومين', value: 'FAMILY_MEMBERS' }
       ];
       this.ensureScopeValue();
       return;
@@ -431,7 +785,7 @@ export class DashBoard implements OnInit {
       return family === 'ALL' ? 'كل الخدام' : `خدام ${family}`;
     }
 
-    return family === 'ALL' ? 'كل الأسر (الجميع)' : family;
+    return family === 'ALL' ? 'كل الأسر' : family;
   }
 
   private isChoirBucket(f: string): boolean {
@@ -504,6 +858,51 @@ export class DashBoard implements OnInit {
     return labels.join(' + ');
   }
 
+  get primaryFamilyLabel(): string {
+    return this.userFamilies()[0] || 'الأسرة';
+  }
+
+  get serviceCards(): ServiceCardView[] {
+    const cards: ServiceCardView[] = [];
+
+    if (this.showFamilyMeetingCard) {
+      const familyCards = this.familyMeetingCards.length
+        ? this.familyMeetingCards
+        : [{
+            family: this.primaryFamilyLabel,
+            present: this.stats.FAMILY_MEETING,
+            total: this.statsTotal.FAMILY_MEETING
+          }];
+
+      for (const family of familyCards) {
+        cards.push({
+          label: family.family,
+          value: this.absenceLabel(family.present, family.total)
+        });
+      }
+    }
+
+    cards.push(
+      {
+        label: 'قداس',
+        value: this.absenceLabel(this.stats.FRIDAY_LITURGY, this.statsTotal.FRIDAY_LITURGY)
+      },
+      {
+        label: 'تسبحة',
+        value: this.absenceLabel(this.stats.TASBEEHA, this.statsTotal.TASBEEHA)
+      }
+    );
+
+    for (const khors of this.khorsCards) {
+      cards.push({
+        label: khors.label,
+        value: this.absenceLabel(khors.count, khors.total)
+      });
+    }
+
+    return cards;
+  }
+
   get khorsCards(): Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number; total: number | null }> {
     const out: Array<{ code: 'MARMARKOS' | 'ATHANASIUS'; label: string; count: number; total: number | null }> = [];
     const year = this.arYearLabel(this.user?.khorsYear);
@@ -536,8 +935,14 @@ export class DashBoard implements OnInit {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     this.loadFamilyCatalog();
+    this.startCountdownTimer();
     this.loadUserData();
     this.loadMyStats();
+  }
+
+  ngOnDestroy(): void {
+    this.stopHeroAutoSlide();
+    this.stopCountdownTimer();
   }
 
   loadUserData(): void {
@@ -609,15 +1014,161 @@ export class DashBoard implements OnInit {
     });
   }
 
+  downloadQrCard(): void {
+    if (!isPlatformBrowser(this.platformId) || !this.qrData) return;
+
+    const sourceCanvas = document.querySelector<HTMLCanvasElement>('#qrDownloadCard qrcode canvas');
+    if (!sourceCanvas) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'رمز QR لم يجهز بعد.' });
+      return;
+    }
+
+    const scale = 2;
+    const width = 420;
+    const height = 560;
+    const canvas = document.createElement('canvas');
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    const drawCard = (logo?: HTMLImageElement) => {
+      ctx.strokeStyle = '#8d5144';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(18, 18, width - 36, height - 36);
+
+      ctx.strokeStyle = '#fbf4ef';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(26, 26, width - 52, height - 52);
+
+      ctx.fillStyle = '#8d5144';
+      ctx.fillRect(70, 36, 110, 4);
+      ctx.fillRect(width - 180, 36, 110, 4);
+      ctx.fillRect(70, height - 40, width - 140, 4);
+
+      ctx.fillStyle = '#8d5144';
+      ctx.textAlign = 'center';
+      ctx.direction = 'rtl';
+
+      if (logo) {
+        const logoSize = 72;
+        ctx.drawImage(logo, (width - logoSize) / 2, 24, logoSize, logoSize);
+      }
+
+      ctx.font = '700 24px Arial, sans-serif';
+      ctx.fillText(String(this.user.fullName || this.user.username || 'مستخدم'), width / 2, 128);
+
+      ctx.font = '600 18px Arial, sans-serif';
+      const familyLines = this.wrapCanvasText(ctx, this.currentFamilyLabel || 'أسرة الشمامسة', 340, 3);
+      familyLines.forEach((line, index) => ctx.fillText(line, width / 2, 162 + (index * 26)));
+
+      ctx.drawImage(sourceCanvas, 100, 245, 220, 220);
+
+      ctx.font = '700 18px Arial, sans-serif';
+      ctx.fillText('أسرة الشمامسة', width / 2, 510);
+
+      const link = document.createElement('a');
+      const safeName = String(this.user.fullName || this.user.username || 'qr').trim().replace(/[\\/:*?"<>|]+/g, '-');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `${safeName || 'qr'}-qr.png`;
+      link.click();
+    };
+
+    const logo = new Image();
+    logo.onload = () => drawCard(logo);
+    logo.onerror = () => drawCard();
+    logo.src = this.churchLogoUrl;
+  }
+
+  private wrapCanvasText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number,
+    maxLines = 3
+  ): string[] {
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let line = '';
+
+    for (const word of words) {
+      const testLine = line ? `${line} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) lines.push(line);
+
+    return lines.slice(0, maxLines);
+  }
+
+
+  private sortEvents(rows: EventView[]): EventView[] {
+    const priority = (e: EventView): number => {
+      if (e?.cancelNoticeActive || String(e?.status || '').toUpperCase() === 'CANCELLED') return 0;
+      if (e?.reminderActive) return 1;
+      if (String(e?.status || '').toUpperCase() === 'PUBLISHED') return 2;
+      return 3;
+    };
+
+    const time = (e: EventView): number => {
+      const d = e?.eventAt ? new Date(e.eventAt) : null;
+      return d && !Number.isNaN(d.getTime()) ? d.getTime() : Number.MAX_SAFE_INTEGER;
+    };
+
+    return [...(rows || [])].sort((a, b) => {
+      const byPriority = priority(a) - priority(b);
+      if (byPriority !== 0) return byPriority;
+      return time(a) - time(b);
+    });
+  }
+
+  private eventDateValue(value: string | Date | null | undefined): number | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.getTime();
+  }
+
+  private isExpiredEvent(e: EventView | null | undefined, now = Date.now()): boolean {
+    const removeAt = this.eventDateValue(e?.removeAt);
+    if (removeAt != null && removeAt <= now) return true;
+
+    const cancelNoticeUntil = this.eventDateValue(e?.cancelNoticeUntil);
+    return cancelNoticeUntil != null && cancelNoticeUntil <= now;
+  }
+
+  private visibleEvents(rows: EventView[]): EventView[] {
+    const now = Date.now();
+    return (rows || []).filter((event) => !this.isExpiredEvent(event, now));
+  }
+
+  private pruneExpiredEvents(): void {
+    if (!this.events?.length) return;
+    const nextEvents = this.visibleEvents(this.events);
+    if (nextEvents.length === this.events.length) return;
+    this.events = nextEvents;
+    this.rebuildHeroSlides();
+  }
+
 
   private loadMonthBoards(): void {
     const month = this.monthParam(this.monthCursor);
     const scope = this.currentScopeConfig();
 
     this.boardService.listEvents(month, scope.requestFamily, scope.requestAudience).subscribe({
-      next: (rows) => this.events = rows || [],
+      next: (rows) => {
+        this.events = this.sortEvents(this.visibleEvents(rows || []));
+        this.rebuildHeroSlides();
+      },
       error: (err) => {
         this.events = [];
+        this.rebuildHeroSlides();
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'حصل خطأ أثناء تحميل جدول الشهر.') });
       }
     });
@@ -640,6 +1191,36 @@ export class DashBoard implements OnInit {
     this.loadAnnouncements();
   }
 
+  openScopeSelect(select: ScopeSelectHandle | null | undefined): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.cancelScopeSelectHide();
+    select?.show?.();
+
+    setTimeout(() => {
+      const panel = document.querySelector('.scope-select-panel');
+      if (!panel || this.scopePanelHoverBound) return;
+      this.scopePanelHoverBound = true;
+      panel.addEventListener('mouseenter', () => this.cancelScopeSelectHide());
+      panel.addEventListener('mouseleave', () => this.scheduleScopeSelectHide(select));
+    }, 0);
+  }
+
+  scheduleScopeSelectHide(select: ScopeSelectHandle | null | undefined): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.cancelScopeSelectHide();
+    this.scopeSelectHideTimer = setTimeout(() => {
+      select?.hide?.();
+      this.scopePanelHoverBound = false;
+    }, 140);
+  }
+
+  private cancelScopeSelectHide(): void {
+    if (this.scopeSelectHideTimer) {
+      clearTimeout(this.scopeSelectHideTimer);
+      this.scopeSelectHideTimer = null;
+    }
+  }
+
   onMonthChange(offset: number): void {
     const next = new Date(this.monthCursor);
     next.setMonth(next.getMonth() + Number(offset || 0));
@@ -655,9 +1236,13 @@ export class DashBoard implements OnInit {
       description: '',
       eventAt: null,
       removeAt: null,
+      reminderBeforeValue: null,
+      imageUrl: null,
       targetFamily: cfg.targetFamily,
       targetAudience: cfg.targetAudience
     };
+    this.selectedEventImageFile = null;
+    this.selectedEventImageName = '';
     this.showEventDialog = true;
   }
 
@@ -669,10 +1254,60 @@ export class DashBoard implements OnInit {
       description: e?.description || '',
       eventAt: e?.eventAt ? new Date(e.eventAt) : null,
       removeAt: e?.removeAt ? new Date(e.removeAt) : null,
+      reminderBeforeValue: this.reminderValueFromMinutes(e?.reminderBeforeMinutes || null).value,
+      imageUrl: e?.imageUrl || null,
       targetFamily: e?.targetFamily || cfg.targetFamily,
       targetAudience: e?.targetAudience || cfg.targetAudience
     };
+    this.selectedEventImageFile = null;
+    this.selectedEventImageName = '';
     this.showEventDialog = true;
+  }
+
+  private reminderValueFromMinutes(minutes: number | null): { value: number | null } {
+    const n = Number(minutes || 0);
+    if (!n) return { value: null };
+    return { value: Math.max(1, Math.ceil(n / 1440)) };
+  }
+
+  private reminderMinutesFromForm(): number | null {
+    const raw = Number(this.eventForm?.reminderBeforeValue || 0);
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    return Math.floor(raw) * 1440;
+  }
+
+  onEventImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0] || null;
+    if (!file) {
+      this.selectedEventImageFile = null;
+      this.selectedEventImageName = '';
+      return;
+    }
+
+    if (!String(file.type || '').startsWith('image/')) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار صورة فقط.' });
+      input!.value = '';
+      return;
+    }
+
+    this.selectedEventImageFile = file;
+    this.selectedEventImageName = file.name;
+  }
+
+  private uploadSelectedEventImage(eventId: number, afterDone: () => void): void {
+    if (!this.selectedEventImageFile) {
+      afterDone();
+      return;
+    }
+
+    this.boardService.uploadEventImage(eventId, this.selectedEventImageFile).subscribe({
+      next: () => afterDone(),
+      error: (err) => {
+        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'تم حفظ الموعد لكن فشل رفع الصورة.') });
+        afterDone();
+      }
+    });
   }
 
   saveEvent(): void {
@@ -680,8 +1315,9 @@ export class DashBoard implements OnInit {
     const payload = {
       title: String(this.eventForm?.title || '').trim(),
       description: this.eventForm?.description || null,
-      eventAt: this.toYmd(this.eventForm?.eventAt),
-      removeAt: this.eventForm?.removeAt ? this.toYmd(this.eventForm?.removeAt) : null,
+      eventAt: this.toLocalDateTimePayload(this.eventForm?.eventAt),
+      removeAt: this.eventForm?.removeAt ? this.toLocalDateTimePayload(this.eventForm?.removeAt) : null,
+      reminderBeforeMinutes: this.reminderMinutesFromForm(),
       targetFamily: String(this.eventForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
       targetFamilyId: this.familyIdForTarget(this.eventForm?.targetFamily || cfg.targetFamily || 'ALL'),
       targetAudience: String(this.eventForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
@@ -699,6 +1335,23 @@ export class DashBoard implements OnInit {
       this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اختار تاريخ الموعد.' });
       return;
     }
+    if (!payload.removeAt) {
+      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اختار وقت الإزالة.' });
+      return;
+    }
+    const eventDate = this.eventForm?.eventAt ? new Date(this.eventForm.eventAt) : null;
+    if (eventDate && eventDate < new Date()) {
+      this.messageService.add({ severity: 'warn', summary: 'تاريخ غير صحيح', detail: 'لا يمكن اختيار وقت فات.' });
+      return;
+    }
+    const removeDate = this.eventForm?.removeAt ? new Date(this.eventForm.removeAt) : null;
+    if (eventDate && removeDate && removeDate <= eventDate) {
+      this.messageService.add({ severity: 'warn', summary: 'تاريخ غير صحيح', detail: 'وقت الإزالة لازم يكون بعد وقت المناسبة.' });
+      return;
+    }
+
+    if (this.isSavingEvent) return;
+    this.isSavingEvent = true;
 
     const id = this.eventForm?.id;
     const req$ = id
@@ -706,12 +1359,24 @@ export class DashBoard implements OnInit {
       : this.boardService.createEvent(payload);
 
     req$.subscribe({
-      next: () => {
-        this.showEventDialog = false;
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ.' });
-        this.loadMonthBoards();
+      next: (res: unknown) => {
+        const savedId = id || Number((res as { id?: number })?.id || 0);
+        const finish = () => {
+          this.isSavingEvent = false;
+          this.showEventDialog = false;
+          this.selectedEventImageFile = null;
+          this.selectedEventImageName = '';
+          this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ.' });
+          this.loadMonthBoards();
+        };
+        if (savedId) {
+          this.uploadSelectedEventImage(savedId, finish);
+        } else {
+          finish();
+        }
       },
       error: (err) => {
+        this.isSavingEvent = false;
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل الحفظ.') });
       }
     });
@@ -722,13 +1387,64 @@ export class DashBoard implements OnInit {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن نشر الموعد حالياً.' });
       return;
     }
-    this.boardService.publishEvent(e.id).subscribe({
+    const id = Number(e.id);
+    if (this.publishingEventIds.has(id)) return;
+    this.publishingEventIds.add(id);
+
+    this.boardService.publishEvent(id).subscribe({
       next: () => {
+        this.publishingEventIds.delete(id);
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر الموعد.' });
         this.loadMonthBoards();
       },
       error: (err) => {
+        this.publishingEventIds.delete(id);
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل نشر الموعد.') });
+      }
+    });
+  }
+
+  unpublishEvent(e: EventView): void {
+    if (!e?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن إخفاء الموعد حالياً.' });
+      return;
+    }
+    const defaultUntil = e.eventAt ? new Date(e.eventAt) : new Date();
+    const minUntil = new Date();
+    minUntil.setHours(minUntil.getHours() + 1, 0, 0, 0);
+    if (defaultUntil < minUntil) defaultUntil.setTime(minUntil.getTime());
+    this.unpublishForm = {
+      event: e,
+      message: '',
+      noticeUntil: defaultUntil
+    };
+    this.showUnpublishDialog = true;
+  }
+
+  confirmUnpublishEvent(): void {
+    const e = this.unpublishForm.event;
+    if (!e?.id) {
+      this.showUnpublishDialog = false;
+      return;
+    }
+
+    const id = Number(e.id);
+    if (this.unpublishingEventIds.has(id)) return;
+    this.unpublishingEventIds.add(id);
+
+    this.boardService.unpublishEvent(id, {
+      message: String(this.unpublishForm.message || '').trim() || null,
+      noticeUntil: this.unpublishForm.noticeUntil ? this.toLocalDateTimePayload(this.unpublishForm.noticeUntil) : null
+    }).subscribe({
+      next: () => {
+        this.unpublishingEventIds.delete(id);
+        this.showUnpublishDialog = false;
+        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء نشر الموعد.' });
+        this.loadMonthBoards();
+      },
+      error: (err) => {
+        this.unpublishingEventIds.delete(id);
+        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل إلغاء نشر الموعد.') });
       }
     });
   }
@@ -752,6 +1468,15 @@ export class DashBoard implements OnInit {
   openJoin(e: EventView): void {
     this.selectedJoinEvent = e;
     this.showJoinDialog = true;
+  }
+
+  openEventDetails(e: EventView): void {
+    this.openJoin(e);
+  }
+
+  joinFromCard(e: EventView): void {
+    this.selectedJoinEvent = e;
+    this.confirmJoin();
   }
 
   confirmJoin(): void {
@@ -919,7 +1644,14 @@ export class DashBoard implements OnInit {
     if (!value) return '';
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleString('ar-EG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   }
 
   daysAgo(value: string | number | Date | null | undefined): string {
@@ -939,6 +1671,3 @@ export class DashBoard implements OnInit {
     return this.daysAgo(ref);
   }
 }
-
-
-

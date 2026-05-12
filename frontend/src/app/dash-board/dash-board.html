@@ -1,276 +1,364 @@
 ﻿<p-toast position="top-left"></p-toast>
 
-<main class="main">
-  <header class="header">
-    <div class="header-copy">
-      <h1>أهلاً بعودتك، {{user.fullName }} 👋</h1>
-      <p>سعداء جداً بوجودك كجزء من <strong>أسرة الشمامسة</strong>.</p>
-    </div>
-
-    <div class="header-qr" *ngIf="qrData; else dashboardQrPlaceholder">
-      <qrcode
-        [qrdata]="qrData"
-        [width]="110"
-        [errorCorrectionLevel]="'M'"
-        [allowEmptyString]="true"
-      ></qrcode>
-    </div>
-
-    <ng-template #dashboardQrPlaceholder>
-      <div class="header-qr header-qr--placeholder">
+<main class="home-page">
+  <section class="home-hero">
+    <header class="welcome-bar">
+      <button
+        type="button"
+        class="qr-shortcut"
+        aria-label="عرض رمز QR"
+        (click)="showQrDialog = true"
+      >
         <i class="pi pi-qrcode"></i>
+      </button>
+
+      <div class="welcome-copy">
+        <h1>مرحباً بك في أسرة الشمامسة</h1>
+        <p>أهلاً بك يا {{ user.fullName || 'عزيزي المستخدم' }} في أسرة الشمامسة</p>
       </div>
-    </ng-template>
-  </header>
+    </header>
 
-  <section class="stats">
-    <p-card class="stat-card gpa">
-      <!-- <h3>الأسرة الحالية</h3> -->
-      <h1>{{ currentFamilyLabel }}</h1>
-    </p-card>
+    <div class="hero-slider" *ngIf="hasHeroSlides">
+      <button
+        *ngIf="showHeroControls"
+        type="button"
+        class="hero-arrow hero-arrow--prev"
+        aria-label="الصورة السابقة"
+        (click)="previousHeroSlide()"
+      >
+        <i class="pi pi-chevron-left"></i>
+      </button>
 
-    <ng-container *ngIf="showFamilyMeetingCard">
-      <p-card *ngFor="let c of familyMeetingCards" class="stat-card credits">
-        <h3>حضور اجتماع {{ c.family }}</h3>
-        <h1>{{ attendanceLabel(c.present, c.total) }}</h1>
-      </p-card>
-    </ng-container>
+      <button type="button" class="hero-slide-button" (click)="openHeroEvent()" aria-label="فتح تفاصيل الموعد">
+        <img [src]="currentHeroSlide" alt="صورة الموعد" />
+      </button>
 
-    <p-card class="stat-card assignments">
-      <h3>حضور قداس الجمعة</h3>
-      <h1>{{ attendanceLabel(stats.FRIDAY_LITURGY, statsTotal.FRIDAY_LITURGY) }}</h1>
-    </p-card>
+      <button
+        *ngIf="showHeroControls"
+        type="button"
+        class="hero-arrow hero-arrow--next"
+        aria-label="الصورة التالية"
+        (click)="nextHeroSlide()"
+      >
+        <i class="pi pi-chevron-right"></i>
+      </button>
+    </div>
 
-    <p-card class="stat-card classes">
-      <h3>حضور التسبحة</h3>
-      <h1>{{ attendanceLabel(stats.TASBEEHA, statsTotal.TASBEEHA) }}</h1>
-    </p-card>
-
-    <!-- كل خورس يظهر في Card لوحده (بدل ما يتجمعوا داخل Card واحدة) -->
-    <ng-container *ngIf="showAnyKhorsCards">
-      <p-card *ngFor="let c of khorsCards" class="stat-card credits">
-        <h3>حضور {{ c.label }}</h3>
-        <h1>{{ attendanceLabel(c.count, c.total) }}</h1>
-      </p-card>
-    </ng-container>
+    <div class="hero-dots" *ngIf="showHeroControls" aria-label="شرائح الصور">
+      <button
+        type="button"
+        *ngFor="let slide of heroSlides; let i = index"
+        [class.active]="i === activeHeroSlide"
+        [attr.aria-label]="'عرض الشريحة ' + (i + 1)"
+        (click)="setHeroSlide(i)"
+      ></button>
+    </div>
   </section>
 
-  <section class="panels">
+  <section class="services-section">
+    <h2>حضورك</h2>
 
-    <div class="boards-scope" *ngIf="showScopeSelector">
-      <p-select
-        [options]="scopeOptions"
-        [(ngModel)]="scopeFamily"
-        optionLabel="label"
-        optionValue="value"
-        placeholder="اختار النطاق"
-        (onChange)="onScopeChange()"
-        class="boards-scope__select"
-      ></p-select>
+    <div class="services-grid">
+      <article class="service-card" *ngFor="let service of serviceCards">
+        <span class="service-card__title">{{ service.label }}</span>
+        <strong class="service-card__value">{{ service.value }}</strong>
+      </article>
     </div>
+  </section>
 
-    <p-panel header="جدول الشهر" class="content-panel">
+  <section class="notice-section" id="trips">
+    <div class="notice-header">
+      <h2>تنبيهات</h2>
 
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
-        <strong>{{ monthCursor | date:'MMMM yyyy' }}</strong>
-
-        <span style="flex:1"></span>
+      <div class="notice-tools">
+        <p-select
+          #scopeSelect
+          *ngIf="showScopeSelector"
+          [options]="scopeOptions"
+          [(ngModel)]="scopeFamily"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="كل الاسر"
+          scrollHeight="280px"
+          panelStyleClass="scope-select-panel"
+          (mouseenter)="openScopeSelect(scopeSelect)"
+          (mouseleave)="scheduleScopeSelectHide(scopeSelect)"
+          (onChange)="onScopeChange()"
+          class="scope-select"
+        ></p-select>
 
         <button
-          *ngIf="isAtLeast('AMIN_OSRA')"
-          pButton
+          *ngIf="isAtLeast('KHADIM')"
           type="button"
-          label="إضافة موعد"
-          icon="pi pi-plus"
-          class="p-button-sm"
+          class="add-event-button"
           (click)="openCreateEvent()"
-        ></button>
+        >
+          <i class="pi pi-plus"></i>
+          <span>إضافة موعد</span>
+        </button>
       </div>
+    </div>
 
-      <ul class="schedule" *ngIf="events.length > 0; else noEvents">
-        <li *ngFor="let e of events" style="align-items:flex-start;">
-          <div style="flex:1;">
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <strong>{{ e.title }}</strong>
-
-              <p-tag *ngIf="e.status==='PENDING'" severity="warn" value="Pending"></p-tag>
-              <p-tag *ngIf="e.status==='PENDING'" severity="danger" [value]="pendingEventAlarmLabel(e)"></p-tag>
-              <p-tag *ngIf="e.status==='PUBLISHED'" severity="success" value="Published"></p-tag>
-
-              <small style="opacity:.85;">• {{ formatDateTime(e.eventAt) }}</small>
-              <small>• {{ targetLabel(e) }}</small>
-              <small style="opacity:.75;">• {{ e.joinCount }} منضم</small>
+    <div class="notice-list" *ngIf="events.length > 0; else noEvents">
+      <article
+        class="notice-card"
+        *ngFor="let e of events"
+        [id]="'event-' + e.id"
+        [class.notice-card--hot]="isHotEvent(e)"
+        [class.notice-card--cancelled]="isCancelledEvent(e)"
+        [class.notice-card--pending]="isPendingEvent(e)"
+      >
+        <div class="notice-card__top">
+          <div class="notice-copy">
+            <h3>{{ e.title }}</h3>
+            <strong>{{ targetLabel(e) }}</strong>
+            <div class="notice-badges" *ngIf="showEventStatusBadge(e) || e.reminderBeforeMinutes">
+              <span *ngIf="showEventStatusBadge(e)">{{ statusLabel(e) }}</span>
+              <span *ngIf="e.reminderBeforeMinutes">{{ reminderLabel(e) }}</span>
+            </div>
+            <p>
+              <span *ngIf="e.eventAt">{{ formatDateTime(e.eventAt) }}</span>
+              <span *ngIf="e.joinCount !== undefined && e.joinCount !== null">الحجز: {{ e.joinCount }}</span>
+            </p>
+            <div class="event-warning" *ngIf="isCancelledEvent(e)">
+              {{ e.cancelMessage || 'تم إلغاء هذا الموعد.' }}
+              <small *ngIf="e.cancelNoticeUntil">سيظهر التنبيه حتى {{ formatDateTime(e.cancelNoticeUntil) }}</small>
+            </div>
+            <div class="event-warning event-warning--reminder" *ngIf="!isCancelledEvent(e) && e.reminderActive">
+              <div>تذكير: هذا الموعد قريب.</div>
+              <strong>{{ countdownLabel(e) }}</strong>
+            </div>
+            <div class="event-warning event-warning--pending" *ngIf="isPendingEvent(e) && showEventStatusBadge(e)">
+              {{ pendingEventAlarmLabel(e) }}
             </div>
           </div>
 
-          <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-            <!-- Join / Unjoin -->
+          <div class="notice-icon-actions" *ngIf="canSeeEventParticipants(e) || e.canDelete || e.canEdit">
             <button
-              *ngIf="e.status==='PUBLISHED' && !e.joined"
-              pButton
+              *ngIf="canSeeEventParticipants(e)"
               type="button"
-              label="التفاصيل والانضمام"
-              icon="pi pi-user-plus"
-              class="p-button-success p-button-sm"
-              (click)="openJoin(e)"
-            ></button>
-
-            <button
-              *ngIf="e.status==='PUBLISHED' && e.joined"
-              pButton
-              type="button"
-              label="إلغاء الانضمام"
-              icon="pi pi-times"
-              class="p-button-danger p-button-sm"
-              (click)="unjoin(e)"
-            ></button>
-
-            <!-- Publish/Edit/Delete/Participants -->
-            <button
-              *ngIf="e.canPublish"
-              pButton
-              style="background-color: #4ade80; border: none;"
-              type="button"
-              label="نشر"
-              icon="pi pi-send"
-              class="p-button-help p-button-sm"
-              (click)="publishEvent(e)"
-            ></button>
-
-            <button
-              *ngIf="e.canEdit"
-              pButton
-              type="button"
-              label="تعديل"
-              icon="pi pi-pencil"
-              class="p-button-secondary p-button-sm"
-              (click)="openEditEvent(e)"
-            ></button>
+              aria-label="عرض المنضمين"
+              (click)="openParticipants(e)"
+            >
+              <i class="pi pi-users"></i>
+            </button>
 
             <button
               *ngIf="e.canDelete"
-              pButton
               type="button"
-              label="مسح"
-              icon="pi pi-trash"
-              class="p-button-danger p-button-sm"
+              aria-label="مسح الموعد"
               (click)="deleteEvent(e)"
-            ></button>
+            >
+              <i class="pi pi-trash"></i>
+            </button>
 
             <button
-              *ngIf="e.canSeeParticipants"
-              pButton
-              style="background-color: #27272a; border: none; color: #d8d3d3;"
+              *ngIf="e.canEdit"
               type="button"
-              label="تفاصيل"
-              icon="pi pi-list"
-              class="p-button-info p-button-sm"
-              (click)="openParticipants(e)"
-            ></button>
+              aria-label="تعديل الموعد"
+              (click)="openEditEvent(e)"
+            >
+              <i class="pi pi-pencil"></i>
+            </button>
           </div>
-        </li>
-      </ul>
+        </div>
 
-      <ng-template #noEvents>
-        <div style="opacity:.7;">لا يوجد مواعيد في هذا الشهر.</div>
-      </ng-template>
-    </p-panel>
+        <div class="notice-card__actions">
+          <button
+            *ngIf="e.canPublish"
+            type="button"
+            [disabled]="isPublishingEvent(e)"
+            (click)="publishEvent(e)"
+          >
+            {{ isPublishingEvent(e) ? 'جاري النشر...' : 'نشر' }}
+          </button>
 
-    <p-panel header="التنبيهات" class="content-panel">
+          <button
+            *ngIf="canUnpublishEvent(e)"
+            type="button"
+            [disabled]="isUnpublishingEvent(e)"
+            (click)="unpublishEvent(e)"
+          >
+            {{ isUnpublishingEvent(e) ? 'جاري الإلغاء...' : 'الغاء النشر' }}
+          </button>
 
-      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
-        <button
-          *ngIf="isAtLeast('KHADIM')"
-          pButton
-          type="button"
-          label="إضافة تنبيه"
-          icon="pi pi-plus"
-          class="p-button-sm"
-          (click)="openCreateAnnouncement()"
-        ></button>
-      </div>
+          <button
+            *ngIf="e.status === 'PUBLISHED' && !e.joined"
+            type="button"
+            (click)="openJoin(e)"
+          >
+            انضم
+          </button>
 
-      <ul class="activity" *ngIf="announcements.length > 0; else noAnn">
-        <li *ngFor="let a of announcements" style="display:flex; gap:10px; align-items:center; justify-content:space-between;">
-          <div>
-            <i class="pi pi-megaphone text-blue-600"></i>
-            <strong>{{ a.title }}</strong>
-            <p-tag *ngIf="a.status==='PENDING'" severity="warn" value="Pending"></p-tag>
-            <p-tag *ngIf="a.status==='PUBLISHED'" severity="success" value="Published"></p-tag>
-            <span style="opacity:.75;">({{ annDaysLabel(a) }})</span>
-            <small style="opacity:.65;"> • {{ targetLabel(a) }}</small>
-          </div>
+          <button
+            *ngIf="e.status === 'PUBLISHED' && e.joined"
+            type="button"
+            (click)="unjoin(e)"
+          >
+            إلغاء الانضمام
+          </button>
 
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button pButton type="button" label="تفاصيل" icon="pi pi-info-circle"
-              style="background-color: #27272a; border: none; color: #d8d3d3;"
-              class="p-button-info p-button-sm" (click)="openAnnDetails(a)"></button>
+          <button type="button" (click)="openEventDetails(e)">
+            تفاصيل
+          </button>
 
-            <button *ngIf="a.canEdit" pButton type="button" label="تعديل" icon="pi pi-pencil"
-              class="p-button-secondary p-button-sm" (click)="openEditAnnouncement(a)"></button>
+        </div>
+      </article>
+    </div>
 
-            <button *ngIf="a.canDelete" pButton type="button" label="مسح" icon="pi pi-trash"
-              class="p-button-danger p-button-sm" (click)="deleteAnnouncement(a)"></button>
-
-            <button *ngIf="a.canPublish" pButton type="button" label="نشر" icon="pi pi-send"
-              style="background-color: #4ade80; border: none;"
-              class="p-button-help p-button-sm" (click)="publishAnnouncement(a)"></button>
-          </div>
-        </li>
-      </ul>
-
-      <ng-template #noAnn>
-        <div style="opacity:.7;">لا يوجد تنبيهات.</div>
-      </ng-template>
-    </p-panel>
+    <ng-template #noEvents>
+      <div class="empty-state">لا يوجد تنبيهات حالياً.</div>
+    </ng-template>
   </section>
 
-  <footer class="footer">
-    © 2025 أسرة الشمامسة — جميع الحقوق محفوظة
-  </footer>
+  <!-- QR Dialog -->
+  <p-dialog
+    [(visible)]="showQrDialog"
+    [modal]="true"
+    [draggable]="false"
+    [style]="{width:'360px'}"
+    styleClass="app-surface-dialog qr-dialog"
+  >
+    <ng-template pTemplate="header">
+      <div class="qr-dialog-header">
+        <span>رمز QR الخاص بك</span>
+        <button
+          type="button"
+          class="qr-download-button"
+          *ngIf="qrData"
+          title="تحميل"
+          aria-label="تحميل رمز QR"
+          (click)="downloadQrCard()"
+        >
+          <i class="pi pi-download"></i>
+        </button>
+      </div>
+    </ng-template>
+
+    <div class="qr-dialog-body" *ngIf="qrData; else noQrData">
+      <div class="qr-dialog-card" id="qrDownloadCard">
+        <div class="qr-frame-line qr-frame-line--left"></div>
+        <div class="qr-frame-line qr-frame-line--right"></div>
+        <img class="qr-dialog-logo" [src]="churchLogoUrl" alt="لوجو الشمامسة" />
+        <div class="qr-dialog-name">{{ user.fullName || user.username || 'مستخدم' }}</div>
+        <div class="qr-dialog-family">{{ currentFamilyLabel || 'أسرة الشمامسة' }}</div>
+
+        <qrcode
+          [qrdata]="qrData"
+          [width]="190"
+          [elementType]="'canvas'"
+          [errorCorrectionLevel]="'M'"
+          [allowEmptyString]="true"
+        ></qrcode>
+      </div>
+    </div>
+
+    <ng-template #noQrData>
+      <div class="qr-dialog-empty">رمز QR غير متاح حالياً.</div>
+    </ng-template>
+  </p-dialog>
 
   <!-- Dialogs زي ما هم عندك (ما غيرتهمش) -->
   <!-- Event Dialog -->
-  <p-dialog [(visible)]="showEventDialog" [modal]="true" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog" header="إضافة/تعديل موعد">
+  <p-dialog [(visible)]="showEventDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog event-dialog" header="إضافة/تعديل موعد">
     <div style="display:flex; flex-direction:column; gap:10px;">
-      <label>العنوان (هيظهر من برّه)</label>
+      <label>العنوان</label>
       <input pInputText [(ngModel)]="eventForm.title" />
 
-      <label>الوصف (هيظهر قبل تأكيد الانضمام)</label>
+      <label>الوصف</label>
       <textarea pTextarea [(ngModel)]="eventForm.description" rows="4"></textarea>
 
       <label>وقت الإيفنت</label>
       <p-datepicker
+        #eventAtPicker
         [(ngModel)]="eventForm.eventAt"
         [showIcon]="true"
-        [showTime]="false"
+        [showTime]="true"
+        hourFormat="12"
+        [minDate]="todayCalendarMinDate"
         dateFormat="yy-mm-dd"
-        placeholder="اختار اليوم"
+        placeholder="اختار اليوم والساعة"
         [showButtonBar]="true"
+        [autoZIndex]="true"
+        [baseZIndex]="12000"
+        styleClass="dashboard-date-input"
+        inputStyleClass="dashboard-date-input__field"
         panelStyleClass="dashboardDatePanel"
         appendTo="body"
-      ></p-datepicker>
+        (onShow)="fixDatePickerOverlay()"
+      >
+        <ng-template pTemplate="buttonbar">
+          <div class="dashboard-picker-actions">
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost" (pointerdown)="onPickerActionPress($event, 'clear', 'eventAt', eventAtPicker)" (click)="onPickerActionClick($event)">
+              امسح
+            </button>
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary" (pointerdown)="onPickerActionPress($event, 'now', 'eventAt', eventAtPicker)" (click)="onPickerActionClick($event)">
+              الآن
+            </button>
+          </div>
+        </ng-template>
+      </p-datepicker>
 
-      <label>وقت الإزالة (اختياري)</label>
+      <label>وقت الإزالة</label>
       <p-datepicker
+        #removeAtPicker
         [(ngModel)]="eventForm.removeAt"
         [showIcon]="true"
-        [showTime]="false"
+        [showTime]="true"
+        hourFormat="12"
+        [minDate]="removeCalendarMinDate"
         dateFormat="yy-mm-dd"
-        placeholder="اختياري: تاريخ إزالة تلقائي"
+        placeholder="اختار تاريخ ووقت الإزالة"
         [showButtonBar]="true"
+        [autoZIndex]="true"
+        [baseZIndex]="12000"
+        styleClass="dashboard-date-input"
+        inputStyleClass="dashboard-date-input__field"
         panelStyleClass="dashboardDatePanel"
         appendTo="body"
-      ></p-datepicker>
+        (onShow)="fixDatePickerOverlay()"
+      >
+        <ng-template pTemplate="buttonbar">
+          <div class="dashboard-picker-actions">
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost" (pointerdown)="onPickerActionPress($event, 'clear', 'removeAt', removeAtPicker)" (click)="onPickerActionClick($event)">
+              امسح
+            </button>
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary" (pointerdown)="onPickerActionPress($event, 'now', 'removeAt', removeAtPicker)" (click)="onPickerActionClick($event)">
+              الآن
+            </button>
+          </div>
+        </ng-template>
+      </p-datepicker>
 
-      <label>هينزل لمين؟</label>
-      <div style="padding:10px; border:1px solid #ddd; border-radius:8px; opacity:.9;">
-        {{ targetLabelFromData(eventForm.targetFamily, eventForm.targetAudience) }}
+      <label>تذكير قبل الموعد (اختياري - بالأيام)</label>
+      <div class="reminder-row reminder-row--days-only">
+        <input
+          pInputText
+          type="number"
+          min="1"
+          inputmode="numeric"
+          [(ngModel)]="eventForm.reminderBeforeValue"
+          placeholder="مثلاً 2"
+        />
       </div>
+
+      <label>صورة السلايدر (اختياري)</label>
+      <div class="image-upload-row">
+        <input type="file" accept="image/*" (change)="onEventImageSelected($event)" />
+        <small *ngIf="selectedEventImageName">{{ selectedEventImageName }}</small>
+        <img *ngIf="eventForm.imageUrl && !selectedEventImageFile" [src]="eventForm.imageUrl" alt="صورة الموعد الحالية" />
+      </div>
+
+      <ng-container *ngIf="showTargetPreview">
+        <label>هينزل لمين؟</label>
+        <div class="target-preview">
+          {{ targetLabelFromData(eventForm.targetFamily, eventForm.targetAudience) }}
+        </div>
+      </ng-container>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
         <button pButton type="button" label="إلغاء" class="p-button-text" (click)="showEventDialog=false"></button>
-        <button pButton type="button" label="حفظ" icon="pi pi-save" (click)="saveEvent()"></button>
+        <button pButton type="button" [label]="isSavingEvent ? 'جاري الحفظ...' : 'حفظ'" icon="pi pi-save" [disabled]="isSavingEvent" (click)="saveEvent()"></button>
       </div>
     </div>
   </p-dialog>
@@ -281,6 +369,10 @@
       <h3 style="margin-top:0;">{{ selectedJoinEvent.title }}</h3>
       <div style="opacity:.8; margin-bottom:10px;">{{ formatDateTime(selectedJoinEvent.eventAt) }}</div>
 
+      <div class="event-warning" *ngIf="isCancelledEvent(selectedJoinEvent)">
+        {{ selectedJoinEvent.cancelMessage || 'تم إلغاء هذا الموعد.' }}
+      </div>
+
       <div *ngIf="selectedJoinEvent.description && selectedJoinEvent.description.trim().length > 0; else noDesc"
            style="padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:12px;">
         {{ selectedJoinEvent.description }}
@@ -290,14 +382,69 @@
       </ng-template>
 
       <div style="display:flex; justify-content:flex-end; gap:10px;">
-        <button pButton type="button" label="إلغاء" class="p-button-text" (click)="showJoinDialog=false"></button>
-        <button pButton type="button" label="انضم" icon="pi pi-check" class="p-button-success" (click)="confirmJoin()"></button>
+        <button
+          *ngIf="selectedJoinEvent.status === 'PUBLISHED' && !selectedJoinEvent.joined"
+          pButton
+          type="button"
+          label="انضم"
+          icon="pi pi-check"
+          class="p-button-success"
+          (click)="confirmJoin()"
+        ></button>
+      </div>
+    </div>
+  </p-dialog>
+
+  <!-- Unpublish / Cancel Dialog -->
+  <p-dialog [(visible)]="showUnpublishDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog" header="تأكيد إلغاء النشر">
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div class="event-warning">
+        هل تريد إلغاء نشر هذا الموعد؟ يمكن كتابة رسالة اختيارية تظهر للناس.
+      </div>
+
+      <label>رسالة الإلغاء (اختياري)</label>
+      <textarea pTextarea [(ngModel)]="unpublishForm.message" rows="4" placeholder="مثال: تم إلغاء الميعاد لظروف خاصة"></textarea>
+
+      <label>تظهر الرسالة لحد يوم</label>
+      <p-datepicker
+        #noticeUntilPicker
+        [(ngModel)]="unpublishForm.noticeUntil"
+        [showIcon]="true"
+        [showTime]="true"
+        hourFormat="12"
+        [minDate]="todayCalendarMinDate"
+        dateFormat="yy-mm-dd"
+        placeholder="اختار آخر وقت لظهور الرسالة"
+        [showButtonBar]="true"
+        [autoZIndex]="true"
+        [baseZIndex]="12000"
+        styleClass="dashboard-date-input"
+        inputStyleClass="dashboard-date-input__field"
+        panelStyleClass="dashboardDatePanel"
+        appendTo="body"
+        (onShow)="fixDatePickerOverlay()"
+      >
+        <ng-template pTemplate="buttonbar">
+          <div class="dashboard-picker-actions">
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost" (pointerdown)="onPickerActionPress($event, 'clearNotice', null, noticeUntilPicker)" (click)="onPickerActionClick($event)">
+              امسح
+            </button>
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary" (pointerdown)="onPickerActionPress($event, 'nowNotice', null, noticeUntilPicker)" (click)="onPickerActionClick($event)">
+              الآن
+            </button>
+          </div>
+        </ng-template>
+      </p-datepicker>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+        <button pButton type="button" label="رجوع" class="p-button-text" (click)="showUnpublishDialog=false"></button>
+        <button pButton type="button" [label]="isUnpublishingEvent(unpublishForm.event) ? 'جاري الإلغاء...' : 'تأكيد إلغاء النشر'" icon="pi pi-times" class="p-button-danger" [disabled]="isUnpublishingEvent(unpublishForm.event)" (click)="confirmUnpublishEvent()"></button>
       </div>
     </div>
   </p-dialog>
 
   <!-- Participants Dialog -->
-  <p-dialog [(visible)]="showParticipantsDialog" [modal]="true" [draggable]="false" [style]="{width:'650px'}" styleClass="app-surface-dialog" header="تفاصيل المنضمين">
+  <p-dialog [(visible)]="showParticipantsDialog" [modal]="true" [draggable]="false" [style]="{width:'650px'}" styleClass="app-surface-dialog participants-dialog" header="تفاصيل المنضمين">
     <p-table [value]="participantsGroups" *ngIf="participantsGroups.length > 0; else noParts">
       <ng-template pTemplate="header">
         <tr>
@@ -332,10 +479,12 @@
       <label>الوصف (هيظهر في تفاصيل)</label>
       <textarea pTextarea [(ngModel)]="annForm.description" rows="4"></textarea>
 
-      <label>هينزل لمين؟</label>
-      <div style="padding:10px; border:1px solid #ddd; border-radius:8px; opacity:.9;">
-        {{ targetLabelFromData(annForm.targetFamily, annForm.targetAudience) }}
-      </div>
+      <ng-container *ngIf="showTargetPreview">
+        <label>هينزل لمين؟</label>
+        <div class="target-preview">
+          {{ targetLabelFromData(annForm.targetFamily, annForm.targetAudience) }}
+        </div>
+      </ng-container>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
         <button pButton type="button" label="إلغاء" class="p-button-text" (click)="showAnnDialog=false"></button>
@@ -362,6 +511,3 @@
   </p-dialog>
 
 </main>
-
-
-

@@ -10,6 +10,13 @@ export type BoardEvent = {
   description?: string | null;
   eventAt?: string | Date | null;
   removeAt?: string | Date | null;
+  reminderBeforeMinutes?: number | null;
+  reminderActive?: boolean;
+  imageUrl?: string | null;
+  cancelMessage?: string | null;
+  cancelNoticeUntil?: string | Date | null;
+  cancelledAt?: string | null;
+  cancelNoticeActive?: boolean;
   targetFamily?: string;
   targetAudience?: EventAudience | string;
   status?: string;
@@ -18,6 +25,7 @@ export type BoardEvent = {
   joinCount?: number;
   joined?: boolean;
   canPublish?: boolean;
+  canUnpublish?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
   canSeeParticipants?: boolean;
@@ -61,6 +69,12 @@ export type BoardItemPayload = {
 export type BoardEventPayload = BoardItemPayload & {
   eventAt: string | null;
   removeAt: string | null;
+  reminderBeforeMinutes?: number | null;
+};
+
+export type BoardUnpublishPayload = {
+  message?: string | null;
+  noticeUntil?: string | null;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -84,6 +98,16 @@ export class BoardService {
 
   publishEvent(id: number): Observable<unknown> {
     return this.http.post(`/api/events/${id}/publish`, {}, { withCredentials: true });
+  }
+
+  unpublishEvent(id: number, payload: BoardUnpublishPayload = {}): Observable<unknown> {
+    return this.http.post(`/api/events/${id}/pending`, payload, { withCredentials: true });
+  }
+
+  uploadEventImage(id: number, file: File): Observable<unknown> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post(`/api/events/${id}/image`, formData, { withCredentials: true });
   }
 
   deleteEvent(id: number): Observable<unknown> {
