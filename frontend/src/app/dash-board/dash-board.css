@@ -184,7 +184,7 @@
 .services-grid {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 28px;
   max-width: 1120px;
   margin-inline: auto;
@@ -242,7 +242,7 @@
 
 @media (min-width: 900px) {
   .services-grid {
-    justify-content: flex-start;
+    justify-content: center;
   }
 }
 
@@ -388,43 +388,41 @@
   border: 1px solid rgba(109, 51, 38, 0.12);
   border-radius: 8px;
   overflow: hidden;
-  background: #fbf7f0;
+  background: #fffaf6;
   box-shadow: 0 8px 20px rgba(94, 43, 32, 0.12);
   direction: rtl;
 }
 
 :host ::ng-deep .scope-select-panel .p-select-list-container {
-  scrollbar-width: thin;
-  scrollbar-color: #9a5a4c #f7f1e8;
+  direction: rtl;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 :host ::ng-deep .scope-select-panel .p-select-list-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-:host ::ng-deep .scope-select-panel .p-select-list-container::-webkit-scrollbar-track {
-  background: #f7f1e8;
-  border-radius: 999px;
-}
-
-:host ::ng-deep .scope-select-panel .p-select-list-container::-webkit-scrollbar-thumb {
-  background: #9a5a4c;
-  border: 2px solid #f7f1e8;
-  border-radius: 999px;
+  width: 0;
+  height: 0;
 }
 
 :host ::ng-deep .scope-select-panel .p-select-option {
+  direction: rtl;
   color: #6d3326;
-  background: #fbf7f0;
+  background: #fffaf6;
   justify-content: flex-start;
   padding: 0.58rem 0.72rem;
   font-size: 0.82rem;
 }
 
-:host ::ng-deep .scope-select-panel .p-select-option.p-select-option-selected,
-:host ::ng-deep .scope-select-panel .p-select-option:hover {
-  background: #efe8df;
-  color: #5e2b20;
+:host ::ng-deep .scope-select-panel .p-select-option:hover,
+:host ::ng-deep .scope-select-panel .p-select-option.p-focus,
+:host ::ng-deep .scope-select-panel .p-select-option.p-highlight {
+  background: #f1e8de !important;
+  color: #5e2b20 !important;
+}
+
+:host ::ng-deep .scope-select-panel .p-select-option.p-select-option-selected {
+  background: #eaded2 !important;
+  color: #5e2b20 !important;
 }
 
 .notice-list {
@@ -551,6 +549,77 @@
   border: 1px dashed #d9c9c1;
   border-radius: 8px;
   background: #fbf8f3;
+}
+
+.image-upload-input {
+  display: none;
+}
+
+.image-upload-control {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "upload name";
+  gap: 10px;
+  align-items: center;
+  direction: ltr;
+}
+
+.image-upload-control:has(.image-upload-clear) {
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "upload name clear";
+}
+
+.image-upload-name {
+  grid-area: name;
+  min-height: 44px;
+  border: 1px solid #d1c1b9;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #7a4033;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-inline: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+}
+
+.image-upload-button {
+  grid-area: upload;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: #8d5144;
+  color: #ffffff;
+  cursor: pointer;
+  padding-inline: 18px;
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.image-upload-button:hover {
+  background: #6d3326;
+}
+
+.image-upload-clear {
+  grid-area: clear;
+  width: 44px;
+  min-height: 44px;
+  border: 1px solid #d8c7bd;
+  border-radius: 10px;
+  background: #fffaf6;
+  color: #8d5144;
+  cursor: pointer;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.image-upload-clear:hover {
+  background: #f1e8de;
+  color: #6d3326;
 }
 
 .image-upload-row img {
@@ -748,6 +817,80 @@
   opacity: 0.9;
 }
 
+.target-scope-select,
+:host ::ng-deep p-select.target-scope-select,
+:host ::ng-deep .target-scope-select.p-select,
+:host ::ng-deep .target-scope-select .p-select {
+  width: 100%;
+}
+
+:host ::ng-deep p-select.target-scope-select,
+:host ::ng-deep .target-scope-select.p-select,
+:host ::ng-deep .target-scope-select .p-select {
+  min-height: 48px;
+  border: 1px solid #eadfd9;
+  border-radius: 12px;
+  background: #fffaf6 !important;
+  box-shadow: none !important;
+  color: #6d3326 !important;
+  direction: rtl;
+}
+
+:host ::ng-deep .target-scope-select .p-select-label {
+  color: #6d3326 !important;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 48px;
+  padding-block: 0;
+  padding-inline: 0.9rem 2.4rem;
+  text-align: right;
+}
+
+:host ::ng-deep .target-scope-select .p-select-dropdown {
+  color: #8d5144;
+}
+
+:host ::ng-deep .target-scope-panel {
+  border: 1px solid #eadfd9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fffaf6;
+  box-shadow: 0 12px 32px rgba(94, 43, 32, 0.14);
+  direction: rtl;
+}
+
+:host ::ng-deep .target-scope-panel .p-select-list-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+:host ::ng-deep .target-scope-panel .p-select-list-container::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+:host ::ng-deep .target-scope-panel .p-select-option {
+  color: #6d3326;
+  background: #fffaf6;
+  justify-content: flex-start;
+  padding: 0.72rem 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+:host ::ng-deep .target-scope-panel .p-select-option:hover,
+:host ::ng-deep .target-scope-panel .p-select-option.p-focus,
+:host ::ng-deep .target-scope-panel .p-select-option.p-highlight {
+  background: #f1e8de !important;
+  color: #5e2b20 !important;
+}
+
+:host ::ng-deep .target-scope-panel .p-select-option.p-select-option-selected {
+  background: #eaded2 !important;
+  color: #5e2b20 !important;
+}
+
 :host ::ng-deep .participants-dialog .p-dialog-header,
 :host ::ng-deep .participants-dialog .p-dialog-content {
   background: #ffffff;
@@ -933,6 +1076,48 @@
   color: #6d4a10;
 }
 
+.details-description {
+  max-height: 190px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  border: 1px solid #e4dad3;
+  border-radius: 8px;
+  background: #fffaf6;
+  color: #5e2b20;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(141, 81, 68, 0.38) #fffaf6;
+}
+
+.details-description::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.details-description::-webkit-scrollbar-track {
+  background: #fffaf6;
+  border-radius: 999px;
+}
+
+.details-description::-webkit-scrollbar-thumb {
+  background: rgba(141, 81, 68, 0.34);
+  border: 2px solid #fffaf6;
+  border-radius: 999px;
+}
+
+.details-description::-webkit-scrollbar-thumb:hover {
+  background: rgba(109, 51, 38, 0.5);
+}
+
+.details-description::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 :host ::ng-deep .dashboardDatePanel .p-datepicker-ampm-picker,
 :host ::ng-deep .dashboardDatePanel .p-datepicker-ampm {
   direction: ltr;
@@ -945,6 +1130,37 @@
 }
 
 :host ::ng-deep .event-dialog .p-dialog-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+:host ::ng-deep .event-dialog textarea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(141, 81, 68, 0.42) #fffaf6;
+}
+
+:host ::ng-deep .event-dialog textarea::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:host ::ng-deep .event-dialog textarea::-webkit-scrollbar-track {
+  background: #fffaf6;
+  border-radius: 999px;
+}
+
+:host ::ng-deep .event-dialog textarea::-webkit-scrollbar-thumb {
+  background: rgba(141, 81, 68, 0.38);
+  border: 2px solid #fffaf6;
+  border-radius: 999px;
+}
+
+:host ::ng-deep .event-dialog textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(109, 51, 38, 0.52);
+}
+
+:host ::ng-deep .event-dialog textarea::-webkit-scrollbar-button {
+  display: none;
   width: 0;
   height: 0;
 }
@@ -965,7 +1181,11 @@
   border-radius: 10px !important;
   background: #fffaf6 !important;
   color: #5e2b20 !important;
+  direction: ltr;
+  text-align: right;
+  font-size: 1.02rem;
   font-weight: 700;
+  padding-inline: 14px !important;
   box-shadow: none !important;
 }
 
@@ -1014,11 +1234,24 @@
 }
 
 ::ng-deep .dashboardDatePanel .p-datepicker-header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
   min-height: 58px;
   padding: 12px 14px !important;
   border-bottom: 1px solid #eadfd9 !important;
   background: #fffaf6 !important;
   color: #5e2b20 !important;
+}
+
+::ng-deep .dashboardDatePanel .p-datepicker-prev-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+::ng-deep .dashboardDatePanel .p-datepicker-next-button {
+  grid-column: 1;
+  justify-self: start;
 }
 
 ::ng-deep .dashboardDatePanel .p-datepicker-title,
@@ -1032,6 +1265,36 @@
   color: #5e2b20 !important;
   font-weight: 900 !important;
   opacity: 1 !important;
+}
+
+::ng-deep .dashboardDatePanel .p-datepicker-title {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+::ng-deep .dashboardDatePanel .p-datepicker-title button,
+::ng-deep .dashboardDatePanel .p-datepicker-select-month,
+::ng-deep .dashboardDatePanel .p-datepicker-select-year {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+::ng-deep .dashboardDatePanel .p-datepicker-title button:hover,
+::ng-deep .dashboardDatePanel .p-datepicker-title button:focus,
+::ng-deep .dashboardDatePanel .p-datepicker-select-month:hover,
+::ng-deep .dashboardDatePanel .p-datepicker-select-month:focus,
+::ng-deep .dashboardDatePanel .p-datepicker-select-year:hover,
+::ng-deep .dashboardDatePanel .p-datepicker-select-year:focus {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+  box-shadow: none !important;
 }
 
 ::ng-deep .dashboardDatePanel .p-datepicker-prev-button,
@@ -1055,6 +1318,11 @@
   color: #6d3326 !important;
 }
 
+::ng-deep .dashboardDatePanel .p-datepicker-prev-button svg,
+::ng-deep .dashboardDatePanel .p-datepicker-next-button svg {
+  transform: scaleX(-1) !important;
+}
+
 ::ng-deep .dashboardDatePanel .p-datepicker-weekday,
 ::ng-deep .dashboardDatePanel th,
 ::ng-deep .dashboardDatePanel thead th,
@@ -1066,26 +1334,52 @@
 
 ::ng-deep .dashboardDatePanel .p-datepicker-day,
 ::ng-deep .dashboardDatePanel .p-datepicker-date,
+::ng-deep .dashboardDatePanel .p-datepicker-month,
+::ng-deep .dashboardDatePanel .p-datepicker-year,
 ::ng-deep .dashboardDatePanel td > span,
 ::ng-deep .dashboardDatePanel td > button {
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
   color: #5e2b20 !important;
   opacity: 1 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+::ng-deep .dashboardDatePanel .p-datepicker-day,
+::ng-deep .dashboardDatePanel .p-datepicker-date,
+::ng-deep .dashboardDatePanel td > span,
+::ng-deep .dashboardDatePanel td > button {
+  border-radius: 50% !important;
 }
 
 ::ng-deep .dashboardDatePanel .p-datepicker-day:not(.p-disabled):not(.p-datepicker-day-selected):hover,
 ::ng-deep .dashboardDatePanel .p-datepicker-date:not(.p-disabled):not(.p-highlight):hover,
-::ng-deep .dashboardDatePanel td > span:not(.p-disabled):not(.p-highlight):hover {
+::ng-deep .dashboardDatePanel .p-datepicker-month:not(.p-disabled):not(.p-datepicker-month-selected):hover,
+::ng-deep .dashboardDatePanel .p-datepicker-year:not(.p-disabled):not(.p-datepicker-year-selected):hover,
+::ng-deep .dashboardDatePanel td > span:not(.p-disabled):not(.p-highlight):hover,
+::ng-deep .dashboardDatePanel .p-datepicker-day:not(.p-disabled):focus {
   background: #fbf1eb !important;
   color: #6d3326 !important;
+  box-shadow: none !important;
 }
 
 ::ng-deep .dashboardDatePanel .p-datepicker-day-selected,
 ::ng-deep .dashboardDatePanel .p-datepicker-date.p-highlight,
-::ng-deep .dashboardDatePanel td.p-datepicker-today > span,
+::ng-deep .dashboardDatePanel .p-datepicker-month-selected,
+::ng-deep .dashboardDatePanel .p-datepicker-year-selected,
 ::ng-deep .dashboardDatePanel td > span.p-highlight {
   background: #8d5144 !important;
   color: #ffffff !important;
   border-color: #8d5144 !important;
+}
+
+::ng-deep .dashboardDatePanel td.p-datepicker-today > span:not(.p-datepicker-day-selected):not(.p-highlight),
+::ng-deep .dashboardDatePanel td.p-datepicker-today > button:not(.p-datepicker-day-selected):not(.p-highlight) {
+  border: 1px solid #d9c2b8 !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
 }
 
 ::ng-deep .dashboardDatePanel .p-disabled,
@@ -1150,6 +1444,16 @@
   font-size: 0.95rem;
 }
 
+.dashboard-picker-btn--icon {
+  min-width: 72px;
+  font-size: 1rem;
+}
+
+.dashboard-picker-btn--icon i {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
 .dashboard-picker-btn--ghost {
   border: 1px solid #eadfd9;
   background: #f8f2ec;
@@ -1180,27 +1484,4 @@
 ::ng-deep body .p-datepicker-panel.dashboardDatePanel {
   z-index: 15000 !important;
   pointer-events: auto !important;
-}
-
-::ng-deep body .dashboardDatePanel button,
-::ng-deep body .dashboardDatePanel .p-datepicker-day,
-::ng-deep body .dashboardDatePanel .p-datepicker-date,
-::ng-deep body .dashboardDatePanel td,
-::ng-deep body .dashboardDatePanel td span,
-::ng-deep body .dashboardDatePanel td button,
-::ng-deep body .dashboardDatePanel .p-datepicker-prev-button,
-::ng-deep body .dashboardDatePanel .p-datepicker-next-button,
-::ng-deep body .dashboardDatePanel .p-datepicker-increment-button,
-::ng-deep body .dashboardDatePanel .p-datepicker-decrement-button {
-  pointer-events: auto !important;
-  cursor: pointer;
-}
-
-::ng-deep body .dashboardDatePanel .p-disabled,
-::ng-deep body .dashboardDatePanel [disabled],
-::ng-deep body .dashboardDatePanel td.p-disabled,
-::ng-deep body .dashboardDatePanel td.p-disabled span,
-::ng-deep body .dashboardDatePanel td.p-disabled button {
-  pointer-events: none !important;
-  cursor: not-allowed !important;
 }

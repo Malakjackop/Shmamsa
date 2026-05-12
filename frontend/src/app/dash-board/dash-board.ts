@@ -135,12 +135,7 @@ export class DashBoard implements OnInit, OnDestroy {
     d.setHours(0, 0, 0, 0);
     return d;
   })();
-
-  get todayCalendarMinDate(): Date {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
+  readonly todayCalendarMinDate: Date = this.todayMinDate;
 
   // ===== Roles =====
   private normRole(role: unknown): string {
@@ -219,6 +214,11 @@ export class DashBoard implements OnInit, OnDestroy {
     targetFamily: 'ALL',
     targetAudience: 'EVERYONE'
   };
+  eventTargetScope = 'ALL_USERS';
+
+  get eventDialogTitle(): string {
+    return this.eventForm?.id ? 'تعديل الموعد' : 'إضافة موعد';
+  }
 
   annForm: AnnouncementForm = {
     id: null,
@@ -227,6 +227,7 @@ export class DashBoard implements OnInit, OnDestroy {
     targetFamily: 'ALL',
     targetAudience: 'EVERYONE'
   };
+  annTargetScope = 'ALL_USERS';
 
   stats: {
     FRIDAY_LITURGY: number;
@@ -302,15 +303,19 @@ export class DashBoard implements OnInit, OnDestroy {
     return this.heroSlides[this.activeHeroSlide]?.imageUrl || '';
   }
 
+  private removeCalendarMinSource = NaN;
+  private removeCalendarMinDateValue = new Date(this.todayMinDate);
+
   get removeCalendarMinDate(): Date {
-    const base = this.eventForm?.eventAt ? new Date(this.eventForm.eventAt) : new Date();
-    if (Number.isNaN(base.getTime())) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return today;
+    const base = this.eventForm?.eventAt ? new Date(this.eventForm.eventAt) : new Date(this.todayMinDate);
+    const source = Number.isNaN(base.getTime()) ? this.todayMinDate.getTime() : base.getTime();
+    if (source !== this.removeCalendarMinSource) {
+      const next = Number.isNaN(base.getTime()) ? new Date(this.todayMinDate) : new Date(base);
+      next.setHours(0, 0, 0, 0);
+      this.removeCalendarMinSource = source;
+      this.removeCalendarMinDateValue = next;
     }
-    base.setHours(0, 0, 0, 0);
-    return base;
+    return this.removeCalendarMinDateValue;
   }
 
   previousHeroSlide(): void {
@@ -417,20 +422,6 @@ export class DashBoard implements OnInit, OnDestroy {
       panels.forEach((panel) => {
         panel.style.zIndex = '15000';
         panel.style.pointerEvents = 'auto';
-
-        panel
-          .querySelectorAll<HTMLElement>(
-            'button, span, td, th, table, .p-datepicker-day, .p-datepicker-date, .p-datepicker-calendar, .p-datepicker-calendar-container, .p-datepicker-prev-button, .p-datepicker-next-button, .p-datepicker-increment-button, .p-datepicker-decrement-button'
-          )
-          .forEach((element) => {
-            element.style.pointerEvents = 'auto';
-          });
-
-        panel
-          .querySelectorAll<HTMLElement>('.p-disabled, [disabled], td.p-disabled, .p-datepicker-day.p-disabled, .p-datepicker-date.p-disabled')
-          .forEach((element) => {
-            element.style.pointerEvents = 'none';
-          });
       });
     }, 0);
   }
@@ -449,15 +440,15 @@ export class DashBoard implements OnInit, OnDestroy {
 
   onPickerActionPress(
     event: Event,
-    action: 'now' | 'clear' | 'nowNotice' | 'clearNotice',
+    action: 'confirm' | 'clear' | 'confirmNotice' | 'clearNotice',
     field: 'eventAt' | 'removeAt' | null,
     picker?: DatePickerHandle | null
   ): void {
     event.preventDefault();
     event.stopPropagation();
 
-    if (action === 'now' && field) {
-      this.setEventDateNow(field, picker);
+    if (action === 'confirm' && field) {
+      this.closeDatePicker(picker);
       return;
     }
 
@@ -466,8 +457,8 @@ export class DashBoard implements OnInit, OnDestroy {
       return;
     }
 
-    if (action === 'nowNotice') {
-      this.setUnpublishNoticeNow(picker);
+    if (action === 'confirmNotice') {
+      this.closeDatePicker(picker);
       return;
     }
 
@@ -715,6 +706,8 @@ export class DashBoard implements OnInit, OnDestroy {
 
   private syncFormsWithScope(): void {
     const cfg = this.currentScopeConfig();
+    this.eventTargetScope = this.scopeFamily;
+    this.annTargetScope = this.scopeFamily;
 
     this.eventForm = {
       ...this.eventForm,
@@ -727,6 +720,49 @@ export class DashBoard implements OnInit, OnDestroy {
       targetFamily: cfg.targetFamily,
       targetAudience: cfg.targetAudience
     };
+  }
+
+  private scopeValueFromTarget(targetFamily: unknown, targetAudience: unknown): string {
+    const family = String(targetFamily || '').trim();
+    const audience = String(targetAudience || 'EVERYONE').trim().toUpperCase();
+
+    if (this.isAtLeast('AMIN_KHEDMA')) {
+      if (audience === 'SERVANTS_ONLY') return 'ALL_SERVANTS';
+      if (!family || family.toUpperCase() === 'ALL') return 'ALL_USERS';
+      return `FAMILY::${family}`;
+    }
+
+    if (audience === 'SERVANTS_ONLY') return 'FAMILY_SERVANTS';
+    if (!family || family.toUpperCase() === 'ALL') return 'FAMILY_ALL';
+    return 'FAMILY_MEMBERS';
+  }
+
+  private applyTargetScope(kind: 'event' | 'announcement'): void {
+    const scope = kind === 'event' ? this.eventTargetScope : this.annTargetScope;
+    const cfg = this.currentScopeConfig(scope);
+
+    if (kind === 'event') {
+      this.eventForm = {
+        ...this.eventForm,
+        targetFamily: cfg.targetFamily,
+        targetAudience: cfg.targetAudience
+      };
+      return;
+    }
+
+    this.annForm = {
+      ...this.annForm,
+      targetFamily: cfg.targetFamily,
+      targetAudience: cfg.targetAudience
+    };
+  }
+
+  onEventTargetScopeChange(): void {
+    this.applyTargetScope('event');
+  }
+
+  onAnnouncementTargetScopeChange(): void {
+    this.applyTargetScope('announcement');
   }
 
   private ensureScopeValue(): void {
@@ -1230,6 +1266,7 @@ export class DashBoard implements OnInit, OnDestroy {
 
   openCreateEvent(): void {
     const cfg = this.currentScopeConfig();
+    this.eventTargetScope = this.scopeFamily;
     this.eventForm = {
       id: null,
       title: '',
@@ -1248,6 +1285,7 @@ export class DashBoard implements OnInit, OnDestroy {
 
   openEditEvent(e: EventView): void {
     const cfg = this.currentScopeConfig();
+    this.eventTargetScope = this.scopeValueFromTarget(e?.targetFamily || cfg.targetFamily, e?.targetAudience || cfg.targetAudience);
     this.eventForm = {
       id: e?.id ?? null,
       title: e?.title || '',
@@ -1295,6 +1333,12 @@ export class DashBoard implements OnInit, OnDestroy {
     this.selectedEventImageName = file.name;
   }
 
+  clearSelectedEventImage(input?: HTMLInputElement | null): void {
+    this.selectedEventImageFile = null;
+    this.selectedEventImageName = '';
+    if (input) input.value = '';
+  }
+
   private uploadSelectedEventImage(eventId: number, afterDone: () => void): void {
     if (!this.selectedEventImageFile) {
       afterDone();
@@ -1311,6 +1355,7 @@ export class DashBoard implements OnInit, OnDestroy {
   }
 
   saveEvent(): void {
+    this.applyTargetScope('event');
     const cfg = this.currentScopeConfig();
     const payload = {
       title: String(this.eventForm?.title || '').trim(),
@@ -1527,6 +1572,7 @@ export class DashBoard implements OnInit, OnDestroy {
 
   openCreateAnnouncement(): void {
     const cfg = this.currentScopeConfig();
+    this.annTargetScope = this.scopeFamily;
     this.annForm = {
       id: null,
       title: '',
@@ -1539,6 +1585,7 @@ export class DashBoard implements OnInit, OnDestroy {
 
   openEditAnnouncement(a: AnnouncementView): void {
     const cfg = this.currentScopeConfig();
+    this.annTargetScope = this.scopeValueFromTarget(a?.targetFamily || cfg.targetFamily, a?.targetAudience || cfg.targetAudience);
     this.annForm = {
       id: a?.id ?? null,
       title: a?.title || '',
@@ -1550,6 +1597,7 @@ export class DashBoard implements OnInit, OnDestroy {
   }
 
   saveAnnouncement(): void {
+    this.applyTargetScope('announcement');
     const cfg = this.currentScopeConfig();
     const payload = {
       title: String(this.annForm?.title || '').trim(),

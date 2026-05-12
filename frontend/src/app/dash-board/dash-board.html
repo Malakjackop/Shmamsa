@@ -260,7 +260,7 @@
 
   <!-- Dialogs زي ما هم عندك (ما غيرتهمش) -->
   <!-- Event Dialog -->
-  <p-dialog [(visible)]="showEventDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog event-dialog" header="إضافة/تعديل موعد">
+  <p-dialog [(visible)]="showEventDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog event-dialog" [header]="eventDialogTitle">
     <div style="display:flex; flex-direction:column; gap:10px;">
       <label>العنوان</label>
       <input pInputText [(ngModel)]="eventForm.title" />
@@ -276,11 +276,12 @@
         [showTime]="true"
         hourFormat="12"
         [minDate]="todayCalendarMinDate"
-        dateFormat="yy-mm-dd"
-        placeholder="اختار اليوم والساعة"
+        dateFormat="dd/mm/yy"
         [showButtonBar]="true"
+        [hideOnDateTimeSelect]="false"
         [autoZIndex]="true"
         [baseZIndex]="12000"
+        [focusTrap]="false"
         styleClass="dashboard-date-input"
         inputStyleClass="dashboard-date-input__field"
         panelStyleClass="dashboardDatePanel"
@@ -289,11 +290,11 @@
       >
         <ng-template pTemplate="buttonbar">
           <div class="dashboard-picker-actions">
-            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost" (pointerdown)="onPickerActionPress($event, 'clear', 'eventAt', eventAtPicker)" (click)="onPickerActionClick($event)">
-              امسح
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost dashboard-picker-btn--icon" aria-label="مسح الاختيار" title="مسح الاختيار" (pointerdown)="onPickerActionPress($event, 'clear', 'eventAt', eventAtPicker)" (click)="onPickerActionClick($event)">
+              <i class="pi pi-times"></i>
             </button>
-            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary" (pointerdown)="onPickerActionPress($event, 'now', 'eventAt', eventAtPicker)" (click)="onPickerActionClick($event)">
-              الآن
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary dashboard-picker-btn--icon" aria-label="تأكيد الاختيار" title="تأكيد الاختيار" (pointerdown)="onPickerActionPress($event, 'confirm', 'eventAt', eventAtPicker)" (click)="onPickerActionClick($event)">
+              <i class="pi pi-check"></i>
             </button>
           </div>
         </ng-template>
@@ -307,11 +308,12 @@
         [showTime]="true"
         hourFormat="12"
         [minDate]="removeCalendarMinDate"
-        dateFormat="yy-mm-dd"
-        placeholder="اختار تاريخ ووقت الإزالة"
+        dateFormat="dd/mm/yy"
         [showButtonBar]="true"
+        [hideOnDateTimeSelect]="false"
         [autoZIndex]="true"
         [baseZIndex]="12000"
+        [focusTrap]="false"
         styleClass="dashboard-date-input"
         inputStyleClass="dashboard-date-input__field"
         panelStyleClass="dashboardDatePanel"
@@ -320,11 +322,11 @@
       >
         <ng-template pTemplate="buttonbar">
           <div class="dashboard-picker-actions">
-            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost" (pointerdown)="onPickerActionPress($event, 'clear', 'removeAt', removeAtPicker)" (click)="onPickerActionClick($event)">
-              امسح
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost dashboard-picker-btn--icon" aria-label="مسح الاختيار" title="مسح الاختيار" (pointerdown)="onPickerActionPress($event, 'clear', 'removeAt', removeAtPicker)" (click)="onPickerActionClick($event)">
+              <i class="pi pi-times"></i>
             </button>
-            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary" (pointerdown)="onPickerActionPress($event, 'now', 'removeAt', removeAtPicker)" (click)="onPickerActionClick($event)">
-              الآن
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary dashboard-picker-btn--icon" aria-label="تأكيد الاختيار" title="تأكيد الاختيار" (pointerdown)="onPickerActionPress($event, 'confirm', 'removeAt', removeAtPicker)" (click)="onPickerActionClick($event)">
+              <i class="pi pi-check"></i>
             </button>
           </div>
         </ng-template>
@@ -344,16 +346,37 @@
 
       <label>صورة السلايدر (اختياري)</label>
       <div class="image-upload-row">
-        <input type="file" accept="image/*" (change)="onEventImageSelected($event)" />
-        <small *ngIf="selectedEventImageName">{{ selectedEventImageName }}</small>
+        <input #eventImageInput class="image-upload-input" type="file" accept="image/*" (change)="onEventImageSelected($event)" />
+        <div class="image-upload-control">
+          <div class="image-upload-name">{{ selectedEventImageName || '' }}</div>
+          <button
+            *ngIf="selectedEventImageName"
+            type="button"
+            class="image-upload-clear"
+            aria-label="حذف الصورة المختارة"
+            title="حذف الصورة"
+            (click)="clearSelectedEventImage(eventImageInput)"
+          >
+            ×
+          </button>
+          <button type="button" class="image-upload-button" (click)="eventImageInput.click()">رفع الصورة</button>
+        </div>
         <img *ngIf="eventForm.imageUrl && !selectedEventImageFile" [src]="eventForm.imageUrl" alt="صورة الموعد الحالية" />
       </div>
 
       <ng-container *ngIf="showTargetPreview">
         <label>هينزل لمين؟</label>
-        <div class="target-preview">
-          {{ targetLabelFromData(eventForm.targetFamily, eventForm.targetAudience) }}
-        </div>
+        <p-select
+          [options]="scopeOptions"
+          [(ngModel)]="eventTargetScope"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="اختار الأسرة"
+          scrollHeight="260px"
+          panelStyleClass="target-scope-panel"
+          class="target-scope-select"
+          (onChange)="onEventTargetScopeChange()"
+        ></p-select>
       </ng-container>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
@@ -374,7 +397,7 @@
       </div>
 
       <div *ngIf="selectedJoinEvent.description && selectedJoinEvent.description.trim().length > 0; else noDesc"
-           style="padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:12px;">
+           class="details-description">
         {{ selectedJoinEvent.description }}
       </div>
       <ng-template #noDesc>
@@ -413,11 +436,13 @@
         [showTime]="true"
         hourFormat="12"
         [minDate]="todayCalendarMinDate"
-        dateFormat="yy-mm-dd"
-        placeholder="اختار آخر وقت لظهور الرسالة"
+        dateFormat="dd/mm/yy"
+        placeholder="اليوم / الشهر / السنة - الساعة"
         [showButtonBar]="true"
+        [hideOnDateTimeSelect]="false"
         [autoZIndex]="true"
         [baseZIndex]="12000"
+        [focusTrap]="false"
         styleClass="dashboard-date-input"
         inputStyleClass="dashboard-date-input__field"
         panelStyleClass="dashboardDatePanel"
@@ -426,11 +451,11 @@
       >
         <ng-template pTemplate="buttonbar">
           <div class="dashboard-picker-actions">
-            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost" (pointerdown)="onPickerActionPress($event, 'clearNotice', null, noticeUntilPicker)" (click)="onPickerActionClick($event)">
-              امسح
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--ghost dashboard-picker-btn--icon" aria-label="مسح الاختيار" title="مسح الاختيار" (pointerdown)="onPickerActionPress($event, 'clearNotice', null, noticeUntilPicker)" (click)="onPickerActionClick($event)">
+              <i class="pi pi-times"></i>
             </button>
-            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary" (pointerdown)="onPickerActionPress($event, 'nowNotice', null, noticeUntilPicker)" (click)="onPickerActionClick($event)">
-              الآن
+            <button type="button" class="dashboard-picker-btn dashboard-picker-btn--primary dashboard-picker-btn--icon" aria-label="تأكيد الاختيار" title="تأكيد الاختيار" (pointerdown)="onPickerActionPress($event, 'confirmNotice', null, noticeUntilPicker)" (click)="onPickerActionClick($event)">
+              <i class="pi pi-check"></i>
             </button>
           </div>
         </ng-template>
@@ -481,9 +506,17 @@
 
       <ng-container *ngIf="showTargetPreview">
         <label>هينزل لمين؟</label>
-        <div class="target-preview">
-          {{ targetLabelFromData(annForm.targetFamily, annForm.targetAudience) }}
-        </div>
+        <p-select
+          [options]="scopeOptions"
+          [(ngModel)]="annTargetScope"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="اختار الأسرة"
+          scrollHeight="260px"
+          panelStyleClass="target-scope-panel"
+          class="target-scope-select"
+          (onChange)="onAnnouncementTargetScopeChange()"
+        ></p-select>
       </ng-container>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
@@ -500,7 +533,7 @@
       <div style="opacity:.8; margin-bottom:8px;">{{ daysAgo(selectedAnn.createdAt) }} • {{ targetLabel(selectedAnn) }}</div>
 
       <div *ngIf="selectedAnn.description && selectedAnn.description.trim().length > 0; else noAnnDesc"
-           style="padding:10px; border:1px solid #ddd; border-radius:8px;">
+           class="details-description">
         {{ selectedAnn.description }}
       </div>
 
