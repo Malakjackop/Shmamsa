@@ -599,7 +599,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   openGrantsPopup(): void {
+    this.grantSearchText = '';
+    this.grantsFilterFamily = '';
+    this.grantPopupFilter = 'ALL';
     this.grantPopupVisible = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      });
+    });
   }
 
   closeGrantsPopup(): void {
@@ -2730,7 +2740,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (!target) return;
     const nextValue = this.normalizeGrantDateValue(value);
     const currentEndOffset = this.grantWindowEndOffset(target);
-    target.endsAt = this.grantPermanentEnabled && nextValue
+    target.endsAt = !this.grantPermanentEnabled && nextValue
       ? this.dateForRelativeOffset(target.startsAt || this.nextMatchingWeekday(day, new Date()), currentEndOffset, nextValue)
       : nextValue;
     if (this.grantSelectedWeekday === day) {
@@ -2796,7 +2806,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const base = target.startsAt || this.nextMatchingWeekday(day, now);
     const next = new Date(base);
     next.setHours(now.getHours(), now.getMinutes(), 0, 0);
-    this.onGrantWindowStartChange(day, this.grantPermanentEnabled ? next : now);
+    this.onGrantWindowStartChange(day, !this.grantPermanentEnabled ? next : now);
   }
 
   setGrantWindowEndNow(day: number): void {
@@ -2806,7 +2816,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const base = target.endsAt || target.startsAt || this.nextMatchingWeekday(day, now);
     const next = new Date(base);
     next.setHours(now.getHours(), now.getMinutes(), 0, 0);
-    this.onGrantWindowEndChange(day, this.grantPermanentEnabled ? next : now);
+    this.onGrantWindowEndChange(day, !this.grantPermanentEnabled ? next : now);
   }
 
   private dateForRelativeWeekday(start: Date, targetDay: number, timeSource: Date): Date {
@@ -3230,7 +3240,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.refreshGrantTargetLists();
   }
 
-  private resetPermanentGrantOptions(permanentByDefault = true): void {
+  private resetPermanentGrantOptions(permanentByDefault = false): void {
     this.grantPermanentEnabled = permanentByDefault;
     this.grantPermanentFromDate = null;
     this.grantPermanentToDate = null;
@@ -3256,13 +3266,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return dates[dates.length - 1] || null;
   }
 
-  onGrantOneTimeToggle(enabled: boolean): void {
-    if (this.grantDialogMode !== 'create') {
-      this.grantPermanentEnabled = this.isEditingRecurringGrant();
-      return;
+  selectGrantPermanentMode(mode: boolean): void {
+    this.grantPermanentEnabled = mode;
+    if (mode) {
+      this.grantPermanentFromDate = null;
+      this.grantPermanentToDate = null;
+      this.grantDayWindows = [];
+      this.grantSelectedWeekday = null;
+      this.grantStartsAtDate = null;
+      this.grantEndsAtDate = null;
+    } else {
+      this.syncGrantDatesForSelection(true);
     }
-    this.grantPermanentEnabled = !enabled;
-    this.syncGrantDatesForSelection(true);
   }
 
   private combineDateWithTime(datePart: Date, timeSource: Date | null | undefined): Date {
@@ -3277,7 +3292,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private buildPermanentGrantWindows(baseWindow: GrantDayWindow): GrantDayWindow[] {
-    if (!this.grantPermanentEnabled) return [baseWindow];
+    if (this.grantPermanentEnabled) return [baseWindow];
     const rangeStart = this.normalizeGrantDateValue(this.grantPermanentFromDate);
     const rangeEnd = this.normalizeGrantDateValue(this.grantPermanentToDate);
     if (!rangeStart || !rangeEnd) return [];
@@ -3316,7 +3331,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private permanentGrantSummaryText(windows: GrantDayWindow[], targetCount: number): string {
     if (!windows.length) return 'لم يتم إنشاء أي تخصيص.';
-    if (!this.grantPermanentEnabled) return `تم حفظ التخصيص غير الدائم بنجاح ليوم ${this.dayLabel(windows[0].day)}`;
     return `تم حفظ ${windows.length} ميعاد متكرر لـ ${targetCount} شخص`;
   }
 
@@ -3498,7 +3512,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.selectedGrantTargetIds = [];
     this.grantTargetSearch = '';
     this.grantSavedSummaries = [];
-    this.resetPermanentGrantOptions(true);
+    this.resetPermanentGrantOptions(false);
     this.refreshGrantTargetLists();
     this.grantFamilySelections = this.grantForm.familyBase ? [this.grantForm.familyBase] : [];
     this.syncGrantFamilyFormFromSelections();
@@ -3518,7 +3532,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.lastGrantAudience = this.grantAudience;
     this.selectedGrantTargetIds = [];
     this.grantTargetSearch = '';
-    this.resetPermanentGrantOptions(true);
+    this.resetPermanentGrantOptions(false);
     this.refreshGrantTargetLists();
     this.grantFamilySelections = this.grantForm.familyBase ? [this.grantForm.familyBase] : [];
     this.syncGrantFamilyFormFromSelections();
@@ -3558,8 +3572,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.selectedGrantTargetIds = group.grants.map((item) => Number(item.targetUserId || 0)).filter(Boolean);
     this.grantTargetSearch = '';
     this.grantSavedSummaries = [];
-    this.resetPermanentGrantOptions(group.grants.length > 1);
-    if (group.grants.length > 1) {
+    const hasWideRange = group.grants.some((g) => {
+      const s = new Date(g.startsAt);
+      const e = new Date(g.endsAt);
+      return !Number.isNaN(s.getTime()) && s.getFullYear() <= 2000 && !Number.isNaN(e.getTime()) && e.getFullYear() >= 2080;
+    });
+    this.resetPermanentGrantOptions(hasWideRange);
+    if (group.grants.length > 1 && !hasWideRange) {
       this.grantPermanentFromDate = this.minGrantStartDate(group.grants);
       this.grantPermanentToDate = this.maxGrantEndDate(group.grants);
     }
@@ -3592,6 +3611,79 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختر مناسبة واحدة على الأقل' });
       return;
     }
+
+    const basePayload = {
+      ...this.grantForm,
+      grantKind: this.grantKindFromAudience((this.grantForm.allowedTypes || []).includes('CUSTOM_EVENT') ? 'SERVANTS' : this.grantAudience),
+      familyBase: this.canChooseGrantFamily()
+        ? (this.grantForm.familyBase || undefined)
+        : (this.defaultGrantScopeFamily() || undefined)
+    };
+
+    const editingRecurringGrant = this.isEditingRecurringGrant();
+
+    // ---- PERMANENT MODE ----
+    if (this.grantPermanentEnabled) {
+      const permanentStartsAt = '2000-01-01T00:00';
+      const permanentEndsAt = '2099-12-31T23:59';
+
+      if (this.grantDialogMode === 'edit') {
+        const selectedIds = new Set(this.selectedGrantTargetIds.map((id) => Number(id || 0)).filter(Boolean));
+        const requests = this.knownAccessGrants()
+          .filter((grant) => this.editingGrantGroupIds.includes(Number(grant.id || 0)))
+          .map((grant) => this.attendance.updateAccessGrant(Number(grant.id), {
+            ...basePayload,
+            targetUserId: Number(grant.targetUserId || 0),
+            dayOfWeek: this.grantSelectedWeekday ?? 5,
+            note: basePayload.note || '',
+            startsAt: permanentStartsAt,
+            endsAt: permanentEndsAt
+          }));
+        forkJoin(requests).subscribe({
+          next: () => {
+            this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ التعديلات' });
+            this.loadAccessGrants();
+            this.cancelGrantEdit();
+            if (closeAfterSave) this.grantDialogVisible = false;
+          },
+          error: (err) => this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل الحفظ' })
+        });
+        return;
+      }
+
+      const createRequests = this.selectedGrantTargetIds.map((targetUserId) => {
+        const payload = {
+          ...basePayload,
+          targetUserId,
+          dayOfWeek: this.grantSelectedWeekday ?? 5,
+          note: basePayload.note || '',
+          startsAt: permanentStartsAt,
+          endsAt: permanentEndsAt
+        };
+        return this.attendance.createAccessGrant(payload);
+      });
+
+      forkJoin(createRequests).subscribe({
+        next: () => {
+          this.message.add({
+            severity: 'success',
+            summary: 'تم',
+            detail: `تم حفظ التخصيص الدائم لـ ${this.selectedGrantTargetIds.length} شخص`
+          });
+          this.grantForm.note = '';
+          this.selectedGrantTargetIds = [];
+          this.refreshGrantTargetLists();
+          this.loadAccessGrants();
+          if (closeAfterSave) this.grantDialogVisible = false;
+        },
+        error: (err) => {
+          this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل الحفظ' });
+        }
+      });
+      return;
+    }
+
+    // ---- TEMPORARY MODE ----
     const selectedWindow = this.selectedGrantWindowValue
       || (this.grantSelectedWeekday !== null ? this.buildGrantWindow(this.grantSelectedWeekday, this.grantStartsAtDate, this.grantEndsAtDate) : null);
     const baseWindows = selectedWindow && selectedWindow.startsAt && selectedWindow.endsAt ? [selectedWindow] : [];
@@ -3601,24 +3693,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const editingRecurringGrant = this.isEditingRecurringGrant();
-
-    if (this.grantPermanentEnabled && this.grantDialogMode !== 'create' && !editingRecurringGrant) {
-      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'التخصيص الدائم متاح عند إنشاء تخصيص جديد فقط.' });
+    if (this.grantDialogMode === 'create' && (!this.grantPermanentFromDate || !this.grantPermanentToDate)) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد فترة تشغيل التخصيص المؤقت من وإلى.' });
       return;
     }
 
-    if (this.grantPermanentEnabled && this.grantDialogMode === 'create' && (!this.grantPermanentFromDate || !this.grantPermanentToDate)) {
-      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد فترة تشغيل التخصيص الدائم من وإلى.' });
-      return;
-    }
-
-    if (this.grantPermanentEnabled && this.grantDialogMode === 'create' && (this.isBeforeToday(this.grantPermanentFromDate) || this.isBeforeToday(this.grantPermanentToDate))) {
+    if (this.grantDialogMode === 'create' && (this.isBeforeToday(this.grantPermanentFromDate) || this.isBeforeToday(this.grantPermanentToDate))) {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن اختيار أيام سابقة في فترة التخصيص.' });
       return;
     }
 
-    const windows = this.grantPermanentEnabled && this.grantDialogMode === 'create'
+    const windows = this.grantDialogMode === 'create'
       ? this.buildPermanentGrantWindows(baseWindows[0])
       : baseWindows;
 
@@ -3641,14 +3726,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const basePayload = {
-      ...this.grantForm,
-      grantKind: this.grantKindFromAudience((this.grantForm.allowedTypes || []).includes('CUSTOM_EVENT') ? 'SERVANTS' : this.grantAudience),
-      familyBase: this.canChooseGrantFamily()
-        ? (this.grantForm.familyBase || undefined)
-        : (this.defaultGrantScopeFamily() || undefined)
-    };
-
     const handleSuccess = (savedGrants: AttendanceAccessGrant[] = []) => {
       this.message.add({
         severity: 'success',
@@ -3656,8 +3733,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         detail: this.permanentGrantSummaryText(windows, this.selectedGrantTargetIds.length)
       });
       this.recordSavedGrantSummaries(windows, savedGrants);
-      this.grantForm.note = '';
       this.loadAccessGrants();
+      if (this.grantDialogMode === 'edit') {
+        this.cancelGrantEdit();
+      } else {
+        this.grantForm.note = '';
+        this.selectedGrantTargetIds = [];
+        this.refreshGrantTargetLists();
+      }
       if (closeAfterSave) {
         this.grantDialogVisible = false;
       }
@@ -3814,6 +3897,30 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       notes: schedule.notesText ? [schedule.notesText] : []
     };
     this.deleteGrantGroup(group);
+  }
+
+  deletePersonGrantGroup(personGroup: PersonGrantGroup): void {
+    const ids = personGroup.grants
+      .map((grant) => Number(grant.id || 0))
+      .filter(Boolean);
+    if (!ids.length) return;
+    forkJoin(ids.map((id) => this.attendance.deleteAccessGrant(id))).subscribe({
+      next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف التخصيصات' });
+        this.selectedGrantPersonKeys = this.selectedGrantPersonKeys.filter((k) => k !== personGroup.key);
+        this.loadAccessGrants();
+      },
+      error: (err) => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل حذف التخصيصات' });
+      }
+    });
+  }
+
+  editPersonGrantGroup(personGroup: PersonGrantGroup): void {
+    const schedule = personGroup.schedules[0];
+    if (!schedule) return;
+    this.grantPopupVisible = false;
+    this.openEditGrantGroup(schedule.editGroup);
   }
 
   editSavedGrant(item: GrantSavedSummary): void {

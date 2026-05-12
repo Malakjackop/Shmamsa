@@ -138,6 +138,12 @@ host {
   margin-bottom: 12px;
 }
 
+.side-divider {
+  border: none;
+  border-top: 1px solid #ececec;
+  margin: 14px 0;
+}
+
 .field-label {
   display: block;
   font-weight: 700;
@@ -738,7 +744,8 @@ textarea {
 }
 
 .grant-list--popup {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .grant-card {
@@ -751,12 +758,52 @@ textarea {
 .grant-person-card {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.grant-person-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
 }
 
-.grant-person-card.is-selected {
-  border-color: #9a4b35;
-  box-shadow: 0 0 0 2px rgba(122, 61, 45, 0.12);
+.grant-person-card__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.grant-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: #f3f0ee;
+  color: #5e2b20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.grant-icon-btn > i {
+  pointer-events: none;
+}
+
+.grant-icon-btn:hover {
+  background: #e8dfd9;
+  transform: translateY(-1px);
+}
+
+.grant-icon-btn.danger {
+  background: #fff0f0;
+  color: #a73232;
+}
+
+.grant-icon-btn.danger:hover {
+  background: #ffe0e0;
 }
 
 .grant-card__top {
@@ -825,7 +872,7 @@ textarea {
 .grant-meta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   color: #3f332e;
   font-size: 13px;
 }
@@ -853,25 +900,23 @@ textarea {
 }
 
 .person-grant-schedules {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .person-grant-schedule {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #efe3dc;
-  border-radius: 12px;
-  background: #fffaf7;
+  gap: 8px;
+  padding: 4px 0;
+  background: transparent;
 }
 
 .person-grant-schedule__main {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -879,35 +924,16 @@ textarea {
 .person-grant-schedule__title {
   color: #5c3427;
   font-weight: 900;
+  font-size: 13px;
 }
 
 .person-grant-schedule__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 4px 12px;
   color: #57463f;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.person-grant-schedule__actions {
-  flex: 0 1 190px;
-  justify-content: flex-end;
-  margin-top: 0;
-}
-
-.person-grant-schedule__edit {
-  min-height: 44px;
-}
-
-.grant-dialog-existing .person-grant-schedule {
-  flex-direction: column;
-}
-
-.grant-dialog-existing .person-grant-schedule__actions {
-  width: 100%;
-  flex-basis: auto;
-  justify-content: flex-start;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .grant-popup-backdrop {
@@ -922,7 +948,7 @@ textarea {
 }
 
 .grant-popup {
-  width: min(980px, 100%);
+  width: min(720px, 100%);
   max-height: min(84vh, 920px);
   display: flex;
   flex-direction: column;
@@ -1152,10 +1178,6 @@ textarea {
 
 .form-group.full-width {
   width: 100%;
-}
-
-.checkbox-wrap {
-  justify-content: flex-end;
 }
 
 .checkbox-label {
@@ -1705,46 +1727,234 @@ textarea {
   width: 100%;
 }
 
-::ng-deep .attendanceGrantDatePanel {
+::ng-deep .attendanceGrantDatePanel,
+::ng-deep .attendanceGrantDatePanel.p-datepicker,
+::ng-deep .attendanceGrantDatePanel.p-datepicker-panel {
+  width: min(420px, calc(100vw - 28px)) !important;
+  max-width: calc(100vw - 28px) !important;
+  border: 1px solid #e7dad3 !important;
+  border-radius: 16px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  overflow: hidden !important;
+  box-shadow: 0 18px 45px rgba(39, 18, 13, 0.22) !important;
   direction: rtl;
   z-index: 20000 !important;
   pointer-events: auto;
-  min-width: 380px;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-group-container {
-  min-width: 360px;
+::ng-deep .attendanceGrantDatePanel .p-datepicker,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-panel,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-group,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-calendar-container,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-calendar,
+::ng-deep .attendanceGrantDatePanel table,
+::ng-deep .attendanceGrantDatePanel tbody,
+::ng-deep .attendanceGrantDatePanel tr,
+::ng-deep .attendanceGrantDatePanel td,
+::ng-deep .attendanceGrantDatePanel th {
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-calendar {
-  width: 100%;
+::ng-deep .attendanceGrantDatePanel .p-datepicker-header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-month {
-  white-space: nowrap;
-  min-width: 100px;
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button {
+  grid-column: 3;
+  justify-self: end;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-monthpicker .p-datepicker-month {
-  width: auto;
-  padding: 8px 12px;
-  min-width: 110px;
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button {
+  grid-column: 1;
+  justify-self: start;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-title,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-month,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-year,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-month-view,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-year-view,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-decade,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-month,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-year {
+  color: #5e2b20 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-title {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-title button,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-month,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-year {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-title button:hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-title button:focus,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-month:hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-month:focus,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-year:hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-select-year:focus {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+  box-shadow: none !important;
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button,
-::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button {
-  pointer-events: auto;
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next {
+  width: 36px !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+  box-shadow: none !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button:hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button:hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev:hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next:hover {
+  background: #efe1da !important;
+  color: #6d3326 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button .p-button-icon,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button .pi,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button .p-icon,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button svg,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button .p-button-icon,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button .pi,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button .p-icon,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button svg {
+  transform: scaleX(-1) !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-weekday,
+::ng-deep .attendanceGrantDatePanel th,
+::ng-deep .attendanceGrantDatePanel thead th,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-weekheader {
+  color: #8d5144 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-day,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-date,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-month,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-year,
+::ng-deep .attendanceGrantDatePanel td > span,
+::ng-deep .attendanceGrantDatePanel td > button {
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
   cursor: pointer;
-  position: relative;
-  z-index: 1;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-clear-button {
-  display: none;
+::ng-deep .attendanceGrantDatePanel .p-datepicker-day,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-date,
+::ng-deep .attendanceGrantDatePanel td > span,
+::ng-deep .attendanceGrantDatePanel td > button {
+  border-radius: 50% !important;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-buttonbar {
-  justify-content: flex-start;
+::ng-deep .attendanceGrantDatePanel .p-datepicker-day:not(.p-disabled):not(.p-datepicker-day-selected):hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-date:not(.p-disabled):not(.p-highlight):hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-month:not(.p-disabled):not(.p-datepicker-month-selected):hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-year:not(.p-disabled):not(.p-datepicker-year-selected):hover,
+::ng-deep .attendanceGrantDatePanel td > span:not(.p-disabled):not(.p-highlight):hover,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-day:not(.p-disabled):focus {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+  box-shadow: none !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-day-selected,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-date.p-highlight,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-month-selected,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-year-selected,
+::ng-deep .attendanceGrantDatePanel td > span.p-highlight {
+  background: #8d5144 !important;
+  color: #ffffff !important;
+  border-color: #8d5144 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel td.p-datepicker-today > span:not(.p-datepicker-day-selected):not(.p-highlight),
+::ng-deep .attendanceGrantDatePanel td.p-datepicker-today > button:not(.p-datepicker-day-selected):not(.p-highlight) {
+  border: 1px solid #d9c2b8 !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-disabled,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-other-month,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-other-month .p-datepicker-day,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-other-month span,
+::ng-deep .attendanceGrantDatePanel td.p-disabled > span,
+::ng-deep .attendanceGrantDatePanel td.p-disabled > button {
+  color: #b08f84 !important;
+  opacity: 0.72 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-time-picker,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-timepicker {
+  direction: rtl;
+  padding: 12px 16px !important;
+  border-top: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-hour-picker,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-minute-picker,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-ampm-picker,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-ampm,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-separator {
+  color: #5e2b20 !important;
+  font-weight: 800 !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-increment-button,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-decrement-button,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-time-picker button,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-timepicker button {
+  color: #8d5144 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-buttonbar,
+::ng-deep .attendanceGrantDatePanel .p-datepicker-button-bar {
+  padding: 12px 14px !important;
+  border-top: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
 }
 
 @media (max-width: 1100px) {

@@ -104,62 +104,57 @@
           </div>
         </div>
 
-        <div class="side-card" *ngIf="canManageAccessGrants()">
-          <div class="side-title">تخصيصات الحضور</div>
-          <button type="button" class="action-btn" (click)="openCreateGrant()" [disabled]="!selectedFamily">
+        <div class="side-card" *ngIf="canManageAccessGrants() || canUseCustomEvent()">
+          <div class="side-title">الإعدادات</div>
+
+          <button type="button" class="action-btn" (click)="openCreateGrant()" [disabled]="!selectedFamily" *ngIf="canManageAccessGrants()">
             <i class="pi pi-plus"></i>
-            إضافة تخصيص جديد
+            إدارة التخصيصات
           </button>
-          <button type="button" class="action-btn secondary attendance-side-btn" (click)="openGrantsPopup()">
-            <i class="pi pi-eye"></i>
-            عرض التخصيصات الحالية
-          </button>
-          <div class="grant-summary-card grant-summary-card--side">
-            <div class="grant-summary-card__count">{{ personGrantGroupCount() }}</div>
-            <div class="grant-summary-card__text">تخصيص محفوظ</div>
-          </div>
-          <p class="side-hint" *ngIf="!selectedFamily">اختار أسرة أولاً عشان تختار الأشخاص المستهدفين.</p>
-        </div>
 
-        <div class="side-card" *ngIf="canUseCustomEvent()">
-          <div class="side-title"> المناسبات</div>
-          <button type="button" class="action-btn" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily && !isAminKhedmaOrDeveloper()">
-            <i class="pi pi-calendar-plus"></i>
-          ادارة المناسبات
-          </button>
-          <p class="side-hint" *ngIf="!selectedFamily && !isAminKhedmaOrDeveloper()">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة لها.</p>
+          <p class="side-hint" *ngIf="!selectedFamily && canManageAccessGrants()">اختار أسرة أولاً عشان تختار الأشخاص المستهدفين.</p>
 
-          <div class="custom-event-list" *ngIf="displayCustomEventGroups.length; else noCustomEvents">
-            <div class="custom-event-card" *ngFor="let group of displayCustomEventPreviewGroups; trackBy: trackCustomEventGroup">
-              <div class="custom-event-card__top">
-                <div>
-                  <div class="custom-event-card__title">{{ group.first.title }}</div>
-                  <div class="custom-event-card__meta">
-                    {{ customEventScopeLabel(group.first) }} • {{ customEventGroupDaysLabel(group) }} • {{ customEventDisplayRange(group.first) }}
+          <ng-container *ngIf="canUseCustomEvent()">
+            <hr class="side-divider" *ngIf="canManageAccessGrants()">
+
+            <button type="button" class="action-btn" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily && !isAminKhedmaOrDeveloper()">
+              <i class="pi pi-calendar-plus"></i>
+              ادارة المناسبات
+            </button>
+            <p class="side-hint" *ngIf="!selectedFamily && !isAminKhedmaOrDeveloper()">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة لها.</p>
+
+            <div class="custom-event-list" *ngIf="displayCustomEventGroups.length; else noCustomEvents">
+              <div class="custom-event-card" *ngFor="let group of displayCustomEventPreviewGroups; trackBy: trackCustomEventGroup">
+                <div class="custom-event-card__top">
+                  <div>
+                    <div class="custom-event-card__title">{{ group.first.title }}</div>
+                    <div class="custom-event-card__meta">
+                      {{ customEventScopeLabel(group.first) }} • {{ customEventGroupDaysLabel(group) }} • {{ customEventDisplayRange(group.first) }}
+                    </div>
+                    <div class="custom-event-card__meta" *ngIf="customEventPermittedEditorsSummary(group.first)">
+                      مسموح بالتعديل: {{ customEventPermittedEditorsSummary(group.first) }}
+                    </div>
                   </div>
-                  <div class="custom-event-card__meta" *ngIf="customEventPermittedEditorsSummary(group.first)">
-                    مسموح بالتعديل: {{ customEventPermittedEditorsSummary(group.first) }}
-                  </div>
+                  <span class="grant-enabled" [class.off]="!group.enabled" [class.pending]="!group.enabled">
+                    {{ group.enabled ? 'مفعلة' : 'pending' }}
+                  </span>
                 </div>
-                <span class="grant-enabled" [class.off]="!group.enabled" [class.pending]="!group.enabled">
-                  {{ group.enabled ? 'مفعلة' : 'pending' }}
-                </span>
-              </div>
-              <div class="grant-actions" *ngIf="canEditCustomEventGroup(group)">
-                <button type="button" class="mini-btn" (click)="openEditCustomEventGroup(group)">
-                  <i class="pi pi-pencil"></i>
-                  تعديل
-                </button>
-                <button type="button" class="mini-btn danger" (click)="deleteCustomEventGroup(group)">
-                  <i class="pi pi-trash"></i>
-                  حذف
-                </button>
+                <div class="grant-actions" *ngIf="canEditCustomEventGroup(group)">
+                  <button type="button" class="mini-btn" (click)="openEditCustomEventGroup(group)">
+                    <i class="pi pi-pencil"></i>
+                    تعديل
+                  </button>
+                  <button type="button" class="mini-btn danger" (click)="deleteCustomEventGroup(group)">
+                    <i class="pi pi-trash"></i>
+                    حذف
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-          <ng-template #noCustomEvents>
-            <p class="side-hint">لا توجد مناسبات مخصصة محفوظة للأسرة أو الخورس المحدد.</p>
-          </ng-template>
+            <ng-template #noCustomEvents>
+              <p class="side-hint">لا توجد مناسبات مخصصة محفوظة للأسرة أو الخورس المحدد.</p>
+            </ng-template>
+          </ng-container>
         </div>
       </aside>
 
@@ -176,10 +171,13 @@
             <div class="control-field">
               <label>اليوم</label>
               <p-datepicker
+                #attendanceDatePicker
                 [(ngModel)]="selectedDate"
                 (onSelect)="onDateChange()"
                 (onBlur)="onDateChange()"
                 [showIcon]="true"
+                styleClass="attendance-date-input"
+                inputStyleClass="attendance-date-input__field"
                 panelStyleClass="attendanceDatePanel"
                 [disabledDays]="disabledDays"
                 [minDate]="minDate"
@@ -187,7 +185,24 @@
                 [firstDayOfWeek]="firstDayOfWeek"
                 dateFormat="yy-mm-dd"
                 placeholder="اختار يوم التسجيل"
-              ></p-datepicker>
+                [showButtonBar]="true"
+                [hideOnDateTimeSelect]="false"
+              >
+                <ng-template pTemplate="buttonbar">
+                  <div class="attendance-picker-actions">
+                    <button type="button" class="attendance-picker-btn attendance-picker-btn--ghost"
+                      aria-label="مسح" title="مسح"
+                      (click)="attendanceDatePicker.overlayVisible = false; selectedDate = null; onDateChange()">
+                      <i class="pi pi-times"></i>
+                    </button>
+                    <button type="button" class="attendance-picker-btn attendance-picker-btn--primary"
+                      aria-label="تأكيد" title="تأكيد"
+                      (click)="attendanceDatePicker.overlayVisible = false; onDateChange()">
+                      <i class="pi pi-check"></i>
+                    </button>
+                  </div>
+                </ng-template>
+              </p-datepicker>
             </div>
 
             <div class="control-field control-field--actions">
@@ -406,6 +421,8 @@
           </ng-template>
         </div>
 
+
+
         <div class="grant-popup-backdrop" *ngIf="grantPopupVisible" (click)="closeGrantsPopup()">
           <div class="grant-popup" (click)="$event.stopPropagation()">
             <div class="grant-popup__head">
@@ -482,55 +499,18 @@
             <div class="grant-loading" *ngIf="grantsLoading">جارٍ تحميل التخصيصات...</div>
 
             <div class="grant-popup__body" *ngIf="!grantsLoading && filteredPersonGrantGroups.length; else popupNoGrants">
-              <div class="grant-bulk-toolbar">
-                <label class="grant-person-select grant-person-select--all">
-                  <input
-                    type="checkbox"
-                    [checked]="allVisibleGrantPeopleSelected()"
-                    (change)="toggleAllVisibleGrantPeople($any($event.target).checked)"
-                  />
-                  <span>تحديد الكل</span>
-                </label>
-
-                <div class="grant-bulk-toolbar__actions" *ngIf="selectedGrantPersonCount()">
-                  <span>{{ selectedGrantPersonCount() }} محدد</span>
-                  <button type="button" class="action-btn person-grant-schedule__edit" (click)="editSelectedGrantPeople()">
-                    <i class="pi pi-pencil"></i>
-                    تعديل المحدد
-                  </button>
-                  <button type="button" class="mini-btn danger" (click)="deleteSelectedGrantPeople()">
-                    <i class="pi pi-trash"></i>
-                    حذف المحدد
-                  </button>
-                  <button type="button" class="mini-btn" (click)="clearGrantPersonSelection()">
-                    <i class="pi pi-times"></i>
-                    إلغاء التحديد
-                  </button>
-                </div>
-              </div>
-
               <div class="grant-list grant-list--popup">
-                <div class="grant-card grant-person-card" *ngFor="let personGroup of filteredPersonGrantGroups" [class.is-selected]="isGrantPersonSelected(personGroup)">
-                  <div class="grant-card__top">
-                    <div class="grant-card__identity">
-                      <label class="grant-person-select">
-                        <input
-                          type="checkbox"
-                          [checked]="isGrantPersonSelected(personGroup)"
-                          (change)="toggleGrantPersonSelection(personGroup, $any($event.target).checked)"
-                        />
-                        <span class="srOnly">تحديد {{ personGroup.targetName || 'بدون اسم' }}</span>
-                      </label>
-                      <div>
-                        <div class="grant-kind">{{ personGroup.kindLabel }}</div>
-                        <div class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</div>
-                      </div>
+                <div class="grant-card grant-person-card" *ngFor="let personGroup of filteredPersonGrantGroups">
+                  <div class="grant-person-card__head">
+                    <div class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</div>
+                    <div class="grant-person-card__actions">
+                      <button type="button" class="grant-icon-btn" (click)="editPersonGrantGroup(personGroup)" title="تعديل">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                      <button type="button" class="grant-icon-btn danger" (click)="deletePersonGrantGroup(personGroup)" title="حذف">
+                        <i class="pi pi-trash"></i>
+                      </button>
                     </div>
-                    <span class="grant-enabled" [class.off]="!personGroup.enabled">{{ personGroup.enabled ? 'مفعل' : 'معطل' }}</span>
-                  </div>
-
-                  <div class="grant-meta">
-                    <div><b>عدد التخصيصات:</b> {{ personGroup.schedules.length }}</div>
                   </div>
 
                   <div class="person-grant-schedules">
@@ -541,25 +521,8 @@
                           <span>{{ schedule.dayLabel }}</span>
                           <span>{{ schedule.dateRangeText }}</span>
                           <span>{{ schedule.timeRangeText }}</span>
+                          <span *ngIf="schedule.notesText">{{ schedule.notesText }}</span>
                         </div>
-                        <div class="person-grant-schedule__meta">
-                          <span>{{ schedule.familyLabel }}</span>
-                          <span *ngIf="schedule.notesText">ملاحظة: {{ schedule.notesText }}</span>
-                        </div>
-                      </div>
-                      <div class="grant-actions person-grant-schedule__actions">
-                        <button
-                          type="button"
-                          class="action-btn person-grant-schedule__edit"
-                          (click)="openEditGrantGroup(schedule.editGroup); closeGrantsPopup()"
-                        >
-                          <i class="pi pi-pencil"></i>
-                          تعديل
-                        </button>
-                        <button type="button" class="mini-btn danger" (click)="deleteGrantSchedule(schedule)">
-                          <i class="pi pi-trash"></i>
-                          حذف
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -666,7 +629,7 @@
 
       <div class="form-group grant-target-group">
         <label>الأشخاص المستهدفون</label>
-        <div class="grant-target-row">
+        <div class="grant-target-row" *ngIf="grantDialogMode !== 'edit'">
           <p-select
             [options]="grantTargetDropdownOptions"
             [(ngModel)]="grantTargetDropdownSelection"
@@ -701,7 +664,7 @@
         <div class="custom-editor-chips" *ngIf="selectedGrantTargetList.length; else noSelectedGrantTargets">
           <div class="custom-editor-chip" *ngFor="let u of selectedGrantTargetList">
             <span>{{ u.fullName }}</span>
-            <button type="button" class="custom-editor-chip__remove" (click)="removeGrantTarget(u.id)" aria-label="حذف الشخص">
+            <button type="button" class="custom-editor-chip__remove" (click)="removeGrantTarget(u.id)" *ngIf="grantDialogMode !== 'edit'" aria-label="حذف الشخص">
               <i class="pi pi-times"></i>
             </button>
           </div>
@@ -714,23 +677,13 @@
       <div class="grant-dialog-existing full-width" *ngIf="grantDialogMode === 'edit' && editingGrantGroup() as editGroup">
         <div class="grant-dialog-existing__head">
           <div class="grant-dialog-existing__title">التخصيص الذي يتم تعديله حالياً</div>
-          <button type="button" class="action-btn grant-edit-cancel-btn" (click)="cancelGrantEdit()">
+          <button type="button" class="grant-icon-btn" (click)="cancelGrantEdit()" title="إلغاء التعديل">
             <i class="pi pi-times"></i>
-            إلغاء التعديل
           </button>
         </div>
         <div class="grant-card grant-card--compact">
-          <div class="grant-card__top">
-            <div>
-              <div class="grant-kind">{{ editGroup.first.grantKind === 'SELF_CHECKIN' ? 'مخدوم' : 'خادم' }}</div>
-              <div class="grant-target">{{ editGroup.targetNames || 'بدون اسم' }}</div>
-            </div>
-            <span class="grant-enabled" [class.off]="editGroup.first.enabled === false">{{ editGroup.first.enabled === false ? 'معطل' : 'مفعل' }}</span>
-          </div>
           <div class="grant-meta">
-            <div><b>عدد الأشخاص:</b> {{ editGroup.grants.length }}</div>
             <div><b>النوع:</b> <span *ngFor="let t of editGroup.first.allowedTypes; let last = last">{{ displayTypeLabel(t) }}{{ last ? '' : ' + ' }}</span></div>
-            <div><b>الأسماء:</b> {{ editGroup.targetNames }}</div>
             <div><b>الأسر:</b> {{ grantFamilyLabel(editGroup.first.familyBase) }}</div>
             <div><b>اليوم:</b> {{ grantGroupDayLabel(editGroup) }}</div>
             <div><b>من:</b> {{ editGroup.first.startsAt | date:'yyyy-MM-dd HH:mm' }}</div>
@@ -740,17 +693,21 @@
         </div>
       </div>
 
-      <ng-container *ngIf="dialogExistingPersonGrantGroups() as existingGroups">
+      <ng-container *ngIf="grantDialogMode !== 'edit' && dialogExistingPersonGrantGroups() as existingGroups">
         <div class="grant-dialog-existing grant-dialog-existing--scrollbox full-width">
           <div class="grant-dialog-existing__title">{{ dialogExistingGrantTitle() }}</div>
           <div class="grant-list grant-list--dialog" *ngIf="existingGroups.length; else noExistingTargetGrants">
             <div class="grant-card grant-card--compact grant-person-card" *ngFor="let personGroup of existingGroups">
-              <div class="grant-card__top">
-                <div>
-                  <div class="grant-kind">{{ personGroup.kindLabel }}</div>
-                  <div class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</div>
+              <div class="grant-person-card__head">
+                <div class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</div>
+                <div class="grant-person-card__actions">
+                  <button type="button" class="grant-icon-btn" (click)="editPersonGrantGroup(personGroup)" title="تعديل">
+                    <i class="pi pi-pencil"></i>
+                  </button>
+                  <button type="button" class="grant-icon-btn danger" (click)="deletePersonGrantGroup(personGroup)" title="حذف">
+                    <i class="pi pi-trash"></i>
+                  </button>
                 </div>
-                <span class="grant-enabled" [class.off]="!personGroup.enabled">{{ personGroup.enabled ? 'مفعل' : 'معطل' }}</span>
               </div>
 
               <div class="person-grant-schedules">
@@ -761,21 +718,8 @@
                       <span>{{ schedule.dayLabel }}</span>
                       <span>{{ schedule.dateRangeText }}</span>
                       <span>{{ schedule.timeRangeText }}</span>
+                      <span *ngIf="schedule.notesText">{{ schedule.notesText }}</span>
                     </div>
-                    <div class="person-grant-schedule__meta">
-                      <span>{{ schedule.familyLabel }}</span>
-                      <span *ngIf="schedule.notesText">ملاحظة: {{ schedule.notesText }}</span>
-                    </div>
-                  </div>
-                  <div class="grant-actions person-grant-schedule__actions">
-                    <button type="button" class="action-btn person-grant-schedule__edit" (click)="openEditGrantGroup(schedule.editGroup)">
-                      <i class="pi pi-pencil"></i>
-                      تعديل
-                    </button>
-                    <button type="button" class="mini-btn danger" (click)="deleteGrantSchedule(schedule)">
-                      <i class="pi pi-trash"></i>
-                      حذف
-                    </button>
                   </div>
                 </div>
               </div>
@@ -819,140 +763,152 @@
       </div>
 
       <div class="grant-permanent-box full-width">
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            [ngModel]="!grantPermanentEnabled"
-            (ngModelChange)="onGrantOneTimeToggle($event)"
-            [disabled]="grantDialogMode !== 'create'"
-          />
-          <span>تخصيص غير دائم</span>
-        </label>
-        <p class="hint" *ngIf="grantPermanentEnabled && grantDialogMode === 'create'">افتح نفس اليوم والتوقيت كل أسبوع داخل فترة محددة.</p>
-        <p class="hint" *ngIf="grantPermanentEnabled && grantDialogMode === 'edit'">تعديل ميعاد الفتح الأسبوعي للتواريخ المحفوظة في هذا التخصيص.</p>
-        <p class="hint" *ngIf="!grantPermanentEnabled">اختار تاريخ ووقت محدد لتخصيص مرة واحدة.</p>
-        <p class="hint" *ngIf="grantDialogMode !== 'create' && !grantPermanentEnabled">التعديل الحالي لتخصيص واحد، والتخصيص الدائم متاح أثناء إنشاء تخصيص جديد.</p>
-
-        <div class="grant-permanent-grid" *ngIf="grantPermanentEnabled && grantDialogMode === 'create'">
-          <div class="form-group">
-            <label>من تاريخ</label>
-            <p-datepicker
-              [(ngModel)]="grantPermanentFromDate"
-              [disabledDays]="grantNoDisabledDays"
-              [minDate]="grantMinDate"
-              [showIcon]="true"
-              [showOtherMonths]="true"
-              [selectOtherMonths]="true"
-              [showButtonBar]="true"
-              [autoZIndex]="false"
-              [baseZIndex]="20000"
-              appendTo="body"
-              panelStyleClass="attendanceGrantDatePanel"
-              dateFormat="yy-mm-dd"
-              placeholder="اختر بداية فترة التشغيل"
-            ></p-datepicker>
-          </div>
-
-          <div class="form-group">
-            <label>إلى تاريخ</label>
-            <p-datepicker
-              [(ngModel)]="grantPermanentToDate"
-              [disabledDays]="grantNoDisabledDays"
-              [minDate]="grantPermanentFromDate || grantMinDate"
-              [showIcon]="true"
-              [showOtherMonths]="true"
-              [selectOtherMonths]="true"
-              [showButtonBar]="true"
-              [autoZIndex]="false"
-              [baseZIndex]="20000"
-              appendTo="body"
-              panelStyleClass="attendanceGrantDatePanel"
-              dateFormat="yy-mm-dd"
-              placeholder="اختر نهاية فترة التشغيل"
-            ></p-datepicker>
-          </div>
+        <label>نوع التخصيص</label>
+        <div class="grant-audience-toggle" role="group" aria-label="نوع التخصيص">
+          <button
+            type="button"
+            class="grant-audience-toggle__button"
+            [class.active]="grantPermanentEnabled"
+            (click)="selectGrantPermanentMode(true)"
+          >
+            تخصيص دائم
+          </button>
+          <button
+            type="button"
+            class="grant-audience-toggle__button"
+            [class.active]="!grantPermanentEnabled"
+            (click)="selectGrantPermanentMode(false)"
+          >
+            تخصيص مؤقت
+          </button>
         </div>
-      </div>
+        <p class="hint" *ngIf="grantPermanentEnabled">التخصيص مفتوح على طول بدون تحديد وقت.</p>
+        <p class="hint" *ngIf="!grantPermanentEnabled && grantDialogMode === 'create'">حدد فترة زمنية وأيام ومواعيد التخصيص.</p>
+        <p class="hint" *ngIf="!grantPermanentEnabled && grantDialogMode === 'edit'">تعديل فترة التشغيل والمواعيد للتخصيص المؤقت.</p>
 
-      <div class="grant-day-windows" *ngIf="selectedGrantWindowValue as window">
-        <div class="grant-day-window">
-          <div class="grant-day-window__title">
-            {{ grantPermanentEnabled ? 'ميعاد الفتح الأسبوعي' : dayLabel(window.day) }}
-          </div>
-          <div class="grant-day-window__grid grant-day-window__days" *ngIf="grantPermanentEnabled">
+        <ng-container *ngIf="!grantPermanentEnabled">
+          <div class="grant-permanent-grid">
             <div class="form-group">
-              <label>من يوم</label>
-              <div class="readonly-box grant-day-window__readonly-day">{{ dayLabel(window.day) }}</div>
-            </div>
-
-            <div class="form-group">
-              <label>إلى يوم</label>
-              <select [ngModel]="grantWindowEndOffset(window)" (ngModelChange)="onGrantWindowEndOffsetChange(window.day, $event)">
-                <option *ngFor="let option of grantWindowEndDayOptions(window.day)" [ngValue]="option.offset">
-                  {{ option.label }}
-                </option>
-              </select>
-            </div>
-          </div>
-          <div class="grant-day-window__grid">
-            <div class="form-group">
-              <label>{{ grantPermanentEnabled ? 'من الساعة' : 'من' }}</label>
+              <label>من تاريخ</label>
               <p-datepicker
-                [ngModel]="window.startsAt"
-                (ngModelChange)="onGrantWindowStartChange(window.day, $event)"
+                [(ngModel)]="grantPermanentFromDate"
                 [disabledDays]="grantNoDisabledDays"
-                [minDate]="grantPermanentEnabled ? null : grantMinDate"
-                [showIcon]="!grantPermanentEnabled"
-                [timeOnly]="grantPermanentEnabled"
-                [showTime]="true"
+                [minDate]="grantMinDate"
+                [showIcon]="true"
                 [showOtherMonths]="true"
                 [selectOtherMonths]="true"
                 [showButtonBar]="true"
                 [autoZIndex]="false"
                 [baseZIndex]="20000"
-                hourFormat="12"
-                [stepMinute]="1"
-                [readonlyInput]="false"
-                (onTodayClick)="setGrantWindowStartNow(window.day)"
                 appendTo="body"
+                styleClass="attendance-date-input"
+                inputStyleClass="attendance-date-input__field"
                 panelStyleClass="attendanceGrantDatePanel"
-                [placeholder]="grantPermanentEnabled ? 'اختر وقت البداية' : 'اختر اليوم والوقت'"
+                dateFormat="yy-mm-dd"
+                placeholder="اختر بداية فترة التشغيل"
               ></p-datepicker>
             </div>
 
             <div class="form-group">
-              <label>{{ grantPermanentEnabled ? 'إلى الساعة' : 'إلى' }}</label>
+              <label>إلى تاريخ</label>
               <p-datepicker
-                [ngModel]="window.endsAt"
-                (ngModelChange)="onGrantWindowEndChange(window.day, $event)"
+                [(ngModel)]="grantPermanentToDate"
                 [disabledDays]="grantNoDisabledDays"
-                [minDate]="grantPermanentEnabled ? null : grantMinDate"
-                [showIcon]="!grantPermanentEnabled"
-                [timeOnly]="grantPermanentEnabled"
-                [showTime]="true"
+                [minDate]="grantPermanentFromDate || grantMinDate"
+                [showIcon]="true"
                 [showOtherMonths]="true"
                 [selectOtherMonths]="true"
                 [showButtonBar]="true"
                 [autoZIndex]="false"
                 [baseZIndex]="20000"
-                hourFormat="12"
-                [stepMinute]="1"
-                [readonlyInput]="false"
-                (onTodayClick)="setGrantWindowEndNow(window.day)"
                 appendTo="body"
+                styleClass="attendance-date-input"
+                inputStyleClass="attendance-date-input__field"
                 panelStyleClass="attendanceGrantDatePanel"
-                [placeholder]="grantPermanentEnabled ? 'اختر وقت النهاية' : 'اختر اليوم والوقت'"
+                dateFormat="yy-mm-dd"
+                placeholder="اختر نهاية فترة التشغيل"
               ></p-datepicker>
             </div>
           </div>
 
-          <div class="grant-day-window__actions">
-            <button type="button" class="action-btn" (click)="saveGrant()">
-              <i class="pi pi-check"></i>
-              حفظ {{ dayLabel(window.day) }}
-            </button>
+          <div class="grant-day-windows" *ngIf="selectedGrantWindowValue as window">
+            <div class="grant-day-window">
+              <div class="grant-day-window__title">ميعاد الفتح الأسبوعي</div>
+              <div class="grant-day-window__grid grant-day-window__days">
+                <div class="form-group">
+                  <label>من يوم</label>
+                  <div class="readonly-box grant-day-window__readonly-day">{{ dayLabel(window.day) }}</div>
+                </div>
+
+                <div class="form-group">
+                  <label>إلى يوم</label>
+                  <select [ngModel]="grantWindowEndOffset(window)" (ngModelChange)="onGrantWindowEndOffsetChange(window.day, $event)">
+                    <option *ngFor="let option of grantWindowEndDayOptions(window.day)" [ngValue]="option.offset">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+              <div class="grant-day-window__grid">
+                <div class="form-group">
+                  <label>من الساعة</label>
+                  <p-datepicker
+                    [ngModel]="window.startsAt"
+                    (ngModelChange)="onGrantWindowStartChange(window.day, $event)"
+                    [disabledDays]="grantNoDisabledDays"
+                    [minDate]="null"
+                    [showIcon]="false"
+                    [timeOnly]="true"
+                    [showTime]="true"
+                    [showOtherMonths]="true"
+                    [selectOtherMonths]="true"
+                    [showButtonBar]="true"
+                    [autoZIndex]="false"
+                    [baseZIndex]="20000"
+                    hourFormat="12"
+                    [stepMinute]="1"
+                    [readonlyInput]="false"
+                    (onTodayClick)="setGrantWindowStartNow(window.day)"
+                    appendTo="body"
+                    styleClass="attendance-date-input"
+                    inputStyleClass="attendance-date-input__field"
+                    panelStyleClass="attendanceGrantDatePanel"
+                    placeholder="اختر وقت البداية"
+                  ></p-datepicker>
+                </div>
+
+                <div class="form-group">
+                  <label>إلى الساعة</label>
+                  <p-datepicker
+                    [ngModel]="window.endsAt"
+                    (ngModelChange)="onGrantWindowEndChange(window.day, $event)"
+                    [disabledDays]="grantNoDisabledDays"
+                    [minDate]="null"
+                    [showIcon]="false"
+                    [timeOnly]="true"
+                    [showTime]="true"
+                    [showOtherMonths]="true"
+                    [selectOtherMonths]="true"
+                    [showButtonBar]="true"
+                    [autoZIndex]="false"
+                    [baseZIndex]="20000"
+                    hourFormat="12"
+                    [stepMinute]="1"
+                    [readonlyInput]="false"
+                    (onTodayClick)="setGrantWindowEndNow(window.day)"
+                    appendTo="body"
+                    styleClass="attendance-date-input"
+                    inputStyleClass="attendance-date-input__field"
+                    panelStyleClass="attendanceGrantDatePanel"
+                    placeholder="اختر وقت النهاية"
+                  ></p-datepicker>
+                </div>
+              </div>
+
+
+            </div>
           </div>
-        </div>
+        </ng-container>
       </div>
     </div>
 
@@ -965,10 +921,9 @@
 
   <ng-template pTemplate="footer">
     <div class="dialog-footer">
-      <button type="button" class="mini-btn" (click)="grantDialogVisible = false">إلغاء</button>
-      <button type="button" class="action-btn" (click)="saveGrant(true)">
+      <button type="button" class="action-btn" (click)="saveGrant()">
         <i class="pi pi-check"></i>
-        حفظ نهائي
+        {{ grantDialogMode === 'edit' ? 'حفظ التعديلات' : 'حفظ' }}
       </button>
     </div>
   </ng-template>
@@ -1083,29 +1038,69 @@
       <div class="form-group" *ngIf="customEventForm.alwaysActive === false">
         <label>من تاريخ</label>
         <p-datepicker
+          #customEventFromPicker
           [(ngModel)]="customEventActiveFromDate"
           (ngModelChange)="onCustomEventActiveFromChange($event)"
           [showIcon]="true"
           appendTo="body"
+          styleClass="attendance-date-input"
+          inputStyleClass="attendance-date-input__field"
           panelStyleClass="attendanceGrantDatePanel"
           dateFormat="yy-mm-dd"
           [disabledDates]="customEventBlockedDates"
           placeholder="اختر أول تاريخ"
-        ></p-datepicker>
+          [showButtonBar]="true"
+          [hideOnDateTimeSelect]="false"
+        >
+          <ng-template pTemplate="buttonbar">
+            <div class="attendance-picker-actions">
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--ghost"
+                aria-label="مسح" title="مسح"
+                (click)="customEventFromPicker.overlayVisible = false; customEventActiveFromDate = null; onCustomEventActiveFromChange(null)">
+                <i class="pi pi-times"></i>
+              </button>
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--primary"
+                aria-label="تأكيد" title="تأكيد"
+                (click)="customEventFromPicker.overlayVisible = false">
+                <i class="pi pi-check"></i>
+              </button>
+            </div>
+          </ng-template>
+        </p-datepicker>
       </div>
 
       <div class="form-group" *ngIf="customEventForm.alwaysActive === false">
         <label>إلى تاريخ</label>
         <p-datepicker
+          #customEventToPicker
           [(ngModel)]="customEventActiveToDate"
           (ngModelChange)="onCustomEventActiveToChange($event)"
           [showIcon]="true"
           appendTo="body"
+          styleClass="attendance-date-input"
+          inputStyleClass="attendance-date-input__field"
           panelStyleClass="attendanceGrantDatePanel"
           dateFormat="yy-mm-dd"
           [disabledDates]="customEventBlockedDates"
           placeholder="اختر آخر تاريخ"
-        ></p-datepicker>
+          [showButtonBar]="true"
+          [hideOnDateTimeSelect]="false"
+        >
+          <ng-template pTemplate="buttonbar">
+            <div class="attendance-picker-actions">
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--ghost"
+                aria-label="مسح" title="مسح"
+                (click)="customEventToPicker.overlayVisible = false; customEventActiveToDate = null; onCustomEventActiveToChange(null)">
+                <i class="pi pi-times"></i>
+              </button>
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--primary"
+                aria-label="تأكيد" title="تأكيد"
+                (click)="customEventToPicker.overlayVisible = false">
+                <i class="pi pi-check"></i>
+              </button>
+            </div>
+          </ng-template>
+        </p-datepicker>
       </div>
     </div>
   </div>
