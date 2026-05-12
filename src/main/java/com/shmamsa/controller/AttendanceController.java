@@ -109,6 +109,83 @@ public class AttendanceController {
         return roles.contains("AMIN_OSRA") || roles.contains("AMIN_KHEDMA");
     }
 
+    private boolean hasScopedRole(User user, String wantedRole) {
+        if (user == null || wantedRole == null || wantedRole.isBlank()) return false;
+        return userFamilyRoleService.getAssignments(user).stream()
+                .map(UserFamilyAssignmentView::getRole)
+                .map(this::normRole)
+                .anyMatch(wantedRole::equals);
+    }
+
+    private boolean hasAminOsraPrivilege(User user) {
+        if (user == null) return false;
+        String roleNorm = normRole(user.getRole());
+        return "AMIN_OSRA".equals(roleNorm) || hasScopedRole(user, "AMIN_OSRA");
+    }
+
+    private boolean hasAminKhedmaPrivilege(User user) {
+        if (user == null) return false;
+        String roleNorm = normRole(user.getRole());
+        return "AMIN_KHEDMA".equals(roleNorm) || hasScopedRole(user, "AMIN_KHEDMA");
+    }
+
+    private boolean hasGlobalAttendancePrivilege(User user) {
+        if (user == null) return false;
+        String roleNorm = normRole(user.getRole());
+        return "DEVELOPER".equals(roleNorm)
+                || "DEV".equals(roleNorm)
+                || hasAminKhedmaPrivilege(user);
+    }
+
+    private List<String> aminOsraManagedBases(User user) {
+        if (!hasAminOsraPrivilege(user)) return List.of();
+
+        LinkedHashSet<String> bases = userFamilyRoleService.getAssignments(user).stream()
+                .filter(Objects::nonNull)
+                .filter(assignment -> "AMIN_OSRA".equals(normRole(assignment.getRole())))
+                .map(assignment -> familyAccessService.baseNameForId(assignment.getFamilyId(), assignment.getFamilyName()))
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (!bases.isEmpty()) return new ArrayList<>(bases);
+
+        String primaryBase = familyAccessService.baseFamily(user);
+        if (primaryBase != null && !primaryBase.isBlank()) {
+            return List.of(primaryBase);
+        }
+
+        return familyAccessService.servingBasesOf(user).stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private boolean isScopedAminOsraAttendanceManager(User user) {
+        return user != null && !hasGlobalAttendancePrivilege(user) && hasAminOsraPrivilege(user);
+    }
+
+    private void enforceScopedAminOsraFamilyAccess(User user, String familyBase, boolean requireSelection) {
+        if (!isScopedAminOsraAttendanceManager(user)) return;
+
+        String targetBase = normalizeFamilyBaseForGrant(familyBase);
+        if (targetBase.isBlank()) {
+            if (requireSelection) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "FAMILY_REQUIRED", "اختار الأسرة أولاً");
+            }
+            return;
+        }
+
+        boolean allowed = aminOsraManagedBases(user).stream()
+                .anyMatch(base -> base.equalsIgnoreCase(targetBase));
+        if (!allowed) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "لا يمكن أخذ حضور هذه الأسرة");
+        }
+    }
+
     private int toJavascriptDayOfWeek(LocalDate date) {
         if (date == null) return -1;
         return date.getDayOfWeek().getValue() % 7;
@@ -816,7 +893,7 @@ public class AttendanceController {
     private List<String> manageableFamiliesForConfig(User user) {
         if (user == null) return List.of();
         String roleNorm = normRole(user.getRole());
-        if ("DEVELOPER".equals(roleNorm) || "DEV".equals(roleNorm) || "AMIN_KHEDMA".equals(roleNorm)) {
+        if ("DEVELOPER".equals(roleNorm) || "DEV".equals(roleNorm) || hasAminKhedmaPrivilege(user)) {
             return List.of("ALL");
         }
         List<String> bases = familyAccessService.servingBasesOf(user);
@@ -826,7 +903,7 @@ public class AttendanceController {
     private void assertCanManageAttendanceConfig(User user, String familyBase) {
         if (user == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Unauthorized");
         String roleNorm = normRole(user.getRole());
-        if ("DEVELOPER".equals(roleNorm) || "DEV".equals(roleNorm) || "AMIN_KHEDMA".equals(roleNorm)) return;
+        if ("DEVELOPER".equals(roleNorm) || "DEV".equals(roleNorm) || hasAminKhedmaPrivilege(user)) return;
 
         String normalizedTargetBase = familyAccessService.baseNameForName(familyBase);
         if (normalizedTargetBase == null || normalizedTargetBase.isBlank()) {
@@ -905,6 +982,7 @@ public class AttendanceController {
         if (servant == null || servant.getId() == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
         }
+        if (isPrivilegedAttendanceActor(servant)) return;
         // A saved attendance customization is enough to open attendance-taking.
         // The start/end window is kept for display only and must not block the assigned user.
         if (hasConfiguredAttendanceTakingGrant(servant)) return;
@@ -1054,6 +1132,12 @@ public class AttendanceController {
     private void enforceScanFamilyAccess(User servant, AttendanceType type, String familyBase) {
         if (servant == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
 
+        if (hasGlobalAttendancePrivilege(servant)) return;
+        if (isScopedAminOsraAttendanceManager(servant)) {
+            enforceScopedAminOsraFamilyAccess(servant, familyBase, true);
+            return;
+        }
+
         String targetBase = normalizeFamilyBaseForGrant(familyBase);
         List<AttendanceAccessGrant> activeGrants = activeAttendanceTakingGrantsFor(servant, type);
 
@@ -1077,6 +1161,8 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
         }
 
+        if (isPrivilegedAttendanceActor(servant)) return;
+
         List<AttendanceAccessGrant> activeGrants = activeAttendanceTakingGrantsFor(servant, type);
         if (activeGrants.isEmpty()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "لا يوجد تخصيص حضور محفوظ لك");
@@ -1086,6 +1172,12 @@ public class AttendanceController {
     private void enforceTakeAttendanceGrantFamilyIfNeeded(User servant, AttendanceType type, String familyBase) {
         if (servant == null || servant.getId() == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        }
+
+        if (hasGlobalAttendancePrivilege(servant)) return;
+        if (isScopedAminOsraAttendanceManager(servant)) {
+            enforceScopedAminOsraFamilyAccess(servant, familyBase, true);
+            return;
         }
 
         String targetBase = normalizeFamilyBaseForGrant(familyBase);
@@ -1151,11 +1243,10 @@ public class AttendanceController {
 
     private void assertChoirAuthorization(User servant, AttendanceType type) {
         if (hasActiveTakeAttendanceGrantForType(servant, type)) return;
-        String role = servant.getRole() == null ? "" : servant.getRole().trim().toUpperCase(Locale.ROOT);
-        boolean isAminOrDev = role.equals("AMIN_KHEDMA") || role.equals("DEVELOPER") || role.equals("DEV");
-        if (isAminOrDev) return;
+        if (hasGlobalAttendancePrivilege(servant)) return;
+        String role = normRole(servant.getRole());
 
-        if (!role.equals("KHADIM")) {
+        if (!"KHADIM".equals(role)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed");
         }
 
@@ -1216,6 +1307,7 @@ public class AttendanceController {
             if (base == null || base.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Family meeting needs a selected family");
             }
+            enforceScopedAminOsraFamilyAccess(servant, base, true);
             List<Long> ids = familyAccessService.relatedIdsForSelection(base);
             return new ScopeResult(attendanceScopeUsersForFamilyIds(ids, roles), base, familyAccessService.familyIdForName(base));
         }
@@ -1230,10 +1322,13 @@ public class AttendanceController {
             }
             String base = familyAccessService.baseNameForName(family);
             if (base != null && !base.isBlank()) {
+                enforceScopedAminOsraFamilyAccess(servant, base, true);
                 List<Long> ids = familyAccessService.relatedIdsForSelection(base);
                 return new ScopeResult(attendanceScopeUsersForFamilyIds(ids, roles), base, familyAccessService.familyIdForName(base));
             }
         }
+
+        enforceScopedAminOsraFamilyAccess(servant, null, true);
 
         // Friday liturgy / Tasbeeha are global across all families when no family scope is selected.
         return new ScopeResult(userRepo.findByRoleIn(roles), null, null);

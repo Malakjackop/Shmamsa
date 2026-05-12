@@ -113,6 +113,11 @@ type CustomEventGroup = {
   days: number[];
   enabled: boolean;
 };
+type CustomEventDialogOption = {
+  value: string;
+  label: string;
+  isNew?: boolean;
+};
 
 @Component({
   selector: 'app-attendance',
@@ -191,6 +196,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   selectedGrantWindowValue: GrantDayWindow | null = null;
   filteredGrantTargetList: PickUser[] = [];
   selectedGrantTargetList: PickUser[] = [];
+  grantTargetDropdownSelection: number | null = null;
   grantSavedSummaries: GrantSavedSummary[] = [];
   readonly grantNoDisabledDays: number[] = [];
   readonly grantMinDate: Date = this.startOfToday();
@@ -234,6 +240,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   customEventSaving = false;
   private editingCustomEventGroupIds: number[] = [];
   customEventForm: CustomEventForm = this.defaultCustomEventForm();
+  customEventDialogSelection = '__new__';
+  customEventDialogEvents: AttendanceCustomEvent[] = [];
+  customEventDialogGroups: CustomEventGroup[] = [];
   customEventActiveFromDate: Date | null = null;
   customEventActiveToDate: Date | null = null;
   customEventBlockedDates: Date[] = [];
@@ -324,7 +333,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   canSelectFamily(): boolean {
     if (this.isSelfCheckinMode() || this.isDelegatedAttendanceMode()) return this.currentGrantFamilyOptions().length > 1;
-    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm()) || this.isKhadim() || this.hasAnyAminPrivilegeScope();
+    return this.isAminKhedmaOrDeveloper() || this.isKhadim() || this.hasAnyAminPrivilegeScope();
   }
 
   hasRestrictedFamilyScope(): boolean {
@@ -356,15 +365,31 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canFilterGrantFamilies(): boolean {
-    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
+    return this.isAminKhedmaOrDeveloper();
   }
 
   isDeveloper(): boolean {
     return this.roleNorm() === 'DEVELOPER';
   }
 
+  private hasScopedAssignmentRole(role: 'AMIN_OSRA' | 'AMIN_KHEDMA'): boolean {
+    return this.assignmentsOf(this.me).some((assignment) => assignment.role === role);
+  }
+
+  private hasAminOsraPrivilege(): boolean {
+    return this.roleNorm() === 'AMIN_OSRA' || this.hasScopedAssignmentRole('AMIN_OSRA');
+  }
+
+  private hasAminKhedmaPrivilege(): boolean {
+    return this.roleNorm() === 'AMIN_KHEDMA' || this.hasScopedAssignmentRole('AMIN_KHEDMA');
+  }
+
   isAminKhedmaOrDeveloper(): boolean {
-    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
+    return this.isDeveloper() || this.hasAminKhedmaPrivilege();
+  }
+
+  private isScopedAminOsraAttendanceManager(): boolean {
+    return !this.isAminKhedmaOrDeveloper() && this.hasAminOsraPrivilege();
   }
 
   canChooseGrantFamily(): boolean {
@@ -496,6 +521,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private aminOsraFamilies(): string[] {
+    if (!this.hasAminOsraPrivilege()) return [];
+
     const fromAssignments = this.assignmentsOf(this.me)
       .filter((x) => x.role === 'AMIN_OSRA')
       .map((x) => String(x.familyName || '').trim())
@@ -531,7 +558,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private buildConfigFamilyOptions(): string[] {
-    if (['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm())) {
+    if (this.isAminKhedmaOrDeveloper()) {
       return Array.from(new Set([...this.families, ...this.choirFamilies()])).filter(Boolean);
     }
     if (this.roleNorm() === 'AMIN_OSRA' || this.hasAnyAminPrivilegeScope()) {
@@ -551,7 +578,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.selectedScheduleConfigType = this.scheduleEditableTypeOptions[0]?.value || '';
       return;
     }
-    if (!['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm())) {
+    if (!this.isAminKhedmaOrDeveloper()) {
       this.selectedConfigFamily = this.configFamilyOptions[0];
       this.updateScheduleEditableTypes();
       this.selectedScheduleConfigType = this.scheduleEditableTypeOptions[0]?.value || '';
@@ -564,7 +591,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   isConfigFamilyLocked(): boolean {
-    return !!this.selectedConfigFamily && !['AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm()) && this.configFamilyOptions.length === 1;
+    return !!this.selectedConfigFamily && !this.isAminKhedmaOrDeveloper() && this.configFamilyOptions.length === 1;
   }
 
   shouldShowConfigFamilyPicker(): boolean {
@@ -1245,6 +1272,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private shouldEnforceGrantWindow(): boolean {
+    if (this.canOverrideAbsenceOpenClose()) return false;
     return this.isSelfCheckinMode() || this.relevantScopeGrants().length > 0;
   }
 
@@ -2287,7 +2315,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const iso = this.selectedDate ? this.toIsoDate(this.selectedDate) : undefined;
     const requestedFamily = this.selectedFamily || undefined;
     const selectedType = this.selectedAttendanceType();
-    const family = (this.shouldEnforceGrantWindow() && requestedFamily)
+    const family = ((this.shouldEnforceGrantWindow() || this.isScopedAminOsraAttendanceManager()) && requestedFamily)
       ? requestedFamily
       : (['FAMILY_MEETING', 'CUSTOM_EVENT', 'MARMARKOS_KHORS', 'ATHANASIUS_KHORS'].includes(selectedType)
         ? requestedFamily
@@ -2980,30 +3008,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private loadGrantCustomEvents(): void {
-    this.syncGrantOccasionFromForm();
-
     if (!this.canUseCustomEvent()) {
       this.grantCustomEvents = [];
       this.syncGrantOccasionFromForm();
       return;
     }
-
-    const families = Array.from(new Set(this.grantScopeFamilies().filter(Boolean)));
-    if (!families.length) {
-      this.grantCustomEvents = [];
-      this.syncGrantOccasionFromForm();
-      return;
-    }
-
-    forkJoin([
-      this.attendance.listCustomEvents(),
-      ...families.map((family) => this.attendance.listCustomEvents(family))
-    ]).subscribe({
-      next: (groups) => {
-        const merged = groups.flatMap((group) => group || []);
-        const relevant = merged.filter((event) => this.isGlobalCustomEvent(event)
-          || families.some((family) => this.isCustomEventRelevantToFamily(event, family)));
-        this.grantCustomEvents = this.filterAthanasiusVisibilityForEvents(this.uniqueCustomEvents(relevant));
+    this.attendance.listCustomEvents().subscribe({
+      next: (events) => {
+        this.grantCustomEvents = this.filterAthanasiusVisibilityForEvents(events || []);
         this.syncGrantOccasionFromForm();
       },
       error: () => {
@@ -3057,7 +3069,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.refreshGrantTargetLists();
       return;
     }
-    if (this.grantAudience === 'SERVANTS' && !scopeFamily) {
+    if (!scopeFamily) {
       const allFamilies = this.families.filter(Boolean);
       if (!allFamilies.length) {
         this.grantTargets = [];
@@ -3065,16 +3077,19 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.refreshGrantTargetLists();
         return;
       }
+      const isServants = this.grantAudience === 'SERVANTS';
       forkJoin(allFamilies.map((family) => forkJoin([
         this.familySvc.members(family, true, 'attendance'),
-        this.familySvc.members(family, true)
+        ...(isServants ? [this.familySvc.members(family, true)] : [])
       ]))).subscribe({
         next: (groups) => {
           const merged = groups
             .flatMap((pair: any) => [...(pair?.[0] || []), ...(pair?.[1] || [])])
             .map((x: any) => this.toPickUser(x));
           const unique = merged.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
-          this.grantTargets = unique.filter((user) => this.isServantGrantTarget(user));
+          this.grantTargets = unique.filter((user) =>
+            isServants ? this.isServantGrantTarget(user) : this.isMemberGrantTarget(user)
+          );
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
         },
@@ -3084,12 +3099,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
           this.refreshGrantTargetLists();
         }
       });
-      return;
-    }
-    if (!scopeFamily) {
-      this.grantTargets = [];
-      this.syncSelectedGrantTargets();
-      this.refreshGrantTargetLists();
       return;
     }
     if (this.grantAudience === 'SERVANTS') {
@@ -3160,8 +3169,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  onGrantTargetSearchChange(): void {
-    this.refreshGrantTargetLists();
+  get grantTargetDropdownOptions(): any[] {
+    return this.filteredGrantTargetList.map((u) => ({
+      label: `${u.fullName}`,
+      value: u.id
+    }));
+  }
+
+  onGrantTargetDropdownChange(): void {
+    if (this.grantTargetDropdownSelection) {
+      this.addGrantTarget(this.grantTargetDropdownSelection);
+      this.grantTargetDropdownSelection = null;
+    }
   }
 
   private grantTargetSelectionIds(): number[] {
@@ -3470,6 +3489,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.editingGrantGroupIds = [];
     this.editingGrantTargetFallbacks = [];
     this.grantForm = this.defaultGrantForm();
+    if (this.canChooseGrantFamily() && !this.grantForm.familyBase) {
+      const familyOptions = this.grantFamilyFilterOptions();
+      this.grantForm.familyBase = familyOptions[0] || '';
+    }
     this.grantAudience = this.grantAudienceFromKind(this.grantForm.grantKind);
     this.lastGrantAudience = this.grantAudience;
     this.selectedGrantTargetIds = [];
@@ -3834,7 +3857,45 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   get displayCustomEventGroups(): CustomEventGroup[] {
-    return this.familyCustomEventGroups;
+    // المناسبات الافتراضية
+    const defaultTypes: { type: AttendanceType; label: string }[] = [
+      { type: 'FRIDAY_LITURGY', label: this.typeLabel('FRIDAY_LITURGY') },
+      { type: 'TASBEEHA', label: this.typeLabel('TASBEEHA') },
+      { type: 'FAMILY_MEETING', label: this.typeLabel('FAMILY_MEETING') }
+    ];
+    const defaultGroups: CustomEventGroup[] = defaultTypes
+      .filter(({ type }) => this.configuredTypeHasDays(type))
+      .map(({ type, label }) => {
+        const days = this.configDaysForType(type);
+        return {
+          key: `DEFAULT:${type}`,
+          events: days.map(day => ({
+            id: undefined,
+            familyBase: this.selectedFamily || '',
+            title: label,
+            dayOfWeek: day,
+            enabled: true,
+            alwaysActive: true,
+            type,
+            // خصائص إضافية افتراضية
+          } as AttendanceCustomEvent)),
+          first: {
+            id: undefined,
+            familyBase: this.selectedFamily || '',
+            title: label,
+            dayOfWeek: days[0],
+            enabled: true,
+            alwaysActive: true,
+            type,
+          } as AttendanceCustomEvent,
+          days,
+          enabled: true
+        };
+      });
+    // المناسبات المخصصة
+    const customGroups = this.familyCustomEventGroups;
+    // دمجهم معًا
+    return [...defaultGroups, ...customGroups];
   }
 
   get displayCustomEventPreviewGroups(): CustomEventGroup[] {
@@ -3867,7 +3928,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private customEventGroupKey(event: AttendanceCustomEvent): string {
-    return this.normalizeCustomEventTitleKey(event.title);
+    return this.buildCustomEventGroupKey(event.title, event.familyBase);
+  }
+
+  private buildCustomEventGroupKey(title?: string | null, familyBase?: string | null): string {
+    return `${this.normalizeCustomEventScopeKey(familyBase)}|${this.normalizeCustomEventTitleKey(title)}`;
+  }
+
+  private normalizeCustomEventScopeKey(value?: string | null): string {
+    const family = canonicalFamilyName(String(value || '')).trim();
+    if (!family) return '__all__';
+    return this.normalizeCustomEventTitleKey(family);
   }
 
   private normalizeCustomEventTitleKey(value?: string | null): string {
@@ -3883,7 +3954,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   isCustomEventFamilyLocked(): boolean {
-    return this.customEventDialogMode === 'edit' || (!this.isAminKhedmaOrDeveloper() && this.customEventFamilyOptions().length <= 1);
+    return false;
+  }
+
+  customEventDialogHeader(): string {
+    return this.isCreatingNewCustomEventSelection() ? 'إضافة مناسبة' : 'تعديل مناسبة';
   }
 
   customEventFamilyLabel(): string {
@@ -3891,7 +3966,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canManageCustomEventEditors(): boolean {
-    return this.isAminKhedmaOrDeveloper() && !!String(this.customEventForm.familyBase || '').trim();
+    return this.isAminKhedmaOrDeveloper();
   }
 
   customEventFamilyOptions(): Array<{ label: string; value: string }> {
@@ -3899,6 +3974,30 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       ? [{ label: 'كل الأسر', value: '' }, ...this.filterAthanasiusVisibility(this.families).map((family) => ({ label: family, value: family }))]
       : this.filterAthanasiusVisibility(this.aminOsraFamilies()).filter(Boolean).map((family) => ({ label: family, value: family }));
     return options;
+  }
+
+  customEventDialogOptions(): CustomEventDialogOption[] {
+    const defaultOptions: CustomEventDialogOption[] = [
+      ...this.grantTypeOptions().map((opt: { value: AttendanceType; label: string }) => ({
+        value: `DEFAULT:${opt.value}`,
+        label: opt.label
+      }))
+    ];
+    const existing = this.customEventDialogGroups
+      .filter((group) => group.events.some((event) => this.canEditCustomEvent(event)))
+      .map((group) => ({
+      value: group.key,
+      label: group.first.title || 'بدون اسم'
+      }));
+    return [
+      ...defaultOptions,
+      ...existing,
+      { value: '__new__', label: 'إضافة مناسبة جديدة', isNew: true }
+    ];
+  }
+
+  isCreatingNewCustomEventSelection(): boolean {
+    return this.customEventDialogSelection === '__new__';
   }
 
   private loadCustomEventsForFamily(): void {
@@ -4056,11 +4155,52 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.customEventForm.permittedEditorIds = [];
     this.customEventEditorPickerId = null;
     this.customEventEditorSearch = '';
-    if (!this.canManageCustomEventEditors()) {
-      this.customEventEditorTargets = [];
+    this.loadCustomEventDialogScopeEvents(true);
+    this.loadCustomEventEditorTargets();
+  }
+
+  onCustomEventDialogSelectionChange(): void {
+    if (this.isCreatingNewCustomEventSelection()) {
+      this.customEventDialogMode = 'create';
+      this.editingCustomEventGroupIds = [];
+      const familyBase = String(this.customEventForm.familyBase || '').trim();
+      const form = this.defaultCustomEventForm();
+      this.customEventForm = {
+        ...form,
+        familyBase,
+        permittedEditorIds: []
+      };
+      this.customEventActiveFromDate = null;
+      this.customEventActiveToDate = null;
+      this.loadCustomEventEditorTargets();
       return;
     }
-    this.loadCustomEventEditorTargets();
+
+    if (this.customEventDialogSelection.startsWith('DEFAULT:')) {
+      const type = this.customEventDialogSelection.replace('DEFAULT:', '') as AttendanceType;
+      const days = this.configDaysForType(type, this.customEventForm.familyBase || this.selectedFamily);
+      this.customEventDialogMode = 'edit';
+      this.editingCustomEventGroupIds = [];
+      this.customEventForm = {
+        familyBase: this.customEventForm.familyBase || '',
+        title: this.typeLabel(type),
+        dayOfWeek: days[0] ?? 5,
+        dayOfWeeks: days.length ? [...days] : [5],
+        enabled: true,
+        alwaysActive: true,
+        permittedEditorIds: []
+      };
+      this.customEventActiveFromDate = null;
+      this.customEventActiveToDate = null;
+      this.customEventEditorPickerId = null;
+      this.customEventEditorSearch = '';
+      this.loadCustomEventEditorTargets();
+      return;
+    }
+
+    const group = this.customEventDialogGroups.find((item) => item.key === this.customEventDialogSelection);
+    if (!group) return;
+    this.applyCustomEventGroupToForm(group);
   }
 
   private loadCustomEventEditorTargets(): void {
@@ -4082,7 +4222,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     };
 
     if (!family) {
-      this.customEventEditorTargets = [];
+      const allFamilies = this.families.filter(Boolean);
+      if (!allFamilies.length) {
+        this.customEventEditorTargets = [];
+        return;
+      }
+      forkJoin(allFamilies.map((f) => forkJoin([
+        this.familySvc.members(f, true, 'attendance'),
+        this.familySvc.members(f, true)
+      ]))).subscribe({
+        next: (groups) => {
+          const merged = groups.flatMap((pair: any) => [...(pair?.[0] || []), ...(pair?.[1] || [])]);
+          applyTargets(merged);
+        },
+        error: () => this.customEventEditorTargets = []
+      });
       return;
     }
 
@@ -4157,6 +4311,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canEditCustomEventGroup(group: CustomEventGroup): boolean {
+    // السماح بتعديل المناسبات الافتراضية والمخصصة
+    if (group.key && group.key.startsWith('DEFAULT:')) return true;
     return this.customEventGroupEvents(group).some((event) => this.canEditCustomEvent(event));
   }
 
@@ -4166,22 +4322,107 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return fromCurrent.length ? fromCurrent : (group.events || []);
   }
 
+  private filterCustomEventsForDialogScope(events: AttendanceCustomEvent[], familyBase: string): AttendanceCustomEvent[] {
+    return (events || []).filter((event) => {
+      const eventFamily = String(event.familyBase || '').trim();
+      if (!familyBase) return true;
+      return canonicalFamilyName(eventFamily) === canonicalFamilyName(familyBase);
+    });
+  }
+
+  private loadCustomEventDialogScopeEvents(forceNewSelection = false, preferredKey = ''): void {
+    const familyBase = String(this.customEventForm.familyBase || '').trim();
+    const request$ = familyBase
+      ? this.attendance.listCustomEvents(familyBase)
+      : this.attendance.listCustomEvents();
+
+    request$.subscribe({
+      next: (events) => {
+        const filtered = this.filterAthanasiusVisibilityForEvents(
+          this.uniqueCustomEvents(this.filterCustomEventsForDialogScope(events || [], familyBase))
+        );
+        this.customEventDialogEvents = filtered;
+        this.customEventDialogGroups = this.groupCustomEvents(filtered);
+
+        const wantedKey = preferredKey || this.customEventDialogSelection;
+        if (wantedKey.startsWith('DEFAULT:')) return;
+        const matched = this.customEventDialogGroups.find((group) => group.key === wantedKey);
+        if (!forceNewSelection && matched) {
+          this.customEventDialogSelection = matched.key;
+          this.applyCustomEventGroupToForm(matched);
+          return;
+        }
+
+        this.selectFirstCustomEventOption();
+      },
+      error: () => {
+        this.customEventDialogEvents = [];
+        this.customEventDialogGroups = [];
+        if (this.customEventDialogSelection.startsWith('DEFAULT:')) return;
+        this.selectFirstCustomEventOption();
+      }
+    });
+  }
+
+  private selectFirstCustomEventOption(): void {
+    const options = this.customEventDialogOptions();
+    const firstNonNew = options.find((opt) => !opt.isNew);
+    if (firstNonNew) {
+      this.customEventDialogSelection = firstNonNew.value;
+      this.onCustomEventDialogSelectionChange();
+    } else {
+      this.customEventDialogSelection = '__new__';
+      this.onCustomEventDialogSelectionChange();
+    }
+  }
+
+  private applyCustomEventGroupToForm(group: CustomEventGroup): void {
+    const groupEvents = this.customEventGroupEvents(group);
+    const editableEvents = groupEvents.filter((event) => this.canEditCustomEvent(event));
+    if (!editableEvents.length) return;
+
+    const event = editableEvents[0];
+    this.customEventDialogMode = 'edit';
+    this.editingCustomEventGroupIds = groupEvents.map((item) => Number(item.id || 0)).filter(Boolean);
+    this.customEventForm = {
+      ...event,
+      id: event.id,
+      familyBase: event.familyBase || '',
+      title: event.title || '',
+      dayOfWeek: Number(event.dayOfWeek ?? 5),
+      dayOfWeeks: Array.from(new Set(groupEvents.map((item) => Number(item.dayOfWeek)).filter((day) => this.weekDays.includes(day)))),
+      enabled: event.enabled !== false,
+      alwaysActive: event.alwaysActive !== false,
+      permittedEditorIds: [...(event.permittedEditorIds || []), ...(event.permittedEditorId ? [event.permittedEditorId] : [])]
+        .filter((id, index, arr) => !!id && arr.indexOf(id) === index)
+    };
+    this.customEventDialogSelection = group.key;
+    this.customEventActiveFromDate = event.activeFrom ? new Date(event.activeFrom) : null;
+    this.customEventActiveToDate = event.activeTo ? new Date(event.activeTo) : null;
+    this.customEventEditorPickerId = null;
+    this.customEventEditorSearch = '';
+    this.loadCustomEventEditorTargets();
+  }
+
   openCreateCustomEvent(): void {
     if (!this.canUseCustomEvent()) return;
     this.customEventDialogMode = 'create';
     this.editingCustomEventGroupIds = [];
     const options = this.customEventFamilyOptions();
-    const preferredFamily = this.preferredCustomEventFamily();
     this.customEventForm = {
       ...this.defaultCustomEventForm(),
-      familyBase: preferredFamily || options[0]?.value || ''
+      familyBase: options[0]?.value || ''
     };
+    this.customEventDialogEvents = [];
+    this.customEventDialogGroups = [];
     this.customEventActiveFromDate = null;
     this.customEventActiveToDate = null;
     this.customEventEditorPickerId = null;
     this.customEventEditorSearch = '';
-    this.loadCustomEventEditorTargets();
+    this.customEventDialogSelection = 'DEFAULT:FRIDAY_LITURGY';
+    this.onCustomEventDialogSelectionChange();
     this.customEventDialogVisible = true;
+    this.loadCustomEventDialogScopeEvents(true);
   }
 
   openEditCustomEvent(event: AttendanceCustomEvent): void {
@@ -4198,29 +4439,47 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   openEditCustomEventGroup(group: CustomEventGroup): void {
+    // إذا كانت المناسبة افتراضية (قداس/تسبحة/اجتماع)
+    if (group.key && group.key.startsWith('DEFAULT:')) {
+      const event = group.first;
+      this.customEventDialogMode = 'edit';
+      this.customEventForm = {
+        familyBase: event.familyBase || '',
+        title: event.title,
+        dayOfWeek: event.dayOfWeek,
+        dayOfWeeks: group.days,
+        enabled: event.enabled,
+        alwaysActive: event.alwaysActive,
+        permittedEditorIds: []
+      };
+      this.customEventDialogSelection = group.key;
+      this.customEventDialogEvents = [];
+      this.customEventDialogGroups = [];
+      this.customEventActiveFromDate = null;
+      this.customEventActiveToDate = null;
+      this.customEventEditorPickerId = null;
+      this.customEventEditorSearch = '';
+      this.customEventDialogVisible = true;
+      return;
+    }
+    // المناسبات المخصصة
     const groupEvents = this.customEventGroupEvents(group);
     const editableEvents = groupEvents.filter((event) => this.canEditCustomEvent(event));
     if (!editableEvents.length) return;
     const event = editableEvents[0];
     this.customEventDialogMode = 'edit';
-    this.editingCustomEventGroupIds = groupEvents.map((item) => Number(item.id || 0)).filter(Boolean);
     this.customEventForm = {
-      ...event,
-      id: event.id,
-      familyBase: event.familyBase || '',
-      title: event.title || '',
-      dayOfWeek: Number(event.dayOfWeek ?? 5),
-      dayOfWeeks: Array.from(new Set(groupEvents.map((item) => Number(item.dayOfWeek)).filter((day) => this.weekDays.includes(day)))),
-      enabled: event.enabled !== false,
-      alwaysActive: event.alwaysActive !== false,
-      permittedEditorIds: [...(event.permittedEditorIds || []), ...(event.permittedEditorId ? [event.permittedEditorId] : [])]
-        .filter((id, index, arr) => !!id && arr.indexOf(id) === index)
+      ...this.defaultCustomEventForm(),
+      familyBase: event.familyBase || ''
     };
+    this.customEventDialogSelection = group.key;
+    this.customEventDialogEvents = [];
+    this.customEventDialogGroups = [];
     this.customEventActiveFromDate = event.activeFrom ? new Date(event.activeFrom) : null;
     this.customEventActiveToDate = event.activeTo ? new Date(event.activeTo) : null;
     this.customEventEditorPickerId = null;
     this.customEventEditorSearch = '';
-    this.loadCustomEventEditorTargets();
+    this.loadCustomEventDialogScopeEvents(false, group.key);
     this.customEventDialogVisible = true;
   }
 
@@ -4247,7 +4506,48 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   saveCustomEvent(): void {
     if (!this.canUseCustomEvent()) return;
-    if (!this.customEventForm.title?.trim()) {
+    if (this.customEventDialogSelection.startsWith('DEFAULT:')) {
+      const type = this.customEventDialogSelection.replace('DEFAULT:', '') as AttendanceType;
+      const selectedDays = this.customEventSelectedDays();
+      if (!selectedDays.length) {
+        this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار يوم واحد على الأقل للمناسبة' });
+        return;
+      }
+      const family = String(this.customEventForm.familyBase || this.selectedFamily || '').trim();
+      if (!family) {
+        this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد الأسرة أولاً' });
+        return;
+      }
+      this.customEventSaving = true;
+      const payload = { [type]: selectedDays } as Partial<Record<AttendanceType, number[]>>;
+      const existingAllowedDays = this.attendanceContext?.config?.familyAbsenceAllowedDays?.[family];
+      const existingOpenDays = this.attendanceContext?.config?.familyAbsenceOpenDays?.[family];
+      this.attendance.saveFamilyTypeDays(family, payload, existingAllowedDays, existingOpenDays).subscribe({
+        next: (cfg) => {
+          this.customEventSaving = false;
+          this.customEventDialogVisible = false;
+          const merged = this.mergeConfig(cfg);
+          this.configEditor = merged;
+          this.attendanceContext = {
+            ...(this.attendanceContext || {
+              todayOpenForServant: true, activeGrants: [], selfCheckinAllowed: false,
+              takeAttendanceGrantActive: false, selfAllowedTypes: [], takeAllowedTypes: [], canUseCustomEvent: false
+            }),
+            config: merged
+          };
+          this.initCalendarRules();
+          this.refreshRuntimeState();
+          this.loadCustomEventsForFamily();
+          this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ أيام المناسبة بنجاح' });
+        },
+        error: (err) => {
+          this.customEventSaving = false;
+          this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل حفظ أيام المناسبة' });
+        }
+      });
+      return;
+    }
+    if (this.isCreatingNewCustomEventSelection() && !this.customEventForm.title?.trim()) {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اكتب اسم المناسبة أولاً' });
       return;
     }
@@ -4280,9 +4580,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
 
     this.customEventSaving = true;
-    const editingTitleKey = this.normalizeCustomEventTitleKey(this.customEventForm.title);
+    const editingTitleKey = this.buildCustomEventGroupKey(this.customEventForm.title, this.customEventForm.familyBase);
+    const editingSource = this.customEventDialogEvents.length ? this.customEventDialogEvents : this.currentFamilyCustomEvents;
     const editingEvents = this.customEventDialogMode === 'edit'
-      ? this.currentFamilyCustomEvents.filter((event) =>
+      ? editingSource.filter((event) =>
           this.editingCustomEventGroupIds.includes(Number(event.id || 0))
           || this.customEventGroupKey(event) === editingTitleKey
         )
@@ -4313,6 +4614,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             ? `تم حفظ المناسبة لأيام: ${this.customEventSelectedDaysLabel()}`
             : 'تم حفظ المناسبة بنجاح'
         });
+        this.loadCustomEventDialogScopeEvents(this.isCreatingNewCustomEventSelection(), this.customEventDialogSelection);
         this.loadCustomEventsForFamily();
         this.onDateChange();
       },
@@ -4346,6 +4648,26 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (!ids.length) return;
     forkJoin(ids.map((id) => this.attendance.deleteCustomEvent(id))).subscribe({
       next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف المناسبة' });
+        this.loadCustomEventsForFamily();
+        this.onDateChange();
+      },
+      error: (err) => this.message.add({
+        severity: 'error',
+        summary: 'خطأ',
+        detail: err?.error?.error || err?.error?.message || 'فشل حذف المناسبة'
+      })
+    });
+  }
+
+  deleteEditingCustomEvent(): void {
+    const ids = this.editingCustomEventGroupIds
+      .filter((id) => !!id)
+      .map((id) => Number(id));
+    if (!ids.length) return;
+    forkJoin(ids.map((id) => this.attendance.deleteCustomEvent(id))).subscribe({
+      next: () => {
+        this.customEventDialogVisible = false;
         this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف المناسبة' });
         this.loadCustomEventsForFamily();
         this.onDateChange();

@@ -39,10 +39,9 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
     public void run(String... args) {
         if (fieldRepository.countByIsSystemTrue() > 0) {
             backfillMissingSystemSelectOptions();
-            return; // Already initialized
+            return;
         }
 
-        // We use order starting from 1 to easily sort them up.
         int order = 1;
 
         createSystemField("fullName", "الاسم بالكامل بالعربي", "TEXT", true, order++);
@@ -80,7 +79,6 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
         createSystemField("guardiansPhone", "هاتف ولي الأمر", "TEXT", true, order++);
         createSystemField("guardianRelation", "صلة القرابة", "TEXT", false, order++);
 
-        // Now, we must shift the display_order of any existing custom fields so they appear after system fields.
         List<CustomRegistrationField> existingCustoms = fieldRepository.findByIsSystemFalseOrderByDisplayOrderAsc();
         for (CustomRegistrationField f : existingCustoms) {
             f.setDisplayOrder(order++);
@@ -97,7 +95,7 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
                 .required(required)
                 .isSystem(true)
                 .displayOrder(order)
-                .visibilityRule("ALWAYS") // Specialized UI handles real visibility
+                .visibilityRule("ALWAYS")
                 .showIn("NONE")
                 .profileEditable(DEFAULT_PROFILE_EDITABLE_FIELDS.contains(key))
                 .enabled(true)

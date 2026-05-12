@@ -6,7 +6,7 @@ host {
   padding: 16px;
   max-width: 1280px;
   margin: 0 auto;
-  color: #161616;
+  color: #5e2b20 ;
 }
 
 .page-header {
@@ -53,7 +53,7 @@ host {
 
 .status-badge--blocked {
   background: #fff0f0;
-  color: #aa2d2d;
+  color: #5e2b20 ;
 }
 
 .alert {
@@ -83,7 +83,7 @@ host {
 .alert--danger {
   background: #fff6f6;
   border-color: #efc8c8;
-  color: #a73232;
+  color: #5e2b20 ;
 }
 
 .alert--info {
@@ -95,11 +95,11 @@ host {
 .alert--grant-note {
   background: #fff8f3;
   border-color: #ead3c7;
-  color: #7a341f;
+  color: #5e2b20 ;
 }
 
 .alert--grant-note .alert-body {
-  color: #5b3a31;
+  color: #5e2b20 ;
 }
 
 .layout {
@@ -258,18 +258,18 @@ textarea {
 .action-btn.secondary,
 .mini-btn {
   background: #f3f0ee;
-  color: #603426;
+  color: #5e2b20 ;
 }
 
 .scan-btn {
-  background: #111;
+  background: #5e2b20 ;
   color: #fff;
   min-height: 44px;
 }
 
 .pick-btn {
   min-width: 110px;
-  background: #161616;
+  background: #5e2b20 ;
   color: #fff;
 }
 
@@ -327,7 +327,7 @@ textarea {
 }
 
 .required-star {
-  color: #ef4444;
+  color: #5e2b20 ;
   margin-right: 2px;
 }
 
@@ -498,7 +498,7 @@ textarea {
   width: fit-content;
   border-radius: 999px;
   background: #f3f0ee;
-  color: #603426;
+  color: #5e2b20 ;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 800;
@@ -506,7 +506,7 @@ textarea {
 
 .self-checkin-card__countdown {
   font-weight: 800;
-  color: #5c2f21;
+  color: #5e2b20 ;
 }
 
 .self-checkin-submit {
@@ -590,7 +590,7 @@ textarea {
 .grant-summary-card__text {
   font-size: 16px;
   font-weight: 700;
-  color: #5f3328;
+  color: #5e2b20 ;
 }
 
 .grant-summary-card--side {
@@ -1099,10 +1099,30 @@ textarea {
   box-shadow: 0 26px 90px rgba(45, 23, 16, 0.34) !important;
 }
 
+::ng-deep .app-surface-dialog:not(.grant-dialog) .p-dialog-content {
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+::ng-deep .app-surface-dialog:not(.grant-dialog) .p-dialog-content::-webkit-scrollbar {
+  display: none;
+}
+
 ::ng-deep .grant-dialog .p-dialog-header,
 ::ng-deep .grant-dialog .p-dialog-content,
 ::ng-deep .grant-dialog .p-dialog-footer {
   color: #2f211b;
+}
+
+::ng-deep .grant-dialog .p-dialog-content {
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+::ng-deep .grant-dialog .p-dialog-content::-webkit-scrollbar {
+  display: none;
 }
 
 ::ng-deep .grant-dialog .p-dialog-footer {
@@ -1457,35 +1477,45 @@ textarea {
   margin-inline-start: auto;
 }
 
-.grant-target-options {
+.grant-target-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  max-height: 170px;
-  overflow: auto;
-  margin-top: 12px;
-  padding-inline-end: 4px;
 }
 
-.grant-target-option {
-  display: block;
-  width: 100%;
-  text-align: right;
-  padding: 12px 14px;
-  border: 1px solid #eaded6;
-  border-radius: 18px;
+.grant-target-row p-select {
+  flex: 1;
+}
+
+.grant-target-row ::ng-deep .p-select {
+  border: 1px solid #d4d4d4;
+  border-radius: 12px;
   background: #fff;
-  cursor: pointer;
+  padding: 5px 12px;
+  min-height: 44px;
 }
 
-.grant-target-option__name {
-  font-weight: 800;
-  color: #311f19;
-  font-size: 15px;
+.grant-target-row ::ng-deep .p-select .p-select-label {
+  color: #111;
+  font-size: 14px;
 }
 
-.grant-target-option__meta {
-  margin-top: 4px;
+.grant-target-row ::ng-deep .p-select .p-select-dropdown {
+  color: #6f645d;
+}
+
+.grant-target-row ::ng-deep .p-select.p-select-filter {
+  padding: 5px 12px;
+}
+
+
+
+.grant-target-row .mini-btn {
+  color: #000;
+}
+
+.grant-target-row .grant-target-actions__count {
+  white-space: nowrap;
   color: #6f645d;
   font-size: 13px;
 }
@@ -1503,7 +1533,7 @@ textarea {
   padding: 10px 12px;
   border-radius: 14px;
   background: #f6efe9;
-  color: #603729;
+  color: #5e2b20 ;
   font-weight: 700;
 }
 
@@ -1548,7 +1578,7 @@ textarea {
 .grant-type-window-group {
   padding: 16px;
   border-radius: 18px;
-  border: 1px solid #3a2a27;
+  border: 1px solid #5e2b20 ;
   background:
     linear-gradient(180deg, rgba(69, 45, 39, 0.96), rgba(42, 27, 25, 0.96));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -1623,7 +1653,7 @@ textarea {
 .grant-type-window select,
 .grant-type-window input,
 .grant-type-window textarea {
-  background: rgba(24, 19, 18, 0.92);
+  background: #5e2b20 ;
   border: 1px solid rgba(228, 197, 177, 0.2);
   color: #fff8f3;
 }
@@ -1641,14 +1671,14 @@ textarea {
 
 .grant-type-window ::ng-deep .p-inputtext,
 .grant-type-window ::ng-deep .p-datepicker-input {
-  background: rgba(24, 19, 18, 0.92);
+  background: #5e2b20 ;
   border: 1px solid rgba(228, 197, 177, 0.2);
   color: #fff8f3;
   width: 100%;
 }
 
 .grant-type-window ::ng-deep .p-datepicker-trigger {
-  background: rgba(255, 244, 236, 0.08);
+  background: #5e2b20;
   border: 1px solid rgba(228, 197, 177, 0.2);
   color: #fff4ec;
 }
@@ -1671,22 +1701,34 @@ textarea {
   font-weight: 700;
 }
 
-.grant-target-options {
-  max-height: 170px;
-  overflow-y: auto;
-}
-
 .form-group ::ng-deep .p-datepicker {
   width: 100%;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-header {
-  direction: rtl;
-}
-
 ::ng-deep .attendanceGrantDatePanel {
+  direction: rtl;
   z-index: 20000 !important;
   pointer-events: auto;
+  min-width: 380px;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-group-container {
+  min-width: 360px;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-calendar {
+  width: 100%;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-month {
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+::ng-deep .attendanceGrantDatePanel .p-datepicker-monthpicker .p-datepicker-month {
+  width: auto;
+  padding: 8px 12px;
+  min-width: 110px;
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button,
@@ -1876,8 +1918,8 @@ textarea {
 }
 
 .day-chip.active {
-  background: #7f3d2b;
-  border-color: #7f3d2b;
+  background: #5e2b20 ;
+  border-color: #5e2b20 ;
   color: #fff;
 }
 
@@ -1917,7 +1959,7 @@ textarea {
 
 .custom-event-card__title {
   font-weight: 800;
-  color: #3b2218;
+  color: #5e2b20 ;
 }
 
 .custom-event-card__meta {
@@ -1940,28 +1982,25 @@ textarea {
   padding: 8px 12px;
   border-radius: 999px;
   background: #f4eee8;
-  color: #5f3528;
+  color: #5e2b20 ;
   font-size: 13px;
   font-weight: 700;
 }
 
 .custom-editor-chip__remove {
-  width: 22px;
-  height: 22px;
   border: none;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  color: #8a4030;
+  background: none;
+  color: #5e2b20 ;
   cursor: pointer;
   padding: 0;
 }
 
 .grant-enabled.pending {
   background: #fff3cd;
-  color: #8a5a00;
+  color: #5e2b20 ;
   border-color: #f2cf72;
 }
 
@@ -1981,18 +2020,12 @@ textarea {
   .grant-family-checks {
     grid-template-columns: 1fr;
   }
-
-  .grant-target-options {
-    max-height: 220px;
-  }
 }
 
 .custom-editor-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 8px;
-  max-height: 220px;
-  overflow: auto;
   margin-top: 10px;
   padding: 4px;
 }
@@ -2015,7 +2048,7 @@ textarea {
 
 .custom-editor-option span {
   font-weight: 800;
-  color: #3b2218;
+  color: #5e2b20 ;
 }
 
 .custom-editor-option small {
@@ -2037,7 +2070,7 @@ textarea {
   display: grid;
   gap: 5px;
   font-size: 0.84rem;
-  color: #30231f;
+  color: #5e2b20 ;
 }
 
 .grant-type-status.open {
@@ -2055,7 +2088,7 @@ textarea {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  color: #2d211c;
+  color: #5e2b20 ;
 }
 
 .grant-type-status__head strong {
@@ -2084,7 +2117,7 @@ textarea {
 
 .grant-saved-list__title {
   font-weight: 900;
-  color: #3b2218;
+  color: #5e2b20 ;
 }
 
 .grant-saved-item {
@@ -2101,7 +2134,7 @@ textarea {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
-  color: #3b2218;
+  color: #5e2b20 ;
 }
 
 .grant-saved-item__main span,
@@ -2203,31 +2236,31 @@ textarea {
 ::ng-deep .grant-dialog .dialog-footer .mini-btn {
   background: #f5ece7;
   border: 1px solid #ead8ca;
-  color: #5e2b20;
+  color: #5e2b20 ;
   font-weight: 800;
 }
 
 ::ng-deep .grant-dialog .grant-target-actions .mini-btn:hover,
 ::ng-deep .grant-dialog .dialog-footer .mini-btn:hover {
-  background: #7f3d2b;
-  border-color: #7f3d2b;
+  background: #5e2b20 ;
+  border-color: #5e2b20 ;
   color: #ffffff;
 }
 
 ::ng-deep .grant-dialog .dialog-footer .action-btn {
-  background: #7f3d2b;
-  border: 1px solid #7f3d2b;
+  background: #5e2b20 ;
+  border: 1px solid #5e2b20 ;
   color: #ffffff;
 }
 
 ::ng-deep .grant-dialog .dialog-footer .action-btn:hover {
-  background: #6f3425;
-  border-color: #6f3425;
+  background: #5e2b20 ;
+  border-color: #5e2b20 ;
   color: #ffffff;
 }
 
 .grant-target-actions__count {
-  color: #6b4a3d;
+  color: #5e2b20 ;
   font-size: 13px;
   font-weight: 700;
 }

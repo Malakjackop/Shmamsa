@@ -177,10 +177,10 @@ public class CustomAttendanceEventController {
 
     private boolean canEditEvent(User user, CustomAttendanceEvent event) {
         if (event == null || user == null) return false;
-        if (canManage(user)) return true;
+        if (isAminKhedmaOrDev(user)) return true;
+        if (canManageEventFamily(user, event)) return true;
         if (isSameUser(user, event.getCreatedBy())) return true;
         if (isPermittedEditor(user, event)) return true;
-        if (canManageEventFamily(user, event)) return true;
         return event.getCreatedBy() == null && isAminKhedmaOrDev(user);
     }
 

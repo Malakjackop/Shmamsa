@@ -173,7 +173,6 @@ export class FamilyAttendanceComponent implements OnInit {
   dailyPresent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
   dailyAbsent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
   dailyMaxDate: Date = this.buildDailyMaxDate();
-  dailyDisabledWeekDays: number[] = [0, 1, 2, 3]; // الأحد - الاثنين - الثلاثاء - الأربعاء
   familyCustomEvents: AttendanceCustomEvent[] = [];
   availableDailyCustomEvents: AttendanceCustomEvent[] = [];
   selectedDailyCustomEventId: number | '' = '';
@@ -256,11 +255,31 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   isAminKhedmaOrDev(): boolean {
-    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(normalizeRole(this.me?.role));
+    return this.hasAminKhedmaPrivilege() || normalizeRole(this.me?.role) === 'DEVELOPER';
   }
 
   isKhadim(): boolean {
     return normalizeRole(this.me?.role) === 'KHADIM';
+  }
+
+  private hasScopedAssignmentRole(role: 'AMIN_OSRA' | 'AMIN_KHEDMA'): boolean {
+    return this.assignmentsOf(this.me).some((assignment) => assignment.role === role);
+  }
+
+  private hasAminOsraPrivilege(): boolean {
+    return normalizeRole(this.me?.role) === 'AMIN_OSRA' || this.hasScopedAssignmentRole('AMIN_OSRA');
+  }
+
+  private hasAminKhedmaPrivilege(): boolean {
+    return normalizeRole(this.me?.role) === 'AMIN_KHEDMA' || this.hasScopedAssignmentRole('AMIN_KHEDMA');
+  }
+
+  private canOverrideDailyAttendanceDateRestriction(): boolean {
+    return this.hasAminOsraPrivilege() || this.isAminKhedmaOrDev();
+  }
+
+  get dailyDisabledWeekDays(): number[] {
+    return this.canOverrideDailyAttendanceDateRestriction() ? [] : [0, 1, 2, 3];
   }
 
   private mainFamily(name: string): string {
@@ -274,9 +293,16 @@ export class FamilyAttendanceComponent implements OnInit {
   private hasAminOsraScopeForFamily(family: string): boolean {
     const target = this.mainFamily(String(family || '').trim()).toUpperCase();
     if (!target) return false;
+    const scopedAssignments = this.assignmentsOf(this.me).filter((x) => x.role === 'AMIN_OSRA');
+    if (scopedAssignments.length) {
+      return scopedAssignments.some((x) =>
+        this.mainFamily(String(x.familyName || '').trim()).toUpperCase() === target
+      );
+    }
+    if (!this.hasAminOsraPrivilege()) return false;
     return this.assignmentsOf(this.me).some((x) =>
       x.role === 'AMIN_OSRA' && this.mainFamily(String(x.familyName || '').trim()).toUpperCase() === target
-    );
+    ) || this.mainFamily(this.familyLabel(this.me)).toUpperCase() === target;
   }
 
   private assignmentsOf(entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined): Array<{ familyName: string; role: string }> {
@@ -744,8 +770,7 @@ export class FamilyAttendanceComponent implements OnInit {
   // ===== Daily attendance (حضور اليوم) =====
 
   canEditDailyAttendance(): boolean {
-    const r = normalizeRole(this.me?.role);
-    return r === 'KHADIM' || r === 'AMIN_OSRA' || r === 'AMIN_KHEDMA' || r === 'DEVELOPER';
+    return this.isKhadim() || this.hasAminOsraPrivilege() || this.isAminKhedmaOrDev();
   }
 
   private buildDailyMaxDate(): Date {
@@ -824,6 +849,8 @@ export class FamilyAttendanceComponent implements OnInit {
 
     // يمنع الأيام المستقبلية
     if (d.getTime() > today.getTime()) return false;
+
+    if (this.canOverrideDailyAttendanceDateRestriction()) return true;
 
     // يسمح فقط بالخميس والجمعة والسبت
     const day = d.getDay(); // 4 الخميس - 5 الجمعة - 6 السبت

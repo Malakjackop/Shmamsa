@@ -539,6 +539,36 @@ textarea {
   padding: 12px 14px;
 }
 
+.p-select-overlay {
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  --p-overlay-select-background: #ffffff;
+  --p-select-overlay-background: #ffffff;
+  --p-select-overlay-color: #111111;
+  --p-select-overlay-border-radius: 12px;
+  --p-select-overlay-border-color: #d4d4d4;
+  --p-select-overlay-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  --p-select-option-color: #111111;
+  --p-select-option-focus-background: #f5ece7;
+  --p-select-option-focus-color: #111111;
+  --p-select-option-selected-background: #f4eee8;
+  --p-select-option-selected-color: #5e2b20;
+  --p-select-option-selected-focus-background: #f4eee8;
+  --p-select-option-selected-focus-color: #5e2b20;
+  --p-select-option-padding: 10px 12px;
+  --p-select-option-border-radius: 8px;
+  --p-select-header-padding: 8px;
+  --p-select-list-padding: 4px;
+  --p-select-list-gap: 2px;
+  --p-select-filter-padding: 10px 12px;
+  --p-select-empty-message-padding: 10px 12px;
+  --p-select-checkmark-color: #111111;
+  --p-select-checkmark-gutter-start: 0;
+  --p-select-checkmark-gutter-end: 0;
+}
+
 .app-surface-dialog input:not([type='checkbox'])::placeholder,
 .app-surface-dialog textarea::placeholder {
   color: #8f827b;

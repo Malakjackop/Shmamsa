@@ -95,6 +95,53 @@ public class  FamilyController {
         }
         return new ArrayList<>(out);
     }
+
+    private boolean hasScopedRole(User user, String wantedRole) {
+        if (user == null || wantedRole == null || wantedRole.isBlank()) return false;
+        return userFamilyRoleService.getAssignments(user).stream()
+                .map(UserFamilyAssignmentView::getRole)
+                .map(FamilyController::normRole)
+                .anyMatch(wantedRole::equals);
+    }
+
+    private boolean hasAminOsraPrivilege(User user) {
+        return user != null
+                && ("AMIN_OSRA".equals(normRole(user.getRole())) || hasScopedRole(user, "AMIN_OSRA"));
+    }
+
+    private boolean hasAminKhedmaPrivilege(User user) {
+        return user != null
+                && ("AMIN_KHEDMA".equals(normRole(user.getRole())) || hasScopedRole(user, "AMIN_KHEDMA"));
+    }
+
+    private List<String> aminOsraScopeBases(User user) {
+        if (!hasAminOsraPrivilege(user)) return List.of();
+
+        LinkedHashSet<String> out = userFamilyRoleService.getAssignments(user).stream()
+                .filter(Objects::nonNull)
+                .filter(assignment -> "AMIN_OSRA".equals(normRole(assignment.getRole())))
+                .map(assignment -> familyAccessService.baseNameForId(assignment.getFamilyId(), assignment.getFamilyName()))
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(x -> !x.isBlank())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        if (!out.isEmpty()) return new ArrayList<>(out);
+
+        List<String> fallback = memberBasesOf(user);
+        if (!fallback.isEmpty()) return fallback;
+
+        String base = baseFamilyOf(user);
+        if (base != null && !base.isBlank()) return List.of(base);
+        return List.of();
+    }
+
+    private boolean hasAminOsraScopeForFamily(User user, String family) {
+        String selectedBase = looseBaseNameForName(family);
+        if (selectedBase == null || selectedBase.isBlank()) return false;
+        return aminOsraScopeBases(user).stream().anyMatch(base -> base.equalsIgnoreCase(selectedBase));
+    }
+
     private List<String> servingBasesOf(User u) {
         return familyAccessService.servingBasesOf(u);
     }
@@ -291,14 +338,20 @@ public class  FamilyController {
         User me = userRepo.findByUsername(auth.getName()).orElse(null);
 
         String role = normRole(me == null ? null : me.getRole());
-        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
+        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role) || hasAminKhedmaPrivilege(me);
         boolean isKhadim = "KHADIM".equals(role);
-        boolean isAminOsra = "AMIN_OSRA".equals(role);
+        boolean isAminOsra = "AMIN_OSRA".equals(role) || hasAminOsraPrivilege(me);
         boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
 
         if (attendanceContext && me != null && !isAminKhedmaOrDev && !isKhadim && !isAminOsra) {
             List<String> grantFamilies = visibleTakeAttendanceGrantFamilies(me);
             return ResponseEntity.ok(grantFamilies);
+        }
+
+        if (attendanceContext && me != null && isAminOsra && !isAminKhedmaOrDev) {
+            List<String> out = new ArrayList<>(aminOsraScopeBases(me));
+            out.sort(String::compareTo);
+            return ResponseEntity.ok(out);
         }
 
         if (isKhadim && !attendanceContext) {
@@ -349,8 +402,8 @@ public class  FamilyController {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
         String role = normRole(me.getRole());
-        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role);
-        boolean isAminOsra = "AMIN_OSRA".equals(role);
+        boolean isAminKhedmaOrDev = "AMIN_KHEDMA".equals(role) || "DEVELOPER".equals(role) || hasAminKhedmaPrivilege(me);
+        boolean isAminOsra = "AMIN_OSRA".equals(role) || hasAminOsraPrivilege(me);
         boolean isKhadim = "KHADIM".equals(role);
 
         boolean servantsBucket = isAminKhedmaOrDev && family != null && "SERVANTS".equalsIgnoreCase(family.trim());
@@ -359,7 +412,8 @@ public class  FamilyController {
         boolean hasFamilySelection = family != null && !family.isBlank();
 
         String effectiveRole = hasFamilySelection ? effectiveRoleIn(me, family) : role;
-        boolean effIsAminOsra = "AMIN_OSRA".equals(effectiveRole);
+        boolean aminOsraScopeForSelectedFamily = hasFamilySelection && hasAminOsraScopeForFamily(me, family);
+        boolean effIsAminOsra = aminOsraScopeForSelectedFamily || (!hasFamilySelection && isAminOsra);
 
         boolean attendanceContext = context != null && "attendance".equalsIgnoreCase(context.trim());
         boolean hasTakeAttendanceGrant = attendanceContext && attendanceAccessGrantService.hasVisibleGrant(me.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
@@ -368,6 +422,10 @@ public class  FamilyController {
         boolean grantSelectedContext = attendanceContext && hasFamilySelection && takeAttendanceGrantAllowsSelectedFamily(me, family);
         boolean delegatedTakeAttendanceContext = attendanceContext && hasFamilySelection && hasTakeAttendanceGrant && takeAttendanceGrantAllowsSelectedFamily(me, family);
         boolean aminOsraAttendanceContext = effIsAminOsra && hasFamilySelection && attendanceContext;
+
+        if (attendanceContext && hasFamilySelection && isAminOsra && !isAminKhedmaOrDev && !aminOsraScopeForSelectedFamily && !grantSelectedContext) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
 
         if (isKhadim && hasFamilySelection && !attendanceContext) {
             String selectedBase = looseBaseNameForName(family);
