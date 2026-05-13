@@ -603,13 +603,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.grantsFilterFamily = '';
     this.grantPopupFilter = 'ALL';
     this.grantPopupVisible = true;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
-      });
-    });
+    setTimeout(() => {
+      if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }, 50);
   }
 
   closeGrantsPopup(): void {

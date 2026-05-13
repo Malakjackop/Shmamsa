@@ -607,6 +607,10 @@ textarea {
   margin-top: 10px;
 }
 
+.side-btn-mt {
+  margin-top: 14px;
+}
+
 .topFilterRow{
   display:flex;
   justify-content:flex-start;

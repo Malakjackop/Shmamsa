@@ -115,9 +115,7 @@
           <p class="side-hint" *ngIf="!selectedFamily && canManageAccessGrants()">اختار أسرة أولاً عشان تختار الأشخاص المستهدفين.</p>
 
           <ng-container *ngIf="canUseCustomEvent()">
-            <hr class="side-divider" *ngIf="canManageAccessGrants()">
-
-            <button type="button" class="action-btn" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily && !isAminKhedmaOrDeveloper()">
+            <button type="button" class="action-btn side-btn-mt" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily && !isAminKhedmaOrDeveloper()">
               <i class="pi pi-calendar-plus"></i>
               ادارة المناسبات
             </button>
