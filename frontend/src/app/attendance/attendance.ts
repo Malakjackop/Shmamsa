@@ -1,5 +1,6 @@
 ﻿import { Component, OnDestroy, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { ViewChild } from '@angular/core';
 import {
   AttendanceService,
   AttendanceType,
@@ -11,10 +12,11 @@ import {
 import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { MessageService } from 'primeng/api';
+import { Select } from 'primeng/select';
 import { assignmentRolesOf, normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
 import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
-import { forkJoin, of } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { forkJoin, from, of } from 'rxjs';
+import { catchError, concatMap, switchMap, toArray } from 'rxjs/operators';
 
 type PickUser = {
   id: number;
@@ -127,6 +129,8 @@ type CustomEventDialogOption = {
   providers: [MessageService]
 })
 export class AttendanceComponent implements OnInit, OnDestroy {
+  @ViewChild('grantTargetSelect') private grantTargetSelect?: Select;
+
   private attendance = inject(AttendanceService);
   private auth = inject(AuthService);
   private familySvc = inject(FamilyService);
@@ -174,6 +178,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   grantSearchText = '';
   grantPopupFilter: GrantPopupFilter = 'ALL';
   selectedGrantPersonKeys: string[] = [];
+  expandedDialogGrantPersonKeys: string[] = [];
   grantDialogVisible = false;
   grantDialogMode: 'create' | 'edit' = 'create';
   grantForm: Partial<AttendanceAccessGrant> = this.defaultGrantForm();
@@ -197,6 +202,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   filteredGrantTargetList: PickUser[] = [];
   selectedGrantTargetList: PickUser[] = [];
   grantTargetDropdownSelection: number | null = null;
+  grantTargetSelectVisible = true;
   grantSavedSummaries: GrantSavedSummary[] = [];
   readonly grantNoDisabledDays: number[] = [];
   readonly grantMinDate: Date = this.startOfToday();
@@ -246,11 +252,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   customEventActiveFromDate: Date | null = null;
   customEventActiveToDate: Date | null = null;
   customEventBlockedDates: Date[] = [];
+  readonly customEventMinDate: Date = this.startOfToday();
   familyCustomEvents: AttendanceCustomEvent[] = [];
   familyCustomEventGroups: CustomEventGroup[] = [];
   availableCustomEvents: AttendanceCustomEvent[] = [];
   selectedCustomEventId: number | '' = '';
   customEventsPopupVisible = false;
+  customEventDeleteConfirmVisible = false;
+  pendingCustomEventDeleteGroup: CustomEventGroup | null = null;
+  private pendingEditingCustomEventDelete = false;
   customEventEditorTargets: PickUser[] = [];
   customEventEditorPickerId: number | null = null;
   customEventEditorSearch = '';
@@ -741,6 +751,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return (this.selectedGrantPersonKeys || []).includes(group.key);
   }
 
+  isDialogGrantPersonExpanded(group: PersonGrantGroup): boolean {
+    return (this.expandedDialogGrantPersonKeys || []).includes(group.key);
+  }
+
+  toggleDialogGrantPerson(group: PersonGrantGroup): void {
+    if (this.isDialogGrantPersonExpanded(group)) {
+      this.expandedDialogGrantPersonKeys = this.expandedDialogGrantPersonKeys.filter((key) => key !== group.key);
+      return;
+    }
+    this.expandedDialogGrantPersonKeys = [group.key];
+  }
+
+  dialogExpandedGrantPersonGroup(groups: PersonGrantGroup[]): PersonGrantGroup | null {
+    const key = this.expandedDialogGrantPersonKeys[0];
+    return groups.find((group) => group.key === key) || null;
+  }
+
   toggleGrantPersonSelection(group: PersonGrantGroup, checked: boolean): void {
     const selected = new Set(this.selectedGrantPersonKeys || []);
     if (checked) selected.add(group.key);
@@ -1031,12 +1058,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const selectedTargetIds = new Set((this.selectedGrantTargetIds || []).map((id) => Number(id || 0)).filter(Boolean));
     const wantedAudience = this.grantAudience;
     const editingKey = this.editingGrantGroup()?.key || '';
+    const scopeFamilies = this.currentGrantDialogScopeFamilies();
 
     return this.groupAccessGrants(
       this.visibleGrantsForCurrentManager(this.knownAccessGrants()).filter((grant) => {
         const grantId = Number(grant.id || 0);
         if (grantId && editingIds.has(grantId)) return false;
         if (selectedTargetIds.size && !selectedTargetIds.has(Number(grant.targetUserId || 0))) return false;
+        if (scopeFamilies.length && !this.grantFamiliesOverlap(this.grantFamilyList(grant.familyBase), scopeFamilies)) return false;
+        if (!this.grantMatchesCurrentConfiguredDays(grant)) return false;
         return this.grantTargetAudience(grant) === wantedAudience;
       })
     ).filter((group) => !editingKey || group.key !== editingKey);
@@ -1047,12 +1077,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const editingIds = new Set(this.editingGrantGroupIds.map((id) => Number(id || 0)).filter(Boolean));
     const selectedTargetIds = new Set((this.selectedGrantTargetIds || []).map((id) => Number(id || 0)).filter(Boolean));
     const wantedAudience = this.grantAudience;
+    const scopeFamilies = this.currentGrantDialogScopeFamilies();
 
     return this.groupGrantsByPerson(
       this.visibleGrantsForCurrentManager(this.knownAccessGrants()).filter((grant) => {
         const grantId = Number(grant.id || 0);
         if (grantId && editingIds.has(grantId)) return false;
         if (selectedTargetIds.size && !selectedTargetIds.has(Number(grant.targetUserId || 0))) return false;
+        if (scopeFamilies.length && !this.grantFamiliesOverlap(this.grantFamilyList(grant.familyBase), scopeFamilies)) return false;
+        if (!this.grantMatchesCurrentConfiguredDays(grant)) return false;
         return this.grantTargetAudience(grant) === wantedAudience;
       })
     );
@@ -1096,6 +1129,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private syncGrantFamilyFormFromSelections(): void {
     this.grantForm.familyBase = this.grantFamilySelections.length ? this.grantFamilySelections.join(', ') : '';
+  }
+
+  private currentGrantDialogScopeFamilies(): string[] {
+    const fromForm = this.grantFamilyList(this.grantForm.familyBase);
+    if (fromForm.length) return fromForm;
+    if (this.grantFamilySelections.length) return this.grantFamilySelections.filter(Boolean);
+    return [this.selectedFamily || this.defaultGrantScopeFamily()].filter(Boolean);
   }
 
   toggleGrantFamilySelection(family: string): void {
@@ -1264,6 +1304,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         };
         this.initCalendarRules();
         this.refreshRuntimeState();
+        this.cleanupAccessGrantsForTypeDays([this.selectedConfigFamily], payload);
         this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ مواعيد الأنواع بنجاح' });
         this.configSaving = false;
       },
@@ -1782,7 +1823,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const family = this.selectedFamily;
     return this.familyCustomEvents.filter((event) => {
       if (event.enabled === false) return false;
-      if (!family) return this.isGlobalCustomEvent(event);
+      if (!this.isCustomEventStillCurrent(event)) return false;
+      if (!family) return true;
       return this.isCustomEventRelevantToFamily(event, family);
     });
   }
@@ -2150,8 +2192,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.selectedCustomEventId = '';
     this.customTitle = '';
     this.refreshTypeOptions();
-    if (this.selectedFamily) this.loadMembersForFamily();
-    else if (this.searchText.trim()) this.runSearch();
+    this.loadMembersForFamily();
     if (this.canManageAccessGrants()) this.loadGrantTargets();
     this.loadCustomEventsForFamily();
     this.initCalendarRules();
@@ -2166,22 +2207,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private runSearch() {
     const q = (this.searchText || '').trim();
-    if (this.selectedFamily || !q) {
-      if (!q) this.globalResults = [];
-      return;
-    }
-
-    this.searching = true;
-    this.familySvc.search(q).subscribe({
-      next: (list) => {
-        this.globalResults = (list as any[])?.map(this.toPickUser) || [];
-        this.searching = false;
-      },
-      error: () => {
-        this.globalResults = [];
-        this.searching = false;
-      }
-    });
+    if (!q) this.globalResults = [];
   }
 
   private loadFamilies() {
@@ -2203,10 +2229,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.families = this.filterFamiliesByGrantScope(allFamilies);
         this.ensureSelectedConfigFamily();
         this.syncSelectedFamilyWithGrantScope();
-        if ((!this.selectedFamily || !this.families.includes(this.selectedFamily)) && this.families.length) {
+        if ((!this.selectedFamily || !this.families.includes(this.selectedFamily)) && this.families.length && this.hasRestrictedFamilyScope()) {
           this.selectedFamily = this.families[0];
           this.loadMembersForFamily();
-        } else if (this.selectedFamily) {
+        } else {
           this.loadMembersForFamily();
         }
         this.loadCustomEventsForFamily();
@@ -2219,11 +2245,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private loadMembersForFamily() {
-    if (!this.selectedFamily) return;
     this.membersLoading = true;
     this.membersLoadError = '';
 
-    const familiesToLoad = this.scopeFamiliesForSelection(this.selectedFamily);
+    const familiesToLoad = this.selectedFamily
+      ? this.scopeFamiliesForSelection(this.selectedFamily)
+      : this.families;
     const requestedFamilies = Array.from(new Set((familiesToLoad.length ? familiesToLoad : [this.selectedFamily]).filter(Boolean)));
 
     const requests = requestedFamilies.map((family) =>
@@ -2281,11 +2308,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   get displayedMembers(): PickUser[] {
     const q = (this.searchText || '').trim().toLowerCase();
-    if (this.selectedFamily) {
-      if (!q) return this.members;
-      return this.members.filter((m) => (m.fullName || '').toLowerCase().includes(q));
-    }
-    return this.globalResults;
+    if (!q) return this.members;
+    return this.members.filter((m) => {
+      const text = [m.fullName, m.username, m.familyName, m.deaconFamily]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+      return text.includes(q);
+    });
   }
 
   isSelected(id: number): boolean {
@@ -2323,10 +2352,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const iso = this.selectedDate ? this.toIsoDate(this.selectedDate) : undefined;
     const requestedFamily = this.selectedFamily || undefined;
     const selectedType = this.selectedAttendanceType();
+    const customEventFamily = selectedType === 'CUSTOM_EVENT'
+      ? String(this.selectedCustomEvent()?.familyBase || '').trim() || undefined
+      : undefined;
     const family = ((this.shouldEnforceGrantWindow() || this.isScopedAminOsraAttendanceManager()) && requestedFamily)
       ? requestedFamily
       : (['FAMILY_MEETING', 'CUSTOM_EVENT', 'MARMARKOS_KHORS', 'ATHANASIUS_KHORS'].includes(selectedType)
-        ? requestedFamily
+        ? (requestedFamily || customEventFamily)
         : undefined);
 
     const customTitle = selectedType === 'CUSTOM_EVENT' ? this.customTitle.trim() || undefined : undefined;
@@ -2342,12 +2374,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
           this.loadMembersForFamily();
           this.initCalendarRules();
           this.refreshRuntimeState();
-          this.message.add({
-            severity: 'info',
-            summary: 'تم تغيير الأسرة تلقائياً',
-            detail: `تم تحويل التسجيل إلى ${effectiveFamily} لأن العضو يتبع هذه الأسرة.`,
-            life: 3500
-          });
         }
 
         if (u?.alreadyPresent) {
@@ -2424,7 +2450,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (['FAMILY_MEETING', 'CUSTOM_EVENT', 'MARMARKOS_KHORS', 'ATHANASIUS_KHORS'].includes(selectedType) && !this.selectedFamily) {
+    const selectedCustomEventFamily = selectedType === 'CUSTOM_EVENT'
+      ? String(this.selectedCustomEvent()?.familyBase || '').trim()
+      : '';
+    const submitFamily = this.selectedFamily || selectedCustomEventFamily || undefined;
+
+    if (['FAMILY_MEETING', 'MARMARKOS_KHORS', 'ATHANASIUS_KHORS'].includes(selectedType) && !this.selectedFamily) {
       this.message.add({ severity: 'warn', summary: 'No family', detail: 'اختار الأسرة قبل التسجيل' });
       return;
     }
@@ -2434,7 +2465,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.attendance.submit(users, selectedType, iso, this.selectedFamily || undefined, this.customTitle.trim() || undefined).subscribe({
+    this.attendance.submit(users, selectedType, iso, submitFamily, this.customTitle.trim() || undefined).subscribe({
       next: (res) => {
         const created = res?.presentCreated ?? res?.created ?? 0;
         const updated = res?.presentUpdated ?? res?.updated ?? 0;
@@ -2471,7 +2502,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       startsAt: this.nowPlusHours(0),
       endsAt: this.nowPlusHours(2),
       enabled: true,
-      familyBase: this.canChooseGrantFamily() ? this.selectedFamily : this.defaultGrantScopeFamily()
+      familyBase: this.canChooseGrantFamily() ? '' : this.defaultGrantScopeFamily()
     };
   }
 
@@ -2600,8 +2631,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.syncGrantFamilyFormFromSelections();
       this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
     } else {
-      this.grantFamilySelections = this.canChooseGrantFamily() ? [] : (this.defaultGrantScopeFamily() ? [this.defaultGrantScopeFamily()] : []);
-      this.grantForm.familyBase = this.canChooseGrantFamily() ? '' : this.defaultGrantScopeFamily();
+      const familyScope = this.grantForm.familyBase
+        || this.selectedFamily
+        || this.defaultGrantScopeFamily()
+        || this.grantFamilyFilterOptions()[0]
+        || '';
+      this.grantFamilySelections = familyScope ? [familyScope] : [];
+      this.grantForm.familyBase = familyScope;
       this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
     }
     this.loadGrantCustomEvents();
@@ -2617,11 +2653,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   onGrantFamilyBaseChange(): void {
     this.grantForm.targetUserId = undefined;
     this.selectedGrantTargetIds = [];
+    this.clearGrantTargetDropdownSelection();
     this.grantTargetSearch = '';
-    if (this.grantAudience === 'SERVANTS') {
-      this.grantFamilySelections = this.grantForm.familyBase ? [this.grantForm.familyBase] : [];
-      this.syncGrantFamilyFormFromSelections();
-    }
+    this.grantFamilySelections = this.grantForm.familyBase ? [this.grantForm.familyBase] : [];
+    if (this.grantAudience === 'SERVANTS') this.syncGrantFamilyFormFromSelections();
     this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
     this.loadGrantCustomEvents();
   }
@@ -3012,7 +3047,29 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       ? savedDay
       : (selected?.days[0] ?? savedDay ?? null);
     this.syncGrantDatesForSelection(false);
+    if (this.grantDialogMode === 'edit') this.applyGrantEditDatesToWindows();
     this.refreshGrantDialogViewModels();
+  }
+
+  private applyGrantEditDatesToWindows(): void {
+    if (this.grantDialogMode !== 'edit') return;
+    const startsAt = this.grantForm.startsAt ? new Date(this.grantForm.startsAt) : null;
+    const endsAt = this.grantForm.endsAt ? new Date(this.grantForm.endsAt) : null;
+    if (!startsAt || !endsAt || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return;
+
+    const day = this.weekDays.includes(Number(this.grantForm.dayOfWeek))
+      ? Number(this.grantForm.dayOfWeek)
+      : startsAt.getDay();
+
+    this.grantSelectedWeekday = day;
+    this.grantForm.dayOfWeek = day;
+    this.grantStartsAtDate = startsAt;
+    this.grantEndsAtDate = endsAt;
+
+    const otherWindows = (this.grantDayWindows || []).filter((window) => window.day !== day);
+    const editWindow = this.buildGrantWindow(day, startsAt, endsAt);
+    this.grantDayWindows = [editWindow, ...otherWindows];
+    this.refreshSelectedGrantWindow();
   }
 
   private loadGrantCustomEvents(): void {
@@ -3070,6 +3127,16 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  private grantTargetScopeFamily(scopeFamily = ''): string {
+    const families = this.grantFamilyList(scopeFamily);
+    return families[0]
+      || this.grantFamilySelections[0]
+      || this.selectedFamily
+      || this.defaultGrantScopeFamily()
+      || this.grantFamilyFilterOptions()[0]
+      || '';
+  }
+
   private loadGrantTargets(scopeFamily = this.grantForm.familyBase || this.defaultGrantScopeFamily()): void {
     if (!this.canManageAccessGrants()) {
       this.grantTargets = [];
@@ -3077,50 +3144,24 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.refreshGrantTargetLists();
       return;
     }
-    if (!scopeFamily) {
-      const allFamilies = this.families.filter(Boolean);
-      if (!allFamilies.length) {
-        this.grantTargets = [];
-        this.syncSelectedGrantTargets();
-        this.refreshGrantTargetLists();
-        return;
-      }
-      const isServants = this.grantAudience === 'SERVANTS';
-      forkJoin(allFamilies.map((family) => forkJoin([
-        this.familySvc.members(family, true, 'attendance'),
-        ...(isServants ? [this.familySvc.members(family, true)] : [])
-      ]))).subscribe({
-        next: (groups) => {
-          const merged = groups
-            .flatMap((pair: any) => [...(pair?.[0] || []), ...(pair?.[1] || [])])
-            .map((x: any) => this.toPickUser(x));
-          const unique = merged.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
-          this.grantTargets = unique.filter((user) =>
-            isServants ? this.isServantGrantTarget(user) : this.isMemberGrantTarget(user)
-          );
-          this.syncSelectedGrantTargets();
-          this.refreshGrantTargetLists();
-        },
-        error: () => {
-          this.grantTargets = [];
-          this.syncSelectedGrantTargets();
-          this.refreshGrantTargetLists();
-        }
-      });
+    const targetScopeFamily = this.grantTargetScopeFamily(scopeFamily);
+    if (!targetScopeFamily) {
+      this.grantTargets = [];
+      this.syncSelectedGrantTargets();
+      this.refreshGrantTargetLists();
       return;
     }
     if (this.grantAudience === 'SERVANTS') {
-      const requestFamily = this.canChooseGrantFamily() ? scopeFamily : undefined;
       forkJoin([
-        this.familySvc.members(requestFamily, true, 'attendance'),
-        this.familySvc.members(requestFamily, true)
+        this.familySvc.members(targetScopeFamily, true, 'attendance'),
+        this.familySvc.members(targetScopeFamily, true)
       ]).subscribe({
         next: ([attendanceMembers, familyMembers]) => {
           const allTargets = [...(attendanceMembers || []), ...(familyMembers || [])]
             .map((x: any) => this.toPickUser(x));
           const unique = allTargets.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
           this.grantTargets = unique.filter((user) =>
-            this.isServantGrantTarget(user) && this.belongsToFamilyScope(user, scopeFamily)
+            this.isServantGrantTarget(user) && this.belongsToFamilyScope(user, targetScopeFamily)
           );
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
@@ -3133,13 +3174,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       });
       return;
     }
-    this.familySvc.members(scopeFamily, true, 'attendance').subscribe({
+    this.familySvc.members(targetScopeFamily, true, 'attendance').subscribe({
       next: (m) => {
         const allTargets = (m || []).map((x: any) => this.toPickUser(x));
         this.grantTargets = allTargets.filter((user) =>
-          this.grantAudience === 'SERVANTS'
+          this.belongsToFamilyScope(user, targetScopeFamily)
+          && (this.grantAudience === 'SERVANTS'
             ? this.isServantGrantTarget(user)
-            : this.isMemberGrantTarget(user)
+            : this.isMemberGrantTarget(user))
         );
         this.syncSelectedGrantTargets();
         this.refreshGrantTargetLists();
@@ -3184,11 +3226,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }));
   }
 
-  onGrantTargetDropdownChange(): void {
-    if (this.grantTargetDropdownSelection) {
-      this.addGrantTarget(this.grantTargetDropdownSelection);
-      this.grantTargetDropdownSelection = null;
+  onGrantTargetDropdownChange(value: number | null): void {
+    this.grantTargetDropdownSelection = value;
+    if (value) {
+      this.addGrantTarget(value);
+      this.clearGrantTargetDropdownSelection();
     }
+  }
+
+  clearGrantTargetDropdownSelection(): void {
+    this.grantTargetDropdownSelection = null;
+    this.grantTargetSelect?.clear();
+    this.grantTargetSelectVisible = false;
+    setTimeout(() => {
+      this.grantTargetDropdownSelection = null;
+      this.grantTargetSelect?.clear();
+      this.grantTargetSelectVisible = true;
+    });
   }
 
   private grantTargetSelectionIds(): number[] {
@@ -3212,6 +3266,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const ids = this.grantTargetSelectionIds();
     this.selectedGrantTargetIds = Array.from(new Set(ids));
     this.grantForm.targetUserId = this.selectedGrantTargetIds[0];
+    this.clearGrantTargetDropdownSelection();
     this.grantTargetSearch = '';
     this.refreshGrantTargetLists();
   }
@@ -3219,6 +3274,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   clearGrantTargets(): void {
     this.selectedGrantTargetIds = [];
     this.grantForm.targetUserId = undefined;
+    this.clearGrantTargetDropdownSelection();
     this.grantTargetSearch = '';
     this.refreshGrantTargetLists();
   }
@@ -3235,6 +3291,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   removeGrantTarget(id: number): void {
     this.selectedGrantTargetIds = (this.selectedGrantTargetIds || []).filter((item) => item !== id);
     this.grantForm.targetUserId = this.selectedGrantTargetIds[0];
+    this.clearGrantTargetDropdownSelection();
     this.refreshGrantTargetLists();
   }
 
@@ -3343,6 +3400,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const day = Number(grant.dayOfWeek);
     if (this.weekDays.includes(day)) return day;
 
+    if (grant.startsAt) {
+      const start = new Date(grant.startsAt);
+      if (!Number.isNaN(start.getTime())) return start.getDay();
+    }
+
     const firstType = (grant.allowedTypes || [])[0];
     if (firstType && firstType !== 'CUSTOM_EVENT') {
       const configuredDays = this.configDaysForType(firstType, String(grant.familyBase || this.selectedFamily || ''));
@@ -3429,6 +3491,91 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  private cleanupAccessGrantsForTypeDays(
+    targetFamilies: string[],
+    typeDays: Partial<Record<AttendanceType, number[]>>
+  ): void {
+    const families = targetFamilies.map((family) => String(family || '').trim()).filter(Boolean);
+    if (!families.length) return;
+
+    const configured = new Map<AttendanceType, Set<number>>();
+    (Object.entries(typeDays || {}) as Array<[AttendanceType, number[]]>).forEach(([type, days]) => {
+      configured.set(type, new Set((days || []).map((day) => Number(day)).filter((day) => this.weekDays.includes(day))));
+    });
+    if (!configured.size) return;
+
+    const deleteIds = this.knownAccessGrants()
+      .filter((grant) => {
+        const id = Number(grant.id || 0);
+        if (!id) return false;
+        if (!this.grantFamiliesOverlap(this.grantFamilyList(grant.familyBase), families)) return false;
+
+        const day = this.grantDayFromGrant(grant);
+        if (day === null) return false;
+
+        return (grant.allowedTypes || []).some((type) => {
+          const allowedDays = configured.get(type);
+          return !!allowedDays && !allowedDays.has(day);
+        });
+      })
+      .map((grant) => Number(grant.id || 0))
+      .filter((id, index, arr) => !!id && arr.indexOf(id) === index);
+
+    if (!deleteIds.length) return;
+
+    forkJoin(deleteIds.map((id) => this.attendance.deleteAccessGrant(id).pipe(catchError(() => of(null))))).subscribe({
+      next: () => {
+        const deleted = new Set(deleteIds);
+        this.grants = this.grants.filter((grant) => !deleted.has(Number(grant.id || 0)));
+        this.grantSavedSummaries = this.grantSavedSummaries.filter((item) => {
+          const grants = item.sourceGrants || (item.sourceGrant ? [item.sourceGrant] : []);
+          return !grants.some((grant) => deleted.has(Number(grant.id || 0)));
+        });
+        if (this.canManageAccessGrants()) this.loadAccessGrants();
+        this.message.add({
+          severity: 'info',
+          summary: 'تم تحديث التخصيصات',
+          detail: `تم حذف ${deleteIds.length} تخصيص مرتبط بأيام تم إلغاؤها.`,
+          life: 4500
+        });
+      }
+    });
+  }
+
+  private grantMatchesCurrentConfiguredDays(grant: AttendanceAccessGrant): boolean {
+    const day = this.grantDayFromGrant(grant);
+    if (day === null) return true;
+
+    const families = this.grantFamilyList(grant.familyBase);
+    const scopeFamilies = families.length ? families : [''];
+
+    return (grant.allowedTypes || []).every((type) => {
+      if (type === 'CUSTOM_EVENT') return true;
+      return scopeFamilies.every((family) => this.configDaysForType(type, family).includes(day));
+    });
+  }
+
+  private cleanupStaleAccessGrantsForCurrentConfig(): void {
+    const deleteIds = this.knownAccessGrants()
+      .filter((grant) => Number(grant.id || 0) && !this.grantMatchesCurrentConfiguredDays(grant))
+      .map((grant) => Number(grant.id || 0))
+      .filter((id, index, arr) => !!id && arr.indexOf(id) === index);
+
+    if (!deleteIds.length) return;
+
+    forkJoin(deleteIds.map((id) => this.attendance.deleteAccessGrant(id).pipe(catchError(() => of(null))))).subscribe({
+      next: () => {
+        const deleted = new Set(deleteIds);
+        this.grants = this.grants.filter((grant) => !deleted.has(Number(grant.id || 0)));
+        this.grantSavedSummaries = this.grantSavedSummaries.filter((item) => {
+          const grants = item.sourceGrants || (item.sourceGrant ? [item.sourceGrant] : []);
+          return !grants.some((grant) => deleted.has(Number(grant.id || 0)));
+        });
+        if (this.canManageAccessGrants()) this.loadAccessGrants();
+      }
+    });
+  }
+
   private appendGrantNote(oldNote?: string | null, newNote?: string | null): string | null {
     const oldText = String(oldNote || '').trim();
     const newText = String(newNote || '').trim();
@@ -3501,6 +3648,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.editingGrantGroupIds = [];
     this.editingGrantTargetFallbacks = [];
     this.grantForm = this.defaultGrantForm();
+    this.expandedDialogGrantPersonKeys = [];
     if (this.canChooseGrantFamily() && !this.grantForm.familyBase) {
       const familyOptions = this.grantFamilyFilterOptions();
       this.grantForm.familyBase = familyOptions[0] || '';
@@ -3518,6 +3666,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
     this.loadGrantCustomEvents();
     this.grantDialogVisible = true;
+    this.cleanupStaleAccessGrantsForCurrentConfig();
   }
 
   cancelGrantEdit(): void {
@@ -3526,6 +3675,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.editingGrantGroupIds = [];
     this.editingGrantTargetFallbacks = [];
     this.grantForm = this.defaultGrantForm();
+    this.expandedDialogGrantPersonKeys = [];
     this.grantAudience = this.grantAudienceFromKind(this.grantForm.grantKind);
     this.lastGrantAudience = this.grantAudience;
     this.selectedGrantTargetIds = [];
@@ -3548,7 +3698,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const grant = group.first;
     this.grantDialogMode = 'edit';
     this.editingGrantGroupIds = group.grants.map((item) => Number(item.id || 0)).filter(Boolean);
-    this.editingGrantTargetFallbacks = group.grants
+    const fallbackByTarget = new Map<number, PickUser>();
+    group.grants
       .map((item) => ({
         id: Number(item.targetUserId || 0),
         fullName: item.targetUserName || 'بدون اسم',
@@ -3556,7 +3707,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         familyName: item.familyBase || undefined,
         deaconFamily: item.familyBase || undefined
       }))
-      .filter((item) => !!item.id);
+      .filter((item) => !!item.id)
+      .forEach((item) => fallbackByTarget.set(item.id, item));
+    this.editingGrantTargetFallbacks = Array.from(fallbackByTarget.values());
     this.grantForm = {
       ...grant,
       familyBase: this.grantAudienceFromKind(grant.grantKind) === 'SERVANTS' ? (grant.familyBase || '') : grant.familyBase,
@@ -3567,7 +3720,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     };
     this.grantAudience = this.grantAudienceFromKind(grant.grantKind);
     this.lastGrantAudience = this.grantAudience;
-    this.selectedGrantTargetIds = group.grants.map((item) => Number(item.targetUserId || 0)).filter(Boolean);
+    this.selectedGrantTargetIds = Array.from(new Set(group.grants.map((item) => Number(item.targetUserId || 0)).filter(Boolean)));
     this.grantTargetSearch = '';
     this.grantSavedSummaries = [];
     const hasWideRange = group.grants.some((g) => {
@@ -3583,6 +3736,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.refreshGrantTargetLists();
     this.syncGrantFamilySelectionsFromForm();
     this.syncGrantDateControls();
+    this.applyGrantEditDatesToWindows();
     this.loadGrantTargets(this.grantForm.familyBase || this.defaultGrantScopeFamily());
     this.loadGrantCustomEvents();
     this.grantDialogVisible = true;
@@ -3897,6 +4051,24 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.deleteGrantGroup(group);
   }
 
+  editGrantSchedule(schedule: GrantScheduleGroup): void {
+    if (!this.canManageAccessGrants()) return;
+    this.grantPopupVisible = false;
+    this.openEditGrantGroup(schedule.editGroup);
+  }
+
+  editGrantScheduleFromEvent(event: Event, schedule: GrantScheduleGroup): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.editGrantSchedule(schedule);
+  }
+
+  deleteGrantScheduleFromEvent(event: Event, schedule: GrantScheduleGroup): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.deleteGrantSchedule(schedule);
+  }
+
   deletePersonGrantGroup(personGroup: PersonGrantGroup): void {
     const ids = personGroup.grants
       .map((grant) => Number(grant.id || 0))
@@ -4013,7 +4185,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private groupCustomEvents(events: AttendanceCustomEvent[]): CustomEventGroup[] {
     const groups = new Map<string, AttendanceCustomEvent[]>();
-    for (const event of events || []) {
+    for (const event of (events || []).filter((item) => this.isCustomEventStillCurrent(item))) {
       const key = this.customEventGroupKey(event);
       groups.set(key, [...(groups.get(key) || []), event]);
     }
@@ -4087,7 +4259,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         value: `DEFAULT:${opt.value}`,
         label: opt.label
       }))
-    ];
+    ].filter((option) => this.canEditDefaultCustomEventOption(option.value.replace('DEFAULT:', '') as AttendanceType));
     const existing = this.customEventDialogGroups
       .filter((group) => group.events.some((event) => this.canEditCustomEvent(event)))
       .map((group) => ({
@@ -4103,6 +4275,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   isCreatingNewCustomEventSelection(): boolean {
     return this.customEventDialogSelection === '__new__';
+  }
+
+  shouldShowCustomEventAdvancedFields(): boolean {
+    return this.isCreatingNewCustomEventSelection()
+      || (!!this.customEventDialogSelection && !this.customEventDialogSelection.startsWith('DEFAULT:'));
   }
 
   private loadCustomEventsForFamily(): void {
@@ -4121,7 +4298,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         const merged = groups.flatMap((group) => group || []);
         const relevant = familyBase
           ? merged.filter((event) => this.isCustomEventRelevantToFamily(event, familyBase))
-          : merged.filter((event) => this.isGlobalCustomEvent(event));
+          : merged;
         this.familyCustomEvents = this.filterAthanasiusVisibilityForEvents(this.uniqueCustomEvents(relevant));
         this.familyCustomEventGroups = this.groupCustomEvents(this.familyCustomEvents);
         this.refreshTypeOptions();
@@ -4247,11 +4424,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   onCustomEventActiveFromChange(val: Date | null): void {
+    if (this.isBeforeToday(val)) val = null;
     this.customEventActiveFromDate = val;
     this.customEventForm.activeFrom = val ? this.toIsoDate(val) : null;
+    if (val && this.customEventActiveToDate && this.customEventActiveToDate < val) {
+      this.customEventActiveToDate = null;
+      this.customEventForm.activeTo = null;
+    }
   }
 
   onCustomEventActiveToChange(val: Date | null): void {
+    const minDate = this.customEventActiveFromDate || this.customEventMinDate;
+    if (this.isBeforeToday(val) || (val && val < minDate)) val = null;
     this.customEventActiveToDate = val;
     this.customEventForm.activeTo = val ? this.toIsoDate(val) : null;
   }
@@ -4260,11 +4444,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.customEventForm.permittedEditorIds = [];
     this.customEventEditorPickerId = null;
     this.customEventEditorSearch = '';
+    if (this.isCreatingNewCustomEventSelection() || this.customEventDialogSelection.startsWith('DEFAULT:')) {
+      this.onCustomEventDialogSelectionChange();
+    }
     this.loadCustomEventDialogScopeEvents(true);
     this.loadCustomEventEditorTargets();
   }
 
   onCustomEventDialogSelectionChange(): void {
+    if (
+      this.customEventDialogSelection
+      && this.customEventDialogSelection !== '__new__'
+      && !this.customEventDialogOptions().some((option) => option.value === this.customEventDialogSelection)
+    ) {
+      this.selectFirstCustomEventOption();
+      return;
+    }
+
     if (this.isCreatingNewCustomEventSelection()) {
       this.customEventDialogMode = 'create';
       this.editingCustomEventGroupIds = [];
@@ -4283,7 +4479,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
     if (this.customEventDialogSelection.startsWith('DEFAULT:')) {
       const type = this.customEventDialogSelection.replace('DEFAULT:', '') as AttendanceType;
-      const days = this.configDaysForType(type, this.customEventForm.familyBase || this.selectedFamily);
+      const days = this.configDaysForType(type, this.customEventForm.familyBase || '');
       this.customEventDialogMode = 'edit';
       this.editingCustomEventGroupIds = [];
       this.customEventForm = {
@@ -4392,9 +4588,25 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  customEventEditorEmptyMessage(): string {
+    if (!this.customEventEditorTargets.length) {
+      return 'لا يوجد خدام متاحين للإضافة في النطاق الحالي.';
+    }
+    if (!this.remainingCustomEventEditorTargets().length) {
+      return 'تم اختيار كل الخدام المتاحين للتعديل.';
+    }
+    return 'لا توجد نتائج مطابقة للبحث الحالي.';
+  }
+
   addCustomEventEditor(id: number): void {
     this.onCustomEventPermittedEditorPick(id);
     this.customEventEditorSearch = '';
+  }
+
+  private allCustomEventConfigFamilies(): string[] {
+    return this.customEventFamilyOptions()
+      .map((option) => String(option.value || '').trim())
+      .filter(Boolean);
   }
 
   customEventPermittedEditorsSummary(event: AttendanceCustomEvent): string {
@@ -4416,9 +4628,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canEditCustomEventGroup(group: CustomEventGroup): boolean {
-    // السماح بتعديل المناسبات الافتراضية والمخصصة
-    if (group.key && group.key.startsWith('DEFAULT:')) return true;
+    if (group.key && group.key.startsWith('DEFAULT:')) {
+      return this.canEditCustomEvent(group.first);
+    }
     return this.customEventGroupEvents(group).some((event) => this.canEditCustomEvent(event));
+  }
+
+  private canEditDefaultCustomEventOption(type: AttendanceType): boolean {
+    return this.canEditCustomEvent({
+      familyBase: this.customEventForm.familyBase || this.selectedFamily || '',
+      title: this.typeLabel(type),
+      dayOfWeek: this.configDaysForType(type, this.customEventForm.familyBase || this.selectedFamily)[0] ?? 5,
+      enabled: true,
+      alwaysActive: true,
+      type
+    } as AttendanceCustomEvent);
   }
 
   private customEventGroupEvents(group: CustomEventGroup): AttendanceCustomEvent[] {
@@ -4546,6 +4770,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   openEditCustomEventGroup(group: CustomEventGroup): void {
     // إذا كانت المناسبة افتراضية (قداس/تسبحة/اجتماع)
     if (group.key && group.key.startsWith('DEFAULT:')) {
+      if (!this.canEditCustomEvent(group.first)) return;
       const event = group.first;
       this.customEventDialogMode = 'edit';
       this.customEventForm = {
@@ -4603,9 +4828,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       alwaysActive: this.customEventForm.alwaysActive !== false,
       activeFrom: this.customEventForm.alwaysActive === false ? (this.customEventForm.activeFrom || null) : null,
       activeTo: this.customEventForm.alwaysActive === false ? (this.customEventForm.activeTo || null) : null,
-      permittedEditorIds: scopedFamily
-        ? [...new Set((this.customEventForm.permittedEditorIds || []).filter(Boolean))]
-        : []
+      permittedEditorIds: [...new Set((this.customEventForm.permittedEditorIds || []).filter(Boolean))]
     };
   }
 
@@ -4618,20 +4841,26 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختار يوم واحد على الأقل للمناسبة' });
         return;
       }
-      const family = String(this.customEventForm.familyBase || this.selectedFamily || '').trim();
-      if (!family) {
-        this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'حدد الأسرة أولاً' });
+      const family = String(this.customEventForm.familyBase || '').trim();
+      const targetFamilies = family ? [family] : this.allCustomEventConfigFamilies();
+      if (!targetFamilies.length) {
+        this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا توجد أسر متاحة لتطبيق الأيام عليها' });
         return;
       }
       this.customEventSaving = true;
       const payload = { [type]: selectedDays } as Partial<Record<AttendanceType, number[]>>;
-      const existingAllowedDays = this.attendanceContext?.config?.familyAbsenceAllowedDays?.[family];
-      const existingOpenDays = this.attendanceContext?.config?.familyAbsenceOpenDays?.[family];
-      this.attendance.saveFamilyTypeDays(family, payload, existingAllowedDays, existingOpenDays).subscribe({
-        next: (cfg) => {
+      from(targetFamilies).pipe(
+        concatMap((targetFamily) => {
+          const existingAllowedDays = this.attendanceContext?.config?.familyAbsenceAllowedDays?.[targetFamily];
+          const existingOpenDays = this.attendanceContext?.config?.familyAbsenceOpenDays?.[targetFamily];
+          return this.attendance.saveFamilyTypeDays(targetFamily, payload, existingAllowedDays, existingOpenDays);
+        }),
+        toArray()
+      ).subscribe({
+        next: (configs) => {
           this.customEventSaving = false;
           this.customEventDialogVisible = false;
-          const merged = this.mergeConfig(cfg);
+          const merged = this.mergeConfig(configs[configs.length - 1]);
           this.configEditor = merged;
           this.attendanceContext = {
             ...(this.attendanceContext || {
@@ -4642,8 +4871,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
           };
           this.initCalendarRules();
           this.refreshRuntimeState();
+          this.cleanupAccessGrantsForTypeDays(targetFamilies, payload);
           this.loadCustomEventsForFamily();
-          this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ أيام المناسبة بنجاح' });
+          this.message.add({
+            severity: 'success',
+            summary: 'تم',
+            detail: family ? 'تم حفظ أيام المناسبة بنجاح' : 'تم حفظ أيام المناسبة لكل الأسر'
+          });
         },
         error: (err) => {
           this.customEventSaving = false;
@@ -4765,6 +4999,50 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  requestDeleteCustomEventGroup(group: CustomEventGroup): void {
+    const ids = this.customEventGroupEvents(group)
+      .filter((event) => event.id && this.canEditCustomEvent(event))
+      .map((event) => Number(event.id));
+    if (!ids.length) return;
+    this.pendingCustomEventDeleteGroup = group;
+    this.pendingEditingCustomEventDelete = false;
+    this.customEventDeleteConfirmVisible = true;
+  }
+
+  confirmDeleteCustomEventGroup(): void {
+    if (this.pendingEditingCustomEventDelete) {
+      this.customEventDeleteConfirmVisible = false;
+      this.pendingEditingCustomEventDelete = false;
+      this.deleteEditingCustomEvent();
+      return;
+    }
+
+    const group = this.pendingCustomEventDeleteGroup;
+    if (!group) return;
+    this.customEventDeleteConfirmVisible = false;
+    this.pendingCustomEventDeleteGroup = null;
+    this.deleteCustomEventGroup(group);
+  }
+
+  cancelCustomEventDeleteConfirm(): void {
+    this.customEventDeleteConfirmVisible = false;
+    this.pendingCustomEventDeleteGroup = null;
+    this.pendingEditingCustomEventDelete = false;
+  }
+
+  canDeleteEditingCustomEvent(): boolean {
+    return this.customEventDialogMode === 'edit'
+      && !this.customEventDialogSelection.startsWith('DEFAULT:')
+      && this.editingCustomEventGroupIds.some((id) => !!id);
+  }
+
+  requestDeleteEditingCustomEvent(): void {
+    if (!this.canDeleteEditingCustomEvent()) return;
+    this.pendingCustomEventDeleteGroup = null;
+    this.pendingEditingCustomEventDelete = true;
+    this.customEventDeleteConfirmVisible = true;
+  }
+
   deleteEditingCustomEvent(): void {
     const ids = this.editingCustomEventGroupIds
       .filter((id) => !!id)
@@ -4807,6 +5085,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (from) return `من ${from}`;
     if (to) return `إلى ${to}`;
     return 'بدون تاريخ محدد';
+  }
+
+  private isCustomEventStillCurrent(event: AttendanceCustomEvent): boolean {
+    if (!event || event.enabled === false) return false;
+    if (event.alwaysActive !== false || !event.activeTo) return true;
+    const to = new Date(event.activeTo);
+    if (Number.isNaN(to.getTime())) return true;
+    to.setHours(23, 59, 59, 999);
+    return new Date().getTime() <= to.getTime();
   }
 
   customEventScopeLabel(event: AttendanceCustomEvent): string {

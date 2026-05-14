@@ -650,6 +650,18 @@ textarea {
   padding: 12px 14px;
 }
 
+.app-surface-dialog input:not([type='checkbox']):focus,
+.app-surface-dialog select:focus,
+.app-surface-dialog textarea:focus,
+.app-surface-dialog .p-select.p-focus,
+.app-surface-dialog .p-select.p-select-focused,
+.app-surface-dialog .p-select:focus,
+.app-surface-dialog .p-select:focus-visible {
+  border-color: #8d5144 !important;
+  box-shadow: 0 0 0 3px rgba(141, 81, 68, 0.14) !important;
+  outline: 0 !important;
+}
+
 .p-select-overlay {
   background: #ffffff;
   border: 1px solid #d4d4d4;
@@ -678,6 +690,14 @@ textarea {
   --p-select-checkmark-color: #111111;
   --p-select-checkmark-gutter-start: 0;
   --p-select-checkmark-gutter-end: 0;
+}
+
+.p-select-overlay .p-select-filter,
+.p-select-overlay .p-inputtext:focus,
+.p-select-overlay .p-inputtext:focus-visible {
+  border-color: #8d5144 !important;
+  box-shadow: 0 0 0 3px rgba(141, 81, 68, 0.14) !important;
+  outline: 0 !important;
 }
 
 .app-surface-dialog input:not([type='checkbox'])::placeholder,

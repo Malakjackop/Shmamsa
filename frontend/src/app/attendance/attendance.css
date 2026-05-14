@@ -609,6 +609,7 @@ textarea {
 
 .side-btn-mt {
   margin-top: 14px;
+  margin-inline-start: 8px;
 }
 
 .topFilterRow{
@@ -903,10 +904,101 @@ textarea {
   margin-top: 12px;
 }
 
+.custom-event-card .grant-actions {
+  align-items: center;
+}
+
+.custom-event-card .grant-icon-btn {
+  width: 44px;
+  height: 44px;
+}
+
+.confirm-dialog__body {
+  color: #3b2218;
+  font-weight: 700;
+  line-height: 1.8;
+  padding: 8px 0 4px;
+}
+
+:host ::ng-deep .confirm-dialog .confirm-dialog__back {
+  background: #f4eee8 !important;
+  border-color: #ead8ca !important;
+  color: #5e2b20 !important;
+}
+
+:host ::ng-deep .confirm-dialog .confirm-dialog__back:hover {
+  background: #ead8ca !important;
+  border-color: #d7bdaa !important;
+  color: #4a2018 !important;
+}
+
 .person-grant-schedules {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.grant-person-card--accordion {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #eadfda;
+  border-radius: 12px;
+  background: #ffffff;
+  min-height: 58px;
+}
+
+.grant-person-card--accordion.is-expanded {
+  border-color: #d7c2b5;
+  background: #fffaf6;
+}
+
+.grant-person-accordion__trigger {
+  width: 100%;
+  height: 58px;
+  min-height: 58px;
+  border: 0;
+  background: #ffffff;
+  color: #3b2218;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 18px;
+  font: inherit;
+  cursor: pointer;
+  text-align: right;
+  line-height: 1.7;
+}
+
+.grant-person-accordion__trigger:hover {
+  background: #fffaf6;
+}
+
+.grant-person-accordion__trigger .grant-target {
+  color: #3b2218;
+  font-weight: 900;
+  font-size: 1rem;
+  line-height: 1.8;
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+.grant-person-accordion__trigger i {
+  color: #5e2b20;
+  font-size: 0.95rem;
+}
+
+.person-grant-detail-panel {
+  border: 1px solid #eadfda;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px 14px;
+  margin-top: 2px;
+  overflow: visible;
 }
 
 .person-grant-schedule {
@@ -923,6 +1015,28 @@ textarea {
   gap: 2px;
   min-width: 0;
   flex: 1 1 auto;
+}
+
+.person-grant-schedule__actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.grant-icon-btn--schedule {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 10px;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+.grant-icon-btn--schedule:hover {
+  transform: none;
 }
 
 .person-grant-schedule__title {
@@ -1390,6 +1504,10 @@ textarea {
   gap: 10px;
 }
 
+.dialog-footer--split {
+  justify-content: space-between;
+}
+
 .readonly-input {
   background: #f6f1ee;
   color: #5c3427;
@@ -1534,10 +1652,60 @@ textarea {
   padding: 5px 12px;
 }
 
+::ng-deep .grant-target-select-panel .p-select-option.p-select-option-selected,
+::ng-deep .grant-target-select-panel .p-select-option[data-p-highlight="true"],
+::ng-deep .grant-target-select-panel .p-select-option.p-focus {
+  background: #ffffff;
+  color: #111111;
+}
+
+::ng-deep .grant-target-select-panel .p-select-option:hover {
+  background: #f5ece7;
+  color: #5e2b20;
+}
+
+::ng-deep .grant-target-select-panel .p-select-list-container,
+::ng-deep .grant-target-select-panel .p-select-list {
+  scrollbar-width: thin;
+  scrollbar-color: #c7ac9c #fffaf6;
+}
+
+::ng-deep .grant-target-select-panel .p-select-list-container::-webkit-scrollbar,
+::ng-deep .grant-target-select-panel .p-select-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+::ng-deep .grant-target-select-panel .p-select-list-container::-webkit-scrollbar-track,
+::ng-deep .grant-target-select-panel .p-select-list::-webkit-scrollbar-track {
+  background: #fffaf6;
+  border-radius: 999px;
+}
+
+::ng-deep .grant-target-select-panel .p-select-list-container::-webkit-scrollbar-thumb,
+::ng-deep .grant-target-select-panel .p-select-list::-webkit-scrollbar-thumb {
+  background: #d7c2b5;
+  border-radius: 999px;
+  border: 2px solid #fffaf6;
+}
+
+::ng-deep .grant-target-select-panel .p-select-list-container::-webkit-scrollbar-thumb:hover,
+::ng-deep .grant-target-select-panel .p-select-list::-webkit-scrollbar-thumb:hover {
+  background: #c7ac9c;
+}
+
 
 
 .grant-target-row .mini-btn {
-  color: #000;
+  background: #f5ece7;
+  border: 1px solid #ead8ca;
+  color: #5e2b20;
+  font-weight: 800;
+}
+
+.grant-target-row .mini-btn:hover {
+  background: #5e2b20;
+  border-color: #5e2b20;
+  color: #ffffff;
 }
 
 .grant-target-row .grant-target-actions__count {
@@ -2019,6 +2187,10 @@ textarea {
     width: 100%;
   }
 
+  .side-btn-mt {
+    margin-inline-start: 0;
+  }
+
   .remove-btn {
     width: 100%;
     height: auto;
@@ -2242,6 +2414,31 @@ textarea {
   gap: 8px;
   margin-top: 10px;
   padding: 4px;
+  max-height: 188px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-inline-end: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #b78b78 #f6eee8;
+}
+
+.custom-editor-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-editor-options::-webkit-scrollbar-track {
+  background: #f6eee8;
+  border-radius: 999px;
+}
+
+.custom-editor-options::-webkit-scrollbar-thumb {
+  background: #b78b78;
+  border: 2px solid #f6eee8;
+  border-radius: 999px;
+}
+
+.custom-editor-options::-webkit-scrollbar-thumb:hover {
+  background: #8d5144;
 }
 
 .custom-editor-option {
@@ -2378,20 +2575,22 @@ textarea {
 }
 
 .grant-dialog-existing {
-  border: 1px solid #ead8ca;
-  border-radius: 16px;
-  padding: 12px;
-  background: #fffaf6;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 12px 12px;
+  background: #f7f4f2;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .grant-dialog-existing--scrollbox {
-  max-height: 360px;
+  max-height: none;
   overflow: hidden;
 }
 
 .grant-dialog-existing__title {
+  padding: 0;
   font-weight: 900;
   color: #3b2218;
 }
@@ -2410,14 +2609,52 @@ textarea {
 .grant-list--dialog {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
-  max-height: 292px;
-  overflow: auto;
-  padding-inline-end: 4px;
+  gap: 8px;
+  max-height: none;
+  overflow-y: visible;
+  overflow-x: hidden;
+  padding: 0 2px 0 4px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c7ac9c #fffaf6;
+}
+
+.grant-list--dialog.has-scroll {
+  height: 190px;
+  max-height: 190px;
+  overflow-y: scroll;
+}
+
+.grant-list--dialog.has-scroll.has-expanded {
+  height: auto;
+  max-height: 310px;
+}
+
+.grant-list--dialog.has-scroll .grant-person-card--accordion {
+  min-height: 58px;
+}
+
+.grant-list--dialog::-webkit-scrollbar {
+  width: 8px;
+}
+
+.grant-list--dialog::-webkit-scrollbar-track {
+  background: #fffaf6;
+  border-radius: 999px;
+}
+
+.grant-list--dialog::-webkit-scrollbar-thumb {
+  background: #d7c2b5;
+  border: 2px solid #fffaf6;
+  border-radius: 999px;
+}
+
+.grant-list--dialog::-webkit-scrollbar-thumb:hover {
+  background: #c7ac9c;
 }
 
 .grant-card--compact {
-  padding: 12px;
+  padding: 0;
   box-shadow: none;
 }
 

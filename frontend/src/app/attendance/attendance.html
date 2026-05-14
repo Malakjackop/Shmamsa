@@ -4,14 +4,10 @@
   <div class="page-header">
     <div>
       <h1>الحضور</h1>
-      <p class="page-subtitle">صفحة الحضور بقت مبنية على الإعدادات والتخصيصات بدل القيم الثابتة.</p>
     </div>
 
-    <div class="page-badges">
-      <span class="status-badge status-badge--self" *ngIf="isSelfCheckinMode() && !blockedMessage">تسجيل حضور بالتخصيص</span>
-      <span class="status-badge status-badge--servant" *ngIf="isDelegatedAttendanceMode() && !blockedMessage">تسجيل حضور بالتخصيص</span>
-      <span class="status-badge status-badge--servant" *ngIf="!isSelfCheckinMode() && isServantOrAbove() && !blockedMessage">تسجيل حضور للخدام</span>
-      <span class="status-badge status-badge--blocked" *ngIf="blockedMessage">مقفول حالياً</span>
+    <div class="page-badges" *ngIf="blockedMessage">
+      <span class="status-badge status-badge--blocked">مقفول حالياً</span>
     </div>
   </div>
 
@@ -27,7 +23,6 @@
     <div class="section-head section-head--compact">
       <div>
         <h2>{{ grantClosedScheduleTitle() }}</h2>
-        <p>الأنواع المقفولة ظاهرة بعلامة قفل، ولو المتبقي أقل من 5 ساعات هيظهر عداد. لو أكتر هيظهر التاريخ والوقت.</p>
       </div>
     </div>
     <div class="grant-type-status-list">
@@ -78,7 +73,6 @@
               <option value="" *ngIf="!hasRestrictedFamilyScope()">كل الأسر</option>
               <option *ngFor="let f of families" [value]="f">{{ f }}</option>
             </select>
-            <p class="side-hint">اختيار الأسرة بيحدد الأشخاص الظاهرين والتخصيصات اللي هتتعمل عليهم.</p>
           </ng-container>
 
           <ng-template #fixedFamilyBlock>
@@ -91,68 +85,32 @@
 
         <div class="side-card grant-status-sidebar" *ngIf="!blockedMessage && shouldShowGrantTypeStatuses()">
           <div class="side-title">حالة الأنواع</div>
-          <p class="side-hint">كل الأنواع ظاهرة هنا، والمقفل متعلم بعلامة قفل.</p>
-          <div class="grant-type-status-list">
-            <div class="grant-type-status" *ngFor="let status of grantTypeStatuses()" [class.open]="status.state === 'open'" [class.locked]="status.state !== 'open'">
-              <div class="grant-type-status__head">
-                <span>{{ status.icon }} {{ status.label }}</span>
-                <strong>{{ status.note }}</strong>
-              </div>
-              <div class="grant-type-status__range">{{ status.rangeText }}</div>
-              <div class="grant-type-status__countdown" *ngIf="status.countdownText">{{ status.state === 'open' ? 'هيتقفل بعد' : 'هيبدأ بعد' }} {{ status.countdownText }}</div>
+            <div class="grant-type-status-list">
+             <div class="grant-type-status" *ngFor="let status of grantTypeStatuses()" [class.open]="status.state === 'open'" [class.locked]="status.state !== 'open'">
+               <div class="grant-type-status__head">
+                 <span>{{ status.icon }} {{ status.label }}</span>
+                 <strong>{{ status.note }}</strong>
+               </div>
+                <div class="grant-type-status__range">{{ status.rangeText }}</div>
+                <div class="grant-type-status__countdown" *ngIf="status.countdownText">{{ status.state === 'open' ? 'هيتقفل بعد' : 'هيبدأ بعد' }} {{ status.countdownText }}</div>
+             </div>
             </div>
-          </div>
-        </div>
+         </div>
 
-        <div class="side-card" *ngIf="canManageAccessGrants() || canUseCustomEvent()">
-          <div class="side-title">الإعدادات</div>
+          <div class="side-card" *ngIf="canManageAccessGrants() || canUseCustomEvent()">
+            <div class="side-title">الإعدادات</div>
 
-          <button type="button" class="action-btn" (click)="openCreateGrant()" [disabled]="!selectedFamily" *ngIf="canManageAccessGrants()">
-            <i class="pi pi-plus"></i>
-            إدارة التخصيصات
-          </button>
-
-          <p class="side-hint" *ngIf="!selectedFamily && canManageAccessGrants()">اختار أسرة أولاً عشان تختار الأشخاص المستهدفين.</p>
-
-          <ng-container *ngIf="canUseCustomEvent()">
-            <button type="button" class="action-btn side-btn-mt" (click)="openCreateCustomEvent()" [disabled]="!selectedFamily && !isAminKhedmaOrDeveloper()">
-              <i class="pi pi-calendar-plus"></i>
-              ادارة المناسبات
+            <button type="button" class="action-btn" (click)="openCreateGrant()" *ngIf="canManageAccessGrants()">
+              <i class="pi pi-plus"></i>
+              إدارة التخصيصات
             </button>
-            <p class="side-hint" *ngIf="!selectedFamily && !isAminKhedmaOrDeveloper()">اختار الأسرة أو الخورس أولاً علشان تضيف مناسبة لها.</p>
 
-            <div class="custom-event-list" *ngIf="displayCustomEventGroups.length; else noCustomEvents">
-              <div class="custom-event-card" *ngFor="let group of displayCustomEventPreviewGroups; trackBy: trackCustomEventGroup">
-                <div class="custom-event-card__top">
-                  <div>
-                    <div class="custom-event-card__title">{{ group.first.title }}</div>
-                    <div class="custom-event-card__meta">
-                      {{ customEventScopeLabel(group.first) }} • {{ customEventGroupDaysLabel(group) }} • {{ customEventDisplayRange(group.first) }}
-                    </div>
-                    <div class="custom-event-card__meta" *ngIf="customEventPermittedEditorsSummary(group.first)">
-                      مسموح بالتعديل: {{ customEventPermittedEditorsSummary(group.first) }}
-                    </div>
-                  </div>
-                  <span class="grant-enabled" [class.off]="!group.enabled" [class.pending]="!group.enabled">
-                    {{ group.enabled ? 'مفعلة' : 'pending' }}
-                  </span>
-                </div>
-                <div class="grant-actions" *ngIf="canEditCustomEventGroup(group)">
-                  <button type="button" class="mini-btn" (click)="openEditCustomEventGroup(group)">
-                    <i class="pi pi-pencil"></i>
-                    تعديل
-                  </button>
-                  <button type="button" class="mini-btn danger" (click)="deleteCustomEventGroup(group)">
-                    <i class="pi pi-trash"></i>
-                    حذف
-                  </button>
-                </div>
-              </div>
-            </div>
-            <ng-template #noCustomEvents>
-              <p class="side-hint">لا توجد مناسبات مخصصة محفوظة للأسرة أو الخورس المحدد.</p>
-            </ng-template>
-          </ng-container>
+           <ng-container *ngIf="canUseCustomEvent()">
+             <button type="button" class="action-btn side-btn-mt" (click)="openCreateCustomEvent()">
+               <i class="pi pi-calendar-plus"></i>
+               ادارة المناسبات
+             </button>
+            </ng-container>
         </div>
       </aside>
 
@@ -501,14 +459,6 @@
                 <div class="grant-card grant-person-card" *ngFor="let personGroup of filteredPersonGrantGroups">
                   <div class="grant-person-card__head">
                     <div class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</div>
-                    <div class="grant-person-card__actions">
-                      <button type="button" class="grant-icon-btn" (click)="editPersonGrantGroup(personGroup)" title="تعديل">
-                        <i class="pi pi-pencil"></i>
-                      </button>
-                      <button type="button" class="grant-icon-btn danger" (click)="deletePersonGrantGroup(personGroup)" title="حذف">
-                        <i class="pi pi-trash"></i>
-                      </button>
-                    </div>
                   </div>
 
                   <div class="person-grant-schedules">
@@ -521,6 +471,14 @@
                           <span>{{ schedule.timeRangeText }}</span>
                           <span *ngIf="schedule.notesText">{{ schedule.notesText }}</span>
                         </div>
+                      </div>
+                      <div class="person-grant-schedule__actions" *ngIf="canManageAccessGrants()">
+                        <button type="button" class="grant-icon-btn grant-icon-btn--schedule" (mousedown)="editGrantScheduleFromEvent($event, schedule)" (click)="$event.preventDefault(); $event.stopPropagation()" [title]="'تعديل ' + schedule.typeLabel">
+                          <i class="pi pi-pencil"></i>
+                        </button>
+                        <button type="button" class="grant-icon-btn grant-icon-btn--schedule danger" (mousedown)="deleteGrantScheduleFromEvent($event, schedule)" (click)="$event.preventDefault(); $event.stopPropagation()" [title]="'حذف ' + schedule.typeLabel">
+                          <i class="pi pi-trash"></i>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -559,18 +517,13 @@
                       مسموح بالتعديل: {{ customEventPermittedEditorsSummary(group.first) }}
                     </div>
                   </div>
-                  <span class="grant-enabled" [class.off]="!group.enabled" [class.pending]="!group.enabled">
-                    {{ group.enabled ? 'مفعلة' : 'pending' }}
-                  </span>
                 </div>
                 <div class="grant-actions" *ngIf="canEditCustomEventGroup(group)">
-                  <button type="button" class="mini-btn" (click)="openEditCustomEventGroup(group); customEventsPopupVisible = false">
+                  <button type="button" class="grant-icon-btn" (click)="openEditCustomEventGroup(group); customEventsPopupVisible = false" aria-label="تعديل المناسبة" title="تعديل">
                     <i class="pi pi-pencil"></i>
-                    تعديل
                   </button>
-                  <button type="button" class="mini-btn danger" (click)="deleteCustomEventGroup(group)">
+                  <button type="button" class="grant-icon-btn danger" (click)="requestDeleteCustomEventGroup(group)" aria-label="حذف المناسبة" title="حذف">
                     <i class="pi pi-trash"></i>
-                    حذف
                   </button>
                 </div>
               </div>
@@ -593,6 +546,7 @@
   [baseZIndex]="10000"
   [draggable]="false"
   [resizable]="false"
+  [focusOnShow]="false"
   dir="rtl"
 >
   <div class="dialog-body">
@@ -629,14 +583,20 @@
         <label>الأشخاص المستهدفون</label>
         <div class="grant-target-row" *ngIf="grantDialogMode !== 'edit'">
           <p-select
+            *ngIf="grantTargetSelectVisible"
+            #grantTargetSelect
             [options]="grantTargetDropdownOptions"
-            [(ngModel)]="grantTargetDropdownSelection"
-            (onChange)="onGrantTargetDropdownChange()"
+            [ngModel]="grantTargetDropdownSelection"
+            (ngModelChange)="onGrantTargetDropdownChange($event)"
             [filter]="true"
-            filterPlaceholder="ابحث باسم..."
-            placeholder="اختر الشخص..."
-            showClear
-          ></p-select>
+            panelStyleClass="grant-target-select-panel"
+            filterPlaceholder="ابحث باسم"
+            placeholder="اختر الشخص"
+          >
+            <ng-template pTemplate="selectedItem">
+              <span>اختر الشخص</span>
+            </ng-template>
+          </p-select>
           <button
             type="button"
             class="mini-btn"
@@ -694,34 +654,49 @@
       <ng-container *ngIf="grantDialogMode !== 'edit' && dialogExistingPersonGrantGroups() as existingGroups">
         <div class="grant-dialog-existing grant-dialog-existing--scrollbox full-width">
           <div class="grant-dialog-existing__title">{{ dialogExistingGrantTitle() }}</div>
-          <div class="grant-list grant-list--dialog" *ngIf="existingGroups.length; else noExistingTargetGrants">
-            <div class="grant-card grant-card--compact grant-person-card" *ngFor="let personGroup of existingGroups">
-              <div class="grant-person-card__head">
-                <div class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</div>
-                <div class="grant-person-card__actions">
-                  <button type="button" class="grant-icon-btn" (click)="editPersonGrantGroup(personGroup)" title="تعديل">
-                    <i class="pi pi-pencil"></i>
-                  </button>
-                  <button type="button" class="grant-icon-btn danger" (click)="deletePersonGrantGroup(personGroup)" title="حذف">
-                    <i class="pi pi-trash"></i>
-                  </button>
-                </div>
+          <div
+            class="grant-list grant-list--dialog"
+            [class.has-scroll]="existingGroups.length > 3"
+            [class.has-expanded]="expandedDialogGrantPersonKeys.length"
+            *ngIf="existingGroups.length; else noExistingTargetGrants"
+          >
+            <ng-container *ngFor="let personGroup of existingGroups">
+              <div
+                class="grant-card grant-card--compact grant-person-card grant-person-card--accordion"
+                [class.is-expanded]="isDialogGrantPersonExpanded(personGroup)"
+              >
+                <button type="button" class="grant-person-accordion__trigger" (click)="toggleDialogGrantPerson(personGroup)">
+                  <span class="grant-target">{{ personGroup.targetName || 'بدون اسم' }}</span>
+                  <i class="pi" [class.pi-chevron-down]="!isDialogGrantPersonExpanded(personGroup)" [class.pi-chevron-up]="isDialogGrantPersonExpanded(personGroup)"></i>
+                </button>
               </div>
-
-              <div class="person-grant-schedules">
-                <div class="person-grant-schedule" *ngFor="let schedule of personGroup.schedules">
-                  <div class="person-grant-schedule__main">
-                    <div class="person-grant-schedule__title">{{ schedule.typeLabel }}</div>
-                    <div class="person-grant-schedule__meta">
-                      <span>{{ schedule.dayLabel }}</span>
-                      <span>{{ schedule.dateRangeText }}</span>
-                      <span>{{ schedule.timeRangeText }}</span>
-                      <span *ngIf="schedule.notesText">{{ schedule.notesText }}</span>
+              <div
+                class="person-grant-detail-panel"
+                *ngIf="isDialogGrantPersonExpanded(personGroup)"
+              >
+                <div class="person-grant-schedules">
+                  <div class="person-grant-schedule" *ngFor="let schedule of personGroup.schedules">
+                    <div class="person-grant-schedule__main">
+                      <div class="person-grant-schedule__title">{{ schedule.typeLabel }}</div>
+                      <div class="person-grant-schedule__meta">
+                        <span>{{ schedule.dayLabel }}</span>
+                        <span>{{ schedule.dateRangeText }}</span>
+                        <span>{{ schedule.timeRangeText }}</span>
+                        <span *ngIf="schedule.notesText">{{ schedule.notesText }}</span>
+                      </div>
+                    </div>
+                    <div class="person-grant-schedule__actions" *ngIf="canManageAccessGrants()">
+                      <button type="button" class="grant-icon-btn grant-icon-btn--schedule" (mousedown)="editGrantScheduleFromEvent($event, schedule)" (click)="$event.preventDefault(); $event.stopPropagation()" [title]="'تعديل ' + schedule.typeLabel">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                      <button type="button" class="grant-icon-btn grant-icon-btn--schedule danger" (mousedown)="deleteGrantScheduleFromEvent($event, schedule)" (click)="$event.preventDefault(); $event.stopPropagation()" [title]="'حذف ' + schedule.typeLabel">
+                        <i class="pi pi-trash"></i>
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </ng-container>
           </div>
           <ng-template #noExistingTargetGrants>
             <p class="hint">{{ dialogExistingGrantHint() }}</p>
@@ -976,6 +951,7 @@
         <p class="hint">ممكن تختار يوم واحد أو أكتر لنفس المناسبة.</p>
       </div>
 
+      <ng-container *ngIf="shouldShowCustomEventAdvancedFields()">
       <div class="form-group full-width" *ngIf="canManageCustomEventEditors()">
         <label>الخدام المسموح لهم بالتعديل</label>
         <input
@@ -995,7 +971,7 @@
           </button>
         </div>
         <ng-template #noCustomEventEditorTargets>
-          <p class="hint">لا يوجد خدام متاحين للإضافة في النطاق الحالي.</p>
+          <p class="hint">{{ customEventEditorEmptyMessage() }}</p>
         </ng-template>
 
         <div class="custom-editor-chips" *ngIf="selectedCustomEventEditors().length; else noCustomEventEditors">
@@ -1045,6 +1021,7 @@
           inputStyleClass="attendance-date-input__field"
           panelStyleClass="attendanceGrantDatePanel"
           dateFormat="yy-mm-dd"
+          [minDate]="customEventMinDate"
           [disabledDates]="customEventBlockedDates"
           placeholder="اختر أول تاريخ"
           [showButtonBar]="true"
@@ -1079,6 +1056,7 @@
           inputStyleClass="attendance-date-input__field"
           panelStyleClass="attendanceGrantDatePanel"
           dateFormat="yy-mm-dd"
+          [minDate]="customEventActiveFromDate || customEventMinDate"
           [disabledDates]="customEventBlockedDates"
           placeholder="اختر آخر تاريخ"
           [showButtonBar]="true"
@@ -1100,19 +1078,49 @@
           </ng-template>
         </p-datepicker>
       </div>
+      </ng-container>
     </div>
   </div>
 
   <ng-template pTemplate="footer">
-    <div class="dialog-footer">
-      <button type="button" class="mini-btn danger" (click)="deleteEditingCustomEvent()" *ngIf="customEventDialogMode === 'edit'">
+    <div class="dialog-footer dialog-footer--split">
+      <button
+        type="button"
+        class="mini-btn danger"
+        *ngIf="canDeleteEditingCustomEvent()"
+        (click)="requestDeleteEditingCustomEvent()"
+      >
         <i class="pi pi-trash"></i>
-        إلغاء هذه المناسبة
+        حذف المناسبة
       </button>
-      <button type="button" class="mini-btn" (click)="customEventDialogVisible = false">إلغاء</button>
       <button type="button" class="action-btn" (click)="saveCustomEvent()" [disabled]="customEventSaving">
         <i class="pi pi-check"></i>
         {{ customEventSaving ? 'جارٍ الحفظ...' : 'حفظ المناسبة' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  header="تأكيد حذف المناسبة"
+  [(visible)]="customEventDeleteConfirmVisible"
+  [modal]="true"
+  [style]="{ width: '420px', maxWidth: '92vw' }"
+  styleClass="app-surface-dialog confirm-dialog"
+  [baseZIndex]="10020"
+  [draggable]="false"
+  [resizable]="false"
+  dir="rtl"
+>
+  <div class="confirm-dialog__body">
+    هل أنت متأكد أنك تريد حذف هذه المناسبة؟
+  </div>
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button type="button" class="mini-btn confirm-dialog__back" (click)="cancelCustomEventDeleteConfirm()">رجوع</button>
+      <button type="button" class="mini-btn danger" (click)="confirmDeleteCustomEventGroup()">
+        <i class="pi pi-trash"></i>
+        حذف
       </button>
     </div>
   </ng-template>
