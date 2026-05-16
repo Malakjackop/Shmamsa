@@ -371,6 +371,14 @@
                        [required]="customFieldRequired(f)"
                        (blur)="markTouched('custom_' + f.fieldKey)" />
 
+                <ng-container *ngIf="f.fieldType === 'DATE'">
+                  <label class="custom-field-label">{{ f.labelAr }}</label>
+                  <input type="date"
+                         [formControlName]="'custom_' + f.fieldKey"
+                         [required]="customFieldRequired(f)"
+                         (blur)="markTouched('custom_' + f.fieldKey)" />
+                </ng-container>
+
                 <select *ngIf="f.fieldType === 'SELECT'"
                         class="form-select"
                         [formControlName]="'custom_' + f.fieldKey"

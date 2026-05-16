@@ -1,7 +1,7 @@
 import { NgModule ,  LOCALE_ID } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient, withFetch } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router'; // ✅ Needed for <router-outlet>
@@ -25,6 +25,8 @@ import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
 import { StartNewYearComponent } from './start-new-year/start-new-year';
+import { PendingApprovalComponent } from './pending-approval/pending-approval';
+import { ChooseFamilyComponent } from './choose-family/choose-family';
 import { GradesComponent } from './grades/grades';
 import { DevSettingsComponent } from './dev-settings/dev-settings';
 
@@ -67,6 +69,8 @@ import { TableModule } from 'primeng/table';
     AttendanceComponent,
     ResourcesComponent,
     StartNewYearComponent,
+    PendingApprovalComponent,
+    ChooseFamilyComponent,
     GradesComponent,
 
   ],
@@ -78,7 +82,6 @@ import { TableModule } from 'primeng/table';
     AttendanceHistoryComponent,
     DevSettingsComponent,
     AppRoutingModule,
-    HttpClientModule,
     ReactiveFormsModule,
     FormsModule,
     CommonModule,
@@ -105,6 +108,7 @@ import { TableModule } from 'primeng/table';
   providers: [
     { provide: LOCALE_ID, useValue: 'ar-EG' },
     MessageService,
+    provideHttpClient(withFetch()),
     providePrimeNG({
       theme: {
         preset: Aura

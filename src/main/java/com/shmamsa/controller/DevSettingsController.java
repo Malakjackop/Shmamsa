@@ -193,8 +193,8 @@ public class DevSettingsController {
         }
 
         String type = (req.fieldType() == null || req.fieldType().isBlank()) ? "TEXT" : req.fieldType().trim().toUpperCase();
-        if (!List.of("TEXT", "SELECT").contains(type)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Type must be TEXT or SELECT");
+        if (!List.of("TEXT", "SELECT", "DATE").contains(type)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Type must be TEXT, SELECT, or DATE");
         }
         String requiredRule = normalizeRequiredRuleSet(req.requiredRule());
         String showIn = normalizeShowIn(req.showIn());
@@ -252,8 +252,8 @@ public class DevSettingsController {
 
         if (req.fieldType() != null && !req.fieldType().isBlank()) {
             String type = req.fieldType().trim().toUpperCase();
-            if (!List.of("TEXT", "SELECT").contains(type)) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Type must be TEXT or SELECT");
+            if (!List.of("TEXT", "SELECT", "DATE").contains(type)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TYPE", "Type must be TEXT, SELECT, or DATE");
             }
             field.setFieldType(type);
         }

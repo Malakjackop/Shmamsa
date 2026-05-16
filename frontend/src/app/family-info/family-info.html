@@ -19,6 +19,17 @@
       <i class="pi pi-bell"></i>
       <span class="badge" *ngIf="pendingRequestsCount > 0">{{ pendingRequestsCount }}</span>
     </button>
+
+    <button
+      type="button"
+      class="notifBtn"
+      (click)="openFamilyRequests()"
+      [title]="'طلبات الانضمام للأسرة'"
+      aria-label="طلبات الانضمام للأسرة"
+    >
+      <i class="pi pi-envelope"></i>
+      <span class="badge" *ngIf="familyRequestsPendingCount > 0">{{ familyRequestsPendingCount }}</span>
+    </button>
   </div>
 
   <div class="filtersBar">
@@ -299,6 +310,56 @@
               class="p-button-danger"
               icon="pi pi-times"
               (click)="decideKhorsRequest(request, false)"
+            ></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Family Join Requests Modal ════════════════════════ -->
+  <div class="modal legacy-modal" *ngIf="familyRequestsOpen">
+    <div class="modalCard wide">
+      <div class="modalHead">
+        <div>
+          <div class="title">طلبات الانضمام للأسرة</div>
+          <div class="sub" *ngIf="familyRequestsPendingCount > 0">عدد الطلبات: {{ familyRequestsPendingCount }}</div>
+          <div class="sub" *ngIf="familyRequestsPendingCount === 0">لا يوجد طلبات حالياً</div>
+        </div>
+        <div class="modalActions">
+          <button type="button" class="detailsIconBtn" (click)="closeFamilyRequests()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="familyRequestsLoading" class="hint">جاري التحميل...</div>
+
+      <div *ngIf="!familyRequestsLoading && familyRequests?.length" class="reqList">
+        <div class="reqRow" *ngFor="let request of familyRequests">
+          <div class="reqInfo">
+            <div class="reqName">{{ request.fullName }}</div>
+            <div class="reqMeta">
+              <span>اسم المستخدم: {{ request.username }}</span>
+              <span>الدور: {{ request.role | roleLabel }}</span>
+              <span>الأسرة: {{ request.familyName }}</span>
+            </div>
+          </div>
+
+          <div class="reqActions">
+            <button
+              pButton
+              type="button"
+              class="p-button-success"
+              icon="pi pi-check"
+              (click)="decideFamilyRequest(request, true)"
+            ></button>
+            <button
+              pButton
+              type="button"
+              class="p-button-danger"
+              icon="pi pi-times"
+              (click)="decideFamilyRequest(request, false)"
             ></button>
           </div>
         </div>

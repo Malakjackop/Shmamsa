@@ -26,7 +26,9 @@ public class FamilyCatalogService {
     @Transactional
     public void seedDefaults() {
         for (FamilyCatalog def : defaultFamilies()) {
-            FamilyCatalog item = familyCatalogRepository.findByCode(def.getCode()).orElseGet(FamilyCatalog::new);
+            FamilyCatalog item = familyCatalogRepository.findByCode(def.getCode())
+                    .orElseGet(() -> familyCatalogRepository.findByNameAr(def.getNameAr())
+                            .orElseGet(FamilyCatalog::new));
             item.setCode(def.getCode());
             item.setNameAr(def.getNameAr());
             item.setBaseName(def.getBaseName());
@@ -201,22 +203,22 @@ public class FamilyCatalogService {
 
     private List<FamilyCatalog> defaultFamilies() {
         return List.of(
-                family("SAMAEYIN", "اسرة السمائين", "اسرة السمائين", null, "FAMILY", 10, true, true),
-                family("ABANOUB", "اسرة القديس ابانوب", "اسرة القديس ابانوب", null, "FAMILY", 20, true, true),
-                family("DIOSCORUS", "اسرة القديس ديسقورس", "اسرة القديس ديسقورس", null, "FAMILY", 30, true, true),
-                family("SIDHOM_BISHAY", "اسرة القديس سيدهم بشاي", "اسرة القديس سيدهم بشاي", null, "FAMILY", 40, true, true),
-                family("ASKLABIUS", "اسرة القديس اسكلابيوس", "اسرة القديس اسكلابيوس", null, "FAMILY", 50, true, true),
-                family("KYRILLOS", "اسرة القديس البابا كيرلس", "اسرة القديس البابا كيرلس", null, "FAMILY", 60, true, false),
-                family("KYRILLOS_A", "اسرة القديس البابا كيرلس أ", "اسرة القديس البابا كيرلس", "A", "FAMILY", 61, false, true),
-                family("KYRILLOS_B", "اسرة القديس البابا كيرلس ب", "اسرة القديس البابا كيرلس", "B", "FAMILY", 62, false, true),
-                family("ABRAM", "اسرة القديس الانبا ابرام", "اسرة القديس الانبا ابرام", null, "FAMILY", 70, true, false),
-                family("ABRAM_A", "اسرة القديس الانبا ابرام أ", "اسرة القديس الانبا ابرام", "A", "FAMILY", 71, false, true),
-                family("ABRAM_B", "اسرة القديس الانبا ابرام ب", "اسرة القديس الانبا ابرام", "B", "FAMILY", 72, false, true),
-                family("STEPHANOS", "اسرة القديس اسطفانوس", "اسرة القديس اسطفانوس", null, "FAMILY", 80, true, false),
-                family("STEPHANOS_A", "اسرة القديس اسطفانوس أ", "اسرة القديس اسطفانوس", "A", "FAMILY", 81, false, true),
-                family("STEPHANOS_B", "اسرة القديس اسطفانوس ب", "اسرة القديس اسطفانوس", "B", "FAMILY", 82, false, true),
-                family("MARMARKOS_KHORS", "خورس مارمرقس", "خورس مارمرقس", null, "KHORS", 90, true, false),
-                family("ATHANASIUS_KHORS", "خورس البابا اثناسيوس", "خورس البابا اثناسيوس", null, "KHORS", 100, true, false)
+                family("F1", "اسرة السمائين", "اسرة السمائين", null, "FAMILY", 10, true, true),
+                family("F2", "اسرة القديس ابانوب", "اسرة القديس ابانوب", null, "FAMILY", 20, true, true),
+                family("F3", "اسرة القديس ديسقورس", "اسرة القديس ديسقورس", null, "FAMILY", 30, true, true),
+                family("F4", "اسرة القديس سيدهم بشاي", "اسرة القديس سيدهم بشاي", null, "FAMILY", 40, true, true),
+                family("F5", "اسرة القديس اسكلابيوس", "اسرة القديس اسكلابيوس", null, "FAMILY", 50, true, true),
+                family("F6", "اسرة القديس البابا كيرلس", "اسرة القديس البابا كيرلس", null, "FAMILY", 60, true, false),
+                family("F6.1", "اسرة القديس البابا كيرلس أ", "اسرة القديس البابا كيرلس", "A", "FAMILY", 61, false, true),
+                family("F6.2", "اسرة القديس البابا كيرلس ب", "اسرة القديس البابا كيرلس", "B", "FAMILY", 62, false, true),
+                family("F7", "اسرة القديس الانبا ابرام", "اسرة القديس الانبا ابرام", null, "FAMILY", 70, true, false),
+                family("F7.1", "اسرة القديس الانبا ابرام أ", "اسرة القديس الانبا ابرام", "A", "FAMILY", 71, false, true),
+                family("F7.2", "اسرة القديس الانبا ابرام ب", "اسرة القديس الانبا ابرام", "B", "FAMILY", 72, false, true),
+                family("F8", "اسرة القديس اسطفانوس", "اسرة القديس اسطفانوس", null, "FAMILY", 80, true, false),
+                family("F8.1", "اسرة القديس اسطفانوس أ", "اسرة القديس اسطفانوس", "A", "FAMILY", 81, false, true),
+                family("F8.2", "اسرة القديس اسطفانوس ب", "اسرة القديس اسطفانوس", "B", "FAMILY", 82, false, true),
+                family("F9", "خورس مارمرقس", "خورس مارمرقس", null, "KHORS", 90, true, false),
+                family("F10", "خورس البابا اثناسيوس", "خورس البابا اثناسيوس", null, "KHORS", 100, true, false)
         );
     }
 

@@ -10,6 +10,8 @@ import java.util.List;
 public interface UserFamilyRoleRepository extends JpaRepository<UserFamilyRole, Long> {
     List<UserFamilyRole> findByUser_IdOrderByAssignmentOrderAscIdAsc(Long userId);
 
+    boolean existsByFamilyId(Long familyId);
+
     @Modifying
     @Transactional
     void deleteByUser_Id(Long userId);

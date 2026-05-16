@@ -7,6 +7,7 @@ import { AuthService, AuthUser } from '../services/auth.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
 import { FamilyMemberDetails, FamilyMemberSummary, FamilyService } from '../services/family.service';
 import { KhorsJoinRequestView, KhorsRequestsService } from '../services/khors-requests.service';
+import { FamilyJoinRequestService, FamilyJoinRequestView } from '../services/family-join-request.service';
 import {
   buildVisibleCustomFieldEntries,
   customFieldHasTarget,
@@ -141,6 +142,7 @@ export class FamilyInfoComponent implements OnInit {
   private adminSvc = inject(AdminService);
   private auth = inject(AuthService);
   private khorsReq = inject(KhorsRequestsService);
+  private familyJoinReq = inject(FamilyJoinRequestService);
   private devSettings = inject(DevSettingsService);
   private message = inject(MessageService);
   private confirm = inject(ConfirmationService);
@@ -193,6 +195,11 @@ export class FamilyInfoComponent implements OnInit {
   requestsOpen = false;
   requestsLoading = false;
   requests: KhorsJoinRequestView[] = [];
+
+  familyRequestsPendingCount = 0;
+  familyRequestsOpen = false;
+  familyRequestsLoading = false;
+  familyRequests: FamilyJoinRequestView[] = [];
   private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
   ngOnInit() {
@@ -313,6 +320,7 @@ export class FamilyInfoComponent implements OnInit {
   onFamilyChange() {
     this.resetInteractiveStateForNewFamily();
     this.loadMembers();
+    this.loadFamilyPendingRequestsCount();
     if (this.canSeeKhorsRequests()) {
       this.loadPendingRequestsCount();
     } else {
@@ -709,6 +717,61 @@ export class FamilyInfoComponent implements OnInit {
     });
   }
 
+  /* ── Family Join Requests ───────────────────────────── */
+  openFamilyRequests() {
+    this.familyRequestsOpen = true;
+    this.familyRequestsLoading = true;
+    this.familyJoinReq.pending().subscribe({
+      next: (list) => {
+        this.familyRequests = list || [];
+        this.familyRequestsLoading = false;
+        this.familyRequestsPendingCount = this.familyRequests.length;
+      },
+      error: () => {
+        this.familyRequestsLoading = false;
+        this.familyRequests = [];
+        this.familyRequestsPendingCount = 0;
+      }
+    });
+  }
+
+  closeFamilyRequests() {
+    this.familyRequestsOpen = false;
+    this.familyRequestsLoading = false;
+    this.familyRequests = [];
+    this.loadFamilyPendingRequestsCount();
+  }
+
+  decideFamilyRequest(req: FamilyJoinRequestView, approved: boolean) {
+    if (!req?.requestId) return;
+    this.familyJoinReq.decide(req.requestId, approved).subscribe({
+      next: () => {
+        this.familyRequests = (this.familyRequests || []).filter((item) => item.requestId !== req.requestId);
+        this.familyRequestsPendingCount = this.familyRequests.length;
+        if (approved) this.loadMembers();
+        this.message.add({
+          severity: 'success',
+          summary: 'تم',
+          detail: approved ? 'تم قبول الطلب' : 'تم رفض الطلب'
+        });
+      },
+      error: (err) => {
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'فشل تنفيذ القرار'
+        });
+      }
+    });
+  }
+
+  private loadFamilyPendingRequestsCount() {
+    this.familyJoinReq.pending().subscribe({
+      next: (list) => (this.familyRequestsPendingCount = (list || []).length),
+      error: () => (this.familyRequestsPendingCount = 0)
+    });
+  }
+
   familyLabel(
     entity: { familyAssignments?: FamilyAssignmentLike[]; role?: string | number; deaconFamily?: string } | null | undefined
   ): string {
@@ -723,6 +786,7 @@ export class FamilyInfoComponent implements OnInit {
           if (this.families.length) {
             this.selectedFamily = this.families[0];
             this.loadMembers();
+            this.loadFamilyPendingRequestsCount();
             this.loadPendingRequestsCount();
           }
         },

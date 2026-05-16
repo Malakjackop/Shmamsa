@@ -176,7 +176,7 @@
             <label>{{ item.label }}</label>
             <ng-container *ngIf="editMode && item.editable">
               <select
-                *ngIf="item.fieldType === 'SELECT'; else editableCustomFieldText"
+                *ngIf="item.fieldType === 'SELECT'; else editableCustomFieldNonSelect"
                 [(ngModel)]="profileCustomFieldValues[item.fieldKey]"
                 [ngModelOptions]="{ standalone: true }"
               >
@@ -184,18 +184,26 @@
                 <option *ngFor="let option of item.options" [value]="option">{{ customFieldOptionLabel(option) }}</option>
               </select>
 
-              <ng-template #editableCustomFieldText>
+              <ng-template #editableCustomFieldNonSelect>
                 <input
-                  type="text"
+                  *ngIf="item.fieldType === 'DATE'; else editableTextField"
+                  type="date"
                   [(ngModel)]="profileCustomFieldValues[item.fieldKey]"
                   [ngModelOptions]="{ standalone: true }"
                 />
+                <ng-template #editableTextField>
+                  <input
+                    type="text"
+                    [(ngModel)]="profileCustomFieldValues[item.fieldKey]"
+                    [ngModelOptions]="{ standalone: true }"
+                  />
+                </ng-template>
               </ng-template>
             </ng-container>
 
             <ng-container *ngIf="editMode && !item.editable">
               <select
-                *ngIf="item.fieldType === 'SELECT'; else disabledCustomFieldText"
+                *ngIf="item.fieldType === 'SELECT'; else disabledCustomFieldNonSelect"
                 [ngModel]="profileCustomFieldValues[item.fieldKey]"
                 [ngModelOptions]="{ standalone: true }"
                 [disabled]="true"
@@ -204,13 +212,22 @@
                 <option *ngFor="let option of item.options" [value]="option">{{ customFieldOptionLabel(option) }}</option>
               </select>
 
-              <ng-template #disabledCustomFieldText>
+              <ng-template #disabledCustomFieldNonSelect>
                 <input
-                  type="text"
+                  *ngIf="item.fieldType === 'DATE'; else disabledTextField"
+                  type="date"
                   [ngModel]="profileCustomFieldValues[item.fieldKey]"
                   [ngModelOptions]="{ standalone: true }"
                   [disabled]="true"
                 />
+                <ng-template #disabledTextField>
+                  <input
+                    type="text"
+                    [ngModel]="profileCustomFieldValues[item.fieldKey]"
+                    [ngModelOptions]="{ standalone: true }"
+                    [disabled]="true"
+                  />
+                </ng-template>
               </ng-template>
             </ng-container>
 

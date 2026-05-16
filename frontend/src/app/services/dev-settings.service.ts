@@ -7,7 +7,7 @@ export interface CustomField {
   id?: number;
   fieldKey: string;
   labelAr: string;
-  fieldType: 'TEXT' | 'SELECT';
+  fieldType: 'TEXT' | 'SELECT' | 'DATE';
   options?: string;
   required: boolean;
   requiredRule?: string;
@@ -99,4 +99,46 @@ export class DevSettingsService {
   deleteField(id: number): Observable<any> {
     return this.http.delete(`/api/dev/custom-fields/${id}`, { withCredentials: true });
   }
+
+  /* ── Families management ──────────────────────────────── */
+  getAllFamilies(): Observable<FamilyCatalog[]> {
+    if (!this.isBrowser) return of([]);
+    return this.http.get<FamilyCatalog[]>('/api/dev/families', { withCredentials: true });
+  }
+
+  createFamily(family: Partial<FamilyCatalog>): Observable<FamilyCatalog[]> {
+    return this.http.post<FamilyCatalog[]>('/api/dev/families', family, { withCredentials: true });
+  }
+
+  updateFamily(id: number, family: Partial<FamilyCatalog>): Observable<FamilyCatalog[]> {
+    return this.http.put<FamilyCatalog[]>(`/api/dev/families/${id}`, family, { withCredentials: true });
+  }
+
+  toggleFamilyActive(id: number): Observable<{ id: number; active: boolean }> {
+    return this.http.put<{ id: number; active: boolean }>(`/api/dev/families/${id}/toggle-active`, {}, { withCredentials: true });
+  }
+
+  deleteFamily(id: number): Observable<any> {
+    return this.http.delete(`/api/dev/families/${id}`, { withCredentials: true });
+  }
+
+  reorderFamilies(items: { id: number; sortOrder: number }[]): Observable<any> {
+    return this.http.put('/api/dev/families/reorder', items, { withCredentials: true });
+  }
+}
+
+export interface FamilyCatalog {
+  id?: number;
+  code: string;
+  nameAr: string;
+  baseName?: string;
+  branch?: string;
+  category?: string;
+  active: boolean;
+  sortOrder: number;
+  servantSelectable: boolean;
+  memberSelectable: boolean;
+  directJoinGrades?: string;
+  directJoinFrom?: string;
+  directJoinUntil?: string;
 }

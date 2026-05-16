@@ -14,4 +14,5 @@ public interface FamilyCatalogRepository extends JpaRepository<FamilyCatalog, Lo
     List<FamilyCatalog> findByActiveTrueAndMemberSelectableTrueOrderBySortOrderAscNameArAsc();
     boolean existsByNameArAndActiveTrueAndServantSelectableTrue(String nameAr);
     boolean existsByNameArAndActiveTrueAndMemberSelectableTrue(String nameAr);
+    List<FamilyCatalog> findAllByOrderBySortOrderAsc();
 }

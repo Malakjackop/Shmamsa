@@ -3,6 +3,8 @@ package com.shmamsa.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "families")
 @Getter
@@ -42,4 +44,13 @@ public class FamilyCatalog {
 
     @Column(name = "member_selectable", nullable = false)
     private Boolean memberSelectable;
+
+    @Column(name = "direct_join_grades", length = 500)
+    private String directJoinGrades;
+
+    @Column(name = "direct_join_from")
+    private LocalDate directJoinFrom;
+
+    @Column(name = "direct_join_until")
+    private LocalDate directJoinUntil;
 }

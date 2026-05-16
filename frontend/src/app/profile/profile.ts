@@ -11,7 +11,7 @@ type ProfileCustomEntry = {
   fieldKey: string;
   label: string;
   value: string;
-  fieldType: 'TEXT' | 'SELECT';
+  fieldType: 'TEXT' | 'SELECT' | 'DATE';
   editable: boolean;
   options: string[];
 };

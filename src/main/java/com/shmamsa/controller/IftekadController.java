@@ -238,24 +238,17 @@ public class IftekadController {
         return ResponseEntity.ok(Map.of("message", "deleted", "id", id));
     }
 
-    @GetMapping("/last")
-    public ResponseEntity<?> last(@RequestParam(name = "memberIds") String memberIds, Authentication auth) {
+    @PostMapping("/last")
+    public ResponseEntity<?> last(@RequestBody Map<String, List<Long>> body, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
-        if (memberIds == null || memberIds.trim().isBlank()) {
+        List<Long> ids = body == null ? null : body.get("ids");
+        if (ids == null || ids.isEmpty()) {
             return ResponseEntity.ok(Map.of());
         }
-
-        List<Long> ids = new ArrayList<>();
-        for (String p : memberIds.split(",")) {
-            String s = p == null ? "" : p.trim();
-            if (s.isBlank()) continue;
-            try { ids.add(Long.valueOf(s)); } catch (Exception ignored) {}
-        }
-        if (ids.isEmpty()) return ResponseEntity.ok(Map.of());
 
         Map<Long, User> members = new LinkedHashMap<>();
         for (Long id : ids) {

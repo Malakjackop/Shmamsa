@@ -32,7 +32,11 @@ public class ServantSecretService {
 
     @PostConstruct
     public void init() {
-        ensureSecretExists();
+        try {
+            ensureSecretExists();
+        } catch (Exception e) {
+            System.err.println("WARN: Could not initialize servant secret: " + e.getMessage());
+        }
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "Africa/Cairo")

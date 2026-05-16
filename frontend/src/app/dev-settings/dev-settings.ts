@@ -14,7 +14,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { forkJoin } from 'rxjs';
 
-import { DevSettingsService, CustomField, VisibilityCondition } from '../services/dev-settings.service';
+import { DevSettingsService, CustomField, VisibilityCondition, FamilyCatalog } from '../services/dev-settings.service';
 import { AuthService, FamilyOption } from '../services/auth.service';
 import { effectiveProfileEditable, effectiveShowInTargets, parseShowInTargets } from '../shared/custom-field-display';
 
@@ -67,6 +67,27 @@ export class DevSettingsComponent implements OnInit {
   groupedSections: FieldSection[] = [];
   loading = true;
 
+  /* ── Tab state ────────────────────────────────────────── */
+  activeTab: 'fields' | 'families' = 'fields';
+
+  /* ── Families state ───────────────────────────────────── */
+  families: FamilyCatalog[] = [];
+  familiesLoading = false;
+  familyDialogVisible = false;
+  familyDialogMode: 'create' | 'edit' = 'create';
+  editingFamily: Partial<FamilyCatalog> = {};
+  familyHasBranches = false;
+  familyBranchCount = 0;
+
+  /* ── Family join config ───────────────────────────────── */
+  knownSchoolGrades = [
+    'أولى ابتدائي', 'تانية ابتدائي', 'تالتة ابتدائي', 'رابعة ابتدائي', 'خامسة ابتدائي', 'سادسة ابتدائي',
+    'أولى إعدادي', 'تانية إعدادي', 'تالتة إعدادي',
+    'أولى ثانوي', 'تانية ثانوي', 'تالتة ثانوي',
+    'other'
+  ];
+  selectedDirectJoinGrades: string[] = [];
+
   /* ── Dialog state ─────────────────────────────────────── */
   dialogVisible = false;
   dialogMode: 'create' | 'edit' = 'create';
@@ -79,7 +100,8 @@ export class DevSettingsComponent implements OnInit {
 
   fieldTypeOptions = [
     { label: 'نص (Text)', value: 'TEXT' },
-    { label: 'قائمة اختيارات (Select)', value: 'SELECT' }
+    { label: 'قائمة اختيارات (Select)', value: 'SELECT' },
+    { label: 'تاريخ (Date)', value: 'DATE' }
   ];
 
   visibilityOptions = [
@@ -777,6 +799,228 @@ export class DevSettingsComponent implements OnInit {
         this.loadFields();
       }
     });
+  }
+
+  /* ── Families management ─────────────────────────────── */
+  loadFamilies(): void {
+    this.familiesLoading = true;
+    this.svc.getAllFamilies().subscribe({
+      next: (data) => {
+        this.families = data || [];
+        this.familiesLoading = false;
+      },
+      error: () => {
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل العائلات' });
+        this.familiesLoading = false;
+      }
+    });
+  }
+
+  openCreateFamily(): void {
+    this.familyDialogMode = 'create';
+    this.familyHasBranches = false;
+    this.familyBranchCount = 0;
+    this.selectedDirectJoinGrades = [];
+    this.editingFamily = {
+      nameAr: '',
+      baseName: '',
+      category: 'FAMILY',
+      active: true,
+      servantSelectable: true,
+      memberSelectable: true
+    };
+    this.familyDialogVisible = true;
+  }
+
+  openEditFamily(f: FamilyCatalog): void {
+    this.familyDialogMode = 'edit';
+    this.familyHasBranches = !!f.branch;
+    this.familyBranchCount = 0;
+    this.selectedDirectJoinGrades = this.parseGrades(f.directJoinGrades);
+    this.editingFamily = { ...f };
+    this.familyDialogVisible = true;
+  }
+
+  private parseGrades(grades?: string | null): string[] {
+    return (grades || '')
+      .split(',')
+      .map(g => g.trim())
+      .filter(Boolean);
+  }
+
+  toggleDirectJoinGrade(grade: string, checked: boolean): void {
+    if (checked) {
+      if (!this.selectedDirectJoinGrades.includes(grade)) {
+        this.selectedDirectJoinGrades = [...this.selectedDirectJoinGrades, grade];
+      }
+    } else {
+      this.selectedDirectJoinGrades = this.selectedDirectJoinGrades.filter(g => g !== grade);
+    }
+  }
+
+  hasDirectJoinGrade(grade: string): boolean {
+    return this.selectedDirectJoinGrades.includes(grade);
+  }
+
+  onFamilyHasBranchesChange(hasBranches: boolean): void {
+    this.familyHasBranches = hasBranches;
+    if (!hasBranches) {
+      this.familyBranchCount = 0;
+    } else {
+      this.familyBranchCount = 2;
+    }
+  }
+
+  get branchLettersPreview(): string[] {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const count = Math.max(2, Math.min(26, this.familyBranchCount || 2));
+    return letters.slice(0, count).split('');
+  }
+
+  get nextFamilyNumber(): number {
+    const existing = this.families
+      .map(f => f.code?.match(/^F(\d+)$/))
+      .filter(m => m)
+      .map(m => parseInt(m![1], 10))
+      .filter(n => !isNaN(n));
+    return existing.length ? Math.max(...existing) + 1 : 1;
+  }
+
+  saveFamily(): void {
+    if (!this.editingFamily.nameAr?.trim()) {
+      this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اسم العائلة مطلوب' });
+      return;
+    }
+
+    const joinGrades = this.selectedDirectJoinGrades.length ? this.selectedDirectJoinGrades.join(',') : null;
+
+    if (this.familyDialogMode === 'create') {
+      const payload: any = {
+        nameAr: this.editingFamily.nameAr,
+        category: this.editingFamily.category || 'FAMILY',
+        servantSelectable: this.editingFamily.servantSelectable,
+        memberSelectable: this.editingFamily.memberSelectable,
+        directJoinGrades: joinGrades,
+        directJoinFrom: this.editingFamily.directJoinFrom || null,
+        directJoinUntil: this.editingFamily.directJoinUntil || null
+      };
+      if (this.familyHasBranches) {
+        payload.baseName = this.editingFamily.baseName || this.editingFamily.nameAr;
+        payload.branchCount = this.familyBranchCount;
+      }
+      this.svc.createFamily(payload).subscribe({
+        next: (result) => {
+          const count = Array.isArray(result) ? result.length : 1;
+          this.msg.add({ severity: 'success', summary: 'تم', detail: `تم إنشاء ${count} عائلة بنجاح` });
+          this.familyDialogVisible = false;
+          this.loadFamilies();
+        },
+        error: (err) => {
+          const detail = err?.error?.message || 'فشل إنشاء العائلة';
+          this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+        }
+      });
+    } else {
+      const { id, code, ...updateData } = this.editingFamily;
+      const payload: any = {
+        ...updateData,
+        directJoinGrades: joinGrades,
+        directJoinFrom: this.editingFamily.directJoinFrom || null,
+        directJoinUntil: this.editingFamily.directJoinUntil || null
+      };
+      if (this.familyHasBranches) {
+        payload.baseName = this.editingFamily.baseName || this.editingFamily.nameAr;
+        payload.branchCount = this.familyBranchCount;
+      }
+      this.svc.updateFamily(id!, payload).subscribe({
+        next: (result) => {
+          const count = Array.isArray(result) ? result.length : 1;
+          this.msg.add({ severity: 'success', summary: 'تم', detail: `تم حفظ ${count} عائلة بنجاح` });
+          this.familyDialogVisible = false;
+          this.loadFamilies();
+        },
+        error: (err) => {
+          const detail = err?.error?.message || 'فشل تعديل العائلة';
+          this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+        }
+      });
+    }
+  }
+
+  toggleFamilyActive(f: FamilyCatalog): void {
+    this.svc.toggleFamilyActive(f.id!).subscribe({
+      next: (res) => {
+        f.active = res.active;
+        const status = res.active ? 'مفعلة' : 'معطلة';
+        this.msg.add({ severity: 'info', summary: 'تم', detail: `العائلة ${status}` });
+      },
+      error: (err) => {
+        const detail = err?.error?.message || 'فشل تحديث حالة العائلة';
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+      }
+    });
+  }
+
+  deleteFamily(f: FamilyCatalog): void {
+    this.confirm.confirm({
+      message: `هل أنت متأكد من حذف العائلة "${f.nameAr}"؟`,
+      header: 'تأكيد الحذف',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'حذف',
+      rejectLabel: 'إلغاء',
+      accept: () => {
+        this.svc.deleteFamily(f.id!).subscribe({
+          next: () => {
+            this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم حذف العائلة' });
+            this.loadFamilies();
+          },
+          error: (err) => {
+            const detail = err?.error?.message || 'فشل حذف العائلة';
+            this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+          }
+        });
+      }
+    });
+  }
+
+  moveFamilyUp(index: number): void {
+    if (index <= 0) return;
+    const items = this.families.map((f, i) => ({ id: f.id!, sortOrder: i * 10 }));
+    const tmp = items[index].sortOrder;
+    items[index] = { ...items[index], sortOrder: items[index - 1].sortOrder };
+    items[index - 1] = { ...items[index - 1], sortOrder: tmp };
+    this.svc.reorderFamilies(items).subscribe({
+      next: () => {
+        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تحديث الترتيب' });
+        this.loadFamilies();
+      },
+      error: () => {
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ الترتيب' });
+      }
+    });
+  }
+
+  moveFamilyDown(index: number): void {
+    if (index >= this.families.length - 1) return;
+    const items = this.families.map((f, i) => ({ id: f.id!, sortOrder: i * 10 }));
+    const tmp = items[index].sortOrder;
+    items[index] = { ...items[index], sortOrder: items[index + 1].sortOrder };
+    items[index + 1] = { ...items[index + 1], sortOrder: tmp };
+    this.svc.reorderFamilies(items).subscribe({
+      next: () => {
+        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تحديث الترتيب' });
+        this.loadFamilies();
+      },
+      error: () => {
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ الترتيب' });
+      }
+    });
+  }
+
+  familyCategoryLabel(cat?: string): string {
+    if (cat === 'KHORS') return 'خورس';
+    if (cat === 'FAMILY') return 'عائلة';
+    return cat || 'عائلة';
   }
 
   /* ── Label helpers ──────────────────────────────────── */

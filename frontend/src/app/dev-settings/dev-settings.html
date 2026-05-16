@@ -10,94 +10,268 @@
       <h3>مطور النظام</h3>
     </div>
     <ul class="dev-menu">
-      <li class="active">
-        <i class="pi pi-address-book"></i>
-        <span>حقول التسجيل</span>
-      </li>
+    <li [class.active]="activeTab === 'fields'" (click)="activeTab = 'fields'">
+      <i class="pi pi-address-book"></i>
+      <span>حقول التسجيل</span>
+    </li>
+    <li [class.active]="activeTab === 'families'" (click)="activeTab = 'families'; loadFamilies()">
+      <i class="pi pi-users"></i>
+      <span>العائلات</span>
+    </li>
     </ul>
   </aside>
 
   <!-- ── Main Content Area ─────────────────────────────── -->
   <div class="dev-main-content">
-    <!-- Header -->
-    <div class="page-header">
-      <div class="header-content">
-        <div class="header-icon">
-          <i class="pi pi-cog"></i>
+
+    <!-- ══ Registration Fields Tab ══════════════════════════ -->
+    <ng-container *ngIf="activeTab === 'fields'">
+      <div class="page-header">
+        <div class="header-content">
+          <div class="header-icon">
+            <i class="pi pi-cog"></i>
+          </div>
+          <div>
+            <h1>بناء حقول التسجيل</h1>
+          </div>
         </div>
-        <div>
-          <h1>بناء حقول التسجيل</h1>
-        </div>
+        <button class="btn-add" (click)="openCreate()">
+          <i class="pi pi-plus"></i>
+          إضافة حقل جديد
+        </button>
       </div>
-      <button class="btn-add" (click)="openCreate()">
-        <i class="pi pi-plus"></i>
-        إضافة حقل جديد
-      </button>
-    </div>
 
-    <!-- Builder -->
-    <div class="builder-container">
-      <div class="form-preview">
-        <div class="section-title">
-          <i class="pi pi-desktop"></i>
-         الحقول الموجوده حاليا
-        </div>
-
-        <div class="fields-preview" *ngIf="fields.length > 0">
-          <div class="fields-preview__head">
-            <h2> حقول التسجيل</h2>
-            <p>الحقول مقسمة إلى أقسام واضحة، ويمكنك السحب والترتيب داخل كل قسم.</p>
+      <div class="builder-container">
+        <div class="form-preview">
+          <div class="section-title">
+            <i class="pi pi-desktop"></i>
+           الحقول الموجوده حاليا
           </div>
 
-          <div class="sections-stack">
-            <section class="fields-section" *ngFor="let section of groupedSections">
-              <div class="fields-section__head">
-                <h3>{{ section.title }}</h3>
-                <span>{{ section.fields.length }} حقل</span>
-              </div>
+          <div class="fields-preview" *ngIf="fields.length > 0">
+            <div class="fields-preview__head">
+              <h2> حقول التسجيل</h2>
+              <p>الحقول مقسمة إلى أقسام واضحة، ويمكنك السحب والترتيب داخل كل قسم.</p>
+            </div>
 
-              <div class="fields-list" cdkDropList [cdkDropListData]="section.fields" (cdkDropListDropped)="dropSection($event, section.id)">
-                <div class="field-wrapper" *ngFor="let f of section.fields" cdkDrag cdkDragLockAxis="y" [class.disabled-field]="!f.enabled">
-                  <div class="field-actions-overlay">
-                    <div class="field-main">
-                      <button class="drag-handle-btn" cdkDragHandle type="button" title="اسحب لنقل الحقل">
-                        <i class="pi pi-bars"></i>
-                      </button>
-                      <div class="field-summary">
-                        <div class="field-summary__title">
-                          {{ f.labelAr }}
-                        </div>
-                        <div class="field-summary__meta">
-                          <span class="badge badge-type">{{ f.fieldType === 'TEXT' ? 'Text' : 'List' }}</span>
-                          <span class="badge badge-req" [class.badge-muted]="isRequirementOptional(f)">{{ requirementLabel(f) }}</span>
+            <div class="sections-stack">
+              <section class="fields-section" *ngFor="let section of groupedSections">
+                <div class="fields-section__head">
+                  <h3>{{ section.title }}</h3>
+                  <span>{{ section.fields.length }} حقل</span>
+                </div>
+
+                <div class="fields-list" cdkDropList [cdkDropListData]="section.fields" (cdkDropListDropped)="dropSection($event, section.id)">
+                  <div class="field-wrapper" *ngFor="let f of section.fields" cdkDrag cdkDragLockAxis="y" [class.disabled-field]="!f.enabled">
+                    <div class="field-actions-overlay">
+                      <div class="field-main">
+                        <button class="drag-handle-btn" cdkDragHandle type="button" title="اسحب لنقل الحقل">
+                          <i class="pi pi-bars"></i>
+                        </button>
+                        <div class="field-summary">
+                          <div class="field-summary__title">
+                            {{ f.labelAr }}
+                          </div>
+                          <div class="field-summary__meta">
+                            <span class="badge badge-type">{{ f.fieldType === 'TEXT' ? 'Text' : 'List' }}</span>
+                            <span class="badge badge-req" [class.badge-muted]="isRequirementOptional(f)">{{ requirementLabel(f) }}</span>
+                          </div>
                         </div>
                       </div>
+                      <div class="action-btns-overlay">
+                        <button class="toggle-btn" [class.on]="f.enabled" (click)="$event.stopPropagation(); toggleField(f)" title="تفعيل / تعطيل">
+                          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </button>
+                        <button class="icon-btn edit" (click)="$event.stopPropagation(); openEdit(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
+                        <button class="icon-btn delete" (click)="$event.stopPropagation(); deleteField(f)" title="حذف"><i class="pi pi-trash"></i></button>
+                      </div>
                     </div>
-                    <div class="action-btns-overlay">
-                      <button class="toggle-btn" [class.on]="f.enabled" (click)="$event.stopPropagation(); toggleField(f)" title="تفعيل / تعطيل">
-                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                      </button>
-                      <button class="icon-btn edit" (click)="$event.stopPropagation(); openEdit(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
-                      <button class="icon-btn delete" (click)="$event.stopPropagation(); deleteField(f)" title="حذف"><i class="pi pi-trash"></i></button>
-                    </div>
-                  </div>
 
-                  <div *cdkDragPlaceholder class="field-placeholder"></div>
+                    <div *cdkDragPlaceholder class="field-placeholder"></div>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ng-container>
+
+    <!-- ══ Families Tab ════════════════════════════════════ -->
+    <ng-container *ngIf="activeTab === 'families'">
+      <div class="page-header">
+        <div class="header-content">
+          <div class="header-icon">
+            <i class="pi pi-users"></i>
+          </div>
+          <div>
+            <h1>إدارة العائلات</h1>
+          </div>
+        </div>
+        <button class="btn-add" (click)="openCreateFamily()">
+          <i class="pi pi-plus"></i>
+          إضافة عائلة جديدة
+        </button>
+      </div>
+
+      <div class="builder-container">
+        <div class="form-preview">
+          <div class="section-title">
+            <i class="pi pi-list"></i>
+            العائلات المسجلة
+          </div>
+
+          <div class="families-list" *ngIf="families.length > 0">
+            <div class="family-card" *ngFor="let f of families; let i = index" [class.inactive]="!f.active">
+              <div class="family-card__main">
+                <div class="family-card__order-controls">
+                  <button class="order-btn" (click)="moveFamilyUp(i)" [disabled]="i === 0" title="تحريك لأعلى">
+                    <i class="pi pi-chevron-up"></i>
+                  </button>
+                  <span class="order-num">{{ i + 1 }}</span>
+                  <button class="order-btn" (click)="moveFamilyDown(i)" [disabled]="i === families.length - 1" title="تحريك لأسفل">
+                    <i class="pi pi-chevron-down"></i>
+                  </button>
+                </div>
+                <div class="family-card__info">
+                  <div class="family-card__name">{{ f.nameAr }}</div>
+                  <div class="family-card__meta">
+                    <span class="badge badge-type">{{ familyCategoryLabel(f.category) }}</span>
+                    <span class="badge" [class.badge-system]="f.active" [class.badge-muted]="!f.active">
+                      {{ f.active ? 'نشطة' : 'معطلة' }}
+                    </span>
+                    <span class="badge badge-req" *ngIf="f.servantSelectable">خدمة</span>
+                    <span class="badge badge-req" *ngIf="f.memberSelectable">مخدومين</span>
+                    <span class="family-code" *ngIf="f.code">{{ f.code }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="action-btns-overlay">
+                <button class="toggle-btn" [class.on]="f.active" (click)="toggleFamilyActive(f)" title="تفعيل / تعطيل">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </button>
+                <button class="icon-btn edit" (click)="openEditFamily(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
+                <button class="icon-btn delete" (click)="deleteFamily(f)" title="حذف"><i class="pi pi-trash"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-state" *ngIf="!familiesLoading && families.length === 0">
+            <div class="dashed-box">
+              <i class="pi pi-users"></i>
+              <p>لا توجد عائلات مسجلة بعد</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
   </div>
 </div>
+
+<!-- ══ FAMILY CREATE / EDIT DIALOG ══════════════════════ -->
+<p-dialog
+  [header]="familyDialogMode === 'create' ? 'إضافة عائلة جديدة' : 'تعديل العائلة'"
+  [(visible)]="familyDialogVisible"
+  [modal]="true"
+  [blockScroll]="true"
+  [style]="{ width: '520px' }"
+  [baseZIndex]="10000"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="dev-dialog app-surface-dialog"
+  dir="rtl">
+
+  <div class="dialog-body">
+    <div class="form-group">
+      <label>اسم العائلة (بالعربي)</label>
+      <input type="text" [(ngModel)]="editingFamily.nameAr" placeholder="مثال: اسرة القديس مارمرقس" />
+      <small *ngIf="familyDialogMode === 'create' && editingFamily.nameAr">سيتم إنشاء الكود تلقائياً: F{{ nextFamilyNumber }}</small>
+    </div>
+
+    <div class="form-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [ngModel]="familyHasBranches" (ngModelChange)="onFamilyHasBranchesChange($event)" />
+        <span>العائلة لها فروع (أ، ب)</span>
+      </label>
+    </div>
+
+    <ng-container *ngIf="familyHasBranches">
+      <div class="form-group">
+        <label>الاسم الأساسي (Base Name)</label>
+        <input type="text" [(ngModel)]="editingFamily.baseName" placeholder="الاسم المشترك لكل الفروع" />
+        <small>الاسم اللي بيتجمع تحته الفروع</small>
+      </div>
+
+      <div class="form-group">
+        <label>عدد الفروع</label>
+        <input type="number" min="2" max="26" [(ngModel)]="familyBranchCount" placeholder="مثال: 2" />
+        <small *ngIf="familyBranchCount > 0">سيتم إنشاء الفروع: {{ branchLettersPreview.join('، ') }}</small>
+      </div>
+    </ng-container>
+
+    <div class="form-group">
+      <label>التصنيف</label>
+      <select [(ngModel)]="editingFamily.category">
+        <option value="FAMILY">عائلة</option>
+        <option value="KHORS">خورس</option>
+      </select>
+    </div>
+
+    <div class="form-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="editingFamily.servantSelectable" />
+        <span>متاح للخدمة (يظهر في اختيارات الخدام)</span>
+      </label>
+    </div>
+
+    <div class="form-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="editingFamily.memberSelectable" />
+        <span>متاح للمخدومين (يظهر في اختيارات المخدومين)</span>
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label>إعدادات الانضمام المباشر</label>
+      <small>اختر الصفوف الدراسية المسموح لها بالانضمام مباشرة. باقي الصفوف هترسل طلب لمسؤول العائلة.</small>
+    </div>
+
+    <div class="join-grades-grid">
+      <label class="grade-checkbox" *ngFor="let grade of knownSchoolGrades">
+        <input type="checkbox" [ngModel]="hasDirectJoinGrade(grade)" (ngModelChange)="toggleDirectJoinGrade(grade, $event)" [ngModelOptions]="{ standalone: true }" />
+        <span>{{ grade }}</span>
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label>مدة التفعيل (من - إلى)</label>
+      <div class="date-range-row">
+        <input type="date" [(ngModel)]="editingFamily.directJoinFrom" placeholder="من تاريخ" />
+        <span>إلى</span>
+        <input type="date" [(ngModel)]="editingFamily.directJoinUntil" placeholder="إلى تاريخ" />
+      </div>
+      <small>خلال هذه الفترة فقط، الصفوف المحددة تدخل مباشرة. بعد انتهاء الفترة، الكل يدخل بطلب.</small>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button class="btn-cancel" (click)="familyDialogVisible = false">إلغاء</button>
+      <button class="btn-save" (click)="saveFamily()">
+        <i class="pi pi-check"></i>
+        {{ familyDialogMode === 'create' ? 'إنشاء' : 'حفظ التعديلات' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
 
 <!-- ══ CREATE / EDIT DIALOG ══════════════════════════════ -->
 <p-dialog
   [header]="dialogMode === 'create' ? 'إضافة حقل جديد' : 'تعديل الحقل'"
   [(visible)]="dialogVisible"
   [modal]="true"
+  [blockScroll]="true"
   [style]="{ width: '520px' }"
   [baseZIndex]="10000"
   [draggable]="false"
