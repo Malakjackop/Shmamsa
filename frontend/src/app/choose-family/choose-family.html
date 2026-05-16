@@ -1,0 +1,26 @@
+<p-toast position="top-left"></p-toast>
+
+<div class="page-wrapper">
+  <div class="card">
+    <div class="icon"><i class="pi pi-users"></i></div>
+    <h1>تم رفض طلب الانضمام</h1>
+    <p>للأسف، تم رفض طلب انضمامك للأسرة السابقة. برجاء اختيار أسرة جديدة.</p>
+
+    <div class="field-group" *ngIf="!loading; else loadingTpl">
+      <div *ngIf="families.length; else emptyTpl">
+        <select class="family-select" (change)="onFamilyChange($event)" [disabled]="submitting">
+          <option value="" disabled selected>اختار الأسرة</option>
+          <option *ngFor="let f of families" [value]="f.id">{{ f.nameAr }}</option>
+        </select>
+        <button class="submit-btn" (click)="selectFamily()" [disabled]="submitting || !selectedFamilyId">
+          {{ submitting ? 'جاري الإرسال...' : 'إرسال الطلب' }}
+        </button>
+      </div>
+    </div>
+
+    <ng-template #loadingTpl><div class="hint">جاري التحميل...</div></ng-template>
+    <ng-template #emptyTpl><div class="hint">لا توجد أسر متاحة حالياً.</div></ng-template>
+
+    <button class="logout-btn" (click)="logout()">تسجيل الخروج</button>
+  </div>
+</div>

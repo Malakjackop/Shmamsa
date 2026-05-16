@@ -1,0 +1,116 @@
+.page-wrapper {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('/assets/images/church-bg.jpg') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.card {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  max-width: 420px;
+  width: 100%;
+}
+
+.icon {
+  font-size: 3rem;
+  color: #e74c3c;
+  margin-bottom: 1rem;
+}
+
+h1 {
+  font-size: 1.3rem;
+  color: #2d2d2d;
+  margin: 0 0 0.5rem;
+}
+
+p {
+  color: #555;
+  line-height: 1.6;
+  margin: 0 0 1.5rem;
+}
+
+.field-group {
+  margin-bottom: 1.2rem;
+}
+
+.family-select {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  font-size: 15px;
+  background-color: #f8f8f8;
+  color: #1a1a1a;
+  transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+  margin-bottom: 0.8rem;
+  cursor: pointer;
+}
+
+.family-select:focus {
+  border-color: #4a8ed4;
+  box-shadow: 0 0 0 3px rgba(74, 142, 212, 0.3);
+  background-color: #fff;
+}
+
+.family-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: #3a2929;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s, box-shadow 0.3s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #306090;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.hint {
+  color: #999;
+  padding: 1rem 0;
+}
+
+.logout-btn {
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: #5e2b20;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.logout-btn:hover {
+  background: #7a3a2c;
+}
