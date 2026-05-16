@@ -2,7 +2,7 @@
 <p-confirmDialog [style]="{ width: '420px' }" [baseZIndex]="10000"></p-confirmDialog>
 
 <div class="dev-layout" dir="rtl">
-  
+
   <!-- ── Inner Sidebar ───────────────────────────────────── -->
   <aside class="dev-sidebar">
     <div class="dev-sidebar-header">
@@ -392,9 +392,17 @@
     <!-- Show In -->
     <div class="form-group">
       <label>يعرض فين بعد التسجيل؟</label>
-      <select [(ngModel)]="editingField.showIn" (ngModelChange)="onShowInChange($event)">
-        <option *ngFor="let opt of showInOptions" [value]="opt.value">{{ opt.label }}</option>
-      </select>
+      <div class="rule-checkbox-list">
+        <label class="rule-checkbox" *ngFor="let opt of showInOptions">
+          <input
+            type="checkbox"
+            [ngModel]="showInHasTarget(opt.value)"
+            (ngModelChange)="toggleShowInTarget(opt.value, $event)"
+            [ngModelOptions]="{ standalone: true }" />
+          <span>{{ opt.label }}</span>
+        </label>
+      </div>
+      <small>يمكن اختيار مكان أو أكثر، ولو لم تختار أي مكان مش هيظهر بعد التسجيل.</small>
       <label class="checkbox-label" *ngIf="showInIncludesProfile(editingField.showIn)">
         <input type="checkbox" [(ngModel)]="editingField.profileEditable" />
         <span>يسمح بالتعديل من الصفحة الشخصية</span>

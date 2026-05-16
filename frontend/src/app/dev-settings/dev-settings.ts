@@ -57,10 +57,11 @@ export class DevSettingsComponent implements OnInit {
   private authService = inject(AuthService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
-  private readonly showInTargetOrder = ['FAMILY_INFO', 'PROFILE'];
+  private readonly showInTargetOrder = ['FAMILY_INFO', 'PROFILE', 'IFTEKAD'];
   private readonly showInTargetLabels: Record<string, string> = {
     FAMILY_INFO: 'بيانات الأسرة',
-    PROFILE: 'الصفحة الشخصية'
+    PROFILE: 'الصفحة الشخصية',
+    IFTEKAD: 'الافتقاد'
   };
 
   fields: CustomField[] = [];
@@ -136,8 +137,7 @@ export class DevSettingsComponent implements OnInit {
   showInOptions = [
     { label: 'بيانات الأسرة', value: 'FAMILY_INFO' },
     { label: 'الصفحة الشخصية', value: 'PROFILE' },
-    { label: 'بيانات الأسرة والصفحة الشخصية', value: 'FAMILY_INFO,PROFILE' },
-    { label: 'متظهرش', value: 'NONE' }
+    { label: 'الافتقاد', value: 'IFTEKAD' }
   ];
 
   private readonly visibilityDependencyFallbackOptions: Record<string, string[]> = {
@@ -356,11 +356,26 @@ export class DevSettingsComponent implements OnInit {
     }
   }
 
-  onShowInChange(showInValue: string): void {
-    this.editingField.showIn = showInValue;
-    if (!this.showInIncludesProfile(showInValue)) {
+  onShowInChange(showInValue = this.editingField.showIn): void {
+    this.editingField.showIn = this.normalizeConfiguredShowInValue(showInValue);
+    if (!this.showInIncludesProfile(this.editingField.showIn)) {
       this.editingField.profileEditable = false;
     }
+  }
+
+  showInHasTarget(target: string): boolean {
+    return parseShowInTargets(this.editingField.showIn).includes(target);
+  }
+
+  toggleShowInTarget(target: string, checked: boolean): void {
+    const selected = new Set(parseShowInTargets(this.editingField.showIn));
+    if (checked) {
+      selected.add(target);
+    } else {
+      selected.delete(target);
+    }
+
+    this.onShowInChange(Array.from(selected).join(','));
   }
 
   showInIncludesProfile(showInValue?: string | null): boolean {
@@ -1035,7 +1050,7 @@ export class DevSettingsComponent implements OnInit {
   showInLabel(val: string): string {
     const normalized = this.normalizeConfiguredShowInValue(val);
     if (normalized === 'NONE') {
-      return this.showInOptions.find(o => o.value === 'NONE')?.label || 'متظهرش';
+      return 'متظهرش';
     }
 
     return parseShowInTargets(normalized)

@@ -43,8 +43,8 @@ public class DevSettingsController {
             "STUDENT_UNIVERSITY",
             "GRADUATE_ONLY"
     );
-    private static final List<String> SHOW_IN_TARGET_ORDER = List.of("FAMILY_INFO", "PROFILE");
-    private static final Set<String> ALLOWED_SHOW_IN_TARGETS = Set.of("NONE", "FAMILY_INFO", "PROFILE");
+    private static final List<String> SHOW_IN_TARGET_ORDER = List.of("FAMILY_INFO", "PROFILE", "IFTEKAD");
+    private static final Set<String> ALLOWED_SHOW_IN_TARGETS = Set.of("NONE", "FAMILY_INFO", "PROFILE", "IFTEKAD");
 
     private final CustomRegistrationFieldRepository fieldRepo;
     private final CustomFieldValueRepository valueRepo;

@@ -584,6 +584,7 @@ public class  FamilyController {
                 row.put("dateOfBirth", u.getDateOfBirth());
                 row.put("address", u.getAddress());
             }
+            appendCustomFieldValues(row, u, "IFTEKAD");
             out.add(row);
         }
 

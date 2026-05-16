@@ -24,8 +24,6 @@ import { FamilyInfoComponent } from './family-info/family-info';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
 import { StartNewYearComponent } from './start-new-year/start-new-year';
 import { GradesComponent } from './grades/grades';
-import { PendingApprovalComponent } from './pending-approval/pending-approval';
-import { ChooseFamilyComponent } from './choose-family/choose-family';
 
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -35,8 +33,6 @@ const routes: Routes = [
   { path: 'register-servant', component: RegisterServantComponent },
   { path: 'forgot-password', component: ForgotPasswordComponent },
   { path: 'reset-password', redirectTo: 'forgot-password', pathMatch: 'full' },
-  { path: 'pending-approval', component: PendingApprovalComponent },
-  { path: 'choose-family', component: ChooseFamilyComponent },
 
   {
     path: '',

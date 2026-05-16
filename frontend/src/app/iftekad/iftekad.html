@@ -1,0 +1,295 @@
+<p-toast position="top-left"></p-toast>
+
+<div class="iftekadPage" dir="rtl">
+  <div class="pageHead">
+    <div>
+      <h1>الافتقاد</h1>
+    </div>
+
+    <div class="headActions">
+      <button type="button" class="softBtn" (click)="handleWhatsAppButton()">
+        <i class="pi pi-whatsapp"></i>
+        رسائل واتساب
+        <span *ngIf="selectedMembersCount()">({{ selectedMembersCount() }})</span>
+      </button>
+
+      <button *ngIf="canEditSettings()" type="button" class="settingsBtn" (click)="openSettings()">
+        <i class="pi pi-cog"></i>
+        الأعدادات
+      </button>
+    </div>
+  </div>
+
+  <div class="filtersPanel">
+    <div class="filterGroup" *ngIf="canSelectFamily() && families.length">
+      <label>الأسرة</label>
+      <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+        <option *ngFor="let family of families" [value]="family">{{ family }}</option>
+      </select>
+    </div>
+
+    <div class="filterGroup">
+      <label>السنة الدراسية</label>
+      <select [(ngModel)]="selectedSchoolGrade" (change)="applyFilters()">
+        <option value="">كل السنوات</option>
+        <option *ngFor="let grade of gradeOptions" [value]="grade">{{ grade }}</option>
+      </select>
+    </div>
+
+    <div class="filterGroup">
+      <label>النوع</label>
+      <select [(ngModel)]="selectedRoleFilter" (change)="applyFilters()">
+        <option value="">الكل</option>
+        <option value="SERVANTS">خدام</option>
+        <option value="MEMBERS">مخدومين</option>
+      </select>
+    </div>
+
+    <div class="filterGroup filterGroup--wide">
+      <label>بحث بالاسم أو الرقم</label>
+      <div class="searchBox">
+        <i class="pi pi-search"></i>
+        <input type="text" [(ngModel)]="searchText" (input)="applyFilters()" placeholder="اكتب اسم أو رقم" />
+      </div>
+    </div>
+
+    <button type="button" class="clearBtn iconOnlyBtn" (click)="clearFilters()" aria-label="مسح الفلاتر" title="مسح الفلاتر">
+      <i class="pi pi-filter-slash"></i>
+    </button>
+  </div>
+
+  <div class="cardsToolbar" *ngIf="selectionMode && filteredMembers.length">
+    <div class="bulkBar">
+      <label class="checkLine">
+        <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" />
+        <span>تحديد كل الظاهرين</span>
+      </label>
+      <span class="countText">المعروض: {{ filteredMembers.length }} / المحدد: {{ selectedMembersCount() }}</span>
+    </div>
+    <button type="button" class="cancelSelectBtn" (click)="cancelSelectionMode()">
+      إلغاء
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="stateBox">جاري تحميل البيانات...</div>
+  <div *ngIf="!loading && !filteredMembers.length" class="stateBox">لا توجد بيانات مطابقة للفلاتر الحالية.</div>
+
+  <div class="cardsGrid" *ngIf="!loading && filteredMembers.length">
+    <article
+      class="iftekadCard"
+      *ngFor="let member of filteredMembers; trackBy: trackByMember"
+      [ngClass]="cardClass(member)"
+      [class.iftekadCard--selected]="selectionMode && member.selected"
+      (click)="onCardClick(member)"
+    >
+      <label class="cardSelect" *ngIf="selectionMode" (click)="$event.stopPropagation()">
+        <input type="checkbox" [(ngModel)]="member.selected" (ngModelChange)="onMemberSelectionChange()" />
+      </label>
+
+      <div class="birthdayBadge" *ngIf="member.isBirthdayToday">
+        <i class="pi pi-gift"></i>
+        عيد ميلاده النهارده
+      </div>
+
+      <div class="cardContent">
+        <h2>{{ member.fullName }}</h2>
+        <div class="statusPill">{{ member.iftekadStatusText }}</div>
+
+        <div class="cardRows">
+          <div class="cardRow" *ngFor="let row of shownCardRows(member)">
+            <span>{{ row.label }}</span>
+            <b>{{ row.value }}</b>
+            <button
+              *ngIf="row.isPhone"
+              type="button"
+              class="copyBtn cardCopyBtn"
+              (click)="$event.stopPropagation(); copyText(row.value)"
+              aria-label="نسخ رقم التليفون">
+              <i class="pi pi-copy"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="modal" *ngIf="profileFor" (click)="closeProfile()">
+    <div class="modalCard profileModal" (click)="$event.stopPropagation()">
+      <div class="modalHead">
+        <div>
+          <h2>{{ profileFor.fullName }}</h2>
+          <p>{{ familyLabel(profileFor) }} • {{ profileFor.role | roleLabel }}</p>
+        </div>
+        <button type="button" class="iconBtn" (click)="closeProfile()" aria-label="إغلاق">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+
+      <div class="profileColumns">
+        <section class="infoBox">
+          <h3>بيانات الشخص</h3>
+          <div *ngIf="profileLoading" class="smallHint">جاري تحميل البيانات...</div>
+          <div *ngIf="!profileLoading" class="detailsGrid">
+            <div class="detailItem" *ngFor="let row of detailsRows()">
+              <span>{{ row.label }}</span>
+              <strong>{{ row.value }}</strong>
+              <button *ngIf="row.isPhone" type="button" class="copyBtn" (click)="copyText(row.value)">
+                <i class="pi pi-copy"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="infoBox addVisitBox">
+          <h3>إضافة افتقاد</h3>
+          <label>
+            تاريخ الافتقاد
+            <p-datepicker
+              [(ngModel)]="visitDate"
+              [showIcon]="true"
+              panelStyleClass="iftekadCalendarPanel"
+              [readonlyInput]="true"
+              [showButtonBar]="true"
+              [maxDate]="todayMaxDate"
+              [firstDayOfWeek]="1"
+              dateFormat="dd/mm/yy"
+              placeholder="اختر التاريخ"
+              appendTo="body"
+            ></p-datepicker>
+          </label>
+          <label>
+            مين اللي راح
+            <p-multiselect
+              #visitCompanionSelect
+              [(ngModel)]="selectedVisitCompanionIds"
+              [options]="visitCompanionOptions"
+              optionLabel="label"
+              optionValue="value"
+              [filter]="true"
+              [showClear]="true"
+              [loading]="visitCompanionsLoading"
+              placeholder="اختار خادم أو أكتر"
+              selectedItemsLabel="{0} خدام مختارين"
+              emptyMessage="لا يوجد خدام متاحين"
+              emptyFilterMessage="لا توجد نتيجة"
+              styleClass="iftekadMultiSelect"
+              panelStyleClass="iftekadMultiSelectPanel"
+              appendTo="body"
+            >
+              <ng-template pTemplate="footer">
+                <div class="iftekadMultiSelectFooter">
+                  <button type="button" class="multiClearBtn" (click)="clearVisitCompanions()">مسح</button>
+                  <button type="button" class="multiDoneBtn" (click)="visitCompanionSelect.hide()">تم</button>
+                </div>
+              </ng-template>
+            </p-multiselect>
+          </label>
+          <label>
+            ملاحظة
+            <textarea [(ngModel)]="visitDescription" rows="4" placeholder="اكتب ملاحظة لو محتاج"></textarea>
+          </label>
+          <button type="button" class="primaryBtn" (click)="saveVisit()" [disabled]="visitSaving">
+            <i class="pi pi-plus"></i>
+            {{ visitSaving ? 'جاري الحفظ...' : 'إضافة افتقاد' }}
+          </button>
+        </section>
+      </div>
+
+      <section class="infoBox historyBox">
+        <h3>سجل الافتقاد</h3>
+        <div *ngIf="visitsLoading" class="smallHint">جاري تحميل السجل...</div>
+        <div *ngIf="!visitsLoading && !visits.length" class="smallHint">لا يوجد سجل افتقاد لهذا الشخص.</div>
+
+        <div class="visitList" *ngIf="!visitsLoading && visits.length">
+          <div class="visitItem" *ngFor="let visit of visits; trackBy: trackByVisit">
+            <div class="visitDate">{{ formatDate(visit.visitDate) }}</div>
+            <div class="visitBody">
+              <div><b>اللي راح:</b> {{ visit.companions || visit.recordedBy?.fullName || 'غير مسجل' }}</div>
+              <div *ngIf="visit.description"><b>ملاحظة:</b> {{ visit.description }}</div>
+              <small *ngIf="visit.recordedBy">تم التسجيل بواسطة: {{ visit.recordedBy.fullName }}</small>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal" *ngIf="settingsOpen" (click)="closeSettings()">
+    <div class="modalCard settingsModal" (click)="$event.stopPropagation()">
+      <div class="modalHead">
+        <div>
+          <h2>اعدادات الافتقاد</h2>
+        </div>
+        <button type="button" class="iconBtn" (click)="closeSettings()" aria-label="إغلاق">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+
+      <div class="settingsGrid">
+        <label>
+          الأخضر لحد كام شهر؟
+          <input type="number" min="0" [(ngModel)]="settingsDraft.greenMaxMonths" />
+        </label>
+        <label>
+          الأصفر لحد كام شهر؟
+          <input type="number" [min]="minYellowMonths()" [(ngModel)]="settingsDraft.yellowMaxMonths" />
+        </label>
+      </div>
+
+      <button type="button" class="primaryBtn full" (click)="saveSettings()" [disabled]="savingSettings">
+        <i class="pi pi-save"></i>
+        {{ savingSettings ? 'جاري الحفظ...' : 'حفظ الإعدادات' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="modal" *ngIf="whatsappOpen" (click)="closeWhatsAppPanel()">
+    <div class="modalCard whatsappModal" (click)="$event.stopPropagation()">
+      <div class="modalHead">
+        <div>
+          <h2>رسائل واتساب</h2>
+          <p>استخدم <b [textContent]="'{name}'"></b> مكان اسم الشخص.</p>
+         </div>
+        <button type="button" class="iconBtn" (click)="closeWhatsAppPanel()" aria-label="إغلاق">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+
+      <label class="messageEditor">
+        نص الرسالة
+        <textarea [(ngModel)]="whatsappTemplate" (ngModelChange)="buildWhatsAppPreviews()" rows="4"></textarea>
+      </label>
+
+      <div class="whatsappActions">
+        <button type="button" class="primaryBtn" (click)="openAllWhatsApp()" [disabled]="!whatsappPreviews.length">
+          <i class="pi pi-whatsapp"></i>
+          إرسال للجميع
+        </button>
+      </div>
+
+      <div *ngIf="!selectedMembersCount()" class="smallHint">اختار أشخاص من الكروت الأول.</div>
+
+      <div class="previewList" *ngIf="whatsappPreviews.length">
+        <div class="previewItem previewItem--sample" *ngIf="whatsappPreviews[0] as preview">
+          <div>
+            <span class="previewLabel">مثال</span>
+            <div class="previewPersonLine">
+              <b>{{ preview.member.fullName }}</b>
+            </div>
+            <p>{{ preview.message }}</p>
+          </div>
+        </div>
+
+        <div class="previewNames" *ngIf="whatsappPreviews.length > 1">
+          <span>باقي المختارين</span>
+          <div class="previewNameChips">
+            <b *ngFor="let preview of whatsappPreviews.slice(1)">
+              {{ preview.member.fullName }}
+              <small *ngIf="!preview.url">رقم غير صالح</small>
+            </b>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

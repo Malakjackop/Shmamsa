@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 public class CustomRegistrationFieldSchemaMigration implements CommandLineRunner {
 
     private static final int REQUIRED_RULE_COLUMN_LENGTH = 255;
+    private static final int SHOW_IN_COLUMN_LENGTH = 60;
     private static final int VISIBILITY_CONDITIONS_COLUMN_LENGTH = 4000;
     private static final String PROFILE_EDITABLE_SYSTEM_KEYS_SQL = "'email','phoneNumber','address','guardiansPhone','guardianRelation','schoolName','schoolGrade','universityName','faculty','universityGrade','graduatedFrom','graduateJob','workDetails'";
 
@@ -32,6 +33,25 @@ public class CustomRegistrationFieldSchemaMigration implements CommandLineRunner
             jdbcTemplate.execute(
                     "alter table custom_registration_fields alter column required_rule type varchar(" +
                             REQUIRED_RULE_COLUMN_LENGTH +
+                            ")"
+            );
+        }
+
+        Integer showInLength = jdbcTemplate.query(
+                """
+                select character_maximum_length
+                from information_schema.columns
+                where table_schema = current_schema()
+                  and table_name = 'custom_registration_fields'
+                  and column_name = 'show_in'
+                """,
+                rs -> rs.next() ? (Integer) rs.getObject(1) : null
+        );
+
+        if (showInLength != null && showInLength < SHOW_IN_COLUMN_LENGTH) {
+            jdbcTemplate.execute(
+                    "alter table custom_registration_fields alter column show_in type varchar(" +
+                            SHOW_IN_COLUMN_LENGTH +
                             ")"
             );
         }

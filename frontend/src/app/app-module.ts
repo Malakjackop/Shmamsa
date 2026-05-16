@@ -29,6 +29,7 @@ import { PendingApprovalComponent } from './pending-approval/pending-approval';
 import { ChooseFamilyComponent } from './choose-family/choose-family';
 import { GradesComponent } from './grades/grades';
 import { DevSettingsComponent } from './dev-settings/dev-settings';
+import { IftekadComponent } from './iftekad/iftekad';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -52,6 +53,7 @@ import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
 import { TagModule } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
+import { MultiSelectModule } from 'primeng/multiselect';
 
 
 @NgModule({
@@ -65,6 +67,7 @@ import { TableModule } from 'primeng/table';
     FamilyComponent,
     FamilyAttendanceComponent,
     FamilyInfoComponent,
+    IftekadComponent,
     TransferMembersComponent,
     AttendanceComponent,
     ResourcesComponent,
@@ -103,7 +106,8 @@ import { TableModule } from 'primeng/table';
     SelectModule,
     TextareaModule,
     TagModule,
-    TableModule
+    TableModule,
+    MultiSelectModule
   ],
   providers: [
     { provide: LOCALE_ID, useValue: 'ar-EG' },

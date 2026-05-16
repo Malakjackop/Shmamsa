@@ -84,9 +84,9 @@ public class CustomRegistrationField {
 
     /**
      * Where to display the value after registration:
-     * FAMILY_INFO, PROFILE, NONE
+     * FAMILY_INFO, PROFILE, IFTEKAD, NONE
      */
-    @Column(name = "show_in", nullable = false, length = 20)
+    @Column(name = "show_in", nullable = false, length = 60)
     @Builder.Default
     private String showIn = "NONE";
 

@@ -36,6 +36,10 @@
             <i class="pi pi-id-card"></i>
             <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره' }}</span>
           </li>
+          <li routerLink="/iftekad" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الافتقاد' : null">
+            <i class="pi pi-heart"></i>
+            <span *ngIf="!isSidebarCollapsed">الافتقاد</span>
+          </li>
         </ng-container>
         <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الانتقلات' : null">
           <i class="pi pi-send"></i>
