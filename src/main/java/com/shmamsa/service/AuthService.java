@@ -35,7 +35,6 @@ public class AuthService {
     private final ServantSecretService servantSecretService;
     private final FamilyCatalogService familyCatalogService;
     private final UserFamilyRoleService userFamilyRoleService;
-    private final FamilyJoinRequestService familyJoinRequestService;
 
     private static class RateWindow {
         int count;
@@ -169,19 +168,15 @@ public class AuthService {
 
         userRepository.save(user);
 
-        if (familyJoinRequestService.canJoinDirectly(user, memberFamily)) {
-            userFamilyRoleService.replaceAssignments(user, List.of(
-                    UserFamilyAssignmentView.builder()
-                            .familyId(memberFamily.getId())
-                            .familyName(memberFamily.getNameAr())
-                            .roleCode(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getCode())
-                            .role(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getRoleName())
-                            .assignmentOrder(1)
-                            .build()
-            ));
-        } else {
-            familyJoinRequestService.createRequest(user, memberFamily.getId());
-        }
+        userFamilyRoleService.replaceAssignments(user, List.of(
+                UserFamilyAssignmentView.builder()
+                        .familyId(memberFamily.getId())
+                        .familyName(memberFamily.getNameAr())
+                        .roleCode(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getCode())
+                        .role(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getRoleName())
+                        .assignmentOrder(1)
+                        .build()
+        ));
 
         userRepository.save(user);
         attendanceBackfillService.backfillForUser(user);
