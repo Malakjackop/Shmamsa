@@ -432,30 +432,7 @@ public class AuthController {
             RegistrationRuleContext context,
             Map<String, String> values
     ) {
-        if (!matchesVisibilityConditions(field, context, values)) {
-            return false;
-        }
-        if (!Boolean.TRUE.equals(field.getIsSystem())) {
-            return true;
-        }
-
-        return switch (field.getFieldKey()) {
-            case "deaconFamily", "khors" -> !context.servant();
-            case "servingWhere" -> context.servant();
-            case "attendKhors" -> context.servant() && context.servingWhere() != null && !context.servingWhere().isBlank();
-            case "graduatedFrom", "graduateJob" -> "graduate".equals(context.status());
-            case "studyType" -> "student".equals(context.status());
-            case "schoolName", "schoolGrade" ->
-                    "student".equals(context.status()) && "school".equals(context.studyType());
-            case "otherGrade" ->
-                    "student".equals(context.status())
-                            && "school".equals(context.studyType())
-                            && "other".equals(context.schoolGrade());
-            case "universityName", "faculty", "universityGrade" ->
-                    "student".equals(context.status()) && "university".equals(context.studyType());
-            case "workDetails" -> Boolean.TRUE.equals(context.isWorking());
-            default -> true;
-        };
+        return matchesVisibilityConditions(field, context, values);
     }
 
     private boolean matchesVisibilityConditions(
@@ -634,9 +611,9 @@ public class AuthController {
         values.put("graduatedFrom", safe(request.getGraduatedFrom()));
         values.put("graduateJob", safe(request.getGraduateJob()));
         values.put("studyType", safe(request.getStudyType()));
-        values.put("schoolName", "");
-        values.put("schoolGrade", "");
-        values.put("otherGrade", "");
+        values.put("schoolName", safe(request.getSchoolName()));
+        values.put("schoolGrade", safe(request.getSchoolGrade()));
+        values.put("otherGrade", extractOtherGradeValue(request.getSchoolGrade()));
         values.put("universityName", safe(request.getUniversityName()));
         values.put("faculty", safe(request.getFaculty()));
         values.put("universityGrade", safe(request.getUniversityGrade()));

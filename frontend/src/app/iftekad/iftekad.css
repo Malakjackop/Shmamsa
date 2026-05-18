@@ -78,9 +78,8 @@ button {
   min-height: 46px;
   padding: 11px 16px;
   border-radius: 14px;
-  background: #2fc98b;
-  color: #09291c;
-  box-shadow: 0 12px 24px rgba(47, 201, 139, 0.24);
+  background: #6f3527 ;
+  color: #ffffff;
 }
 
 .softBtn,
@@ -91,7 +90,6 @@ button {
   background: #ffffff;
   color: #6f2b1d;
   border: 1px solid #eadfd7;
-  box-shadow: 0 10px 22px rgba(34, 22, 18, 0.06);
 }
 
 .iconOnlyBtn {

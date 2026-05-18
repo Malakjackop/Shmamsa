@@ -50,7 +50,6 @@ export class RegisterComponent implements OnInit {
 
   showPassword = false;
   showConfirmPassword = false;
-  showOtherGrade = false;
   memberFamilyOptions: FamilyOption[] = [];
   servantWhereOptions: FamilyOption[] = [];
 
@@ -91,21 +90,6 @@ export class RegisterComponent implements OnInit {
     this.onStatusChange();
     this.onStudyTypeChange();
     this.syncConfiguredRequiredErrors();
-
-    this.registerForm.get('schoolGrade')?.valueChanges.subscribe(value => {
-      this.showOtherGrade = value === 'other';
-
-      const otherCtrl = this.registerForm.get('otherGrade');
-
-      if (value === 'other') {
-        otherCtrl?.setValidators([Validators.required]);
-      } else {
-        otherCtrl?.setValue('', { emitEvent: false });
-        otherCtrl?.clearValidators();
-      }
-
-      otherCtrl?.updateValueAndValidity({ emitEvent: false });
-    });
   }
 
   get servingScope(): string {
@@ -420,42 +404,7 @@ export class RegisterComponent implements OnInit {
 
   private isFieldCurrentlyVisible(field: CustomField): boolean {
     if (!field?.enabled) return false;
-    if (!this.matchesVisibilityConditions(field)) return false;
-    if (!field.isSystem) return true;
-
-    const status = String(this.registerForm.get('status')?.value || '').trim().toLowerCase();
-    const studyType = String(this.registerForm.get('studyType')?.value || '').trim().toLowerCase();
-    const schoolGrade = String(this.registerForm.get('schoolGrade')?.value || '').trim().toLowerCase();
-    const isWorking = this.registerForm.get('isWorking')?.value === true;
-    const servingWhere = this.servingWhereValue;
-
-    switch (field.fieldKey) {
-      case 'deaconFamily':
-      case 'khors':
-        return !this.isServant;
-      case 'servingWhere':
-        return this.isServant;
-      case 'attendKhors':
-        return this.isServant && !!servingWhere;
-      case 'graduatedFrom':
-      case 'graduateJob':
-        return status === 'graduate';
-      case 'studyType':
-        return status === 'student';
-      case 'schoolName':
-      case 'schoolGrade':
-        return status === 'student' && studyType === 'school';
-      case 'otherGrade':
-        return status === 'student' && studyType === 'school' && (this.showOtherGrade || schoolGrade === 'other');
-      case 'universityName':
-      case 'faculty':
-      case 'universityGrade':
-        return status === 'student' && studyType === 'university';
-      case 'workDetails':
-        return isWorking;
-      default:
-        return true;
-    }
+    return this.matchesVisibilityConditions(field);
   }
 
   private sortFields(fields: CustomField[]): CustomField[] {
@@ -740,15 +689,7 @@ onServingWhereChange() {
     if (status !== 'graduate') {
       this.registerForm.get('graduatedFrom')?.setValue('', { emitEvent: false });
       this.registerForm.get('graduateJob')?.setValue('', { emitEvent: false });
-      this.registerForm.get('graduatedFrom')?.clearValidators();
-      this.registerForm.get('graduateJob')?.clearValidators();
-    } else {
-      this.registerForm.get('graduatedFrom')?.setValidators([Validators.required]);
-      this.registerForm.get('graduateJob')?.setValidators([Validators.required]);
     }
-
-    this.registerForm.get('graduatedFrom')?.updateValueAndValidity({ emitEvent: false });
-    this.registerForm.get('graduateJob')?.updateValueAndValidity({ emitEvent: false });
 
     const studyTypeCtrl = this.registerForm.get('studyType');
 
@@ -771,31 +712,13 @@ onServingWhereChange() {
     if (studyType !== 'school') {
       this.registerForm.get('schoolName')?.setValue('', { emitEvent: false });
       this.registerForm.get('schoolGrade')?.setValue('', { emitEvent: false });
-      this.registerForm.get('schoolName')?.clearValidators();
-      this.registerForm.get('schoolGrade')?.clearValidators();
-    } else {
-      this.registerForm.get('schoolName')?.setValidators([Validators.required]);
-      this.registerForm.get('schoolGrade')?.setValidators([Validators.required]);
     }
 
     if (studyType !== 'university') {
       this.registerForm.get('universityName')?.setValue('', { emitEvent: false });
       this.registerForm.get('faculty')?.setValue('', { emitEvent: false });
       this.registerForm.get('universityGrade')?.setValue('', { emitEvent: false });
-      this.registerForm.get('universityName')?.clearValidators();
-      this.registerForm.get('faculty')?.clearValidators();
-      this.registerForm.get('universityGrade')?.clearValidators();
-    } else {
-      this.registerForm.get('universityName')?.setValidators([Validators.required]);
-      this.registerForm.get('faculty')?.setValidators([Validators.required]);
-      this.registerForm.get('universityGrade')?.setValidators([Validators.required]);
     }
-
-    this.registerForm.get('schoolName')?.updateValueAndValidity({ emitEvent: false });
-    this.registerForm.get('schoolGrade')?.updateValueAndValidity({ emitEvent: false });
-    this.registerForm.get('universityName')?.updateValueAndValidity({ emitEvent: false });
-    this.registerForm.get('faculty')?.updateValueAndValidity({ emitEvent: false });
-    this.registerForm.get('universityGrade')?.updateValueAndValidity({ emitEvent: false });
   }
 
   applyPasswordMismatch() {

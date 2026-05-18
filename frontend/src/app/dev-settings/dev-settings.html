@@ -16,7 +16,7 @@
     </li>
     <li [class.active]="activeTab === 'families'" (click)="activeTab = 'families'; loadFamilies()">
       <i class="pi pi-users"></i>
-      <span>العائلات</span>
+      <span>الأسر</span>
     </li>
     </ul>
   </aside>
@@ -51,7 +51,6 @@
           <div class="fields-preview" *ngIf="fields.length > 0">
             <div class="fields-preview__head">
               <h2> حقول التسجيل</h2>
-              <p>الحقول مقسمة إلى أقسام واضحة، ويمكنك السحب والترتيب داخل كل قسم.</p>
             </div>
 
             <div class="sections-stack">
@@ -105,12 +104,12 @@
             <i class="pi pi-users"></i>
           </div>
           <div>
-            <h1>إدارة العائلات</h1>
+            <h1>إدارة الأسر</h1>
           </div>
         </div>
         <button class="btn-add" (click)="openCreateFamily()">
           <i class="pi pi-plus"></i>
-          إضافة عائلة جديدة
+          إضافة أسره جديدة
         </button>
       </div>
 
@@ -118,7 +117,7 @@
         <div class="form-preview">
           <div class="section-title">
             <i class="pi pi-list"></i>
-            العائلات المسجلة
+            الأسر المسجلة
           </div>
 
           <div class="families-list" *ngIf="families.length > 0">
@@ -159,7 +158,7 @@
           <div class="empty-state" *ngIf="!familiesLoading && families.length === 0">
             <div class="dashed-box">
               <i class="pi pi-users"></i>
-              <p>لا توجد عائلات مسجلة بعد</p>
+              <p>لا توجد أسر مسجلة بعد</p>
             </div>
           </div>
         </div>
@@ -171,7 +170,7 @@
 
 <!-- ══ FAMILY CREATE / EDIT DIALOG ══════════════════════ -->
 <p-dialog
-  [header]="familyDialogMode === 'create' ? 'إضافة عائلة جديدة' : 'تعديل العائلة'"
+  [header]="familyDialogMode === 'create' ? 'إضافة أسره جديدة' : 'تعديل أسره'"
   [(visible)]="familyDialogVisible"
   [modal]="true"
   [blockScroll]="true"
@@ -184,7 +183,7 @@
 
   <div class="dialog-body">
     <div class="form-group">
-      <label>اسم العائلة (بالعربي)</label>
+      <label>اسم الأسر (بالعربي)</label>
       <input type="text" [(ngModel)]="editingFamily.nameAr" placeholder="مثال: اسرة القديس مارمرقس" />
       <small *ngIf="familyDialogMode === 'create' && editingFamily.nameAr">سيتم إنشاء الكود تلقائياً: F{{ nextFamilyNumber }}</small>
     </div>
@@ -192,7 +191,7 @@
     <div class="form-group checkbox-group">
       <label class="checkbox-label">
         <input type="checkbox" [ngModel]="familyHasBranches" (ngModelChange)="onFamilyHasBranchesChange($event)" />
-        <span>العائلة لها فروع (أ، ب)</span>
+        <span>الأسر لها فروع (أ، ب)</span>
       </label>
     </div>
 
@@ -213,7 +212,7 @@
     <div class="form-group">
       <label>التصنيف</label>
       <select [(ngModel)]="editingFamily.category">
-        <option value="FAMILY">عائلة</option>
+        <option value="FAMILY">أسره</option>
         <option value="KHORS">خورس</option>
       </select>
     </div>
@@ -221,38 +220,68 @@
     <div class="form-group checkbox-group">
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="editingFamily.servantSelectable" />
-        <span>متاح للخدمة (يظهر في اختيارات الخدام)</span>
+        <span>يظهر في اختيارات الخدام</span>
       </label>
     </div>
 
     <div class="form-group checkbox-group">
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="editingFamily.memberSelectable" />
-        <span>متاح للمخدومين (يظهر في اختيارات المخدومين)</span>
+        <span>يظهر في اختيارات المخدومين</span>
       </label>
     </div>
 
-    <div class="form-group">
-      <label>إعدادات الانضمام المباشر</label>
-      <small>اختر الصفوف الدراسية المسموح لها بالانضمام مباشرة. باقي الصفوف هترسل طلب لمسؤول العائلة.</small>
-    </div>
-
-    <div class="join-grades-grid">
-      <label class="grade-checkbox" *ngFor="let grade of knownSchoolGrades">
-        <input type="checkbox" [ngModel]="hasDirectJoinGrade(grade)" (ngModelChange)="toggleDirectJoinGrade(grade, $event)" [ngModelOptions]="{ standalone: true }" />
-        <span>{{ grade }}</span>
+    <div class="form-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="familyDirectJoinEnabled" />
+        <span>تفعيل الانضمام المباشر</span>
       </label>
     </div>
 
-    <div class="form-group">
-      <label>مدة التفعيل (من - إلى)</label>
-      <div class="date-range-row">
-        <input type="date" [(ngModel)]="editingFamily.directJoinFrom" placeholder="من تاريخ" />
-        <span>إلى</span>
-        <input type="date" [(ngModel)]="editingFamily.directJoinUntil" placeholder="إلى تاريخ" />
+    <ng-container *ngIf="familyDirectJoinEnabled">
+      <div class="form-group">
+        <label>اختر الصفوف الدراسية المسموح لها بالانضمام مباشرة</label>
       </div>
-      <small>خلال هذه الفترة فقط، الصفوف المحددة تدخل مباشرة. بعد انتهاء الفترة، الكل يدخل بطلب.</small>
-    </div>
+
+      <div class="join-grades-grid">
+        <label class="grade-checkbox" *ngFor="let grade of knownSchoolGrades">
+          <input type="checkbox" [ngModel]="hasDirectJoinGrade(grade)" (ngModelChange)="toggleDirectJoinGrade(grade, $event)" [ngModelOptions]="{ standalone: true }" />
+          <span>{{ grade }}</span>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label>مدة التفعيل (من - إلى) <span class="required-asterisk">*</span></label>
+        <div class="date-range-row">
+          <p-datepicker
+            [(ngModel)]="familyDateFrom"
+            [showIcon]="true"
+            panelStyleClass="devFamilyDatePanel"
+            dateFormat="yy-mm-dd"
+            [firstDayOfWeek]="1"
+            [showButtonBar]="true"
+            appendTo="body"
+            [autoZIndex]="false"
+            [baseZIndex]="20000"
+            placeholder="من تاريخ">
+          </p-datepicker>
+          <span>إلى</span>
+          <p-datepicker
+            [(ngModel)]="familyDateUntil"
+            [minDate]="familyDateFrom"
+            [showIcon]="true"
+            panelStyleClass="devFamilyDatePanel"
+            dateFormat="yy-mm-dd"
+            [firstDayOfWeek]="1"
+            [showButtonBar]="true"
+            appendTo="body"
+            [autoZIndex]="false"
+            [baseZIndex]="20000"
+            placeholder="إلى تاريخ">
+          </p-datepicker>
+        </div>
+      </div>
+    </ng-container>
   </div>
 
   <ng-template pTemplate="footer">
@@ -291,6 +320,19 @@
     <div class="form-group">
       <label>اسم الحقل (بالعربي)</label>
       <input type="text" [(ngModel)]="editingField.labelAr" placeholder="مثال: أب الاعتراف" />
+    </div>
+
+    <!-- Category -->
+    <div class="form-group">
+      <label>التصنيف</label>
+      <select [(ngModel)]="selectedCategory" (ngModelChange)="onCategoryChange($event)">
+        <option value="">بدون تصنيف</option>
+        <option *ngFor="let cat of categoryOptions" [value]="cat">{{ cat }}</option>
+        <option value="__new__">إنشاء تصنيف جديد...</option>
+      </select>
+      <div class="form-group" *ngIf="showNewCategoryInput" style="margin-top: 8px;">
+        <input type="text" [(ngModel)]="newCategoryName" placeholder="اسم التصنيف الجديد" />
+      </div>
     </div>
 
     <!-- Field Type -->

@@ -36,7 +36,7 @@ public class FamilyJoinRequestService {
 
     public boolean canJoinDirectly(User user, FamilyCatalog family) {
         if (family.getDirectJoinGrades() == null || family.getDirectJoinGrades().isBlank()) {
-            return true;
+            return false;
         }
         LocalDate today = LocalDate.now();
         if (family.getDirectJoinFrom() != null && today.isBefore(family.getDirectJoinFrom())) {

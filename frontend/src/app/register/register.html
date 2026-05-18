@@ -197,7 +197,7 @@
 
             <!-- graduatedFrom -->
             <ng-container *ngSwitchCase="'graduatedFrom'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'graduate'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('graduatedFrom')" type="text" formControlName="graduatedFrom" [placeholder]="fieldLabel('graduatedFrom', 'تخرج من (مثال: اسم الجامعة)')"
                        (click)="markInteracted('graduatedFrom')" (blur)="markTouched('graduatedFrom')" />
                 <select *ngIf="isSelectField('graduatedFrom')" formControlName="graduatedFrom" (change)="markTouchedFromList('graduatedFrom')">
@@ -210,7 +210,7 @@
 
             <!-- graduateJob -->
             <ng-container *ngSwitchCase="'graduateJob'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'graduate'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('graduateJob')" type="text" formControlName="graduateJob" [placeholder]="fieldLabel('graduateJob', 'الوظيفة الحالية')"
                        (click)="markInteracted('graduateJob')" (blur)="markTouched('graduateJob')" />
                 <select *ngIf="isSelectField('graduateJob')" formControlName="graduateJob" (change)="markTouchedFromList('graduateJob')">
@@ -223,7 +223,7 @@
 
             <!-- studyType -->
             <ng-container *ngSwitchCase="'studyType'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('studyType')" type="text" formControlName="studyType" [placeholder]="fieldLabel('studyType', 'الدراسة في')"
                        (click)="markInteracted('studyType')" (blur)="onStudyTypeChange(); markTouched('studyType')" />
                 <select *ngIf="isSelectField('studyType')" formControlName="studyType" (change)="onStudyTypeChange(); markTouchedFromList('studyType')">
@@ -236,7 +236,7 @@
 
             <!-- schoolName -->
             <ng-container *ngSwitchCase="'schoolName'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student' && registerForm.get('studyType')?.value === 'school'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('schoolName')" type="text" formControlName="schoolName" [placeholder]="fieldLabel('schoolName', 'اسم المدرسة')"
                        (click)="markInteracted('schoolName')" (blur)="markTouched('schoolName')" />
                 <select *ngIf="isSelectField('schoolName')" formControlName="schoolName" (change)="markTouchedFromList('schoolName')">
@@ -249,7 +249,7 @@
 
             <!-- schoolGrade -->
             <ng-container *ngSwitchCase="'schoolGrade'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student' && registerForm.get('studyType')?.value === 'school'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('schoolGrade')" type="text" formControlName="schoolGrade" [placeholder]="fieldLabel('schoolGrade', 'اختر الصف')"
                        (click)="markInteracted('schoolGrade')" (blur)="markTouched('schoolGrade')" />
                 <select *ngIf="isSelectField('schoolGrade')" class="form-select" formControlName="schoolGrade" (change)="markTouchedFromList('schoolGrade')">
@@ -262,7 +262,7 @@
 
             <!-- otherGrade -->
             <ng-container *ngSwitchCase="'otherGrade'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student' && registerForm.get('studyType')?.value === 'school' && showOtherGrade">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('otherGrade')" type="text"
                        formControlName="otherGrade"
                        [placeholder]="fieldLabel('otherGrade', 'اكتب الصف الدراسي')"
@@ -277,7 +277,7 @@
 
             <!-- universityName -->
             <ng-container *ngSwitchCase="'universityName'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student' && registerForm.get('studyType')?.value === 'university'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('universityName')" type="text" formControlName="universityName" [placeholder]="fieldLabel('universityName', 'اسم الجامعة')"
                        (click)="markInteracted('universityName')" (blur)="markTouched('universityName')" />
                 <select *ngIf="isSelectField('universityName')" formControlName="universityName" (change)="markTouchedFromList('universityName')">
@@ -290,7 +290,7 @@
 
             <!-- faculty -->
             <ng-container *ngSwitchCase="'faculty'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student' && registerForm.get('studyType')?.value === 'university'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('faculty')" type="text" formControlName="faculty" [placeholder]="fieldLabel('faculty', 'الكلية')"
                        (click)="markInteracted('faculty')" (blur)="markTouched('faculty')" />
                 <select *ngIf="isSelectField('faculty')" formControlName="faculty" (change)="markTouchedFromList('faculty')">
@@ -303,7 +303,7 @@
 
             <!-- universityGrade -->
             <ng-container *ngSwitchCase="'universityGrade'">
-              <div class="input-group small" *ngIf="registerForm.get('status')?.value === 'student' && registerForm.get('studyType')?.value === 'university'">
+              <div class="input-group small">
                 <input *ngIf="!isSelectField('universityGrade')" type="text" formControlName="universityGrade" [placeholder]="fieldLabel('universityGrade', 'السنة/الفرقة')"
                        (click)="markInteracted('universityGrade')" (blur)="markTouched('universityGrade')" />
                 <select *ngIf="isSelectField('universityGrade')" formControlName="universityGrade" (change)="markTouchedFromList('universityGrade')">
@@ -328,7 +328,7 @@
 
             <!-- workDetails -->
             <ng-container *ngSwitchCase="'workDetails'">
-              <div class="input-group small" *ngIf="registerForm.get('isWorking')?.value === true">
+              <div class="input-group small">
                 <input type="text" formControlName="workDetails" placeholder="ما هي وظيفتك؟"
                        (click)="markInteracted('workDetails')" (blur)="markTouched('workDetails')" />
                 <small class="error-text" *ngIf="shouldShowError('workDetails')">{{ errorText('workDetails','الوظيفة') }}</small>

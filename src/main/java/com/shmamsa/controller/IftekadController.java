@@ -5,6 +5,8 @@ import com.shmamsa.dto.IftekadVisitUpdateRequest;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.IftekadVisit;
 import com.shmamsa.model.User;
+import com.shmamsa.model.AppSetting;
+import com.shmamsa.repository.AppSettingRepository;
 import com.shmamsa.repository.IftekadVisitRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.FamilyAccessService;
@@ -25,6 +27,12 @@ public class IftekadController {
     private final IftekadVisitRepository iftekadRepo;
     private final UserRepository userRepo;
     private final FamilyAccessService familyAccessService;
+    private final AppSettingRepository appSettingRepo;
+
+    private static final String SETTINGS_KEY = "iftekad_settings";
+    private static final String DEFAULT_SETTINGS_JSON = """
+            {"greenMaxMonths":3,"yellowMaxMonths":6,"cardFields":["schoolGrade","birthDate","lastVisit","family"]}
+            """;
 
     private static String normRole(String raw) {
         if (raw == null) return "";
@@ -275,5 +283,53 @@ public class IftekadController {
             out.put(String.valueOf(r.getMemberId()), r.getLastDate());
         }
         return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/settings")
+    public ResponseEntity<Map<String, Object>> getSettings() {
+        String json = appSettingRepo.findBySettingKey(SETTINGS_KEY)
+                .map(AppSetting::getSettingValue)
+                .orElse(DEFAULT_SETTINGS_JSON);
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> settings = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+                    .build().readValue(json, Map.class);
+            return ResponseEntity.ok(settings);
+        } catch (Exception e) {
+            return ResponseEntity.ok(defaultSettingsMap());
+        }
+    }
+
+    @PutMapping("/settings")
+    public ResponseEntity<Map<String, Object>> updateSettings(@RequestBody Map<String, Object> body, Authentication auth) {
+        if (auth == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        String role = normRole(me.getRole());
+        if (!"DEVELOPER".equals(role) && !"AMIN_KHEDMA".equals(role)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+        try {
+            String json = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+                    .build().writeValueAsString(body);
+            AppSetting setting = appSettingRepo.findBySettingKey(SETTINGS_KEY)
+                    .orElse(AppSetting.builder().settingKey(SETTINGS_KEY).build());
+            setting.setSettingValue(json);
+            setting.setUpdatedBy(me.getUsername());
+            appSettingRepo.save(setting);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to save settings");
+        }
+    }
+
+    private Map<String, Object> defaultSettingsMap() {
+        Map<String, Object> defaults = new LinkedHashMap<>();
+        defaults.put("greenMaxMonths", 3);
+        defaults.put("yellowMaxMonths", 6);
+        defaults.put("cardFields", List.of("schoolGrade", "birthDate", "lastVisit", "family"));
+        return defaults;
     }
 }

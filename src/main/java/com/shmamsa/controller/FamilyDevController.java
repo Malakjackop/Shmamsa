@@ -228,19 +228,13 @@ public class FamilyDevController {
         if (req.memberSelectable() != null) {
             family.setMemberSelectable(req.memberSelectable());
         }
-        if (req.directJoinGrades() != null) {
-            family.setDirectJoinGrades(req.directJoinGrades().trim());
-        }
-        if (req.directJoinFrom() != null) {
-            family.setDirectJoinFrom(req.directJoinFrom().isBlank() ? null : LocalDate.parse(req.directJoinFrom()));
-        } else if (req.directJoinFrom() != null) {
-            family.setDirectJoinFrom(null);
-        }
-        if (req.directJoinUntil() != null) {
-            family.setDirectJoinUntil(req.directJoinUntil().isBlank() ? null : LocalDate.parse(req.directJoinUntil()));
-        } else if (req.directJoinUntil() != null) {
-            family.setDirectJoinUntil(null);
-        }
+        family.setDirectJoinGrades(req.directJoinGrades() != null ? req.directJoinGrades().trim() : null);
+        family.setDirectJoinFrom(req.directJoinFrom() != null
+                ? (req.directJoinFrom().isBlank() ? null : LocalDate.parse(req.directJoinFrom()))
+                : null);
+        family.setDirectJoinUntil(req.directJoinUntil() != null
+                ? (req.directJoinUntil().isBlank() ? null : LocalDate.parse(req.directJoinUntil()))
+                : null);
 
         int branchCount = req.branchCount() != null ? req.branchCount() : 0;
         if (branchCount < 0 || branchCount > 26) {

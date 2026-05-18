@@ -18,6 +18,7 @@ export interface CustomField {
   showIn: string;
   showInConfigured?: boolean;
   profileEditable?: boolean;
+  category?: string;
   displayOrder: number;
   enabled: boolean;
   isSystem?: boolean;

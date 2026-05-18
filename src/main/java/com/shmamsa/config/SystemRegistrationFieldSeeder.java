@@ -39,6 +39,7 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
     public void run(String... args) {
         if (fieldRepository.countByIsSystemTrue() > 0) {
             backfillMissingSystemSelectOptions();
+            backfillWorkDetailsVisibility();
             return;
         }
 
@@ -75,6 +76,7 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
         
         createSystemField("isWorking", "هل تعمل؟", "SELECT", false, order++);
         createSystemField("workDetails", "ما هي وظيفتك", "TEXT", false, order++);
+        applyWorkDetailsVisibility();
         
         createSystemField("guardiansPhone", "هاتف ولي الأمر", "TEXT", true, order++);
         createSystemField("guardianRelation", "صلة القرابة", "TEXT", false, order++);
@@ -101,6 +103,30 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
                 .enabled(true)
                 .build();
         fieldRepository.save(field);
+    }
+
+    private void applyWorkDetailsVisibility() {
+        fieldRepository.findByFieldKey("workDetails").ifPresent(field -> {
+            field.setVisibilityDependsOn("isWorking");
+            field.setVisibilityDependsValues("true");
+            fieldRepository.save(field);
+        });
+    }
+
+    private void backfillWorkDetailsVisibility() {
+        fieldRepository.findByFieldKey("workDetails").ifPresent(field -> {
+            String currentDependsOn = field.getVisibilityDependsOn();
+            String currentDependsValues = field.getVisibilityDependsValues();
+            if (currentDependsOn != null && !currentDependsOn.isBlank()) {
+                return;
+            }
+            if (currentDependsValues != null && !currentDependsValues.isBlank()) {
+                return;
+            }
+            field.setVisibilityDependsOn("isWorking");
+            field.setVisibilityDependsValues("true");
+            fieldRepository.save(field);
+        });
     }
 
     private void backfillMissingSystemSelectOptions() {

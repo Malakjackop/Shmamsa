@@ -35,6 +35,7 @@ public class AuthService {
     private final ServantSecretService servantSecretService;
     private final FamilyCatalogService familyCatalogService;
     private final UserFamilyRoleService userFamilyRoleService;
+    private final FamilyJoinRequestService familyJoinRequestService;
 
     private static class RateWindow {
         int count;
@@ -168,15 +169,19 @@ public class AuthService {
 
         userRepository.save(user);
 
-        userFamilyRoleService.replaceAssignments(user, List.of(
-                UserFamilyAssignmentView.builder()
-                        .familyId(memberFamily.getId())
-                        .familyName(memberFamily.getNameAr())
-                        .roleCode(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getCode())
-                        .role(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getRoleName())
-                        .assignmentOrder(1)
-                        .build()
-        ));
+        if (familyJoinRequestService.canJoinDirectly(user, memberFamily)) {
+            userFamilyRoleService.replaceAssignments(user, List.of(
+                    UserFamilyAssignmentView.builder()
+                            .familyId(memberFamily.getId())
+                            .familyName(memberFamily.getNameAr())
+                            .roleCode(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getCode())
+                            .role(com.shmamsa.model.FamilyRoleCode.MAKHDOM.getRoleName())
+                            .assignmentOrder(1)
+                            .build()
+            ));
+        } else {
+            familyJoinRequestService.createRequest(user, memberFamily.getId());
+        }
 
         userRepository.save(user);
         attendanceBackfillService.backfillForUser(user);
@@ -272,7 +277,7 @@ public class AuthService {
             user.setKhors(k);
         }
 
-                String requestedAttendKhors = "NONE";
+        String requestedAttendKhors = "NONE";
 
         if ("FAMILY_ONLY".equals(scope)) {
             String attend = normalizeAttendKhors(request.getAttendKhors());
@@ -469,9 +474,9 @@ public class AuthService {
     }
 
 
-public boolean isEmailTakenByOther(String email, Long currentUserId) {
-    return userRepository.findByEmail(email)
-            .map(u -> !u.getId().equals(currentUserId))
-            .orElse(false);
-}
+    public boolean isEmailTakenByOther(String email, Long currentUserId) {
+        return userRepository.findByEmail(email)
+                .map(u -> !u.getId().equals(currentUserId))
+                .orElse(false);
+    }
 }

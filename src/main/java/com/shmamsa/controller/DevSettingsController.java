@@ -169,7 +169,8 @@ public class DevSettingsController {
             String visibilityDependsValues,
             String showIn,
             Boolean profileEditable,
-            Integer displayOrder
+            Integer displayOrder,
+            String category
     ) {}
 
     @PostMapping("/custom-fields")
@@ -214,6 +215,7 @@ public class DevSettingsController {
                 .showInConfigured(req.showIn() != null)
                 .profileEditable(profileEditable)
                 .displayOrder(req.displayOrder() != null ? req.displayOrder() : 0)
+                .category(req.category() != null ? req.category().trim() : null)
                 .enabled(true)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -236,7 +238,8 @@ public class DevSettingsController {
             String visibilityDependsValues,
             String showIn,
             Boolean profileEditable,
-            Integer displayOrder
+            Integer displayOrder,
+            String category
     ) {}
 
     @PutMapping("/custom-fields/{id}")
@@ -296,6 +299,10 @@ public class DevSettingsController {
         }
         if (req.displayOrder() != null) {
             field.setDisplayOrder(req.displayOrder());
+        }
+
+        if (req.category() != null) {
+            field.setCategory(req.category().trim());
         }
 
         fieldRepo.save(field);

@@ -10,6 +10,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { TagModule } from 'primeng/tag';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
+import { DatePickerModule } from 'primeng/datepicker';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { forkJoin } from 'rxjs';
@@ -46,6 +47,7 @@ interface VisibilityConditionDraft {
     TagModule,
     InputTextModule,
     SelectModule,
+    DatePickerModule,
     DragDropModule
   ],
   providers: [MessageService, ConfirmationService],
@@ -77,6 +79,9 @@ export class DevSettingsComponent implements OnInit {
   familyDialogVisible = false;
   familyDialogMode: 'create' | 'edit' = 'create';
   editingFamily: Partial<FamilyCatalog> = {};
+  familyDateFrom: Date | null = null;
+  familyDateUntil: Date | null = null;
+  familyDirectJoinEnabled = false;
   familyHasBranches = false;
   familyBranchCount = 0;
 
@@ -98,6 +103,11 @@ export class DevSettingsComponent implements OnInit {
   visibilityConditions: VisibilityConditionDraft[] = [];
   memberFamilyOptions: string[] = [];
   servantFamilyOptions: string[] = [];
+
+  categoryOptions: string[] = [];
+  selectedCategory: string = '';
+  newCategoryName: string = '';
+  showNewCategoryInput = false;
 
   fieldTypeOptions = [
     { label: 'نص (Text)', value: 'TEXT' },
@@ -139,6 +149,13 @@ export class DevSettingsComponent implements OnInit {
     { label: 'الصفحة الشخصية', value: 'PROFILE' },
     { label: 'الافتقاد', value: 'IFTEKAD' }
   ];
+
+  private get availableCategories(): string[] {
+    const cats = new Set<string>();
+    this.sectionDefinitions.forEach(s => cats.add(s.title));
+    this.fields.forEach(f => { if (f.category?.trim()) cats.add(f.category!.trim()); });
+    return Array.from(cats).sort();
+  }
 
   private readonly visibilityDependencyFallbackOptions: Record<string, string[]> = {
     gender: ['MALE', 'FEMALE'],
@@ -242,8 +259,13 @@ export class DevSettingsComponent implements OnInit {
       visibilityRule: 'ALWAYS',
       showIn: 'NONE',
       profileEditable: false,
-      displayOrder: this.fields.length
+      displayOrder: this.fields.length,
+      category: ''
     };
+    this.selectedCategory = '';
+    this.newCategoryName = '';
+    this.showNewCategoryInput = false;
+    this.categoryOptions = this.availableCategories;
     this.optionInputs = [''];
     this.selectedRequiredRules = [];
     this.visibilityConditions = [];
@@ -264,8 +286,23 @@ export class DevSettingsComponent implements OnInit {
       visibilityDependsOn: '',
       visibilityDependsValues: ''
     };
+    this.selectedCategory = f.category || '';
+    this.newCategoryName = '';
+    this.showNewCategoryInput = false;
+    this.categoryOptions = this.availableCategories;
     this.optionInputs = this.resolveDialogOptions(f);
     this.dialogVisible = true;
+  }
+
+  onCategoryChange(category: string): void {
+    if (category === '__new__') {
+      this.showNewCategoryInput = true;
+      this.newCategoryName = '';
+      this.editingField.category = '';
+    } else {
+      this.showNewCategoryInput = false;
+      this.editingField.category = category;
+    }
   }
 
   saveField(): void {
@@ -285,8 +322,13 @@ export class DevSettingsComponent implements OnInit {
       return;
     }
 
+    const category = !this.showNewCategoryInput
+      ? this.editingField.category
+      : this.newCategoryName.trim();
+
     const payload: Partial<CustomField> = {
       ...this.editingField,
+      category: category || '',
       required: !!this.editingField.required && this.selectedRequiredRules.length === 0,
       requiredRule: !!this.editingField.required ? this.serializeRequiredRules(this.selectedRequiredRules) : 'NEVER',
       showIn: this.normalizeConfiguredShowInValue(this.editingField.showIn),
@@ -836,6 +878,9 @@ export class DevSettingsComponent implements OnInit {
     this.familyHasBranches = false;
     this.familyBranchCount = 0;
     this.selectedDirectJoinGrades = [];
+    this.familyDateFrom = null;
+    this.familyDateUntil = null;
+    this.familyDirectJoinEnabled = false;
     this.editingFamily = {
       nameAr: '',
       baseName: '',
@@ -852,8 +897,17 @@ export class DevSettingsComponent implements OnInit {
     this.familyHasBranches = !!f.branch;
     this.familyBranchCount = 0;
     this.selectedDirectJoinGrades = this.parseGrades(f.directJoinGrades);
+    this.familyDateFrom = this.parseDate(f.directJoinFrom);
+    this.familyDateUntil = this.parseDate(f.directJoinUntil);
+    this.familyDirectJoinEnabled = this.selectedDirectJoinGrades.length > 0 || !!this.familyDateFrom || !!this.familyDateUntil;
     this.editingFamily = { ...f };
     this.familyDialogVisible = true;
+  }
+
+  private parseDate(value?: string | null): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? null : parsed;
   }
 
   private parseGrades(grades?: string | null): string[] {
@@ -907,7 +961,14 @@ export class DevSettingsComponent implements OnInit {
       return;
     }
 
-    const joinGrades = this.selectedDirectJoinGrades.length ? this.selectedDirectJoinGrades.join(',') : null;
+    const joinGrades = this.familyDirectJoinEnabled && this.selectedDirectJoinGrades.length
+      ? this.selectedDirectJoinGrades.join(',')
+      : null;
+
+    if (this.familyDirectJoinEnabled && (!this.familyDateFrom || !this.familyDateUntil)) {
+      this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'يرجى تحديد مدة التفعيل (من تاريخ - إلى تاريخ)' });
+      return;
+    }
 
     if (this.familyDialogMode === 'create') {
       const payload: any = {
@@ -916,8 +977,8 @@ export class DevSettingsComponent implements OnInit {
         servantSelectable: this.editingFamily.servantSelectable,
         memberSelectable: this.editingFamily.memberSelectable,
         directJoinGrades: joinGrades,
-        directJoinFrom: this.editingFamily.directJoinFrom || null,
-        directJoinUntil: this.editingFamily.directJoinUntil || null
+        directJoinFrom: this.familyDirectJoinEnabled ? this.formatDate(this.familyDateFrom) : null,
+        directJoinUntil: this.familyDirectJoinEnabled ? this.formatDate(this.familyDateUntil) : null
       };
       if (this.familyHasBranches) {
         payload.baseName = this.editingFamily.baseName || this.editingFamily.nameAr;
@@ -940,8 +1001,8 @@ export class DevSettingsComponent implements OnInit {
       const payload: any = {
         ...updateData,
         directJoinGrades: joinGrades,
-        directJoinFrom: this.editingFamily.directJoinFrom || null,
-        directJoinUntil: this.editingFamily.directJoinUntil || null
+        directJoinFrom: this.familyDirectJoinEnabled ? this.formatDate(this.familyDateFrom) : null,
+        directJoinUntil: this.familyDirectJoinEnabled ? this.formatDate(this.familyDateUntil) : null
       };
       if (this.familyHasBranches) {
         payload.baseName = this.editingFamily.baseName || this.editingFamily.nameAr;
@@ -1072,27 +1133,56 @@ export class DevSettingsComponent implements OnInit {
       def.fieldKeys.forEach(key => sectionByKey.set(key, def.id));
     });
 
-    const additionalFields: CustomField[] = [];
-    for (const field of sortedFields) {
-      const sectionId = sectionByKey.get(field.fieldKey);
-      if (!sectionId) {
-        additionalFields.push(field);
-        continue;
-      }
+    const categorySections = new Map<string, FieldSection>();
 
-      sectionState.get(sectionId)?.fields.push(field);
+    for (const field of sortedFields) {
+      const cat = field.category?.trim();
+      if (cat) {
+        const predef = this.sectionDefinitions.find(s => s.title === cat);
+        if (predef) {
+          sectionState.get(predef.id)?.fields.push(field);
+        } else {
+          let sec = categorySections.get(cat);
+          if (!sec) {
+            sec = { id: cat, title: cat, fieldKeys: [], fields: [] };
+            categorySections.set(cat, sec);
+          }
+          sec.fields.push(field);
+          sec.fieldKeys.push(field.fieldKey);
+        }
+      } else {
+        const sectionId = sectionByKey.get(field.fieldKey);
+        if (sectionId) {
+          sectionState.get(sectionId)?.fields.push(field);
+        }
+      }
     }
 
-    const sections = this.sectionDefinitions
-      .map(def => sectionState.get(def.id)!)
-      .filter(section => section.fields.length > 0);
+    const sections: FieldSection[] = [];
 
-    if (additionalFields.length) {
+    this.sectionDefinitions.forEach(def => {
+      const section = sectionState.get(def.id)!;
+      if (section.fields.length > 0) {
+        sections.push(section);
+      }
+    });
+
+    for (const section of categorySections.values()) {
+      sections.push(section);
+    }
+
+    const matchedKeys = new Set<string>();
+    for (const section of sections) {
+      section.fields.forEach(f => matchedKeys.add(f.fieldKey));
+    }
+
+    const remainingFields = sortedFields.filter(f => !matchedKeys.has(f.fieldKey));
+    if (remainingFields.length) {
       sections.push({
         id: 'additional',
         title: 'حقول إضافية',
-        fieldKeys: additionalFields.map(field => field.fieldKey),
-        fields: additionalFields
+        fieldKeys: remainingFields.map(f => f.fieldKey),
+        fields: remainingFields
       });
     }
 
@@ -1198,5 +1288,13 @@ export class DevSettingsComponent implements OnInit {
       isSystem: !!field.isSystem,
       profileEditable: field.profileEditable
     });
+  }
+
+  private formatDate(value: Date | null | undefined): string | null {
+    if (!value) return null;
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 }

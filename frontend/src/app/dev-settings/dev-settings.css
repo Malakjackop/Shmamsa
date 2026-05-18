@@ -881,26 +881,241 @@
   gap: 0.5rem;
 }
 
-.date-range-row input[type="date"] {
+.date-range-row ::ng-deep .p-datepicker {
   flex: 1;
-  padding: 0.65rem 0.85rem;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  color: #333;
-  background: #fafafa;
-  transition: border-color 200ms, box-shadow 200ms;
+  width: 100%;
 }
 
-.date-range-row input[type="date"]:focus {
-  outline: none;
-  border-color: #5e2b20;
-  box-shadow: 0 0 0 3px rgba(94, 43, 32, 0.12);
+.date-range-row ::ng-deep .p-datepicker-input {
+  height: 46px;
+  padding: 0 15px;
+  background-color: #f8f8f8;
+  color: #1a1a1a;
+  font-size: 15px;
+  font-family: inherit;
+  border: 1px solid #c0c0c0;
+  border-radius: 6px;
+  transition: border-color 200ms, box-shadow 200ms, background-color 200ms;
+}
+
+.date-range-row ::ng-deep .p-datepicker-input:focus {
+  border-color: #4a8ed4;
+  box-shadow: 0 0 0 3px rgba(74, 142, 212, 0.3);
   background: #fff;
+}
+
+.date-range-row ::ng-deep .p-datepicker-trigger {
+  background: transparent;
+  border: 1px solid #c0c0c0;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: #666;
 }
 
 .date-range-row span {
   color: #666;
   font-size: 0.9rem;
+}
+
+/* ── DatePicker overlay panel (matching attendance calendar design) ── */
+::ng-deep .devFamilyDatePanel,
+::ng-deep .devFamilyDatePanel.p-datepicker,
+::ng-deep .devFamilyDatePanel.p-datepicker-panel {
+  width: min(420px, calc(100vw - 28px)) !important;
+  max-width: calc(100vw - 28px) !important;
+  border: 1px solid #e7dad3 !important;
+  border-radius: 16px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  overflow: hidden !important;
+  box-shadow: 0 18px 45px rgba(39, 18, 13, 0.22) !important;
+  direction: rtl;
+  z-index: 20000 !important;
+  pointer-events: auto;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker,
+::ng-deep .devFamilyDatePanel .p-datepicker-panel,
+::ng-deep .devFamilyDatePanel .p-datepicker-group,
+::ng-deep .devFamilyDatePanel .p-datepicker-calendar-container,
+::ng-deep .devFamilyDatePanel .p-datepicker-calendar,
+::ng-deep .devFamilyDatePanel table,
+::ng-deep .devFamilyDatePanel tbody,
+::ng-deep .devFamilyDatePanel tr,
+::ng-deep .devFamilyDatePanel td,
+::ng-deep .devFamilyDatePanel th {
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button {
+  grid-column: 1;
+  justify-self: start;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-title,
+::ng-deep .devFamilyDatePanel .p-datepicker-month,
+::ng-deep .devFamilyDatePanel .p-datepicker-year,
+::ng-deep .devFamilyDatePanel .p-datepicker-month-view,
+::ng-deep .devFamilyDatePanel .p-datepicker-year-view,
+::ng-deep .devFamilyDatePanel .p-datepicker-decade,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-month,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-year {
+  color: #5e2b20 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-title {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-title button,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-month,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-year {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-title button:hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-title button:focus,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-month:hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-month:focus,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-year:hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-select-year:focus {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+  box-shadow: none !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button,
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button,
+::ng-deep .devFamilyDatePanel .p-datepicker-prev,
+::ng-deep .devFamilyDatePanel .p-datepicker-next {
+  width: 36px !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+  box-shadow: none !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button:hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button:hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-prev:hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-next:hover {
+  background: #efe1da !important;
+  color: #6d3326 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button .p-button-icon,
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button .pi,
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button .p-icon,
+::ng-deep .devFamilyDatePanel .p-datepicker-prev-button svg,
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button .p-button-icon,
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button .pi,
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button .p-icon,
+::ng-deep .devFamilyDatePanel .p-datepicker-next-button svg {
+  transform: scaleX(-1) !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-weekday,
+::ng-deep .devFamilyDatePanel th,
+::ng-deep .devFamilyDatePanel thead th,
+::ng-deep .devFamilyDatePanel .p-datepicker-weekheader {
+  color: #8d5144 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-day,
+::ng-deep .devFamilyDatePanel .p-datepicker-date,
+::ng-deep .devFamilyDatePanel .p-datepicker-month,
+::ng-deep .devFamilyDatePanel .p-datepicker-year,
+::ng-deep .devFamilyDatePanel td > span,
+::ng-deep .devFamilyDatePanel td > button {
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-day,
+::ng-deep .devFamilyDatePanel .p-datepicker-date,
+::ng-deep .devFamilyDatePanel td > span,
+::ng-deep .devFamilyDatePanel td > button {
+  border-radius: 50% !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-day:not(.p-disabled):not(.p-datepicker-day-selected):hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-date:not(.p-disabled):not(.p-highlight):hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-month:not(.p-disabled):not(.p-datepicker-month-selected):hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-year:not(.p-disabled):not(.p-datepicker-year-selected):hover,
+::ng-deep .devFamilyDatePanel td > span:not(.p-disabled):not(.p-highlight):hover,
+::ng-deep .devFamilyDatePanel .p-datepicker-day:not(.p-disabled):focus {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+  box-shadow: none !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-day-selected,
+::ng-deep .devFamilyDatePanel .p-datepicker-date.p-highlight,
+::ng-deep .devFamilyDatePanel .p-datepicker-month-selected,
+::ng-deep .devFamilyDatePanel .p-datepicker-year-selected,
+::ng-deep .devFamilyDatePanel td > span.p-highlight {
+  background: #8d5144 !important;
+  color: #ffffff !important;
+  border-color: #8d5144 !important;
+}
+
+::ng-deep .devFamilyDatePanel td.p-datepicker-today > span:not(.p-datepicker-day-selected):not(.p-highlight),
+::ng-deep .devFamilyDatePanel td.p-datepicker-today > button:not(.p-datepicker-day-selected):not(.p-highlight) {
+  border: 1px solid #d9c2b8 !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-disabled,
+::ng-deep .devFamilyDatePanel .p-datepicker-other-month,
+::ng-deep .devFamilyDatePanel .p-datepicker-other-month .p-datepicker-day,
+::ng-deep .devFamilyDatePanel .p-datepicker-other-month span,
+::ng-deep .devFamilyDatePanel td.p-disabled > span,
+::ng-deep .devFamilyDatePanel td.p-disabled > button {
+  color: #b08f84 !important;
+  opacity: 0.72 !important;
+}
+
+::ng-deep .devFamilyDatePanel .p-datepicker-buttonbar,
+::ng-deep .devFamilyDatePanel .p-datepicker-button-bar {
+  padding: 12px 14px !important;
+  border-top: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
 }

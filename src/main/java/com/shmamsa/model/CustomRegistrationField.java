@@ -108,6 +108,10 @@ public class CustomRegistrationField {
     @Builder.Default
     private Boolean enabled = true;
 
+    /** User-defined category for grouping fields in the UI */
+    @Column(length = 200)
+    private String category;
+
     /** Whether this field is a core system field (cannot be deleted or have key changed) */
     @Column(name = "is_system", nullable = false)
     @Builder.Default

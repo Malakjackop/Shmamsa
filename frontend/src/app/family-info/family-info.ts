@@ -191,15 +191,11 @@ export class FamilyInfoComponent implements OnInit {
 
   allRoles: string[] = [];
 
-  pendingRequestsCount = 0;
-  requestsOpen = false;
-  requestsLoading = false;
-  requests: KhorsJoinRequestView[] = [];
-
   familyRequestsPendingCount = 0;
   familyRequestsOpen = false;
   familyRequestsLoading = false;
   familyRequests: FamilyJoinRequestView[] = [];
+  khorsRequests: KhorsJoinRequestView[] = [];
   private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
   ngOnInit() {
@@ -209,7 +205,6 @@ export class FamilyInfoComponent implements OnInit {
         this.me = u;
         this.loadRoles();
         this.initFamilyMode();
-        this.loadPendingRequestsCount();
       },
       error: () => {}
     });
@@ -321,14 +316,6 @@ export class FamilyInfoComponent implements OnInit {
     this.resetInteractiveStateForNewFamily();
     this.loadMembers();
     this.loadFamilyPendingRequestsCount();
-    if (this.canSeeKhorsRequests()) {
-      this.loadPendingRequestsCount();
-    } else {
-      this.pendingRequestsCount = 0;
-      this.requestsOpen = false;
-      this.requestsLoading = false;
-      this.requests = [];
-    }
   }
 
   openProfile(member: Member) {
@@ -558,7 +545,7 @@ export class FamilyInfoComponent implements OnInit {
         return;
       }
 
-      const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
       const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
 
       const doc = new jsPDF({ orientation: 'landscape' });
@@ -649,46 +636,8 @@ export class FamilyInfoComponent implements OnInit {
     this.members.forEach((member) => (member.selected = false));
   }
 
-  canSeeKhorsRequests(): boolean {
-    if (!this.isKhorsFamilySelected()) return false;
-    return this.canDecideKhorsRequests();
-  }
-
   canDecideKhorsRequests(): boolean {
     return this.isAminKhedmaOrDev() || this.isKhadimServingKhors();
-  }
-
-  openKhorsRequests() {
-    if (!this.canSeeKhorsRequests()) return;
-    this.requestsOpen = true;
-    this.requestsLoading = true;
-    this.khorsReq.pending().subscribe({
-      next: (list) => {
-        this.requests = this.filterRequestsBySelectedKhors(list || []);
-        this.requestsLoading = false;
-        this.pendingRequestsCount = this.requests.length;
-      },
-      error: (err) => {
-        this.requestsLoading = false;
-        this.requests = [];
-        this.pendingRequestsCount = 0;
-        const isServerError = Number(err?.status) >= 500;
-        this.message.add({
-          severity: isServerError ? 'warn' : 'error',
-          summary: 'خطأ',
-          detail: isServerError
-            ? 'تعذر تحميل طلبات الخورس حاليًا. برجاء المحاولة لاحقًا.'
-            : err?.error?.error || 'فشل تحميل طلبات الخورس'
-        });
-      }
-    });
-  }
-
-  closeKhorsRequests() {
-    this.requestsOpen = false;
-    this.requestsLoading = false;
-    this.requests = [];
-    this.loadPendingRequestsCount();
   }
 
   decideKhorsRequest(req: KhorsJoinRequestView, approved: boolean) {
@@ -696,9 +645,9 @@ export class FamilyInfoComponent implements OnInit {
 
     this.khorsReq.decide(req.requestId, approved).subscribe({
       next: () => {
-        this.requests = (this.requests || []).filter((item) => item.requestId !== req.requestId);
-        this.pendingRequestsCount = this.requests.length;
-        if (approved && this.isKhorsFamilySelected()) {
+        this.khorsRequests = (this.khorsRequests || []).filter((item) => item.requestId !== req.requestId);
+        this.familyRequestsPendingCount = this.familyRequests.length + this.khorsRequests.length;
+        if (approved && !!this.selectedKhorsCode()) {
           this.loadMembers();
         }
         this.message.add({
@@ -717,28 +666,58 @@ export class FamilyInfoComponent implements OnInit {
     });
   }
 
-  /* ── Family Join Requests ───────────────────────────── */
+  /* ── Join Requests (Family + Khors) ─────────────────── */
   openFamilyRequests() {
     this.familyRequestsOpen = true;
     this.familyRequestsLoading = true;
+    this.familyRequests = [];
+    this.khorsRequests = [];
+
     this.familyJoinReq.pending().subscribe({
       next: (list) => {
         this.familyRequests = list || [];
-        this.familyRequestsLoading = false;
-        this.familyRequestsPendingCount = this.familyRequests.length;
+        this.tryFinalizeLoadingRequests();
       },
       error: () => {
-        this.familyRequestsLoading = false;
         this.familyRequests = [];
-        this.familyRequestsPendingCount = 0;
+        this.tryFinalizeLoadingRequests();
       }
     });
+
+    if (this.canDecideKhorsRequests() && !!this.selectedKhorsCode()) {
+      this.khorsReq.pending().subscribe({
+        next: (list) => {
+          this.khorsRequests = this.filterRequestsBySelectedKhors(list || []);
+          this.tryFinalizeLoadingRequests();
+        },
+        error: () => {
+          this.khorsRequests = [];
+          this.tryFinalizeLoadingRequests();
+        }
+      });
+    } else {
+      this.tryFinalizeLoadingRequests();
+    }
+  }
+
+  private requestsLoadedCount = 0;
+  private readonly REQUESTS_LOADERS = 2;
+
+  private tryFinalizeLoadingRequests() {
+    this.requestsLoadedCount++;
+    if (this.requestsLoadedCount >= this.REQUESTS_LOADERS) {
+      this.requestsLoadedCount = 0;
+      this.familyRequestsLoading = false;
+      this.familyRequestsPendingCount = this.familyRequests.length + this.khorsRequests.length;
+    }
   }
 
   closeFamilyRequests() {
     this.familyRequestsOpen = false;
     this.familyRequestsLoading = false;
     this.familyRequests = [];
+    this.khorsRequests = [];
+    this.requestsLoadedCount = 0;
     this.loadFamilyPendingRequestsCount();
   }
 
@@ -766,10 +745,42 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   private loadFamilyPendingRequestsCount() {
+    let familyCount = 0;
+    let khorsCount = 0;
+
     this.familyJoinReq.pending().subscribe({
-      next: (list) => (this.familyRequestsPendingCount = (list || []).length),
-      error: () => (this.familyRequestsPendingCount = 0)
+      next: (list) => {
+        familyCount = (list || []).length;
+        this.tryFinalizePendingCount(familyCount, khorsCount);
+      },
+      error: () => {
+        this.tryFinalizePendingCount(familyCount, khorsCount);
+      }
     });
+
+    if (this.canDecideKhorsRequests() && !!this.selectedKhorsCode()) {
+      this.khorsReq.pending().subscribe({
+        next: (list) => {
+          khorsCount = this.filterRequestsBySelectedKhors(list || []).length;
+          this.tryFinalizePendingCount(familyCount, khorsCount);
+        },
+        error: () => {
+          this.tryFinalizePendingCount(familyCount, khorsCount);
+        }
+      });
+    } else {
+      this.tryFinalizePendingCount(familyCount, khorsCount);
+    }
+  }
+
+  private pendingCountLoaded = 0;
+
+  private tryFinalizePendingCount(familyCount: number, khorsCount: number) {
+    this.pendingCountLoaded++;
+    if (this.pendingCountLoaded >= 2) {
+      this.pendingCountLoaded = 0;
+      this.familyRequestsPendingCount = familyCount + khorsCount;
+    }
   }
 
   familyLabel(
@@ -787,26 +798,25 @@ export class FamilyInfoComponent implements OnInit {
             this.selectedFamily = this.families[0];
             this.loadMembers();
             this.loadFamilyPendingRequestsCount();
-            this.loadPendingRequestsCount();
           }
         },
         error: () => {
           this.families = [];
           this.selectedFamily = '';
           this.loadMembers();
-          this.pendingRequestsCount = 0;
+          this.familyRequestsPendingCount = 0;
         }
       });
     } else {
       this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
       this.loadMembers();
-      this.loadPendingRequestsCount();
+      this.loadFamilyPendingRequestsCount();
     }
   }
 
   private loadMembers() {
     this.loading = true;
-    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
+    const famParam = this.selectedFamily || undefined;
 
     this.familySvc.members(famParam).subscribe({
       next: (rows) => {
@@ -952,9 +962,6 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   private selectedFamilyAttendanceKind(): AttendanceCardKey {
-    const selectedKhors = this.selectedKhorsCode();
-    if (selectedKhors === 'MARMARKOS') return 'MARMARKOS_KHORS';
-    if (selectedKhors === 'ATHANASIUS') return 'ATHANASIUS_KHORS';
     return 'FAMILY_MEETING';
   }
 
@@ -1135,14 +1142,6 @@ export class FamilyInfoComponent implements OnInit {
         role: normalizeAssignmentRole(assignment, entity?.role)
       }))
       .filter((item) => !!item.familyName);
-  }
-
-  private loadPendingRequestsCount() {
-    if (!this.canSeeKhorsRequests()) return;
-    this.khorsReq.pending().subscribe({
-      next: (list) => (this.pendingRequestsCount = this.filterRequestsBySelectedKhors(list || []).length),
-      error: () => (this.pendingRequestsCount = 0)
-    });
   }
 
   private hasDisplayValue(value: unknown): boolean {

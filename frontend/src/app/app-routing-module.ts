@@ -24,6 +24,9 @@ import { FamilyInfoComponent } from './family-info/family-info';
 import { TransferMembersComponent } from './transfer-members/transfer-members';
 import { StartNewYearComponent } from './start-new-year/start-new-year';
 import { GradesComponent } from './grades/grades';
+import { IftekadComponent } from './iftekad/iftekad';
+import { PendingApprovalComponent } from './pending-approval/pending-approval';
+import { ChooseFamilyComponent } from './choose-family/choose-family';
 
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -31,6 +34,8 @@ const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'register-servant', component: RegisterServantComponent },
+  { path: 'pending-approval', component: PendingApprovalComponent },
+  { path: 'choose-family', component: ChooseFamilyComponent },
   { path: 'forgot-password', component: ForgotPasswordComponent },
   { path: 'reset-password', redirectTo: 'forgot-password', pathMatch: 'full' },
 
@@ -87,6 +92,12 @@ const routes: Routes = [
         component: DevSettingsComponent,
         canActivate: [RoleGuard],
         data: { roles: ['DEVELOPER'] }
+      },
+      {
+        path: 'iftekad',
+        component: IftekadComponent,
+        canActivate: [RoleGuard],
+        data: { roles: ['KHADIM','AMIN_OSRA','AMIN_KHEDMA','DEVELOPER'] }
       }
     ]
   },

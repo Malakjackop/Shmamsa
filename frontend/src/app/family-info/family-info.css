@@ -594,6 +594,19 @@
   gap: 8px;
 }
 
+.reqSection + .reqSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.reqSectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7a1e1e;
+  margin-bottom: 10px;
+}
+
 .reqList {
   display: flex;
   flex-direction: column;

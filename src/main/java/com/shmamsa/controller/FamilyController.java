@@ -531,9 +531,16 @@ public class  FamilyController {
             long fridayTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FRIDAY_LITURGY);
             long tasbeehaTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.TASBEEHA);
             Long baseFamilyId = base == null || base.isBlank() || isChoirBucket(base) ? null : familyAccessService.familyIdForName(base);
-            long meetingTotal = base == null || base.isBlank() || isChoirBucket(base)
-                    ? attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING)
-                    : attendanceRepo.countByUser_IdAndTypeAndFamilyIdAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING, baseFamilyId);
+            long meetingTotal;
+            if (baseFamilyId != null) {
+                meetingTotal = attendanceRepo.countByUser_IdAndTypeAndFamilyIdAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING, baseFamilyId);
+            } else {
+                String primFam = familyAccessService.primaryFamilyName(u);
+                Long primFamId = primFam != null ? familyAccessService.familyIdForName(primFam.trim()) : null;
+                meetingTotal = primFamId != null
+                        ? attendanceRepo.countByUser_IdAndTypeAndFamilyIdAndArchivedFalse(u.getId(), AttendanceType.FAMILY_MEETING, primFamId)
+                        : 0;
+            }
 
             // ✅ Choir totals (only meaningful for choir members)
             long marmarkosTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(u.getId(), AttendanceType.MARMARKOS_KHORS);
@@ -541,9 +548,16 @@ public class  FamilyController {
 
             long fridayPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FRIDAY_LITURGY);
             long tasbeehaPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.TASBEEHA);
-            long meetingPresent = base == null || base.isBlank() || isChoirBucket(base)
-                    ? attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.FAMILY_MEETING)
-                    : attendanceRepo.countPresentByUserAndTypeAndFamilyIdActive(u.getId(), AttendanceType.FAMILY_MEETING, baseFamilyId);
+            long meetingPresent;
+            if (baseFamilyId != null) {
+                meetingPresent = attendanceRepo.countPresentByUserAndTypeAndFamilyIdActive(u.getId(), AttendanceType.FAMILY_MEETING, baseFamilyId);
+            } else {
+                String primFam = familyAccessService.primaryFamilyName(u);
+                Long primFamId = primFam != null ? familyAccessService.familyIdForName(primFam.trim()) : null;
+                meetingPresent = primFamId != null
+                        ? attendanceRepo.countPresentByUserAndTypeAndFamilyIdActive(u.getId(), AttendanceType.FAMILY_MEETING, primFamId)
+                        : 0;
+            }
 
             long marmarkosPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.MARMARKOS_KHORS);
             long athanasiusPresent = attendanceRepo.countPresentByUserAndTypeActive(u.getId(), AttendanceType.ATHANASIUS_KHORS);
