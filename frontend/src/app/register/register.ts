@@ -20,6 +20,36 @@ interface FamilyOption {
   category?: string;
 }
 
+const FALLBACK_SYSTEM_FIELD_KEYS = new Set([
+  'fullName',
+  'username',
+  'phoneNumber',
+  'address',
+  'nationalId',
+  'email',
+  'dateOfBirth',
+  'gender',
+  'deaconDegree',
+  'deaconFamily',
+  'khors',
+  'servingWhere',
+  'attendKhors',
+  'status',
+  'graduatedFrom',
+  'graduateJob',
+  'studyType',
+  'schoolName',
+  'schoolGrade',
+  'otherGrade',
+  'universityName',
+  'faculty',
+  'universityGrade',
+  'isWorking',
+  'workDetails',
+  'guardiansPhone',
+  'guardianRelation'
+]);
+
 @Component({
   selector: 'app-register',
   templateUrl: './register.html',
@@ -230,20 +260,104 @@ export class RegisterComponent implements OnInit {
   private loadFields(): void {
     this.devSettingsService.getEnabledFields().subscribe({
       next: (fields) => {
-        this.orderedFields = this.sortFields(fields || []);
-        // Add dynamic form controls only for non-system custom fields
-        for (const f of this.orderedFields) {
-          if (!f.isSystem && !this.registerForm.contains('custom_' + f.fieldKey)) {
-             const validators = f.required ? [Validators.required] : [];
-             this.registerForm.addControl('custom_' + f.fieldKey, new FormControl('', validators));
-          }
-        }
+        this.orderedFields = this.sortFields(this.resolveOrderedFields(fields || []));
+        this.ensureDynamicFieldControls();
         this.syncConfiguredRequiredErrors();
       },
       error: () => {
-        this.orderedFields = [];
+        this.orderedFields = this.sortFields(this.fallbackOrderedFields());
+        this.ensureDynamicFieldControls();
+        this.syncConfiguredRequiredErrors();
       }
     });
+  }
+
+  private resolveOrderedFields(fields: CustomField[]): CustomField[] {
+    const safeFields = Array.isArray(fields) ? fields : [];
+    const hasSystemFields = safeFields.some(field => this.isKnownSystemField(field?.fieldKey));
+    return hasSystemFields ? safeFields : this.fallbackOrderedFields();
+  }
+
+  private ensureDynamicFieldControls(): void {
+    for (const f of this.orderedFields) {
+      if (!f.isSystem && !this.registerForm.contains('custom_' + f.fieldKey)) {
+        const validators = f.required ? [Validators.required] : [];
+        this.registerForm.addControl('custom_' + f.fieldKey, new FormControl('', validators));
+      }
+    }
+  }
+
+  private isKnownSystemField(fieldKey: string | undefined): boolean {
+    return !!fieldKey && FALLBACK_SYSTEM_FIELD_KEYS.has(fieldKey);
+  }
+
+  private fallbackOrderedFields(): CustomField[] {
+    const field = (
+      fieldKey: string,
+      labelAr: string,
+      fieldType: 'TEXT' | 'SELECT' | 'DATE',
+      displayOrder: number,
+      overrides: Partial<CustomField> = {}
+    ): CustomField => ({
+      fieldKey,
+      labelAr,
+      fieldType,
+      options: '',
+      required: false,
+      requiredRule: 'NEVER',
+      visibilityRule: 'ALWAYS',
+      visibilityDependsOn: '',
+      visibilityDependsValues: '',
+      visibilityConditions: [],
+      showIn: 'NONE',
+      showInConfigured: false,
+      profileEditable: false,
+      category: 'system',
+      displayOrder,
+      enabled: true,
+      isSystem: true,
+      ...overrides
+    });
+
+    return [
+      field('fullName', 'الاسم بالكامل بالعربي', 'TEXT', 1, { required: true }),
+      field('username', 'اسم المستخدم', 'TEXT', 2, { required: true }),
+      field('phoneNumber', 'رقم الهاتف', 'TEXT', 3),
+      field('address', 'العنوان', 'TEXT', 4),
+      field('nationalId', 'الرقم القومي', 'TEXT', 5),
+      field('email', 'البريد الإلكتروني', 'TEXT', 6, { required: true }),
+      field('dateOfBirth', 'تاريخ الميلاد', 'DATE', 7),
+      field('gender', 'النوع', 'TEXT', 8),
+      field('deaconDegree', 'رتبة الشماس', 'SELECT', 9, { required: true }),
+      field('deaconFamily', 'الأسرة', 'SELECT', 10, { visibilityRule: 'MEMBER_ONLY' }),
+      field('khors', 'الخورس', 'SELECT', 11, { visibilityRule: 'MEMBER_ONLY' }),
+      field('servingWhere', 'بتخدم فين', 'SELECT', 12, { visibilityRule: 'SERVANT_ONLY' }),
+      field('attendKhors', 'خورس الحضور', 'SELECT', 13, { visibilityRule: 'SERVANT_ONLY' }),
+      field('status', 'الحالة', 'SELECT', 14),
+      field('graduatedFrom', 'الجامعة المتخرج منها', 'TEXT', 15, { visibilityRule: 'GRADUATE_ONLY' }),
+      field('graduateJob', 'الوظيفة الحالية', 'TEXT', 16, { visibilityRule: 'GRADUATE_ONLY' }),
+      field('studyType', 'الجهة الدراسية', 'SELECT', 17, { visibilityRule: 'STUDENT_ONLY' }),
+      field('schoolName', 'اسم المدرسة', 'TEXT', 18, { visibilityRule: 'STUDENT_SCHOOL' }),
+      field('schoolGrade', 'الصف الدراسي', 'SELECT', 19, { visibilityRule: 'STUDENT_SCHOOL' }),
+      field('otherGrade', 'صف دراسي آخر', 'TEXT', 20, {
+        visibilityConditions: [
+          { type: 'RULE', rule: 'STUDENT_SCHOOL' },
+          { type: 'FIELD', fieldKey: 'schoolGrade', values: ['other'] }
+        ]
+      }),
+      field('universityName', 'اسم الجامعة', 'TEXT', 21, { visibilityRule: 'STUDENT_UNIVERSITY' }),
+      field('faculty', 'الكلية', 'TEXT', 22, { visibilityRule: 'STUDENT_UNIVERSITY' }),
+      field('universityGrade', 'الفرقة الدراسية', 'TEXT', 23, { visibilityRule: 'STUDENT_UNIVERSITY' }),
+      field('isWorking', 'هل تعمل؟', 'SELECT', 24, { visibilityRule: 'GRADUATE_ONLY' }),
+      field('workDetails', 'ما هي وظيفتك', 'TEXT', 25, {
+        visibilityConditions: [
+          { type: 'RULE', rule: 'GRADUATE_ONLY' },
+          { type: 'FIELD', fieldKey: 'isWorking', values: ['true'] }
+        ]
+      }),
+      field('guardiansPhone', 'هاتف ولي الأمر', 'TEXT', 26),
+      field('guardianRelation', 'صلة القرابة', 'TEXT', 27)
+    ];
   }
 
   isFieldVisible(f: CustomField): boolean {
