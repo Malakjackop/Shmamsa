@@ -25,6 +25,7 @@ import com.shmamsa.util.NationalIdUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -63,6 +64,9 @@ public class AuthController {
             "workDetails"
     );
 
+
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
 
     private final AuthService authService;
     private final AttendanceBackfillService attendanceBackfillService;
@@ -179,7 +183,7 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("jwt", token)
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(24 * 60 * 60)
                 .sameSite("Lax")
@@ -214,7 +218,7 @@ public class AuthController {
 
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
