@@ -1,93 +1,176 @@
 <p-toast position="top-left"></p-toast>
 
 <div class="dashboard">
-  <aside class="sidebar" [class.collapsed]="isSidebarCollapsed">
-    <div class="sidebar-topbar">
-      <button type="button" class="sidebar-toggle" (click)="toggleSidebar()" [attr.aria-label]="isSidebarCollapsed ? 'فتح القائمة' : 'إغلاق القائمة'">
-        <i class="pi" [ngClass]="isSidebarCollapsed ? 'pi-bars' : 'pi-angle-left'"></i>
+  <!-- Top navigation bar (desktop & mobile) -->
+  <header class="top-navbar">
+    <div class="top-nav-inner">
+      <button type="button" class="mobile-hamburger" (click)="toggleMobileMenu()" aria-label="فتح القائمة">
+        <i class="pi pi-bars"></i>
+      </button>
+
+      <div class="top-nav-brand" (click)="goHome()">
+        <img src="assets/images/church-logo.png" class="top-nav-logo" alt="شعار الكنيسة" />
+        <span>أسرة الشمامسة</span>
+      </div>
+
+      <nav class="top-nav-items">
+        <!-- الرئيسية -->
+        <a class="top-nav-link" routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">
+          <i class="pi pi-home"></i>
+          <span>الرئيسية</span>
+        </a>
+
+        <!-- الحضور والخدمة dropdown -->
+        <div class="nav-dropdown" [class.open]="activeDropdown === 'attendance'" *ngIf="canOpenAttendance()">
+          <button class="top-nav-link dropdown-btn" (click)="toggleDropdown('attendance'); $event.stopPropagation()">
+            <i class="pi pi-check-square"></i>
+            <span>الحضور والخدمة</span>
+            <i class="pi pi-chevron-down dropdown-arrow"></i>
+          </button>
+          <div class="dropdown-menu" (click)="closeDropdowns()">
+            <a routerLink="/attendance" routerLinkActive="active">تسجيل الحضور</a>
+            <ng-container *ngIf="canOpenFamilyTools()">
+              <a routerLink="/family-attendance" routerLinkActive="active">{{ usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره' }}</a>
+              <a routerLink="/family-info" routerLinkActive="active">{{ usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره' }}</a>
+              <a routerLink="/iftekad" routerLinkActive="active">الافتقاد</a>
+            </ng-container>
+            <a *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active">الانتقلات</a>
+          </div>
+        </div>
+
+        <!-- التقارير -->
+        <a class="top-nav-link" routerLink="/grades" routerLinkActive="active">
+          <i class="pi pi-chart-bar"></i>
+          <span>التقارير</span>
+        </a>
+
+        <!-- الشخصية dropdown -->
+        <div class="nav-dropdown" [class.open]="activeDropdown === 'personal'">
+          <button class="top-nav-link dropdown-btn" (click)="toggleDropdown('personal'); $event.stopPropagation()">
+            <i class="pi pi-user"></i>
+            <span>الشخصية</span>
+            <i class="pi pi-chevron-down dropdown-arrow"></i>
+          </button>
+          <div class="dropdown-menu" (click)="closeDropdowns()">
+            <a routerLink="/profile" routerLinkActive="active">الصفحة الشخصية</a>
+            <a routerLink="/resources" routerLinkActive="active">الملفات</a>
+            <a routerLink="/attendance-history" routerLinkActive="active">حضوري</a>
+            <a routerLink="/about" routerLinkActive="active">من نحن</a>
+          </div>
+        </div>
+
+        <!-- الإعدادات dropdown -->
+        <div class="nav-dropdown" [class.open]="activeDropdown === 'settings'" *ngIf="isServantOrAbove()">
+          <button class="top-nav-link dropdown-btn" (click)="toggleDropdown('settings'); $event.stopPropagation()">
+            <i class="pi pi-cog"></i>
+            <span>الإعدادات</span>
+            <i class="pi pi-chevron-down dropdown-arrow"></i>
+          </button>
+          <div class="dropdown-menu" (click)="closeDropdowns()">
+            <a *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active">بدء سنة جديدة</a>
+            <a *ngIf="isDeveloper()" routerLink="/dev-settings" routerLinkActive="active">إعدادات المطور</a>
+          </div>
+        </div>
+      </nav>
+
+      <button type="button" class="top-nav-logout" (click)="logout()" title="تسجيل الخروج">
+        <i class="pi pi-sign-out"></i>
       </button>
     </div>
+  </header>
 
-    <div class="sidebar-header" (click)="goHome()">
-      <a class="logoLink">
-        <img src="assets/images/church-logo.png" class="logo" alt="شعار الكنيسة" />
-      </a>
-      <h2 *ngIf="!isSidebarCollapsed">أسرة الشمامسة</h2>
-      <p *ngIf="!isSidebarCollapsed">كنيسة السيدة العذراء – العمرانية</p>
-    </div>
+  <!-- Mobile overlay drawer -->
+  <div class="mobile-overlay" [class.open]="isMobileMenuOpen" (click)="closeMobileMenu()">
+    <div class="mobile-drawer" [class.open]="isMobileMenuOpen" (click)="$event.stopPropagation()">
+      <div class="drawer-header">
+        <button type="button" class="drawer-close" (click)="closeMobileMenu()" aria-label="إغلاق القائمة">
+          <i class="pi pi-times"></i>
+        </button>
+        <div class="drawer-brand" (click)="goHome()">
+          <img src="assets/images/church-logo.png" class="drawer-logo" alt="شعار الكنيسة" />
+          <h2>أسرة الشمامسة</h2>
+          <p>كنيسة السيدة العذراء – العمرانية</p>
+        </div>
+      </div>
 
-    <ul class="menu">
-      <li routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" [attr.title]="isSidebarCollapsed ? 'الصفحة الرئيسية' : null">
-        <i class="pi pi-home"></i>
-        <span *ngIf="!isSidebarCollapsed">الصفحة الرئيسية</span>
-      </li>
-
-      <ng-container *ngIf="canOpenAttendance()">
-        <li routerLink="/attendance" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'تسجيل الحضور' : null">
-          <i class="pi pi-check-square"></i>
-          <span *ngIf="!isSidebarCollapsed">تسجيل الحضور</span>
+      <ul class="drawer-menu">
+        <li class="menu-group-header">الرئيسية</li>
+        <li routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" (click)="closeMobileMenu()">
+          <i class="pi pi-home"></i>
+          <span>الصفحة الرئيسية</span>
         </li>
-        <ng-container *ngIf="canOpenFamilyTools()">
-          <li routerLink="/family-attendance" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? (usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره') : null">
-            <i class="pi pi-users"></i>
-            <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره' }}</span>
+
+        <ng-container *ngIf="canOpenAttendance()">
+          <li class="menu-group-header">الحضور والخدمة</li>
+          <li routerLink="/attendance" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-check-square"></i>
+            <span>تسجيل الحضور</span>
           </li>
-          <li routerLink="/family-info" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? (usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره') : null">
-            <i class="pi pi-id-card"></i>
-            <span *ngIf="!isSidebarCollapsed">{{ usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره' }}</span>
-          </li>
-          <li routerLink="/iftekad" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الافتقاد' : null">
-            <i class="pi pi-heart"></i>
-            <span *ngIf="!isSidebarCollapsed">الافتقاد</span>
+          <ng-container *ngIf="canOpenFamilyTools()">
+            <li routerLink="/family-attendance" routerLinkActive="active" (click)="closeMobileMenu()">
+              <i class="pi pi-users"></i>
+              <span>{{ usePluralFamilyLabels() ? 'حضور الأسر' : 'حضور الأسره' }}</span>
+            </li>
+            <li routerLink="/family-info" routerLinkActive="active" (click)="closeMobileMenu()">
+              <i class="pi pi-id-card"></i>
+              <span>{{ usePluralFamilyLabels() ? 'بيانات الأسر' : 'بيانات الأسره' }}</span>
+            </li>
+            <li routerLink="/iftekad" routerLinkActive="active" (click)="closeMobileMenu()">
+              <i class="pi pi-heart"></i>
+              <span>الافتقاد</span>
+            </li>
+          </ng-container>
+          <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-send"></i>
+            <span>الانتقلات</span>
           </li>
         </ng-container>
-        <li *ngIf="isAminOsraOrAbove()" routerLink="/transfer-members" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الانتقلات' : null">
-          <i class="pi pi-send"></i>
-          <span *ngIf="!isSidebarCollapsed">الانتقلات</span>
+
+        <li class="menu-group-header">التقارير</li>
+        <li routerLink="/grades" routerLinkActive="active" (click)="closeMobileMenu()">
+          <i class="pi pi-chart-bar"></i>
+          <span>الدرجات</span>
         </li>
-      </ng-container>
 
-      <li routerLink="/grades" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الدرجات' : null">
-        <i class="pi pi-chart-bar"></i>
-        <span *ngIf="!isSidebarCollapsed">الدرجات</span>
-      </li>
-
-      <li routerLink="/profile" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الصفحة الشخصية' : null">
-        <i class="pi pi-user"></i>
-        <span *ngIf="!isSidebarCollapsed">الصفحة الشخصية</span>
-      </li>
-      <li routerLink="/resources" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'الملفات' : null">
-        <i class="pi pi-folder"></i>
-        <span *ngIf="!isSidebarCollapsed">الملفات</span>
-      </li>
-      <li routerLink="/attendance-history" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'حضوري' : null">
-        <i class="pi pi-history"></i>
-        <span *ngIf="!isSidebarCollapsed">حضوري</span>
-      </li>
-      <li routerLink="/about" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'من نحن' : null">
-        <i class="pi pi-info-circle"></i>
-        <span *ngIf="!isSidebarCollapsed">من نحن</span>
-      </li>
-
-      <ng-container *ngIf="isServantOrAbove()">
-        <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'بدء سنة جديدة' : null">
-          <i class="pi pi-calendar"></i>
-          <span *ngIf="!isSidebarCollapsed">بدء سنة جديدة</span>
+        <li class="menu-group-header">الشخصية</li>
+        <li routerLink="/profile" routerLinkActive="active" (click)="closeMobileMenu()">
+          <i class="pi pi-user"></i>
+          <span>الصفحة الشخصية</span>
         </li>
-        <li *ngIf="isDeveloper()" routerLink="/dev-settings" routerLinkActive="active" [attr.title]="isSidebarCollapsed ? 'إعدادات المطور' : null">
-          <i class="pi pi-cog"></i>
-          <span *ngIf="!isSidebarCollapsed">إعدادات المطور</span>
+        <li routerLink="/resources" routerLinkActive="active" (click)="closeMobileMenu()">
+          <i class="pi pi-folder"></i>
+          <span>الملفات</span>
         </li>
-      </ng-container>
-    </ul>
+        <li routerLink="/attendance-history" routerLinkActive="active" (click)="closeMobileMenu()">
+          <i class="pi pi-history"></i>
+          <span>حضوري</span>
+        </li>
+        <li routerLink="/about" routerLinkActive="active" (click)="closeMobileMenu()">
+          <i class="pi pi-info-circle"></i>
+          <span>من نحن</span>
+        </li>
 
-    <div class="logout">
-      <button type="button" (click)="logout()">
-        <i class="pi pi-sign-out"></i>
-        <span *ngIf="!isSidebarCollapsed">تسجيل الخروج</span>
-      </button>
+        <ng-container *ngIf="isServantOrAbove()">
+          <li class="menu-group-header">الإعدادات</li>
+          <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-calendar"></i>
+            <span>بدء سنة جديدة</span>
+          </li>
+          <li *ngIf="isDeveloper()" routerLink="/dev-settings" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-cog"></i>
+            <span>إعدادات المطور</span>
+          </li>
+        </ng-container>
+      </ul>
+
+      <div class="drawer-logout">
+        <button type="button" (click)="logout()">
+          <i class="pi pi-sign-out"></i>
+          <span>تسجيل الخروج</span>
+        </button>
+      </div>
     </div>
-  </aside>
+  </div>
 
   <main class="main">
     <router-outlet></router-outlet>

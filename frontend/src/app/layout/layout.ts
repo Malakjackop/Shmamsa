@@ -1,10 +1,11 @@
-import { Component, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { Component, OnInit, OnDestroy, inject, HostListener } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
 import { assignmentRolesOf, normalizeRole } from '../shared/role-utils';
+import { filter, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-layout',
@@ -14,24 +15,29 @@ import { assignmentRolesOf, normalizeRole } from '../shared/role-utils';
   styleUrls: ['./layout.css'],
   providers: [MessageService]
 })
-export class LayoutComponent implements OnInit {
+export class LayoutComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private router = inject(Router);
   private msg = inject(MessageService);
+  private routerSub?: Subscription;
 
   user: any = null;
-  isSidebarCollapsed = false;
-
-  constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
+  isMobileMenuOpen = false;
+  activeDropdown: string | null = null;
 
 ngOnInit(): void {
-  if (isPlatformBrowser(this.platformId)) {
-    this.isSidebarCollapsed = localStorage.getItem('layout.sidebar.collapsed') === 'true';
-  }
   this.auth.getUserData(true).subscribe({
     next: (u) => this.user = u,
     error: () => this.user = null
   });
+
+  this.routerSub = this.router.events.pipe(
+    filter(event => event instanceof NavigationEnd)
+  ).subscribe(() => this.closeMobileMenu());
+}
+
+ngOnDestroy(): void {
+  this.routerSub?.unsubscribe();
 }
   /** True if user has AMIN_OSRA on any assigned family slot (scoped). */
   private hasAnyAminOsraScope(): boolean {
@@ -86,14 +92,31 @@ ngOnInit(): void {
     this.router.navigate(['/dashboard']);
   }
 
-  toggleSidebar(): void {
-    this.isSidebarCollapsed = !this.isSidebarCollapsed;
-    if (isPlatformBrowser(this.platformId)) {
-      localStorage.setItem('layout.sidebar.collapsed', String(this.isSidebarCollapsed));
-    }
+  toggleDropdown(name: string): void {
+    this.activeDropdown = this.activeDropdown === name ? null : name;
+  }
+
+  closeDropdowns(): void {
+    this.activeDropdown = null;
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.closeDropdowns();
+  }
+
+  toggleMobileMenu(): void {
+    this.isMobileMenuOpen = !this.isMobileMenuOpen;
+    document.body.style.overflow = this.isMobileMenuOpen ? 'hidden' : '';
+  }
+
+  closeMobileMenu(): void {
+    this.isMobileMenuOpen = false;
+    document.body.style.overflow = '';
   }
 
 logout() {
+  this.closeMobileMenu();
   this.auth.logout().subscribe({
     next: () => this.router.navigate(['/login']),
     error: () => this.router.navigate(['/login'])

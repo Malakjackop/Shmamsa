@@ -1,86 +1,93 @@
 ﻿<p-toast position="top-left"></p-toast>
 
 <div class="page">
-  <h1>حضور الأعضاء</h1>
-
-  <div class="top" *ngIf="canSelectFamily() && families?.length">
-    <label>الأسرة</label>
-    <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
-      <option *ngFor="let f of families" [value]="f">{{ f }}</option>
-    </select>
+  <div class="pageHead">
+    <h1>حضور الأعضاء</h1>
+    <button *ngIf="exportMode" pButton type="button" class="p-button-secondary" label="إلغاء" (click)="cancelExport()"></button>
   </div>
 
-  <div class="actions">
-  <button
-    pButton
-    type="button"
-    icon="pi pi-file-pdf"
-    [label]="exportMode && pendingExport === 'pdf' ? 'تصدير PDF (تأكيد)' : 'تحميل PDF'"
-    (click)="exportPdf()"
-    class="pdfBtn"
-  ></button>
-  <button
-    *ngIf="exportMode"
-    pButton
-    type="button"
-    class="p-button-secondary"
-    label="إلغاء"
-    (click)="cancelExport()"
-  ></button>
-  <button
-    pButton
-    type="button"
-    icon="pi pi-calendar"
-    label="حضور اليوم"
-    (click)="openDailyAttendance()"
-    class="todayAttendanceBtn"
-    *ngIf="canEditDailyAttendance()"
-  ></button>
-</div>
+  <div class="filtersBar">
+    <div class="filterGroup" *ngIf="canSelectFamily() && families?.length">
+      <label>الأسرة</label>
+      <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+        <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+      </select>
+    </div>
+
+    <div class="actions">
+      <button
+        pButton
+        type="button"
+        icon="pi pi-calendar"
+        label="حضور اليوم"
+        (click)="openDailyAttendance()"
+        class="todayAttendanceBtn"
+        *ngIf="canEditDailyAttendance()"
+      ></button>
+    </div>
+  </div>
 
   <div *ngIf="loading" class="hint">جاري التحميل...</div>
 
-  <div class="tableWrap" *ngIf="!loading">
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th class="chk" *ngIf="exportMode">
-            <input type="checkbox" [(ngModel)]="selectAll" (change)="toggleSelectAll()" />
-          </th>
-          <th>الاسم</th>
-          <th>قداس الجمعة</th>
-          <th *ngIf="showMarmarkosColumn">خورس مارمرقس</th>
-          <th *ngIf="showAthanasiusColumn">خورس البابا اثناسيوس</th>
-          <th>تسبحة</th>
-          <th *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</th>
-          <th>تفاصيل</th>
-          <th>الملف</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let m of members">
-          <td class="chk" *ngIf="exportMode">
-            <input
-              type="checkbox"
-              [(ngModel)]="m.selected"
-              (ngModelChange)="onMemberSelectionChange()"
-              [ngModelOptions]="{ standalone: true }"
-            />
-          </td>
-          <td>{{ m.fullName }}</td>
-          <td>{{ countLabel(m, 'FRIDAY_LITURGY') }}</td>
-          <td *ngIf="showMarmarkosColumn">{{ countLabel(m, 'MARMARKOS_KHORS') }}</td>
-          <td *ngIf="showAthanasiusColumn">{{ countLabel(m, 'ATHANASIUS_KHORS') }}</td>
-          <td>{{ countLabel(m, 'TASBEEHA') }}</td>
-          <td *ngIf="showFamilyMeetingColumn">{{ countLabel(m, 'FAMILY_MEETING') }}</td>
-          <td><button pButton type="button" icon="pi pi-search" (click)="openDetails(m)">➕</button></td>
+  <div class="memberGrid" *ngIf="!loading && members.length">
+    <article
+      *ngFor="let m of members; let i = index; trackBy: trackByMember"
+      class="memberCard"
+      [class.memberCard--selected]="exportMode && m.selected"
+      (click)="exportMode ? toggleMemberSelection(m) : openDetails(m)"
+    >
+      <div class="memberCard__content">
+        <h2 class="memberCard__name">{{ m.fullName }}</h2>
 
-          <td><button pButton type="button" icon="pi pi-user" class="fileBtn" (click)="openProfile(m)">👤</button></td>
-        </tr>
-      </tbody>
-    </table>
+        <div class="memberCard__phoneRow" *ngIf="memberPhone(m); else noPhone">
+          <button
+            type="button"
+            class="memberCard__copy"
+            (click)="copyPhone(memberPhone(m)); $event.stopPropagation()"
+            aria-label="نسخ الرقم"
+            title="نسخ الرقم"
+          >
+            <i class="pi pi-copy"></i>
+          </button>
+          <span class="memberCard__phoneValue">{{ memberPhone(m) }}</span>
+        </div>
+
+        <ng-template #noPhone>
+          <div class="memberCard__phoneRow memberCard__phoneRow--empty">
+            <span class="memberCard__phoneValue">غير مسجل</span>
+          </div>
+        </ng-template>
+
+        <div class="memberCard__attendanceLines">
+          <div class="memberCard__attItem">
+            <span class="attLabel">قداس الجمعة</span>
+            <span class="attValue">{{ countLabel(m, 'FRIDAY_LITURGY') }}</span>
+          </div>
+          <div class="memberCard__attItem" *ngIf="showFamilyMeetingColumn">
+            <span class="attLabel">اجتماع الأسرة</span>
+            <span class="attValue">{{ countLabel(m, 'FAMILY_MEETING') }}</span>
+          </div>
+          <div class="memberCard__attItem">
+            <span class="attLabel">تسبحة</span>
+            <span class="attValue">{{ countLabel(m, 'TASBEEHA') }}</span>
+          </div>
+        </div>
+
+        <div class="memberCard__checkbox" *ngIf="exportMode" (click)="$event.stopPropagation()">
+          <input
+            type="checkbox"
+            [(ngModel)]="m.selected"
+            (ngModelChange)="onMemberSelectionChange()"
+            [ngModelOptions]="{ standalone: true }"
+          />
+        </div>
+      </div>
+    </article>
   </div>
 
+  <div class="emptyState" *ngIf="!loading && !members.length">
+    لا يوجد أعضاء في هذه الأسرة.
+  </div>
 
   <!-- Daily attendance modal (حضور اليوم) -->
   <div class="modal legacy-modal" *ngIf="showDaily">
@@ -160,44 +167,33 @@
           </div>
         </div>
 
-
-
         <div class="dailyBoxes">
-          <!-- الحضور -->
           <div class="attBox">
             <div class="attBoxHead">الحضور</div>
-
             <div class="attBoxBody" *ngIf="dailyPresent?.length; else noPresent">
               <div class="attRow" *ngFor="let p of dailyPresent">
                 <span class="attName">{{ p.fullName }}</span>
-
                 <button
                   *ngIf="canEditDailyAttendance()"
                   type="button"
                   class="miniDanger"
                   title="تحويل إلى غياب"
                   (click)="askDailyMarkAbsent(p)"
-                >
-                  −
-                </button>
+                >−</button>
               </div>
             </div>
-
             <ng-template #noPresent>
               <div class="attEmpty">لا يوجد حضور</div>
             </ng-template>
           </div>
 
-          <!-- الغياب -->
           <div class="attBox">
             <div class="attBoxHead">الغياب</div>
-
             <div class="attBoxBody" *ngIf="dailyAbsent?.length; else noAbsent">
               <div class="attRow" *ngFor="let a of dailyAbsent">
                 <span class="attName">{{ a.fullName }}</span>
               </div>
             </div>
-
             <ng-template #noAbsent>
               <div class="attEmpty">لا يوجد غياب</div>
             </ng-template>
@@ -207,7 +203,6 @@
         <div class="hint" *ngIf="dailyRecordsCount === 0">لا يوجد تسجيلات لهذا اليوم (غالبًا لم يتم عقد الاجتماع).</div>
       </ng-container>
 
-      <!-- confirm: mark present -> absent -->
       <div class="confirmOverlay" *ngIf="showDailyRemoveConfirm && dailyRemoveTarget">
         <div class="confirmBox">
           <div class="confirmTitle">تأكيد</div>
@@ -224,287 +219,78 @@
   </div>
 
   <!-- Attendance details modal -->
-<div class="modal legacy-modal" *ngIf="detailsFor">
-  <div class="modalCard">
-    <div class="modalHead">
-      <div>
-        <div class="title">{{ detailsFor.fullName }}</div>
-        <div class="sub">{{ detailsFor.role | roleLabel }}</div>
-      </div>
-
-      <div class="legacy-modal__head-actions">
-        <div class="filters detailsFilters">
-          <label>فلتر</label>
-          <select [(ngModel)]="detailsType" (change)="reloadDetails()">
-            <option value="">الكل</option>
-            <option value="FRIDAY_LITURGY">قداس الجمعة</option>
-            <option
-              value="MARMARKOS_KHORS"
-              *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'MARMARKOS_KHORS')"
-            >
-              خورس مارمرقس
-            </option>
-            <option
-              value="ATHANASIUS_KHORS"
-              *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'ATHANASIUS_KHORS')"
-            >
-              خورس البابا اثناسيوس
-            </option>
-            <option value="TASBEEHA">تسبحة</option>
-            <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
-            <option value="CUSTOM_EVENT">مناسبة مخصصة</option>
-          </select>
-        </div>
-        <button type="button" class="legacy-modal__close" (click)="closeDetails()" aria-label="إغلاق">
-          <i class="pi pi-times"></i>
-        </button>
-      </div>
-    </div>
-
-    <!-- لو الفلتر = الكل -->
-    <ng-container *ngIf="detailsType === ''; else singleType">
-      <div class="cards">
-        <div class="typeCard" *ngFor="let t of visibleAttendanceTypes()">
-          <div class="cardTitle">{{ titleForType(t) }}</div>
-
-          <div class="detailList" *ngIf="filteredDetails(t).length; else noType">
-            <div class="detailRow" *ngFor="let d of filteredDetails(t)">
-              <!-- ✅ غياب -->
-              <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock">
-                <div class="dTitle">غياب</div>
-                <div class="dSub">يوم الغياب: {{ d.date }}</div>
-              </ng-container>
-
-              <!-- ✅ حضور -->
-              <ng-template #presentBlock>
-                <div class="dTitle">حضور</div>
-                <div class="dSub">يوم الحضور: {{ d.date }}</div>
-                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
-                <div class="dSub" *ngIf="d.takenBy">
-                  الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})
-                </div>
-              </ng-template>
-            </div>
-          </div>
-
-          <ng-template #noType>
-            <div class="hint">لا يوجد سجلات.</div>
-          </ng-template>
-        </div>
-      </div>
-    </ng-container>
-
-    <!-- لو نوع محدد -->
-    <ng-template #singleType>
-      <div class="detailList" *ngIf="details.length; else noDetails">
-        <div class="detailRow" *ngFor="let d of details">
-          <!-- ✅ غياب -->
-          <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock2">
-            <div class="dTitle">{{ attendanceRowLabel(d) }} • غياب</div>
-            <div class="dSub">يوم الغياب: {{ d.date }}</div>
-          </ng-container>
-
-          <!-- ✅ حضور -->
-          <ng-template #presentBlock2>
-            <div class="dTitle">{{ attendanceRowLabel(d) }} • حضور</div>
-            <div class="dSub">يوم الحضور: {{ d.date }}</div>
-            <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
-            <div class="dSub" *ngIf="d.takenBy">
-              الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})
-            </div>
-          </ng-template>
-        </div>
-      </div>
-    </ng-template>
-
-    <ng-template #noDetails>
-      <div class="hint">لا توجد سجلات حضور.</div>
-    </ng-template>
-  </div>
-</div>
-
-  <!-- Profile modal -->
-  <div class="modal legacy-modal" *ngIf="profileFor">
+  <div class="modal legacy-modal" *ngIf="detailsFor">
     <div class="modalCard">
       <div class="modalHead">
         <div>
-          <div class="title">{{ profileFor.fullName }}</div>
-          <div class="sub">{{ profileFor.role | roleLabel }}</div>
+          <div class="title">{{ detailsFor.fullName }}</div>
+          <div class="sub">{{ detailsFor.role | roleLabel }}</div>
         </div>
+
         <div class="legacy-modal__head-actions">
-          <button type="button" class="legacy-modal__close" (click)="closeProfile()" aria-label="إغلاق">
+          <div class="filters detailsFilters">
+            <label>فلتر</label>
+            <select [(ngModel)]="detailsType" (change)="reloadDetails()">
+              <option value="">الكل</option>
+              <option value="FRIDAY_LITURGY">قداس الجمعة</option>
+              <option value="MARMARKOS_KHORS" *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'MARMARKOS_KHORS')">خورس مارمرقس</option>
+              <option value="ATHANASIUS_KHORS" *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'ATHANASIUS_KHORS')">خورس البابا اثناسيوس</option>
+              <option value="TASBEEHA">تسبحة</option>
+              <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
+              <option value="CUSTOM_EVENT">مناسبة مخصصة</option>
+            </select>
+          </div>
+          <button type="button" class="legacy-modal__close" (click)="closeDetails()" aria-label="إغلاق">
             <i class="pi pi-times"></i>
           </button>
         </div>
       </div>
 
-      <div *ngIf="profile; else loadingProfile" class="profileGrid">
-        <ng-container *ngIf="profileEntries() as entries">
-          <div *ngFor="let item of entries">
-            <b>{{ item.label }}:</b>
-            <ng-container *ngIf="isPhoneLabel(item.label); else plainProfileValue">
-              <span class="phoneInline">
-                <span>{{ item.value }}</span>
-                <button type="button" class="copyPhoneBtn" (click)="copyPhone(item.value)" title="نسخ الرقم" aria-label="نسخ الرقم">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                    <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                </button>
-              </span>
-            </ng-container>
-            <ng-template #plainProfileValue>{{ item.value }}</ng-template>
-          </div>
-
-          <div class="hint" *ngIf="entries.length === 0">
-            لا توجد بيانات متاحة.
-          </div>
-        </ng-container>
-      </div>
-
-      <ng-template #loadingProfile>
-        <div class="hint">جاري التحميل...</div>
-      </ng-template>
-    </div>
-  </div>
-
-  <!-- Iftekad modal -->
-  <div class="modal legacy-modal" *ngIf="iftekadFor">
-    <div class="modalCard">
-      <div class="modalHead">
-        <div>
-          <div class="title">افتقاد - {{ iftekadFor.fullName }}</div>
-          <div class="sub">اختار التاريخ وسجّل الافتقاد</div>
-        </div>
-        <div class="legacy-modal__head-actions">
-          <button type="button" class="legacy-modal__close" (click)="closeIftekad()" aria-label="إغلاق">
-            <i class="pi pi-times"></i>
-          </button>
-        </div>
-      </div>
-
-      <div class="iftekadForm">
-        <div class="iftekadField">
-          <label>التاريخ</label>
-          <p-datepicker
-            [(ngModel)]="iftekadDate"
-            [ngModelOptions]="{ standalone: true }"
-            [showIcon]="true"
-            panelStyleClass="iftekadCalendarPanel"
-            [readonlyInput]="true"
-            [showButtonBar]="true"
-            [maxDate]="dailyMaxDate"
-            [firstDayOfWeek]="1"
-            dateFormat="yy-mm-dd"
-            placeholder="اختر التاريخ"
-            appendTo="body"
-          ></p-datepicker>
-        </div>
-
-        <div class="iftekadField">
-          <label>وصف (اختياري)</label>
-          <input
-            type="text"
-            [(ngModel)]="iftekadDesc"
-            [ngModelOptions]="{ standalone: true }"
-            placeholder="اكتب ملاحظة لو حابب"
-          />
-        </div>
-
-        <div class="iftekadField">
-          <label>أسماء خدام الافتقاد (اختياري)</label>
-          <input
-            type="text"
-            [(ngModel)]="iftekadCompanions"
-            [ngModelOptions]="{ standalone: true }"
-            placeholder="مثال: فلان، فلان"
-          />
-        </div>
-      </div>
-
-      <div class="iftekadActions">
-        <button type="button" class="iftekadSave" [disabled]="iftekadSaving" (click)="saveIftekad()">+</button>
-      </div>
-
-      <!-- Iftekad History (inside same popup) -->
-      <div class="iftekadHistory">
-        <div class="histHead">
-          <div class="histTitle">سجل الافتقاد</div>
-          <div class="histHint" *ngIf="iftekadHistoryLoading">جاري التحميل...</div>
-        </div>
-
-        <div class="hint" *ngIf="!iftekadHistoryLoading && (!iftekadHistory || iftekadHistory.length === 0)">
-          لا يوجد سجل افتقاد لهذا العضو.
-        </div>
-
-        <div class="histList" *ngIf="!iftekadHistoryLoading && iftekadHistory?.length">
-          <div class="histItem" *ngFor="let v of iftekadHistory">
-            <ng-container *ngIf="editingVisitId !== v.id; else editMode">
-              <div class="histTop">
-                <div class="histDate">📅 {{ v.visitDate }}</div>
-                <div class="histRight">
-                  <div class="histBy" *ngIf="v.recordedBy">✍️ {{ v.recordedBy.fullName }} ({{ v.recordedBy.role | roleLabel }})</div>
-                  <button class="histIcon" type="button" (click)="startEditVisit(v)" title="تعديل">✏️</button>
-                  <button class="histIcon" type="button" (click)="askDeleteVisit(v)" title="مسح">🗑️</button>
-                </div>
+      <ng-container *ngIf="detailsType === ''; else singleType">
+        <div class="cards">
+          <div class="typeCard" *ngFor="let t of visibleAttendanceTypes()">
+            <div class="cardTitle">{{ titleForType(t) }}</div>
+            <div class="detailList" *ngIf="filteredDetails(t).length; else noType">
+              <div class="detailRow" *ngFor="let d of filteredDetails(t)">
+                <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock">
+                  <div class="dTitle">غياب</div>
+                  <div class="dSub">يوم الغياب: {{ d.date }}</div>
+                </ng-container>
+                <ng-template #presentBlock>
+                  <div class="dTitle">حضور</div>
+                  <div class="dSub">يوم الحضور: {{ d.date }}</div>
+                  <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
+                  <div class="dSub" *ngIf="d.takenBy">الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})</div>
+                </ng-template>
               </div>
-
-              <div class="histLine" *ngIf="v.description">📝 {{ v.description }}</div>
-              <div class="histLine" *ngIf="v.companions">👥 {{ v.companions }}</div>
-            </ng-container>
-
-            <ng-template #editMode>
-              <div class="editGrid">
-                <div class="editField">
-                  <label>التاريخ</label>
-                  <p-datepicker
-                    [(ngModel)]="editVisitDate"
-                    [ngModelOptions]="{ standalone: true }"
-                    [showIcon]="true"
-                    panelStyleClass="iftekadCalendarPanel"
-                    [readonlyInput]="true"
-                    [showButtonBar]="true"
-                    [maxDate]="dailyMaxDate"
-                    [firstDayOfWeek]="1"
-                    dateFormat="سنة-شهر-يوم"
-                    placeholder="اختر التاريخ"
-                    appendTo="body"
-                  ></p-datepicker>
-                </div>
-
-                <div class="editField">
-                  <label>وصف</label>
-                  <input type="text" [(ngModel)]="editVisitDesc" [ngModelOptions]="{ standalone: true }" />
-                </div>
-                <div class="editField">
-                  <label>الخدام</label>
-                  <input type="text" [(ngModel)]="editVisitCompanions" [ngModelOptions]="{ standalone: true }" />
-                </div>
-              </div>
-              <div class="editActions">
-                <button class="editBtn" type="button" [disabled]="editSaving" (click)="saveEditVisit(v)">حفظ</button>
-                <button class="cancelBtn" type="button" [disabled]="editSaving" (click)="cancelEditVisit()">إلغاء</button>
-              </div>
+            </div>
+            <ng-template #noType>
+              <div class="hint">لا يوجد سجلات.</div>
             </ng-template>
           </div>
         </div>
-      </div>
-        <!-- ✅ Confirm Delete Dialog inside page -->
-      <div class="confirmOverlay" *ngIf="showDeleteConfirm">
-        <div class="confirmBox">
-          <div class="confirmTitle">تأكيد المسح</div>
-          <div class="confirmText">
-            هل أنت متأكد من مسح هذا الافتقاد؟
-            <span *ngIf="visitToDelete?.visitDate"> ({{ visitToDelete?.visitDate }})</span>
-          </div>
+      </ng-container>
 
-          <div class="confirmActions">
-            <button class="dangerBtn" type="button" [disabled]="deleteSaving" (click)="confirmDelete()">مسح</button>
-            <button class="cancelBtn2" type="button" [disabled]="deleteSaving" (click)="cancelDelete()">إلغاء</button>
+      <ng-template #singleType>
+        <div class="detailList" *ngIf="details.length; else noDetails">
+          <div class="detailRow" *ngFor="let d of details">
+            <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock2">
+              <div class="dTitle">{{ attendanceRowLabel(d) }} • غياب</div>
+              <div class="dSub">يوم الغياب: {{ d.date }}</div>
+            </ng-container>
+            <ng-template #presentBlock2>
+              <div class="dTitle">{{ attendanceRowLabel(d) }} • حضور</div>
+              <div class="dSub">يوم الحضور: {{ d.date }}</div>
+              <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
+              <div class="dSub" *ngIf="d.takenBy">الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})</div>
+            </ng-template>
           </div>
         </div>
-      </div>
+      </ng-template>
+
+      <ng-template #noDetails>
+        <div class="hint">لا توجد سجلات حضور.</div>
+      </ng-template>
     </div>
   </div>
 </div>
-

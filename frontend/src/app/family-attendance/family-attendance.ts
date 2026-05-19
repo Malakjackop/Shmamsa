@@ -18,21 +18,24 @@ type Member = {
   familyName?: string;
   deaconFamily: string;
 
-  // choir membership (used to hide choir sections inside details)
-  attendKhors?: string; // MARMARKOS / ATHANASIUS / NONE / BOTH
-  khors?: string; // MARMARKOS / ATHANASIUS / BOTH
+  // choir membership
+  attendKhors?: string;
+  khors?: string;
   khorsYear?: number | null;
   servingScope?: string;
 
   // iftekad
-  lastIftekadDate?: string | null; // yyyy-MM-dd
+  lastIftekadDate?: string | null;
 
-  // backward compatible fields (present count)
+  // phone
+  phoneNumber?: string;
+  guardiansPhone?: string;
+
+  // attendance counts
   fridayLiturgy: number;
   tasbeeha: number;
   familyMeeting: number;
 
-  // new fields (present/total)
   fridayLiturgyPresent?: number;
   fridayLiturgyTotal?: number;
   tasbeehaPresent?: number;
@@ -40,13 +43,11 @@ type Member = {
   familyMeetingPresent?: number;
   familyMeetingTotal?: number;
 
-  // choir (present/total)
   marmarkosKhorsPresent?: number;
   marmarkosKhorsTotal?: number;
   athanasiusKhorsPresent?: number;
   athanasiusKhorsTotal?: number;
 
-  /** UI selection for export */
   selected?: boolean;
 };
 
@@ -496,6 +497,16 @@ export class FamilyAttendanceComponent implements OnInit {
     );
   }
 
+  memberPhone(m: Member): string {
+    return String(m.phoneNumber || m.guardiansPhone || '').trim();
+  }
+
+  attendanceStatusText(m: Member, kind: 'FRIDAY_LITURGY' | 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' | 'TASBEEHA' | 'FAMILY_MEETING'): string {
+    const label = this.titleForType(kind);
+    const count = this.countLabel(m, kind);
+    return `${label}: ${count}`;
+  }
+
   countLabel(
     m: Member,
     kind: 'FRIDAY_LITURGY' | 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' | 'TASBEEHA' | 'FAMILY_MEETING'
@@ -604,6 +615,15 @@ export class FamilyAttendanceComponent implements OnInit {
 
   filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
     return (this.details || []).filter((d) => d?.type === t);
+  }
+
+  trackByMember(_: number, m: Member): number {
+    return m.id;
+  }
+
+  toggleMemberSelection(m: Member) {
+    m.selected = !m.selected;
+    this.onMemberSelectionChange();
   }
 
   closeDetails() {
