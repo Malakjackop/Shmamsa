@@ -68,7 +68,8 @@
           </button>
           <div class="dropdown-menu" (click)="closeDropdowns()">
             <a *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active">بدء سنة جديدة</a>
-            <a *ngIf="isDeveloper()" routerLink="/dev-settings" routerLinkActive="active">إعدادات المطور</a>
+            <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'fields'}" routerLinkActive="active">حقول التسجيل</a>
+            <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'families'}" routerLinkActive="active">الأسر</a>
           </div>
         </div>
       </nav>
@@ -156,9 +157,13 @@
             <i class="pi pi-calendar"></i>
             <span>بدء سنة جديدة</span>
           </li>
-          <li *ngIf="isDeveloper()" routerLink="/dev-settings" routerLinkActive="active" (click)="closeMobileMenu()">
-            <i class="pi pi-cog"></i>
-            <span>إعدادات المطور</span>
+          <li *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'fields'}" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-address-book"></i>
+            <span>حقول التسجيل</span>
+          </li>
+          <li *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'families'}" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-users"></i>
+            <span>الأسر</span>
           </li>
         </ng-container>
       </ul>

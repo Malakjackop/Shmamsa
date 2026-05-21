@@ -95,7 +95,7 @@
             <!-- dateOfBirth -->
             <ng-container *ngSwitchCase="'dateOfBirth'">
               <div class="input-group small">
-                <input type="date" formControlName="dateOfBirth" class="locked-derived" placeholder="تاريخ الميلاد" autocomplete="off" tabindex="-1" />
+                <input type="date" readonly formControlName="dateOfBirth" class="locked-derived" placeholder="تاريخ الميلاد" autocomplete="off" tabindex="-1" />
               </div>
             </ng-container>
 
@@ -373,7 +373,7 @@
 
                 <ng-container *ngIf="f.fieldType === 'DATE'">
                   <label class="custom-field-label">{{ f.labelAr }}</label>
-                  <input type="date"
+                  <input type="date" readonly
                          [formControlName]="'custom_' + f.fieldKey"
                          [required]="customFieldRequired(f)"
                          (blur)="markTouched('custom_' + f.fieldKey)" />

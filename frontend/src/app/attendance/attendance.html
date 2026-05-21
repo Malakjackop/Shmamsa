@@ -143,6 +143,7 @@
                 placeholder="اختار يوم التسجيل"
                 [showButtonBar]="true"
                 [hideOnDateTimeSelect]="false"
+                [readonlyInput]="true"
               >
                 <ng-template pTemplate="buttonbar">
                   <div class="attendance-picker-actions">
@@ -779,6 +780,7 @@
                 panelStyleClass="attendanceGrantDatePanel"
                 dateFormat="yy-mm-dd"
                 placeholder="اختر بداية فترة التشغيل"
+                [readonlyInput]="true"
               ></p-datepicker>
             </div>
 
@@ -800,6 +802,7 @@
                 panelStyleClass="attendanceGrantDatePanel"
                 dateFormat="yy-mm-dd"
                 placeholder="اختر نهاية فترة التشغيل"
+                [readonlyInput]="true"
               ></p-datepicker>
             </div>
           </div>
@@ -1026,6 +1029,7 @@
           placeholder="اختر أول تاريخ"
           [showButtonBar]="true"
           [hideOnDateTimeSelect]="false"
+          [readonlyInput]="true"
         >
           <ng-template pTemplate="buttonbar">
             <div class="attendance-picker-actions">
@@ -1061,6 +1065,7 @@
           placeholder="اختر آخر تاريخ"
           [showButtonBar]="true"
           [hideOnDateTimeSelect]="false"
+          [readonlyInput]="true"
         >
           <ng-template pTemplate="buttonbar">
             <div class="attendance-picker-actions">

@@ -34,6 +34,7 @@ p-card, p-panel {
   flex-direction: column;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background-color: #f4f4f6;
   position: fixed;
@@ -42,6 +43,7 @@ p-card, p-panel {
 
 .main {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   background-color: #f4f4f6;

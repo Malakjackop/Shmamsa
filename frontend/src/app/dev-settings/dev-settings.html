@@ -3,24 +3,6 @@
 
 <div class="dev-layout" dir="rtl">
 
-  <!-- ── Inner Sidebar ───────────────────────────────────── -->
-  <aside class="dev-sidebar">
-    <div class="dev-sidebar-header">
-      <i class="pi pi-wrench"></i>
-      <h3>مطور النظام</h3>
-    </div>
-    <ul class="dev-menu">
-    <li [class.active]="activeTab === 'fields'" (click)="activeTab = 'fields'">
-      <i class="pi pi-address-book"></i>
-      <span>حقول التسجيل</span>
-    </li>
-    <li [class.active]="activeTab === 'families'" (click)="activeTab = 'families'; loadFamilies()">
-      <i class="pi pi-users"></i>
-      <span>الأسر</span>
-    </li>
-    </ul>
-  </aside>
-
   <!-- ── Main Content Area ─────────────────────────────── -->
   <div class="dev-main-content">
 
@@ -263,7 +245,8 @@
             appendTo="body"
             [autoZIndex]="false"
             [baseZIndex]="20000"
-            placeholder="من تاريخ">
+            placeholder="من تاريخ"
+            [readonlyInput]="true">
           </p-datepicker>
           <span>إلى</span>
           <p-datepicker
@@ -277,7 +260,8 @@
             appendTo="body"
             [autoZIndex]="false"
             [baseZIndex]="20000"
-            placeholder="إلى تاريخ">
+            placeholder="إلى تاريخ"
+            [readonlyInput]="true">
           </p-datepicker>
         </div>
       </div>

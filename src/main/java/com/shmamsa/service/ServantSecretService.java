@@ -35,6 +35,7 @@ public class ServantSecretService {
         try {
             ensureSecretExists();
         } catch (Exception e) {
+            e.printStackTrace();
             System.err.println("WARN: Could not initialize servant secret: " + e.getMessage());
         }
     }

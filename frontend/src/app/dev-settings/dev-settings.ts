@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
 import { TableModule } from 'primeng/table';
@@ -39,6 +40,7 @@ interface VisibilityConditionDraft {
   imports: [
     CommonModule,
     FormsModule,
+    RouterModule,
     ToastModule,
     TableModule,
     ButtonModule,
@@ -59,6 +61,7 @@ export class DevSettingsComponent implements OnInit {
   private authService = inject(AuthService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
+  private route = inject(ActivatedRoute);
   private readonly showInTargetOrder = ['FAMILY_INFO', 'PROFILE', 'IFTEKAD'];
   private readonly showInTargetLabels: Record<string, string> = {
     FAMILY_INFO: 'بيانات الأسرة',
@@ -223,6 +226,15 @@ export class DevSettingsComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      const tab = params['tab'];
+      if (tab === 'families') {
+        this.activeTab = 'families';
+        this.loadFamilies();
+      } else {
+        this.activeTab = 'fields';
+      }
+    });
     this.loadFamilyOptionSources();
     this.loadFields();
   }
@@ -286,7 +298,11 @@ export class DevSettingsComponent implements OnInit {
       visibilityDependsOn: '',
       visibilityDependsValues: ''
     };
-    this.selectedCategory = f.category || '';
+    const inferredCategory = f.category || this.inferSectionFromFieldKey(f.fieldKey) || '';
+    this.selectedCategory = inferredCategory;
+    if (!f.category && inferredCategory) {
+      this.editingField.category = inferredCategory;
+    }
     this.newCategoryName = '';
     this.showNewCategoryInput = false;
     this.categoryOptions = this.availableCategories;
@@ -1187,6 +1203,16 @@ export class DevSettingsComponent implements OnInit {
     }
 
     this.groupedSections = sections;
+  }
+
+  private inferSectionFromFieldKey(fieldKey?: string): string | null {
+    if (!fieldKey) return null;
+    for (const def of this.sectionDefinitions) {
+      if (def.fieldKeys.includes(fieldKey)) {
+        return def.title;
+      }
+    }
+    return null;
   }
 
   private sortFields(fields: CustomField[]): CustomField[] {
