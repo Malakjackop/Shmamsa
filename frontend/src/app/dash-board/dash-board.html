@@ -1,4 +1,8 @@
 ﻿<p-toast position="top-left"></p-toast>
+<p-confirmDialog
+  [draggable]="false"
+  styleClass="app-surface-dialog dashboard-confirm-dialog"
+></p-confirmDialog>
 
 <main class="home-page">
   <section class="home-hero">
@@ -18,7 +22,12 @@
       </div>
     </header>
 
-    <div class="hero-slider" *ngIf="hasHeroSlides">
+    <div
+      class="hero-slider"
+      *ngIf="hasHeroSlides"
+      (mouseenter)="pauseHeroAutoSlide()"
+      (mouseleave)="resumeHeroAutoSlide()"
+    >
       <button
         *ngIf="showHeroControls"
         type="button"
@@ -107,6 +116,7 @@
         [class.notice-card--hot]="isHotEvent(e)"
         [class.notice-card--cancelled]="isCancelledEvent(e)"
         [class.notice-card--pending]="isPendingEvent(e)"
+        [class.notice-card--published]="e.status === 'PUBLISHED'"
       >
         <div class="notice-card__top">
           <div class="notice-copy">
@@ -250,6 +260,8 @@
           [errorCorrectionLevel]="'M'"
           [allowEmptyString]="true"
         ></qrcode>
+        <div class="qr-dialog-family">كنيسة السيدة العذراء مريم بالعمرانية </div>
+
       </div>
     </div>
 
@@ -262,13 +274,13 @@
   <!-- Event Dialog -->
   <p-dialog [(visible)]="showEventDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog event-dialog" [header]="eventDialogTitle">
     <div style="display:flex; flex-direction:column; gap:10px;">
-      <label>العنوان</label>
+      <label>العنوان *</label>
       <input pInputText [(ngModel)]="eventForm.title" />
 
       <label>الوصف</label>
       <textarea pTextarea [(ngModel)]="eventForm.description" rows="4"></textarea>
 
-      <label>وقت الإيفنت</label>
+      <label>وقت الإيفنت *</label>
       <p-datepicker
         #eventAtPicker
         [(ngModel)]="eventForm.eventAt"
@@ -301,7 +313,7 @@
         </ng-template>
       </p-datepicker>
 
-      <label>وقت الإزالة</label>
+      <label>وقت الإزالة *</label>
       <p-datepicker
         #removeAtPicker
         [(ngModel)]="eventForm.removeAt"
@@ -334,7 +346,7 @@
         </ng-template>
       </p-datepicker>
 
-      <label>تذكير قبل الموعد (اختياري - بالأيام)</label>
+      <label>تذكير قبل الموعد (بالأيام)</label>
       <div class="reminder-row reminder-row--days-only">
         <input
           pInputText
@@ -346,7 +358,7 @@
         />
       </div>
 
-      <label>صورة السلايدر (اختياري)</label>
+      <label>صورة السلايدر</label>
       <div class="image-upload-row">
         <input #eventImageInput class="image-upload-input" type="file" accept="image/*" (change)="onEventImageSelected($event)" />
         <div class="image-upload-control">

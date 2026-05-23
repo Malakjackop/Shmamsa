@@ -3,7 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
 import { Router } from '@angular/router';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { FamilyService } from '../services/family.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
@@ -95,7 +95,7 @@ type DatePickerHandle = {
   standalone: false,
   templateUrl: './dash-board.html',
   styleUrls: ['./dash-board.css'],
-  providers: [MessageService]
+  providers: [MessageService, ConfirmationService]
 })
 export class DashBoard implements OnInit, OnDestroy {
   private authService = inject(AuthService);
@@ -104,6 +104,7 @@ export class DashBoard implements OnInit, OnDestroy {
   private boardService = inject(BoardService);
   private router = inject(Router);
   private messageService = inject(MessageService);
+  private confirmationService = inject(ConfirmationService);
   private http = inject(HttpClient);
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
@@ -130,6 +131,7 @@ export class DashBoard implements OnInit, OnDestroy {
   heroSlides: HeroSlide[] = [];
   activeHeroSlide = 0;
   private heroAutoTimer: ReturnType<typeof setInterval> | null = null;
+  private heroImageVersion = 0;
   readonly todayMinDate: Date = (() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -303,6 +305,25 @@ export class DashBoard implements OnInit, OnDestroy {
     return this.heroSlides[this.activeHeroSlide]?.imageUrl || '';
   }
 
+  private heroImageUrl(event: EventView): string {
+    const rawUrl = String(event?.imageUrl || '').trim();
+    if (!rawUrl) return '';
+
+    const versionSource = [
+      this.heroImageVersion,
+      event.id,
+      event.publishedAt || '',
+      event.createdAt || '',
+      event.eventAt || ''
+    ].join('|');
+    let version = 0;
+    for (let i = 0; i < versionSource.length; i++) {
+      version = ((version * 31) + versionSource.charCodeAt(i)) >>> 0;
+    }
+
+    return `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}v=${version}`;
+  }
+
   private removeCalendarMinSource = NaN;
   private removeCalendarMinDateValue = new Date(this.todayMinDate);
 
@@ -336,9 +357,17 @@ export class DashBoard implements OnInit, OnDestroy {
   }
 
   private rebuildHeroSlides(): void {
-    this.heroSlides = (this.events || [])
-      .filter((e) => !!e?.id && !!e?.imageUrl)
-      .map((e) => ({ imageUrl: String(e.imageUrl), eventId: Number(e.id) }));
+    this.heroImageVersion++;
+    const seenIds = new Set<number>();
+    this.heroSlides = (this.events || []).reduce<HeroSlide[]>((slides, event) => {
+      const eventId = Number(event?.id || 0);
+      const imageUrl = this.heroImageUrl(event);
+      if (!eventId || !imageUrl || seenIds.has(eventId)) return slides;
+
+      seenIds.add(eventId);
+      slides.push({ imageUrl, eventId });
+      return slides;
+    }, []);
 
     if (this.activeHeroSlide >= this.heroSlides.length) {
       this.activeHeroSlide = 0;
@@ -357,6 +386,14 @@ export class DashBoard implements OnInit, OnDestroy {
       clearInterval(this.heroAutoTimer);
       this.heroAutoTimer = null;
     }
+  }
+
+  pauseHeroAutoSlide(): void {
+    this.stopHeroAutoSlide();
+  }
+
+  resumeHeroAutoSlide(): void {
+    this.restartHeroAutoSlide();
   }
 
 
@@ -1210,6 +1247,51 @@ export class DashBoard implements OnInit, OnDestroy {
     });
   }
 
+  private markEventPublishedInView(id: number): void {
+    this.events = this.events.map((event) => {
+      if (Number(event?.id) !== id) return event;
+      return {
+        ...event,
+        status: 'PUBLISHED',
+        canPublish: false,
+        canUnpublish: true,
+        publishedAt: new Date().toISOString(),
+        cancelMessage: null,
+        cancelNoticeUntil: null,
+        cancelledAt: null,
+        cancelNoticeActive: false
+      };
+    });
+    this.rebuildHeroSlides();
+  }
+
+  private verifyPublishedAfterError(id: number, err: unknown): void {
+    const month = this.monthParam(this.monthCursor);
+    const scope = this.currentScopeConfig();
+
+    this.boardService.listEvents(month, scope.requestFamily, scope.requestAudience).subscribe({
+      next: (rows) => {
+        const nextEvents = this.sortEvents(this.visibleEvents(rows || []));
+        this.events = nextEvents;
+        this.rebuildHeroSlides();
+
+        const published = nextEvents.some((event) =>
+          Number(event?.id) === id && String(event?.status || '').toUpperCase() === 'PUBLISHED'
+        );
+
+        if (published) {
+          this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر الموعد.' });
+          return;
+        }
+
+        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err as any, 'فشل نشر الموعد.') });
+      },
+      error: () => {
+        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err as any, 'فشل نشر الموعد.') });
+      }
+    });
+  }
+
   private loadAnnouncements(): void {
     const scope = this.currentScopeConfig();
     this.boardService.listAnnouncements(scope.requestFamily, scope.requestAudience).subscribe({
@@ -1339,17 +1421,11 @@ export class DashBoard implements OnInit, OnDestroy {
     if (input) input.value = '';
   }
 
-  private uploadSelectedEventImage(eventId: number, afterDone: () => void): void {
-    if (!this.selectedEventImageFile) {
-      afterDone();
-      return;
-    }
-
-    this.boardService.uploadEventImage(eventId, this.selectedEventImageFile).subscribe({
-      next: () => afterDone(),
+  private uploadEventImageInBackground(eventId: number, file: File): void {
+    this.boardService.uploadEventImage(eventId, file).subscribe({
+      next: () => this.loadMonthBoards(),
       error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'تم حفظ الموعد لكن فشل رفع الصورة.') });
-        afterDone();
       }
     });
   }
@@ -1406,18 +1482,17 @@ export class DashBoard implements OnInit, OnDestroy {
     req$.subscribe({
       next: (res: unknown) => {
         const savedId = id || Number((res as { id?: number })?.id || 0);
-        const finish = () => {
-          this.isSavingEvent = false;
-          this.showEventDialog = false;
-          this.selectedEventImageFile = null;
-          this.selectedEventImageName = '';
-          this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الحفظ.' });
-          this.loadMonthBoards();
-        };
-        if (savedId) {
-          this.uploadSelectedEventImage(savedId, finish);
-        } else {
-          finish();
+        const imageFile = this.selectedEventImageFile;
+
+        this.isSavingEvent = false;
+        this.showEventDialog = false;
+        this.selectedEventImageFile = null;
+        this.selectedEventImageName = '';
+        this.messageService.add({ severity: 'success', summary: 'تم', detail: imageFile ? 'تم حفظ الموعد، وجاري رفع الصورة.' : 'تم الحفظ.' });
+        this.loadMonthBoards();
+
+        if (savedId && imageFile) {
+          this.uploadEventImageInBackground(savedId, imageFile);
         }
       },
       error: (err) => {
@@ -1439,12 +1514,13 @@ export class DashBoard implements OnInit, OnDestroy {
     this.boardService.publishEvent(id).subscribe({
       next: () => {
         this.publishingEventIds.delete(id);
+        this.markEventPublishedInView(id);
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر الموعد.' });
         this.loadMonthBoards();
       },
       error: (err) => {
         this.publishingEventIds.delete(id);
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل نشر الموعد.') });
+        this.verifyPublishedAfterError(id, err);
       }
     });
   }
@@ -1499,13 +1575,26 @@ export class DashBoard implements OnInit, OnDestroy {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن مسح الموعد حالياً.' });
       return;
     }
-    this.boardService.deleteEvent(e.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الموعد.' });
-        this.loadMonthBoards();
-      },
-      error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل مسح الموعد.') });
+
+    const title = String(e.title || 'هذا الموعد').trim();
+    this.confirmationService.confirm({
+      header: 'تأكيد الحذف',
+      icon: 'pi pi-exclamation-triangle',
+      message: `هل تريد مسح موعد "${title}"؟`,
+      acceptLabel: 'حذف',
+      rejectLabel: 'إلغاء',
+      acceptButtonStyleClass: 'p-button-danger',
+      rejectButtonStyleClass: 'p-button-text',
+      accept: () => {
+        this.boardService.deleteEvent(e.id!).subscribe({
+          next: () => {
+            this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الموعد.' });
+            this.loadMonthBoards();
+          },
+          error: (err) => {
+            this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل مسح الموعد.') });
+          }
+        });
       }
     });
   }
