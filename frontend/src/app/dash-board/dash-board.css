@@ -1330,18 +1330,38 @@
 
 :host ::ng-deep .dashboard-date-input .p-datepicker-dropdown,
 :host ::ng-deep .dashboard-date-input .p-button {
-  width: 48px !important;
-  min-width: 48px !important;
-  height: var(--dashboard-date-control-height) !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
   padding: 0 !important;
-  border-color: #8d5144 !important;
-  background: #8d5144 !important;
-  color: #ffffff !important;
-  border-radius: 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #8d5144 !important;
+  border-radius: 50% !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  position: absolute !important;
+  inset-inline-end: 6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 1 !important;
+  cursor: pointer;
   box-sizing: border-box;
+}
+
+:host ::ng-deep .dashboard-date-input .p-datepicker-dropdown:hover,
+:host ::ng-deep .dashboard-date-input .p-button:hover {
+  background: rgba(141, 81, 68, 0.1) !important;
+}
+
+:host ::ng-deep .dashboard-date-input {
+  position: relative !important;
+}
+
+:host ::ng-deep .dashboard-date-input .p-inputtext,
+:host ::ng-deep .dashboard-date-input__field {
+  padding-inline-end: 44px !important;
 }
 
 :host ::ng-deep .dashboard-date-input .p-datepicker-dropdown .pi,
@@ -1349,9 +1369,9 @@
 :host ::ng-deep .dashboard-date-input .p-button .pi,
 :host ::ng-deep .dashboard-date-input .p-button svg {
   margin: 0 !important;
-  font-size: 1rem !important;
-  width: 1rem !important;
-  height: 1rem !important;
+  font-size: 1.1rem !important;
+  width: 1.1rem !important;
+  height: 1.1rem !important;
 }
 
 /* appendTo="body" places the datepicker outside the component host, so these selectors must be global. */
@@ -1628,6 +1648,80 @@
   .dashboard-picker-btn {
     min-width: 96px;
   }
+}
+
+/* ===== Consistent form fields in event dialog ===== */
+:host ::ng-deep .event-dialog input:not([type="file"]):not([type="number"]),
+:host ::ng-deep .event-dialog textarea,
+:host ::ng-deep .event-dialog .p-inputtext {
+  height: 50px !important;
+  min-height: 50px;
+  border: 1px solid #e3d6cf !important;
+  border-radius: 10px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  padding-inline: 14px !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+:host ::ng-deep .event-dialog textarea {
+  height: auto !important;
+  min-height: 100px;
+  padding-block: 10px !important;
+  resize: vertical;
+}
+
+:host ::ng-deep .event-dialog .reminder-row--days-only input[type="number"] {
+  height: 50px !important;
+  min-height: 50px;
+  border: 1px solid #e3d6cf !important;
+  border-radius: 10px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  padding-inline: 14px !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+:host ::ng-deep .event-dialog .target-scope-select,
+:host ::ng-deep .event-dialog .target-scope-select.p-select,
+:host ::ng-deep .event-dialog .target-scope-select .p-select {
+  min-height: 50px !important;
+  border: 1px solid #e3d6cf !important;
+  border-radius: 10px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+:host ::ng-deep .event-dialog .target-scope-select .p-select-label {
+  color: #5e2b20 !important;
+  font-size: 1.02rem !important;
+  font-weight: 700 !important;
+  line-height: 50px !important;
+  padding-inline: 14px 2.4rem !important;
+}
+
+:host ::ng-deep .event-dialog input:focus,
+:host ::ng-deep .event-dialog textarea:focus,
+:host ::ng-deep .event-dialog .p-inputtext:focus {
+  border-color: #8d5144 !important;
+  box-shadow: 0 0 0 3px rgba(141, 81, 68, 0.14) !important;
+}
+
+:host ::ng-deep .event-dialog label {
+  color: #5e2b20;
+  font-weight: 800;
+  font-size: 0.92rem;
 }
 
 /* ===== Final fix: DatePicker overlay clickable above dialog ===== */

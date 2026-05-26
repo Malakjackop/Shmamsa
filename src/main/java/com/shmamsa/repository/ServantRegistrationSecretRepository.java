@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface ServantRegistrationSecretRepository extends JpaRepository<ServantRegistrationSecret, Long> {
 
     Optional<ServantRegistrationSecret> findFirstByValidToAfterOrderByValidToDesc(LocalDateTime now);
+
+    Optional<ServantRegistrationSecret> findTopByOrderByValidToDesc();
 }

@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { FamilyJoinRequestService } from '../services/family-join-request.service';
 import { MessageService } from 'primeng/api';
-import { finalize, map, switchMap, catchError } from 'rxjs';
+import { finalize, catchError } from 'rxjs';
 import { of } from 'rxjs';
 
 @Component({
@@ -55,33 +55,48 @@ export class LoginComponent {
     this.authService
       .login(username, password)
       .pipe(
-        finalize(() => (this.isLoading = false)),
-        switchMap((user) =>
-          this.familyJoinReq.myStatus().pipe(
-            map((status) => ({ user, status })),
-            catchError(() => of({ user, status: { status: 'NONE', familyId: null, familyName: null } }))
-          )
-        )
+        finalize(() => (this.isLoading = false))
       )
       .subscribe({
-        next: ({ user, status }) => {
-          if (status.status === 'PENDING') {
-            const family = status.familyName || '';
-            this.router.navigate(['/pending-approval'], { queryParams: { family } });
-          } else if (status.status === 'REJECTED') {
-            this.router.navigate(['/choose-family']);
-          } else {
-            this.messageService.add({
-              severity: 'success',
-              summary: 'تسجيل دخول ناجح',
-              detail: `اهلا بعودتك،  ${user?.username ?? username}!`
+        next: (user) => {
+          if (!user) {
+            this.loginError = 'فشل تسجيل الدخول';
+            return;
+          }
+
+          const role = String(user?.role || '').trim().toUpperCase();
+          const hasFamily = Array.isArray(user?.familyAssignments) && user.familyAssignments.length > 0;
+
+          if (role === 'MAKHDOM' && !hasFamily) {
+            this.familyJoinReq.myStatus().pipe(
+              catchError(() => of({ status: 'NONE', familyId: null, familyName: null }))
+            ).subscribe({
+              next: (status) => {
+                if (status.status === 'PENDING') {
+                  this.router.navigate(['/pending-approval'], { queryParams: { family: status.familyName || '' } });
+                } else if (status.status === 'REJECTED') {
+                  this.router.navigate(['/choose-family']);
+                } else {
+                  this.onLoginSuccess(username, user);
+                }
+              }
             });
-            setTimeout(() => this.router.navigate(['/dashboard']), 500);
+          } else {
+            this.onLoginSuccess(username, user);
           }
         },
         error: (err) => {
           this.loginError = err?.error?.error || 'اسم المستخدم أو كلمة المرور غير صحيحة';
         }
       });
+  }
+
+  private onLoginSuccess(username: string, user: any): void {
+    this.messageService.add({
+      severity: 'success',
+      summary: 'تسجيل دخول ناجح',
+      detail: `اهلا بعودتك،  ${user?.username ?? username}!`
+    });
+    setTimeout(() => this.router.navigate(['/dashboard']), 500);
   }
 }

@@ -46,17 +46,19 @@ public class FamilyJoinRequestController {
         Long familyId = null;
         String familyName = null;
         for (FamilyJoinRequest r : all) {
+            Long fid = r.getFamilyId();
+            if (fid == null) continue;
             if (r.getStatus() == FamilyJoinRequestStatus.PENDING) {
                 status = "PENDING";
-                familyId = r.getFamilyId();
-                FamilyCatalog f = familyRepo.findById(r.getFamilyId()).orElse(null);
+                familyId = fid;
+                FamilyCatalog f = familyRepo.findById(fid).orElse(null);
                 familyName = f == null ? null : f.getNameAr();
                 break;
             }
             if (r.getStatus() == FamilyJoinRequestStatus.REJECTED) {
                 status = "REJECTED";
-                familyId = r.getFamilyId();
-                FamilyCatalog f = familyRepo.findById(r.getFamilyId()).orElse(null);
+                familyId = fid;
+                FamilyCatalog f = familyRepo.findById(fid).orElse(null);
                 familyName = f == null ? null : f.getNameAr();
             }
         }

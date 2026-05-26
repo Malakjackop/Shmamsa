@@ -5,7 +5,7 @@ import { AuthService } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
 import { assignmentRolesOf, normalizeRole } from '../shared/role-utils';
-import { filter, Subscription } from 'rxjs';
+import { filter, Subscription, take } from 'rxjs';
 
 @Component({
   selector: 'app-layout',
@@ -26,7 +26,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   activeDropdown: string | null = null;
 
 ngOnInit(): void {
-  this.auth.getUserData(true).subscribe({
+    this.auth.getUserData().pipe(take(1)).subscribe({
     next: (u) => this.user = u,
     error: () => this.user = null
   });

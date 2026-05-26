@@ -8,6 +8,7 @@ import { FamilyService } from '../services/family.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
 import { AuthUser } from '../services/auth.service';
+import { take } from 'rxjs';
 import {
   BoardAnnouncement as AnnouncementView,
   BoardEvent as EventView,
@@ -1007,7 +1008,6 @@ export class DashBoard implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    this.loadFamilyCatalog();
     this.startCountdownTimer();
     this.loadUserData();
     this.loadMyStats();
@@ -1019,7 +1019,7 @@ export class DashBoard implements OnInit, OnDestroy {
   }
 
   loadUserData(): void {
-    this.authService.getUserData().subscribe({
+    this.authService.getUserData().pipe(take(1)).subscribe({
       next: (data) => {
         if (!data) {
           this.router.navigate(['/login']);
@@ -1037,10 +1037,13 @@ export class DashBoard implements OnInit, OnDestroy {
           this.scopeFamily = 'FAMILY_MEMBERS';
         }
 
-        this.loadScopeOptions();
+        if (this.isAtLeast('AMIN_KHEDMA')) {
+          this.loadFamilyCatalog();
+        } else {
+          this.loadScopeOptions();
+        }
         this.syncFormsWithScope();
         this.rebuildFamilyMeetingCards();
-        this.loadMyQrToken();
         this.loadMonthBoards();
         this.loadAnnouncements();
       },
@@ -1085,6 +1088,13 @@ export class DashBoard implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  openQrDialog(): void {
+    if (!this.qrData) {
+      this.loadMyQrToken();
+    }
+    this.showQrDialog = true;
   }
 
   downloadQrCard(): void {

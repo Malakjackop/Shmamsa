@@ -101,6 +101,10 @@ export class DevSettingsService {
     return this.http.delete(`/api/dev/custom-fields/${id}`, { withCredentials: true });
   }
 
+  reorderFields(items: { id: number; displayOrder: number }[]): Observable<any> {
+    return this.http.put('/api/dev/custom-fields/reorder', items, { withCredentials: true });
+  }
+
   /* ── Families management ──────────────────────────────── */
   getAllFamilies(): Observable<FamilyCatalog[]> {
     if (!this.isBrowser) return of([]);
@@ -126,6 +130,23 @@ export class DevSettingsService {
   reorderFamilies(items: { id: number; sortOrder: number }[]): Observable<any> {
     return this.http.put('/api/dev/families/reorder', items, { withCredentials: true });
   }
+
+  /* ── Servant Registration Secret ──────────────────────── */
+  getCurrentSecretCode(): Observable<SecretCodeResponse> {
+    if (!this.isBrowser) return of({ code: '', validFrom: '', validTo: '', valid: false });
+    return this.http.get<SecretCodeResponse>('/api/dev/servant-secret/current', { withCredentials: true });
+  }
+
+  generateSecretCode(): Observable<SecretCodeResponse> {
+    return this.http.post<SecretCodeResponse>('/api/dev/servant-secret/generate', {}, { withCredentials: true });
+  }
+}
+
+export interface SecretCodeResponse {
+  code: string;
+  validFrom: string;
+  validTo: string;
+  valid: boolean;
 }
 
 export interface FamilyCatalog {

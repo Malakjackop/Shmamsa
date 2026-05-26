@@ -5,6 +5,7 @@ import com.shmamsa.model.CustomRegistrationField;
 import com.shmamsa.model.VisibilityConditionConfig;
 import com.shmamsa.repository.CustomFieldValueRepository;
 import com.shmamsa.repository.CustomRegistrationFieldRepository;
+import com.shmamsa.service.ServantSecretService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +49,7 @@ public class DevSettingsController {
 
     private final CustomRegistrationFieldRepository fieldRepo;
     private final CustomFieldValueRepository valueRepo;
+    private final ServantSecretService servantSecretService;
 
     // ── helpers ──────────────────────────────────────────────────────────
     private void ensureDeveloper(Authentication auth) {
@@ -632,5 +634,38 @@ public class DevSettingsController {
         fieldRepo.delete(field);
 
         return ResponseEntity.ok(Map.of("message", "Field deleted", "fieldKey", field.getFieldKey()));
+    }
+
+    // ── Reorder fields ──────────────────────────────────────────────
+    public record ReorderItem(Long id, Integer displayOrder) {}
+
+    @PutMapping("/custom-fields/reorder")
+    public ResponseEntity<?> reorderFields(@RequestBody List<ReorderItem> items, Authentication auth) {
+        ensureDeveloper(auth);
+        for (ReorderItem item : items) {
+            if (item.id() == null) continue;
+            fieldRepo.findById(item.id()).ifPresent(f -> {
+                f.setDisplayOrder(item.displayOrder() != null ? item.displayOrder() : 0);
+                fieldRepo.save(f);
+            });
+        }
+        return ResponseEntity.ok(Map.of("message", "Order updated"));
+    }
+
+    // ── Servant Registration Secret ──────────────────────────────────
+    @GetMapping("/servant-secret/current")
+    public ResponseEntity<?> getCurrentSecret(Authentication auth) {
+        ensureDeveloper(auth);
+        Map<String, Object> secret = servantSecretService.getCurrentSecretForDev();
+        if (secret == null) {
+            return ResponseEntity.ok(Map.of("code", "", "valid", false));
+        }
+        return ResponseEntity.ok(secret);
+    }
+
+    @PostMapping("/servant-secret/generate")
+    public ResponseEntity<?> generateSecret(Authentication auth) {
+        ensureDeveloper(auth);
+        return ResponseEntity.ok(servantSecretService.generateSecretForDev());
     }
 }

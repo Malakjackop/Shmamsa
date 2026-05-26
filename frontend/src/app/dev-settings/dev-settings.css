@@ -1030,3 +1030,155 @@
   border-top: 1px solid #eadfd9 !important;
   background: #fffaf6 !important;
 }
+
+/* ═══════════════════════════════════════════════════════
+   Tab Navigation
+   ═══════════════════════════════════════════════════════ */
+.tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 3rem 0;
+  background: #f4f4f6;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+  font-family: inherit;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+  background: rgba(94, 43, 32, 0.06);
+  color: #5e2b20;
+}
+
+.tab-btn.active {
+  background: #fafafb;
+  color: #5e2b20;
+  border-bottom-color: #5e2b20;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Secret Code Styles
+   ═══════════════════════════════════════════════════════ */
+.secret-code-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.secret-code-card {
+  background: #fff;
+  border: 1px solid #e9e2dd;
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.secret-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.secret-code-value {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f7f1ee;
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  direction: ltr;
+  flex: 1;
+  min-width: 200px;
+}
+
+.secret-code-text {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #5e2b20;
+  letter-spacing: 2px;
+  flex: 1;
+  word-break: break-all;
+}
+
+.copy-btn {
+  flex: 0 0 auto;
+}
+
+.copy-btn:hover {
+  background: #5e2b20 !important;
+  color: #fff !important;
+}
+
+.secret-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.secret-status.valid {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.secret-status.invalid {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.secret-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #5e2b20;
+  font-size: 0.95rem;
+}
+
+.secret-timer {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #5e2b20;
+}
+
+.secret-timer-label {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.secret-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.secret-meta span {
+  background: #f5f5f5;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}

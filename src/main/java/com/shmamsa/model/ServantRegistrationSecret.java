@@ -18,6 +18,9 @@ public class ServantRegistrationSecret {
     @Column(nullable = false)
     private String secretHash;
 
+    @Column
+    private String secretPlain;
+
     @Column(nullable = false)
     private LocalDateTime validFrom;
 

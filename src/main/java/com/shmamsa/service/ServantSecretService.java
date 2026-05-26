@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,10 +19,6 @@ public class ServantSecretService {
 
     private final ServantRegistrationSecretRepository repo;
     private final BCryptPasswordEncoder encoder;
-    private final EmailService emailService;
-
-    @Value("${app.servant-secret-admin-email}")
-    private String adminEmail;
 
     @Value("${app.servant-secret-ttl-hours:24}")
     private long ttlHours;
@@ -43,6 +39,41 @@ public class ServantSecretService {
     @Scheduled(cron = "0 0 0 * * *", zone = "Africa/Cairo")
     public void rotateDaily() {
         rotateSecretAndEmail();
+    }
+
+    public Map<String, Object> generateSecretForDev() {
+        String raw = generateSecret(16);
+        LocalDateTime from = LocalDateTime.now();
+        LocalDateTime to = from.plusHours(ttlHours);
+
+        ServantRegistrationSecret row = new ServantRegistrationSecret();
+        row.setSecretHash(encoder.encode(raw));
+        row.setSecretPlain(raw);
+        row.setValidFrom(from);
+        row.setValidTo(to);
+
+        repo.save(row);
+
+        return Map.of(
+                "code", raw,
+                "validFrom", from.toString(),
+                "validTo", to.toString(),
+                "valid", true
+        );
+    }
+
+    public Map<String, Object> getCurrentSecretForDev() {
+        var current = repo.findTopByOrderByValidToDesc().orElse(null);
+        if (current == null || current.getSecretPlain() == null) {
+            return null;
+        }
+        boolean valid = LocalDateTime.now().isBefore(current.getValidTo());
+        return Map.of(
+                "code", current.getSecretPlain(),
+                "validFrom", current.getValidFrom().toString(),
+                "validTo", current.getValidTo().toString(),
+                "valid", valid
+        );
     }
 
     public boolean validateSecret(String input) {
@@ -71,13 +102,11 @@ public class ServantSecretService {
 
         ServantRegistrationSecret row = new ServantRegistrationSecret();
         row.setSecretHash(encoder.encode(raw));
+        row.setSecretPlain(raw);
         row.setValidFrom(from);
         row.setValidTo(to);
 
         repo.save(row);
-
-        String validToText = to.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        emailService.sendServantSecretEmail(adminEmail, raw, validToText);
     }
 
     private String generateSecret(int len) {

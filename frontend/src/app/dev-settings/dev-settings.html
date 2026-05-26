@@ -3,6 +3,22 @@
 
 <div class="dev-layout" dir="rtl">
 
+  <!-- ── Tab Navigation ───────────────────────────────── -->
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab === 'fields'" (click)="activeTab = 'fields'">
+      <i class="pi pi-cog"></i>
+      <span>حقول التسجيل</span>
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'families'" (click)="loadFamilies(); activeTab = 'families'">
+      <i class="pi pi-users"></i>
+      <span>الأسر</span>
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'secret'" (click)="loadSecretCode(); activeTab = 'secret'">
+      <i class="pi pi-key"></i>
+      <span>إنشاء كود سري</span>
+    </button>
+  </div>
+
   <!-- ── Main Content Area ─────────────────────────────── -->
   <div class="dev-main-content">
 
@@ -78,6 +94,76 @@
       </div>
     </ng-container>
 
+    <!-- ══ Secret Code Tab ═════════════════════════════════ -->
+    <ng-container *ngIf="activeTab === 'secret'">
+      <div class="page-header">
+        <div class="header-content">
+          <div class="header-icon">
+            <i class="pi pi-key"></i>
+          </div>
+          <div>
+            <h1>إنشاء كود سري</h1>
+            <p>يستخدم هذا الكود لتسجيل الخدام الجدد</p>
+          </div>
+        </div>
+        <button class="btn-add" (click)="generateSecret()" [disabled]="secretGenerating">
+          <i class="pi pi-plus"></i>
+          {{ secretGenerating ? 'جاري الإنشاء...' : 'إنشاء كود جديد' }}
+        </button>
+      </div>
+
+      <div class="builder-container">
+        <div class="form-preview">
+          <div class="section-title">
+            <i class="pi pi-lock"></i>
+            الكود السري الحالي
+          </div>
+
+          <div class="secret-code-container" *ngIf="!secretLoading; else secretLoadingTpl">
+            <div class="secret-code-card" *ngIf="secretCode; else noSecretTpl">
+              <div class="secret-code-row">
+                <div class="secret-code-value" dir="ltr">
+                  <span class="secret-code-text">{{ secretCode }}</span>
+                  <button class="icon-btn copy-btn" (click)="copyToClipboard(secretCode)" title="نسخ الكود">
+                    <i class="pi pi-copy"></i>
+                  </button>
+                </div>
+                <div class="secret-status" [class.valid]="secretValid" [class.invalid]="!secretValid">
+                  <i class="pi" [class.pi-check-circle]="secretValid" [class.pi-times-circle]="!secretValid"></i>
+                  <span>{{ secretValid ? 'ساري' : 'منتهي' }}</span>
+                </div>
+              </div>
+              <div class="secret-time-row" *ngIf="secretValid">
+                <i class="pi pi-clock"></i>
+                <span class="secret-timer">{{ remainingTimeLabel || '--:--:--' }}</span>
+                <span class="secret-timer-label">متبقي</span>
+              </div>
+              <div class="secret-meta">
+                <span *ngIf="secretValidFrom">من: {{ secretValidFrom | date:'yyyy-MM-dd HH:mm' }}</span>
+                <span *ngIf="secretValidTo">إلى: {{ secretValidTo | date:'yyyy-MM-dd HH:mm' }}</span>
+              </div>
+            </div>
+            <ng-template #noSecretTpl>
+              <div class="empty-state">
+                <div class="dashed-box">
+                  <i class="pi pi-key"></i>
+                  <p>لا يوجد كود سري حالياً. اضغط "إنشاء كود جديد" لإنشاء واحد.</p>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+          <ng-template #secretLoadingTpl>
+            <div class="empty-state">
+              <div class="dashed-box">
+                <i class="pi pi-spin pi-spinner"></i>
+                <p>جاري التحميل...</p>
+              </div>
+            </div>
+          </ng-template>
+        </div>
+      </div>
+    </ng-container>
+
     <!-- ══ Families Tab ════════════════════════════════════ -->
     <ng-container *ngIf="activeTab === 'families'">
       <div class="page-header">
@@ -116,15 +202,6 @@
                 </div>
                 <div class="family-card__info">
                   <div class="family-card__name">{{ f.nameAr }}</div>
-                  <div class="family-card__meta">
-                    <span class="badge badge-type">{{ familyCategoryLabel(f.category) }}</span>
-                    <span class="badge" [class.badge-system]="f.active" [class.badge-muted]="!f.active">
-                      {{ f.active ? 'نشطة' : 'معطلة' }}
-                    </span>
-                    <span class="badge badge-req" *ngIf="f.servantSelectable">خدمة</span>
-                    <span class="badge badge-req" *ngIf="f.memberSelectable">مخدومين</span>
-                    <span class="family-code" *ngIf="f.code">{{ f.code }}</span>
-                  </div>
                 </div>
               </div>
               <div class="action-btns-overlay">

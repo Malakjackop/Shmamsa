@@ -74,23 +74,16 @@ p-card, p-panel {
 .top-nav-brand {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .top-nav-logo {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-}
-
-.top-nav-brand span {
-  font-size: 1rem;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 /* Desktop nav items */
@@ -262,12 +255,8 @@ p-card, p-panel {
   }
 
   .top-nav-logo {
-    width: 32px;
-    height: 32px;
-  }
-
-  .top-nav-brand span {
-    font-size: 0.95rem;
+    width: 34px;
+    height: 34px;
   }
 
   /* Overlay backdrop */

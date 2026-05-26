@@ -10,7 +10,6 @@
 
       <div class="top-nav-brand" (click)="goHome()">
         <img src="assets/images/church-logo.png" class="top-nav-logo" alt="شعار الكنيسة" />
-        <span>أسرة الشمامسة</span>
       </div>
 
       <nav class="top-nav-items">
@@ -38,6 +37,12 @@
           </div>
         </div>
 
+        <!-- من نحن -->
+        <a class="top-nav-link" routerLink="/about" routerLinkActive="active">
+          <i class="pi pi-info-circle"></i>
+          <span>من نحن</span>
+        </a>
+
         <!-- التقارير -->
         <a class="top-nav-link" routerLink="/grades" routerLinkActive="active">
           <i class="pi pi-chart-bar"></i>
@@ -55,7 +60,6 @@
             <a routerLink="/profile" routerLinkActive="active">الصفحة الشخصية</a>
             <a routerLink="/resources" routerLinkActive="active">الملفات</a>
             <a routerLink="/attendance-history" routerLinkActive="active">حضوري</a>
-            <a routerLink="/about" routerLinkActive="active">من نحن</a>
           </div>
         </div>
 
@@ -70,6 +74,7 @@
             <a *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active">بدء سنة جديدة</a>
             <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'fields'}" routerLinkActive="active">حقول التسجيل</a>
             <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'families'}" routerLinkActive="active">الأسر</a>
+            <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'secret'}" routerLinkActive="active">كود سري</a>
           </div>
         </div>
       </nav>
@@ -127,6 +132,11 @@
           </li>
         </ng-container>
 
+        <li routerLink="/about" routerLinkActive="active" (click)="closeMobileMenu()">
+          <i class="pi pi-info-circle"></i>
+          <span>من نحن</span>
+        </li>
+
         <li class="menu-group-header">التقارير</li>
         <li routerLink="/grades" routerLinkActive="active" (click)="closeMobileMenu()">
           <i class="pi pi-chart-bar"></i>
@@ -146,10 +156,6 @@
           <i class="pi pi-history"></i>
           <span>حضوري</span>
         </li>
-        <li routerLink="/about" routerLinkActive="active" (click)="closeMobileMenu()">
-          <i class="pi pi-info-circle"></i>
-          <span>من نحن</span>
-        </li>
 
         <ng-container *ngIf="isServantOrAbove()">
           <li class="menu-group-header">الإعدادات</li>
@@ -164,6 +170,10 @@
           <li *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'families'}" routerLinkActive="active" (click)="closeMobileMenu()">
             <i class="pi pi-users"></i>
             <span>الأسر</span>
+          </li>
+          <li *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'secret'}" routerLinkActive="active" (click)="closeMobileMenu()">
+            <i class="pi pi-key"></i>
+            <span>كود سري</span>
           </li>
         </ng-container>
       </ul>

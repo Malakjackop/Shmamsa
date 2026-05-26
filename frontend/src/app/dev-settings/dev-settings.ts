@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -14,9 +14,9 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { forkJoin } from 'rxjs';
+import { forkJoin, interval, Subscription } from 'rxjs';
 
-import { DevSettingsService, CustomField, VisibilityCondition, FamilyCatalog } from '../services/dev-settings.service';
+import { DevSettingsService, CustomField, VisibilityCondition, FamilyCatalog, SecretCodeResponse } from '../services/dev-settings.service';
 import { AuthService, FamilyOption } from '../services/auth.service';
 import { effectiveProfileEditable, effectiveShowInTargets, parseShowInTargets } from '../shared/custom-field-display';
 
@@ -56,7 +56,7 @@ interface VisibilityConditionDraft {
   templateUrl: './dev-settings.html',
   styleUrls: ['./dev-settings.css']
 })
-export class DevSettingsComponent implements OnInit {
+export class DevSettingsComponent implements OnInit, OnDestroy {
   private svc = inject(DevSettingsService);
   private authService = inject(AuthService);
   private msg = inject(MessageService);
@@ -74,7 +74,7 @@ export class DevSettingsComponent implements OnInit {
   loading = true;
 
   /* ── Tab state ────────────────────────────────────────── */
-  activeTab: 'fields' | 'families' = 'fields';
+  activeTab: 'fields' | 'families' | 'secret' = 'fields';
 
   /* ── Families state ───────────────────────────────────── */
   families: FamilyCatalog[] = [];
@@ -97,6 +97,16 @@ export class DevSettingsComponent implements OnInit {
   ];
   selectedDirectJoinGrades: string[] = [];
 
+  /* ── Secret Code state ────────────────────────────────── */
+  secretCode = '';
+  secretValidFrom: string = '';
+  secretValidTo: string = '';
+  secretValid = false;
+  secretLoading = false;
+  secretGenerating = false;
+  remainingSeconds = 0;
+  private timerSub?: Subscription;
+
   /* ── Dialog state ─────────────────────────────────────── */
   dialogVisible = false;
   dialogMode: 'create' | 'edit' = 'create';
@@ -106,6 +116,7 @@ export class DevSettingsComponent implements OnInit {
   visibilityConditions: VisibilityConditionDraft[] = [];
   memberFamilyOptions: string[] = [];
   servantFamilyOptions: string[] = [];
+  private familyOptionsLoaded = false;
 
   categoryOptions: string[] = [];
   selectedCategory: string = '';
@@ -231,11 +242,13 @@ export class DevSettingsComponent implements OnInit {
       if (tab === 'families') {
         this.activeTab = 'families';
         this.loadFamilies();
+      } else if (tab === 'secret') {
+        this.activeTab = 'secret';
+        this.loadSecretCode();
       } else {
         this.activeTab = 'fields';
       }
     });
-    this.loadFamilyOptionSources();
     this.loadFields();
   }
 
@@ -285,6 +298,9 @@ export class DevSettingsComponent implements OnInit {
   }
 
   openEdit(f: CustomField): void {
+    if (this.getManagedFamilyFieldAudience(f.fieldKey)) {
+      this.ensureFamilyOptionsLoaded();
+    }
     this.dialogMode = 'edit';
     this.selectedRequiredRules = this.parseRequiredRules(f.requiredRule);
     this.visibilityConditions = this.deserializeVisibilityConditions(f);
@@ -816,10 +832,10 @@ export class DevSettingsComponent implements OnInit {
     curr.displayOrder = prev.displayOrder;
     prev.displayOrder = tmpOrder;
 
-    this.svc.updateField(curr.id!, { displayOrder: curr.displayOrder }).subscribe();
-    this.svc.updateField(prev.id!, { displayOrder: prev.displayOrder }).subscribe({
-      next: () => this.loadFields()
-    });
+    this.svc.reorderFields([
+      { id: curr.id!, displayOrder: curr.displayOrder },
+      { id: prev.id!, displayOrder: prev.displayOrder }
+    ]).subscribe();
   }
 
   moveDown(index: number): void {
@@ -830,10 +846,10 @@ export class DevSettingsComponent implements OnInit {
     curr.displayOrder = next.displayOrder;
     next.displayOrder = tmpOrder;
 
-    this.svc.updateField(curr.id!, { displayOrder: curr.displayOrder }).subscribe();
-    this.svc.updateField(next.id!, { displayOrder: next.displayOrder }).subscribe({
-      next: () => this.loadFields()
-    });
+    this.svc.reorderFields([
+      { id: curr.id!, displayOrder: curr.displayOrder },
+      { id: next.id!, displayOrder: next.displayOrder }
+    ]).subscribe();
   }
 
   /* ── Drag & Drop ────────────────────────────────────── */
@@ -853,19 +869,18 @@ export class DevSettingsComponent implements OnInit {
     this.fields = orderedFields;
     this.rebuildSections();
 
-    const requests = orderedFields
+    const reorderItems = orderedFields
       .filter(field => field.id != null)
-      .map(field => this.svc.updateField(field.id!, { displayOrder: field.displayOrder }));
+      .map(field => ({ id: field.id!, displayOrder: field.displayOrder }));
 
-    if (!requests.length) {
+    if (!reorderItems.length) {
       this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تحديث ترتيب الحقول' });
       return;
     }
 
-    forkJoin(requests).subscribe({
+    this.svc.reorderFields(reorderItems).subscribe({
       next: () => {
         this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تحديث ترتيب الحقول' });
-        this.loadFields();
       },
       error: () => {
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ ترتيب الحقول' });
@@ -1115,6 +1130,98 @@ export class DevSettingsComponent implements OnInit {
     return cat || 'عائلة';
   }
 
+  /* ── Secret Code ─────────────────────────────────────── */
+  ngOnDestroy(): void {
+    this.stopTimer();
+  }
+
+  loadSecretCode(): void {
+    this.secretLoading = true;
+    this.svc.getCurrentSecretCode().subscribe({
+      next: (res) => {
+        this.secretCode = res.code || '';
+        this.secretValidFrom = res.validFrom || '';
+        this.secretValidTo = res.validTo || '';
+        this.secretValid = res.valid;
+        this.secretLoading = false;
+        if (this.secretValid && this.secretValidTo) {
+          this.startTimer();
+        } else {
+          this.stopTimer();
+          this.remainingSeconds = 0;
+        }
+      },
+      error: () => {
+        this.secretLoading = false;
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الكود السري' });
+      }
+    });
+  }
+
+  generateSecret(): void {
+    this.secretGenerating = true;
+    this.svc.generateSecretCode().subscribe({
+      next: (res) => {
+        this.secretCode = res.code || '';
+        this.secretValidFrom = res.validFrom || '';
+        this.secretValidTo = res.validTo || '';
+        this.secretValid = true;
+        this.secretGenerating = false;
+        this.startTimer();
+        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم إنشاء الكود السري بنجاح' });
+      },
+      error: () => {
+        this.secretGenerating = false;
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل إنشاء الكود السري' });
+      }
+    });
+  }
+
+  copyToClipboard(text: string): void {
+    navigator.clipboard.writeText(text).then(() => {
+      this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم نسخ الكود' });
+    }).catch(() => {
+      this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل النسخ' });
+    });
+  }
+
+  private startTimer(): void {
+    this.stopTimer();
+    this.updateRemainingSeconds();
+    this.timerSub = interval(1000).subscribe(() => this.updateRemainingSeconds());
+  }
+
+  private stopTimer(): void {
+    this.timerSub?.unsubscribe();
+    this.timerSub = undefined;
+  }
+
+  private updateRemainingSeconds(): void {
+    if (!this.secretValidTo) {
+      this.remainingSeconds = 0;
+      return;
+    }
+    const now = new Date().getTime();
+    const end = new Date(this.secretValidTo).getTime();
+    const diff = Math.floor((end - now) / 1000);
+    if (diff <= 0) {
+      this.remainingSeconds = 0;
+      this.secretValid = false;
+      this.stopTimer();
+    } else {
+      this.remainingSeconds = diff;
+    }
+  }
+
+  get remainingTimeLabel(): string {
+    if (!this.secretValid) return '';
+    if (this.remainingSeconds <= 0) return '';
+    const h = Math.floor(this.remainingSeconds / 3600);
+    const m = Math.floor((this.remainingSeconds % 3600) / 60);
+    const s = this.remainingSeconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
   /* ── Label helpers ──────────────────────────────────── */
   enabledCount(): number {
     return this.fields.filter(f => f.enabled).length;
@@ -1217,6 +1324,12 @@ export class DevSettingsComponent implements OnInit {
 
   private sortFields(fields: CustomField[]): CustomField[] {
     return [...fields].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  }
+
+  private ensureFamilyOptionsLoaded(): void {
+    if (this.familyOptionsLoaded) return;
+    this.familyOptionsLoaded = true;
+    this.loadFamilyOptionSources();
   }
 
   private loadFamilyOptionSources(): void {
