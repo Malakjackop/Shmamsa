@@ -2,10 +2,8 @@ package com.shmamsa.service;
 
 import com.shmamsa.model.ServantRegistrationSecret;
 import com.shmamsa.repository.ServantRegistrationSecretRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -25,21 +23,6 @@ public class ServantSecretService {
 
     private static final SecureRandom RNG = new SecureRandom();
     private static final String CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#";
-
-    @PostConstruct
-    public void init() {
-        try {
-            ensureSecretExists();
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.err.println("WARN: Could not initialize servant secret: " + e.getMessage());
-        }
-    }
-
-    @Scheduled(cron = "0 0 0 * * *", zone = "Africa/Cairo")
-    public void rotateDaily() {
-        rotateSecretAndEmail();
-    }
 
     public Map<String, Object> generateSecretForDev() {
         String raw = generateSecret(16);
@@ -81,17 +64,10 @@ public class ServantSecretService {
                 .orElse(null);
 
         if (current == null) {
-            rotateSecretAndEmail();
-            current = repo.findFirstByValidToAfterOrderByValidToDesc(LocalDateTime.now()).orElse(null);
-            if (current == null) return false;
+            return false;
         }
 
         return encoder.matches(input, current.getSecretHash());
-    }
-
-    private void ensureSecretExists() {
-        boolean exists = repo.findFirstByValidToAfterOrderByValidToDesc(LocalDateTime.now()).isPresent();
-        if (!exists) rotateSecretAndEmail();
     }
 
     private void rotateSecretAndEmail() {

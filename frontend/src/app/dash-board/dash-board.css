@@ -502,9 +502,7 @@
   text-align: right;
   line-height: 40px;
   width: auto;
-  max-width: calc(min(320px, 44vw) - 3.52rem);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: none;
   white-space: nowrap;
 }
 
@@ -2166,8 +2164,8 @@
   :host ::ng-deep .scope-select .p-select {
     width: auto;
     min-width: 0;
-    max-width: min(230px, calc(100vw - 118px));
-    flex: 0 1 min(230px, calc(100vw - 118px));
+    max-width: none;
+    flex: 0 0 auto;
     align-self: auto;
     border-radius: 999px;
   }
@@ -2175,12 +2173,8 @@
   :host ::ng-deep p-select.scope-select .p-select-label,
   :host ::ng-deep .scope-select.p-select .p-select-label,
   :host ::ng-deep .scope-select .p-select-label {
-    max-width: calc(min(230px, calc(100vw - 118px)) - 3.52rem);
-  }
-
-  ::ng-deep .scope-select-panel {
-    width: min(230px, calc(100vw - 118px)) !important;
-    max-width: calc(100vw - 24px) !important;
+    max-width: none;
+    text-overflow: clip;
   }
 
   .add-event-button {
