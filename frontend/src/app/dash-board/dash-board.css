@@ -249,6 +249,127 @@
   margin-top: 44px;
 }
 
+.dashboard-footer {
+  width: calc(100% + 68px);
+  margin: 60px -34px -34px;
+  background: linear-gradient(135deg, #6e3427 0%, #5c281d 48%, #4b1d15 100%);
+  color: #fff7f2;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-footer__inner {
+  max-width: 1240px;
+  margin-inline: auto;
+  padding: 40px 34px 46px;
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+  gap: 58px;
+  direction: ltr;
+  box-sizing: border-box;
+}
+
+.dashboard-footer__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  direction: rtl;
+}
+
+.dashboard-footer__brand img {
+  width: 108px;
+  height: 108px;
+  object-fit: contain;
+}
+
+.dashboard-footer__brand-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-footer__brand-copy strong {
+  color: #fff7f2;
+  font-size: 1.16rem;
+  font-weight: 800;
+}
+
+.dashboard-footer__brand-copy span {
+  color: rgba(255, 241, 233, 0.92);
+  font-size: 0.98rem;
+  line-height: 1.8;
+}
+
+.dashboard-footer__socials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-footer__social {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 236, 229, 0.52);
+  border-radius: 50%;
+  color: #fff3ec;
+  text-decoration: none;
+  border-bottom: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.dashboard-footer__social .pi {
+  font-size: 0.95rem;
+}
+
+.dashboard-footer__links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 28px 42px;
+  direction: rtl;
+}
+
+.dashboard-footer__column {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.dashboard-footer__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dashboard-footer__group h3 {
+  margin: 0 0 4px;
+  color: rgba(255, 236, 229, 0.88);
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.dashboard-footer__group a,
+.dashboard-footer__muted {
+  color: rgba(255, 244, 238, 0.94);
+  font-size: 0.94rem;
+  line-height: 1.65;
+  text-decoration: none;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+.dashboard-footer__group a:hover,
+.dashboard-footer__group a:focus-visible {
+  color: #ffffff;
+}
+
+.dashboard-footer__muted {
+  opacity: 0.78;
+}
+
 @media (min-width: 900px) {
   .services-grid {
     justify-content: center;
@@ -1741,6 +1862,10 @@
   .notice-section {
     max-width: min(100%, 860px);
   }
+
+  .dashboard-footer__links {
+    gap: 24px 28px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1751,6 +1876,22 @@
   .home-hero {
     width: calc(100% + 48px);
     margin-inline: -24px;
+  }
+
+  .dashboard-footer {
+    width: calc(100% + 48px);
+    margin-inline: -24px;
+    margin-bottom: -34px;
+  }
+
+  .dashboard-footer__inner {
+    grid-template-columns: 1fr;
+    gap: 34px;
+    padding-inline: 24px;
+  }
+
+  .dashboard-footer__links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .hero-slider {
@@ -1820,6 +1961,19 @@
   .services-section,
   .notice-section {
     max-width: 100%;
+  }
+
+  .dashboard-footer__links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 16px;
+  }
+
+  .dashboard-footer__column {
+    gap: 18px;
+  }
+
+  .dashboard-footer__links > .dashboard-footer__column:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .services-grid {
@@ -1900,6 +2054,34 @@
     width: calc(100% + 24px);
     margin-inline: -12px;
     padding-bottom: 20px;
+  }
+
+  .dashboard-footer {
+    width: calc(100% + 24px);
+    margin-top: 40px;
+    margin-inline: -12px;
+    margin-bottom: -18px;
+  }
+
+  .dashboard-footer__inner {
+    padding: 30px 16px 34px;
+  }
+
+  .dashboard-footer__links {
+    gap: 18px 12px;
+  }
+
+  .dashboard-footer__brand img {
+    width: 92px;
+    height: 92px;
+  }
+
+  .dashboard-footer__brand-copy strong {
+    font-size: 1.08rem;
+  }
+
+  .dashboard-footer__brand-copy span {
+    font-size: 0.92rem;
   }
 
   .welcome-bar {

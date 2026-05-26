@@ -16,7 +16,6 @@ import { LayoutComponent } from './layout/layout';
 
 import { DashBoard } from './dash-board/dash-board';
 import { ProfileComponent } from './profile/profile';
-import { AboutComponent } from './about/about';
 import { AttendanceComponent } from './attendance/attendance';
 import { FamilyComponent } from './family/family';
 import { FamilyAttendanceComponent } from './family-attendance/family-attendance';
@@ -46,7 +45,6 @@ const routes: Routes = [
     children: [
       { path: 'dashboard', component: DashBoard },
       { path: 'profile', component: ProfileComponent },
-      { path: 'about', component: AboutComponent },
       { path: 'resources', component: ResourcesComponent },
       { path: 'attendance-history', component: AttendanceHistoryComponent },
 

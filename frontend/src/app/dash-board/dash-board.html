@@ -221,6 +221,90 @@
     </ng-template>
   </section>
 
+  <footer class="dashboard-footer" aria-label="روابط أسرة الشمامسة">
+    <div class="dashboard-footer__inner">
+      <div class="dashboard-footer__brand">
+        <img src="assets/images/church-logo.png" alt="شعار أسرة الشمامسة" />
+
+        <div class="dashboard-footer__brand-copy">
+          <strong>أسرة الشمامسة</strong>
+          <span>بكنيسة السيدة العذراء مريم بالعمرانية</span>
+        </div>
+
+        <div class="dashboard-footer__socials">
+          <a
+            class="dashboard-footer__social"
+            href="https://www.facebook.com/profile.php?id=61575993013037"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="صفحة أسرة الشمامسة على فيسبوك"
+            title="فيسبوك"
+          >
+            <i class="pi pi-facebook"></i>
+          </a>
+          <a
+            class="dashboard-footer__social"
+            href="https://youtube.com/@shamamsafamily?si=zHalp2BI_x5unI_j"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="قناة أسرة الشمامسة على يوتيوب"
+            title="يوتيوب"
+          >
+            <i class="pi pi-youtube"></i>
+          </a>
+        </div>
+      </div>
+
+      <div class="dashboard-footer__links">
+        <div class="dashboard-footer__column">
+          <div class="dashboard-footer__group">
+            <h3>الرئيسية</h3>
+            <a routerLink="/dashboard">الرئيسية</a>
+          </div>
+
+          <div class="dashboard-footer__group" *ngIf="isAtLeast('KHADIM')">
+            <h3>الخدمة</h3>
+            <a routerLink="/attendance">تسجيل الحضور</a>
+            <a routerLink="/family-attendance">حضور الأسر</a>
+            <a routerLink="/family-info">بيانات الأسر</a>
+            <a routerLink="/iftekad">الافتقاد</a>
+            <a *ngIf="isAtLeast('AMIN_OSRA')" routerLink="/transfer-members">الانتقالات</a>
+          </div>
+        </div>
+
+        <div class="dashboard-footer__column">
+          <div class="dashboard-footer__group">
+            <h3>الشخصية</h3>
+            <a routerLink="/profile">الصفحة الشخصية</a>
+            <a routerLink="/resources">الملفات</a>
+            <a routerLink="/attendance-history">حضوري</a>
+          </div>
+
+          <div class="dashboard-footer__group">
+            <h3>المزيد</h3>
+            <a routerLink="/grades">التقارير</a>
+          </div>
+        </div>
+
+        <div class="dashboard-footer__column" *ngIf="isAtLeast('AMIN_KHEDMA')">
+          <div class="dashboard-footer__group">
+            <h3>الإعدادات</h3>
+            <a routerLink="/start-new-year">بدء سنة جديدة</a>
+            <a *ngIf="isAtLeast('DEVELOPER')" routerLink="/dev-settings" [queryParams]="{ tab: 'fields' }">
+              حقول التسجيل
+            </a>
+            <a *ngIf="isAtLeast('DEVELOPER')" routerLink="/dev-settings" [queryParams]="{ tab: 'families' }">
+              الأسر
+            </a>
+            <a *ngIf="isAtLeast('DEVELOPER')" routerLink="/dev-settings" [queryParams]="{ tab: 'secret' }">
+              الكود السري 
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
   <!-- QR Dialog -->
   <p-dialog
     [(visible)]="showQrDialog"

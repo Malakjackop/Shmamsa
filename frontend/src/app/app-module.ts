@@ -16,7 +16,6 @@ import { DashBoard } from './dash-board/dash-board';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password';
 import { ProfileComponent } from './profile/profile';
 import { RegisterServantComponent } from './register-servant/register-servant';
-import { AboutComponent } from './about/about';
 import { FamilyComponent } from './family/family';
 import { FamilyAttendanceComponent } from './family-attendance/family-attendance';
 import { FamilyInfoComponent } from './family-info/family-info';
@@ -63,7 +62,6 @@ import { MultiSelectModule } from 'primeng/multiselect';
     DashBoard,
     ForgotPasswordComponent,
     ProfileComponent,
-    AboutComponent,
     FamilyComponent,
     FamilyAttendanceComponent,
     FamilyInfoComponent,
