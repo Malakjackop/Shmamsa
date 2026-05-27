@@ -1,0 +1,116 @@
+<p-toast position="top-right"></p-toast>
+<p-confirmDialog [style]="{ width: '420px' }" [baseZIndex]="10000"></p-confirmDialog>
+
+<div class="dev-layout" dir="rtl">
+  <div class="dev-main-content">
+
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-icon">
+          <i class="pi pi-lock"></i>
+        </div>
+        <div>
+          <h1>إدارة الصلاحيات</h1>
+          <p>تحكم في الأدوار والصلاحيات المتاحة لكل دور</p>
+        </div>
+      </div>
+      <button class="btn-add" (click)="openCreate()">
+        <i class="pi pi-plus"></i>
+        إضافة دور جديد
+      </button>
+    </div>
+
+    <div class="builder-container">
+      <div class="form-preview">
+        <div class="section-title">
+          <i class="pi pi-list"></i>
+          الأدوار الحالية
+        </div>
+
+        <div class="roles-list" *ngIf="!loading; else loadingTpl">
+          <div class="role-card" *ngFor="let r of roles; let i = index" [class.inactive]="!r.active">
+            <div class="role-card__main">
+              <div class="role-card__order-controls">
+                <button class="order-btn" (click)="moveUp(i)" [disabled]="i === 0" title="تحريك لأعلى">
+                  <i class="pi pi-chevron-up"></i>
+                </button>
+                <span class="order-num">{{ i + 1 }}</span>
+                <button class="order-btn" (click)="moveDown(i)" [disabled]="i === roles.length - 1" title="تحريك لأسفل">
+                  <i class="pi pi-chevron-down"></i>
+                </button>
+              </div>
+                <div class="role-card__info">
+                  <div class="role-card__name">{{ r.displayNameAr }}</div>
+                  <div class="role-card__code">{{ r.name }}</div>
+                </div>
+            </div>
+            <div class="action-btns-overlay">
+              <button class="toggle-btn" [class.on]="r.active" (click)="toggleActive(r)" title="تفعيل / تعطيل">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </button>
+              <button class="icon-btn edit" (click)="openEdit(r)" title="تعديل"><i class="pi pi-pencil"></i></button>
+              <button class="icon-btn delete" (click)="deleteRole(r)" title="حذف"><i class="pi pi-trash"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #loadingTpl>
+          <div class="empty-state">
+            <div class="dashed-box">
+              <i class="pi pi-spin pi-spinner"></i>
+              <p>جاري التحميل...</p>
+            </div>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ CREATE / EDIT DIALOG ══════════════════════════════ -->
+<p-dialog
+  [header]="dialogMode === 'create' ? 'إضافة دور جديد' : 'تعديل الدور'"
+  [(visible)]="dialogVisible"
+  [modal]="true"
+  [blockScroll]="true"
+  [style]="{ width: '580px' }"
+  [baseZIndex]="10000"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="dev-dialog app-surface-dialog"
+  dir="rtl">
+
+  <div class="dialog-body">
+    <div class="form-group" *ngIf="dialogMode === 'create'">
+      <label>اسم الدور (بالإنجليزي)</label>
+      <input type="text" [(ngModel)]="editingRole.name" placeholder="مثال: SERVANT" dir="ltr" />
+      <small>حروف إنجليزية كبيرة وأرقام و _ فقط</small>
+    </div>
+
+    <div class="form-group">
+      <label>اسم الدور (بالعربي)</label>
+      <input type="text" [(ngModel)]="editingRole.displayNameAr" placeholder="مثال: خادم" />
+    </div>
+
+    <div class="form-group">
+      <label>الصلاحيات</label>
+      <div class="perms-grid">
+        <label class="perm-checkbox" *ngFor="let perm of allPermissions">
+          <input type="checkbox" [checked]="hasPermission(perm)" (change)="togglePermission(perm, $event.target.checked)" />
+          <span>{{ permissionLabel(perm) }}</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button class="btn-cancel" (click)="dialogVisible = false">إلغاء</button>
+      <button class="btn-save" (click)="saveRole()">
+        <i class="pi pi-check"></i>
+        {{ dialogMode === 'create' ? 'إنشاء' : 'حفظ التعديلات' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>

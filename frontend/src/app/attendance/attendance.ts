@@ -141,7 +141,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   me: any;
   attendanceContext: AttendanceContext | null = null;
 
-  scanning = false;
+  scannerOverlayVisible = false;
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
@@ -268,7 +268,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.auth.getUserData(true).subscribe((u) => {
+    this.auth.getUserData().subscribe((u) => {
       this.me = u;
       this.loadContext();
       this.startCountdownTicker();
@@ -1317,7 +1317,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private updateBlockedMessage(): void {
     this.blockedMessage = this.pageBlockedMessage || this.runtimeBlockedMessage || '';
-    if (this.blockedMessage) this.scanning = false;
+    if (this.blockedMessage) this.scannerOverlayVisible = false;
   }
 
   private shouldEnforceGrantWindow(): boolean {
@@ -2179,7 +2179,16 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   toggleScan() {
     if (this.isSelfCheckinMode() || !!this.blockedMessage) return;
-    this.scanning = !this.scanning;
+    this.scannerOverlayVisible = true;
+  }
+
+  onScannerResult(resultString: string): void {
+    this.scannerOverlayVisible = false;
+    this.onCodeResult(resultString);
+  }
+
+  closeScanner(): void {
+    this.scannerOverlayVisible = false;
   }
 
   onFamilyChange() {
@@ -2193,7 +2202,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.customTitle = '';
     this.refreshTypeOptions();
     this.loadMembersForFamily();
-    if (this.canManageAccessGrants()) this.loadGrantTargets();
     this.loadCustomEventsForFamily();
     this.initCalendarRules();
     this.refreshRuntimeState();
@@ -2229,16 +2237,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.families = this.filterFamiliesByGrantScope(allFamilies);
         this.ensureSelectedConfigFamily();
         this.syncSelectedFamilyWithGrantScope();
-        if ((!this.selectedFamily || !this.families.includes(this.selectedFamily)) && this.families.length && this.hasRestrictedFamilyScope()) {
+        if (!this.selectedFamily && this.families.length) {
           this.selectedFamily = this.families[0];
-          this.loadMembersForFamily();
-        } else {
-          this.loadMembersForFamily();
         }
+        this.loadMembersForFamily();
         this.loadCustomEventsForFamily();
         this.initCalendarRules();
         this.refreshRuntimeState();
-        if (this.canManageAccessGrants()) this.loadGrantTargets();
       },
       error: () => (this.families = [])
     });
@@ -3072,15 +3077,34 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.refreshSelectedGrantWindow();
   }
 
+  private cachedAllCustomEvents: AttendanceCustomEvent[] | null = null;
+
+  private updateGrantsAfterSave(addedOrUpdated: AttendanceAccessGrant[], deletedIds: number[] = []): void {
+    if (deletedIds.length) {
+      const delSet = new Set(deletedIds);
+      this.grants = this.grants.filter((g) => !delSet.has(Number(g.id)));
+    }
+    if (addedOrUpdated.length) {
+      const ids = new Set(addedOrUpdated.map((g) => Number(g.id)).filter(Boolean));
+      this.grants = [...this.grants.filter((g) => !ids.has(Number(g.id))), ...addedOrUpdated];
+    }
+  }
+
   private loadGrantCustomEvents(): void {
     if (!this.canUseCustomEvent()) {
       this.grantCustomEvents = [];
       this.syncGrantOccasionFromForm();
       return;
     }
+    if (this.cachedAllCustomEvents) {
+      this.grantCustomEvents = this.filterAthanasiusVisibilityForEvents(this.cachedAllCustomEvents);
+      this.syncGrantOccasionFromForm();
+      return;
+    }
     this.attendance.listCustomEvents().subscribe({
       next: (events) => {
-        this.grantCustomEvents = this.filterAthanasiusVisibilityForEvents(events || []);
+        this.cachedAllCustomEvents = events || [];
+        this.grantCustomEvents = this.filterAthanasiusVisibilityForEvents(this.cachedAllCustomEvents);
         this.syncGrantOccasionFromForm();
       },
       error: () => {
@@ -3151,18 +3175,27 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.refreshGrantTargetLists();
       return;
     }
+
+    if (this.isAminKhedmaOrDeveloper() && canonicalFamilyName(targetScopeFamily) === canonicalFamilyName(this.selectedFamily)) {
+      this.grantTargets = this.members.filter((user) =>
+        this.belongsToFamilyScope(user, targetScopeFamily)
+        && (this.grantAudience === 'SERVANTS'
+          ? this.isServantGrantTarget(user)
+          : this.isMemberGrantTarget(user))
+      );
+      this.syncSelectedGrantTargets();
+      this.refreshGrantTargetLists();
+      return;
+    }
+
     if (this.grantAudience === 'SERVANTS') {
-      forkJoin([
-        this.familySvc.members(targetScopeFamily, true, 'attendance'),
-        this.familySvc.members(targetScopeFamily, true)
-      ]).subscribe({
-        next: ([attendanceMembers, familyMembers]) => {
-          const allTargets = [...(attendanceMembers || []), ...(familyMembers || [])]
-            .map((x: any) => this.toPickUser(x));
-          const unique = allTargets.filter((user, index, arr) => arr.findIndex((x) => x.id === user.id) === index);
-          this.grantTargets = unique.filter((user) =>
-            this.isServantGrantTarget(user) && this.belongsToFamilyScope(user, targetScopeFamily)
-          );
+      this.familySvc.members(targetScopeFamily, true, 'attendance').subscribe({
+        next: (members) => {
+          this.grantTargets = (members || [])
+            .map((x: any) => this.toPickUser(x))
+            .filter((user) =>
+              this.isServantGrantTarget(user) && this.belongsToFamilyScope(user, targetScopeFamily)
+            );
           this.syncSelectedGrantTargets();
           this.refreshGrantTargetLists();
         },
@@ -3651,7 +3684,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.expandedDialogGrantPersonKeys = [];
     if (this.canChooseGrantFamily() && !this.grantForm.familyBase) {
       const familyOptions = this.grantFamilyFilterOptions();
-      this.grantForm.familyBase = familyOptions[0] || '';
+      this.grantForm.familyBase = (this.selectedFamily && familyOptions.includes(this.selectedFamily))
+        ? this.selectedFamily
+        : (familyOptions[0] || '');
     }
     this.grantAudience = this.grantAudienceFromKind(this.grantForm.grantKind);
     this.lastGrantAudience = this.grantAudience;
@@ -3792,9 +3827,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             endsAt: permanentEndsAt
           }));
         forkJoin(requests).subscribe({
-          next: () => {
+          next: (updatedGrants) => {
             this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ التعديلات' });
-            this.loadAccessGrants();
+            this.updateGrantsAfterSave(updatedGrants || []);
             this.cancelGrantEdit();
             if (closeAfterSave) this.grantDialogVisible = false;
           },
@@ -3816,7 +3851,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       });
 
       forkJoin(createRequests).subscribe({
-        next: () => {
+        next: (savedGrants) => {
           this.message.add({
             severity: 'success',
             summary: 'تم',
@@ -3825,7 +3860,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
           this.grantForm.note = '';
           this.selectedGrantTargetIds = [];
           this.refreshGrantTargetLists();
-          this.loadAccessGrants();
+          this.updateGrantsAfterSave(savedGrants || []);
           if (closeAfterSave) this.grantDialogVisible = false;
         },
         error: (err) => {
@@ -3878,6 +3913,16 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const replacementIds = new Set<number>();
+    if (this.grantDialogMode === 'create') {
+      for (const targetUserId of this.selectedGrantTargetIds) {
+        for (const day of Array.from(new Set(windows.map((window) => window.day)))) {
+          this.existingGrantsForReplacement(targetUserId, day, basePayload)
+            .forEach((grant) => replacementIds.add(Number(grant.id || 0)));
+        }
+      }
+    }
+
     const handleSuccess = (savedGrants: AttendanceAccessGrant[] = []) => {
       this.message.add({
         severity: 'success',
@@ -3885,7 +3930,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         detail: this.permanentGrantSummaryText(windows, this.selectedGrantTargetIds.length)
       });
       this.recordSavedGrantSummaries(windows, savedGrants);
-      this.loadAccessGrants();
+      this.updateGrantsAfterSave(savedGrants, Array.from(replacementIds));
       if (this.grantDialogMode === 'edit') {
         this.cancelGrantEdit();
       } else {
@@ -3902,14 +3947,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     };
 
     if (this.grantDialogMode === 'create') {
-      const replacementIds = new Set<number>();
-      for (const targetUserId of this.selectedGrantTargetIds) {
-        for (const day of Array.from(new Set(windows.map((window) => window.day)))) {
-          this.existingGrantsForReplacement(targetUserId, day, basePayload)
-            .forEach((grant) => replacementIds.add(Number(grant.id || 0)));
-        }
-      }
-
       const deleteRequests = Array.from(replacementIds).map((id) => this.attendance.deleteAccessGrant(id));
       const createRequests = this.selectedGrantTargetIds.flatMap((targetUserId) =>
         windows.map((window) => {
@@ -4289,22 +4326,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.availableCustomEvents = [];
       return;
     }
-    const familyBase = this.isAminKhedmaOrDeveloper() ? (this.selectedFamily || undefined) : (this.preferredCustomEventFamily() || undefined);
-    const requests = familyBase
-      ? [this.attendance.listCustomEvents(), this.attendance.listCustomEvents(familyBase)]
-      : [this.attendance.listCustomEvents()];
-    forkJoin(requests).subscribe({
-      next: (groups) => {
-        const merged = groups.flatMap((group) => group || []);
-        const relevant = familyBase
-          ? merged.filter((event) => this.isCustomEventRelevantToFamily(event, familyBase))
-          : merged;
-        this.familyCustomEvents = this.filterAthanasiusVisibilityForEvents(this.uniqueCustomEvents(relevant));
-        this.familyCustomEventGroups = this.groupCustomEvents(this.familyCustomEvents);
-        this.refreshTypeOptions();
-        this.updateCalendarForSelectedType(true);
-        this.refreshAvailableCustomEvents();
-      },
+    this.attendance.listCustomEvents().subscribe({
+      next: (events) => this.applyCustomEventsToView(events || []),
       error: () => {
         this.familyCustomEvents = [];
         this.familyCustomEventGroups = [];
@@ -4313,6 +4336,19 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.updateCalendarForSelectedType(true);
       }
     });
+  }
+
+  private applyCustomEventsToView(events: AttendanceCustomEvent[]): void {
+    this.cachedAllCustomEvents = events || [];
+    const familyBase = this.isAminKhedmaOrDeveloper() ? (this.selectedFamily || undefined) : (this.preferredCustomEventFamily() || undefined);
+    const relevant = familyBase
+      ? this.cachedAllCustomEvents.filter((event) => this.isCustomEventRelevantToFamily(event, familyBase))
+      : this.cachedAllCustomEvents;
+    this.familyCustomEvents = this.filterAthanasiusVisibilityForEvents(this.uniqueCustomEvents(relevant));
+    this.familyCustomEventGroups = this.groupCustomEvents(this.familyCustomEvents);
+    this.refreshTypeOptions();
+    this.updateCalendarForSelectedType(true);
+    this.refreshAvailableCustomEvents();
   }
 
   private uniqueCustomEvents(events: AttendanceCustomEvent[]): AttendanceCustomEvent[] {
@@ -4444,11 +4480,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.customEventForm.permittedEditorIds = [];
     this.customEventEditorPickerId = null;
     this.customEventEditorSearch = '';
-    if (this.isCreatingNewCustomEventSelection() || this.customEventDialogSelection.startsWith('DEFAULT:')) {
+    const wasDefault = this.customEventDialogSelection.startsWith('DEFAULT:');
+    if (this.isCreatingNewCustomEventSelection() || wasDefault) {
       this.onCustomEventDialogSelectionChange();
     }
     this.loadCustomEventDialogScopeEvents(true);
-    this.loadCustomEventEditorTargets();
+    if (!this.customEventDialogSelection.startsWith('DEFAULT:') && !this.isCreatingNewCustomEventSelection()) {
+      this.loadCustomEventEditorTargets();
+    }
   }
 
   onCustomEventDialogSelectionChange(): void {
@@ -4495,7 +4534,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.customEventActiveToDate = null;
       this.customEventEditorPickerId = null;
       this.customEventEditorSearch = '';
-      this.loadCustomEventEditorTargets();
       return;
     }
 
@@ -4523,31 +4561,24 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     };
 
     if (!family) {
-      const allFamilies = this.families.filter(Boolean);
-      if (!allFamilies.length) {
-        this.customEventEditorTargets = [];
-        return;
-      }
-      forkJoin(allFamilies.map((f) => forkJoin([
-        this.familySvc.members(f, true, 'attendance'),
-        this.familySvc.members(f, true)
-      ]))).subscribe({
-        next: (groups) => {
-          const merged = groups.flatMap((pair: any) => [...(pair?.[0] || []), ...(pair?.[1] || [])]);
-          applyTargets(merged);
-        },
-        error: () => this.customEventEditorTargets = []
-      });
+      this.customEventEditorTargets = [];
       return;
     }
 
-    forkJoin([
-      this.familySvc.members(family, true, 'attendance'),
-      this.familySvc.members(family, true)
-    ]).subscribe({
-      next: ([attendanceMembers, familyMembers]) => applyTargets([...(attendanceMembers || []), ...(familyMembers || [])]),
-      error: () => this.customEventEditorTargets = []
-    });
+    if (this.isAminKhedmaOrDeveloper()) {
+      this.familySvc.members(family, true, 'attendance').subscribe({
+        next: (members) => applyTargets(members || []),
+        error: () => this.customEventEditorTargets = []
+      });
+    } else {
+      forkJoin([
+        this.familySvc.members(family, true, 'attendance'),
+        this.familySvc.members(family, true)
+      ]).subscribe({
+        next: ([attendanceMembers, familyMembers]) => applyTargets([...(attendanceMembers || []), ...(familyMembers || [])]),
+        error: () => this.customEventEditorTargets = []
+      });
+    }
   }
 
   onCustomEventPermittedEditorPick(value: number | null): void {
@@ -4937,13 +4968,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       }
       return this.attendance.createCustomEvent(payload);
     });
-    const deleteRemovedRequests = editingEvents
-      .filter((event) => event.id && !selectedDaySet.has(Number(event.dayOfWeek)))
-      .map((event) => this.attendance.deleteCustomEvent(Number(event.id)));
+    const removedEvents = editingEvents
+      .filter((event) => event.id && !selectedDaySet.has(Number(event.dayOfWeek)));
+    const deleteRemovedRequests = removedEvents.map((event) => this.attendance.deleteCustomEvent(Number(event.id)));
+    const removeIds = new Set(removedEvents.map((e) => Number(e.id)));
     const requests = [...updateOrCreateRequests, ...deleteRemovedRequests];
 
     forkJoin(requests).subscribe({
-      next: () => {
+      next: (responses: any[]) => {
         this.customEventSaving = false;
         this.customEventDialogVisible = false;
         this.message.add({
@@ -4953,8 +4985,19 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             ? `تم حفظ المناسبة لأيام: ${this.customEventSelectedDaysLabel()}`
             : 'تم حفظ المناسبة بنجاح'
         });
-        this.loadCustomEventDialogScopeEvents(this.isCreatingNewCustomEventSelection(), this.customEventDialogSelection);
-        this.loadCustomEventsForFamily();
+        const savedEvents = responses.slice(0, selectedDays.length) as AttendanceCustomEvent[];
+        const baseEvents = [...(this.cachedAllCustomEvents || [])]
+          .filter((ev) => !removeIds.has(Number(ev.id)));
+        for (const saved of savedEvents) {
+          if (!saved) continue;
+          const idx = baseEvents.findIndex((ev) => Number(ev.id) === Number(saved.id));
+          if (idx >= 0) {
+            baseEvents[idx] = saved;
+          } else {
+            baseEvents.push(saved);
+          }
+        }
+        this.applyCustomEventsToView(baseEvents);
         this.onDateChange();
       },
       error: (err) => {

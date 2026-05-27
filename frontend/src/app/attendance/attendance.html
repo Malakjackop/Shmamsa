@@ -106,10 +106,10 @@
             </button>
 
            <ng-container *ngIf="canUseCustomEvent()">
-             <button type="button" class="action-btn side-btn-mt" (click)="openCreateCustomEvent()">
-               <i class="pi pi-calendar-plus"></i>
-               ادارة المناسبات
-             </button>
+              <button type="button" class="action-btn side-btn-mt" (click)="openCreateCustomEvent()">
+                <i class="pi pi-calendar-plus"></i>
+                ادارة المناسبات
+              </button>
             </ng-container>
         </div>
       </aside>
@@ -170,8 +170,8 @@
                 (click)="toggleScan()"
                 [disabled]="isSelfCheckinMode() || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()"
               >
-                <i class="pi" [ngClass]="scanning ? 'pi-stop' : 'pi-qrcode'"></i>
-                {{ scanning ? 'إيقاف السكان' : 'تشغيل السكان' }}
+                <i class="pi pi-qrcode"></i>
+                تشغيل السكان
               </button>
             </div>
           </div>
@@ -181,9 +181,6 @@
           </div>
         </div>
 
-        <div class="scanner" *ngIf="scanning">
-          <zxing-scanner (scanSuccess)="onCodeResult($event)"></zxing-scanner>
-        </div>
 
         <div class="searchWrap">
           <span class="search">
@@ -205,6 +202,14 @@
           </div>
         </div>
 
+        <div class="summary-bar" *ngIf="selected.length">
+          <span class="summary-count">{{ selected.length }} اسم تم اختيارهم</span>
+          <button type="button" class="submit-btn" (click)="submit()" [disabled]="!selectedDate || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()">
+            <i class="pi pi-check-square"></i>
+            تسجيل الحضور
+          </button>
+        </div>
+
         <h2 class="listTitle" *ngIf="selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
         <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim()">نتائج البحث</h2>
 
@@ -218,16 +223,38 @@
               <div class="sub" *ngIf="familyLabel(u)">{{ familyLabel(u) }}</div>
             </div>
 
-            <button
-              type="button"
-              class="pick-btn"
-              [class.pick-btn--locked]="isSelected(u.id) || !canPickDisplayedUser(u)"
-              [disabled]="isSelected(u.id) || !canPickDisplayedUser(u)"
-              (click)="toggleSelect(u)"
-            >
-              <i class="pi" [ngClass]="isSelected(u.id) ? 'pi-check' : 'pi-plus'"></i>
-              <span>{{ isSelected(u.id) ? 'تمت إضافته' : (canPickDisplayedUser(u) ? 'إضافة' : 'للعرض فقط') }}</span>
-            </button>
+            <ng-container *ngIf="isSelected(u.id); else addBtn">
+              <button type="button" class="remove-btn" (click)="remove(u.id)">
+                <i class="pi pi-times"></i>
+              </button>
+            </ng-container>
+            <ng-template #addBtn>
+              <button
+                type="button"
+                class="pick-btn"
+                [class.pick-btn--locked]="!canPickDisplayedUser(u)"
+                [disabled]="!canPickDisplayedUser(u)"
+                (click)="toggleSelect(u)"
+              >
+                <i class="pi pi-plus"></i>
+                <span>{{ canPickDisplayedUser(u) ? 'إضافة' : 'للعرض فقط' }}</span>
+              </button>
+            </ng-template>
+          </div>
+        </div>
+
+        <div class="scanner-overlay" *ngIf="scannerOverlayVisible" (click)="closeScanner()">
+          <div class="scanner-popup" (click)="$event.stopPropagation()">
+            <div class="scanner-popup__head">
+              <span>مسح QR</span>
+              <button type="button" class="mini-btn" (click)="closeScanner()">
+                <i class="pi pi-times"></i>
+                إغلاق
+              </button>
+            </div>
+            <div class="scanner-popup__body">
+              <zxing-scanner (scanSuccess)="onScannerResult($event)"></zxing-scanner>
+            </div>
           </div>
         </div>
 
@@ -248,34 +275,6 @@
             مفيش حد مسجل في الأسرة دي.
           </p>
         </ng-template>
-
-        <div class="selectedBox" *ngIf="selected.length">
-          <div class="selectedHeader">
-            <h2>الأسماء التي سيتم تسجيل حضورها</h2>
-            <span class="selectedCount">{{ selected.length }} اسم</span>
-          </div>
-
-          <div class="list member-list">
-            <div class="row" *ngFor="let u of selected">
-              <div>
-                <div class="name">
-                  {{ u.fullName }}
-                  <span class="roleBadge" *ngIf="u.role">{{ prettyRole(u.role) }}</span>
-                </div>
-                <div class="sub" *ngIf="familyLabel(u)">{{ familyLabel(u) }}</div>
-              </div>
-
-              <button type="button" class="remove-btn" (click)="remove(u.id)">
-                <i class="pi pi-times"></i>
-              </button>
-            </div>
-          </div>
-
-          <button type="button" class="submit-btn" (click)="submit()" [disabled]="!selectedDate || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()">
-            <i class="pi pi-check-square"></i>
-            تسجيل الحضور
-          </button>
-        </div>
 
         <div class="grant-section" *ngIf="false && canManageAccessGrants()">
           <div class="section-head">

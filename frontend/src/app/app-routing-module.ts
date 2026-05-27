@@ -8,6 +8,7 @@ import { ForgotPasswordComponent } from './forgot-password/forgot-password';
 import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 import { DevSettingsComponent } from './dev-settings/dev-settings';
+import { RoleSettingsComponent } from './role-settings/role-settings';
 
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
@@ -26,7 +27,6 @@ import { GradesComponent } from './grades/grades';
 import { IftekadComponent } from './iftekad/iftekad';
 import { PendingApprovalComponent } from './pending-approval/pending-approval';
 import { ChooseFamilyComponent } from './choose-family/choose-family';
-
 const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
 
@@ -88,6 +88,12 @@ const routes: Routes = [
       {
         path: 'dev-settings',
         component: DevSettingsComponent,
+        canActivate: [RoleGuard],
+        data: { roles: ['DEVELOPER'] }
+      },
+      {
+        path: 'role-settings',
+        component: RoleSettingsComponent,
         canActivate: [RoleGuard],
         data: { roles: ['DEVELOPER'] }
       },

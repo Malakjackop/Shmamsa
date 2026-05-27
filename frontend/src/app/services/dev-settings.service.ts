@@ -140,6 +140,42 @@ export class DevSettingsService {
   generateSecretCode(): Observable<SecretCodeResponse> {
     return this.http.post<SecretCodeResponse>('/api/dev/servant-secret/generate', {}, { withCredentials: true });
   }
+
+  /* ── Role Settings ──────────────────────────────────── */
+  getAllRoles(): Observable<RoleSettings[]> {
+    if (!this.isBrowser) return of([]);
+    return this.http.get<RoleSettings[]>('/api/dev/roles', { withCredentials: true });
+  }
+
+  getAllPermissions(): Observable<string[]> {
+    if (!this.isBrowser) return of([]);
+    return this.http.get<string[]>('/api/dev/roles/permissions', { withCredentials: true });
+  }
+
+  createRole(role: Partial<RoleSettings>): Observable<RoleSettings> {
+    return this.http.post<RoleSettings>('/api/dev/roles', role, { withCredentials: true });
+  }
+
+  updateRole(id: number, role: Partial<RoleSettings>): Observable<RoleSettings> {
+    return this.http.put<RoleSettings>(`/api/dev/roles/${id}`, role, { withCredentials: true });
+  }
+
+  deleteRole(id: number): Observable<any> {
+    return this.http.delete(`/api/dev/roles/${id}`, { withCredentials: true });
+  }
+
+  reorderRoles(ids: number[]): Observable<any> {
+    return this.http.put('/api/dev/roles/reorder', { ids }, { withCredentials: true });
+  }
+}
+
+export interface RoleSettings {
+  id?: number;
+  name: string;
+  displayNameAr: string;
+  sortOrder: number;
+  active: boolean;
+  permissions: string;
 }
 
 export interface SecretCodeResponse {
