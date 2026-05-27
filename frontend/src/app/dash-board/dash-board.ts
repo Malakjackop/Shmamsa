@@ -152,14 +152,13 @@ export class DashBoard implements OnInit, OnDestroy {
     AMIN_OSRA: 2,
     AMIN_KHEDMA: 3,
     DEVELOPER: 4,
-    ADMIN: 5
   };
 
   private assignedRoles(): string[] {
     return this.assignmentsOf(this.user).map((x) => x.role).filter(Boolean);
   }
 
-  isAtLeast(role: 'MAKHDOM' | 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'DEVELOPER' | 'ADMIN'): boolean {
+  isAtLeast(role: 'MAKHDOM' | 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'DEVELOPER'): boolean {
     const requiredRank = this.roleRank[role] ?? 0;
     const current = this.normRole(this.user?.role);
     const directRank = this.roleRank[current] ?? 0;

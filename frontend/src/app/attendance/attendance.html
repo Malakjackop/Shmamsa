@@ -132,6 +132,7 @@
                 (onSelect)="onDateChange()"
                 (onBlur)="onDateChange()"
                 [showIcon]="true"
+                [showOnFocus]="true"
                 styleClass="attendance-date-input"
                 inputStyleClass="attendance-date-input__field"
                 panelStyleClass="attendanceDatePanel"
@@ -247,13 +248,12 @@
           <div class="scanner-popup" (click)="$event.stopPropagation()">
             <div class="scanner-popup__head">
               <span>مسح QR</span>
-              <button type="button" class="mini-btn" (click)="closeScanner()">
+              <button type="button" class="scanner-close-btn" (click)="closeScanner()" aria-label="إغلاق">
                 <i class="pi pi-times"></i>
-                إغلاق
               </button>
             </div>
             <div class="scanner-popup__body">
-              <zxing-scanner (scanSuccess)="onScannerResult($event)"></zxing-scanner>
+              <zxing-scanner [videoConstraints]="scannerConstraints" (scanSuccess)="onScannerResult($event)"></zxing-scanner>
             </div>
           </div>
         </div>
@@ -768,6 +768,7 @@
                 [disabledDays]="grantNoDisabledDays"
                 [minDate]="grantMinDate"
                 [showIcon]="true"
+                [showOnFocus]="true"
                 [showOtherMonths]="true"
                 [selectOtherMonths]="true"
                 [showButtonBar]="true"
@@ -790,6 +791,7 @@
                 [disabledDays]="grantNoDisabledDays"
                 [minDate]="grantPermanentFromDate || grantMinDate"
                 [showIcon]="true"
+                [showOnFocus]="true"
                 [showOtherMonths]="true"
                 [selectOtherMonths]="true"
                 [showButtonBar]="true"
@@ -1018,6 +1020,7 @@
           [(ngModel)]="customEventActiveFromDate"
           (ngModelChange)="onCustomEventActiveFromChange($event)"
           [showIcon]="true"
+          [showOnFocus]="true"
           appendTo="body"
           styleClass="attendance-date-input"
           inputStyleClass="attendance-date-input__field"
@@ -1054,6 +1057,7 @@
           [(ngModel)]="customEventActiveToDate"
           (ngModelChange)="onCustomEventActiveToChange($event)"
           [showIcon]="true"
+          [showOnFocus]="true"
           appendTo="body"
           styleClass="attendance-date-input"
           inputStyleClass="attendance-date-input__field"

@@ -4,10 +4,9 @@ export type NormalizedRole =
   | 'AMIN_OSRA'
   | 'AMIN_KHEDMA'
   | 'DEVELOPER'
-  | 'ADMIN'
   | '';
 
-const ROLE_CODE_MAP: Record<number, Exclude<NormalizedRole, '' | 'DEVELOPER' | 'ADMIN'>> = {
+const ROLE_CODE_MAP: Record<number, Exclude<NormalizedRole, '' | 'DEVELOPER'>> = {
   1: 'AMIN_KHEDMA',
   2: 'AMIN_OSRA',
   3: 'KHADIM',
@@ -39,7 +38,6 @@ function normalizeRoleToken(raw: string): NormalizedRole {
   if (!upper) return '';
   if (upper === 'DEV') return 'DEVELOPER';
   if (upper.includes('DEVELOPER')) return 'DEVELOPER';
-  if (upper.includes('ADMIN')) return 'ADMIN';
   if (upper.includes('AMIN_KHEDMA')) return 'AMIN_KHEDMA';
   if (upper.includes('AMIN_OSRA')) return 'AMIN_OSRA';
   if (upper.includes('KHADIM')) return 'KHADIM';

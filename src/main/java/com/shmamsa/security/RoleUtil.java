@@ -9,8 +9,7 @@ public class RoleUtil {
             "KHADIM",
             "AMIN_OSRA",
             "AMIN_KHEDMA",
-            "DEVELOPER",
-            "ADMIN"
+            "DEVELOPER"
     );
 
     public static int level(String role) {
@@ -28,20 +27,20 @@ public class RoleUtil {
 
     public static boolean isDeveloper(String role) {
         String r = String.valueOf(role).trim().toUpperCase();
-        return "DEVELOPER".equals(r) || "ADMIN".equals(r);
+        return "DEVELOPER".equals(r);
     }
 
     public static boolean canChangeRoles(String actorRole) {
         String r = String.valueOf(actorRole).trim().toUpperCase();
-        return "AMIN_KHEDMA".equals(r) || "DEVELOPER".equals(r) || "ADMIN".equals(r);
+        return "AMIN_KHEDMA".equals(r) || "DEVELOPER".equals(r);
     }
 
     public static boolean canAssign(String actorRole, String targetRole) {
         String a = String.valueOf(actorRole).trim().toUpperCase();
         String t = String.valueOf(targetRole).trim().toUpperCase();
 
-        if ("ADMIN".equals(a) || "DEVELOPER".equals(a)) return true;
-        if ("AMIN_KHEDMA".equals(a)) return !"DEVELOPER".equals(t) && !"ADMIN".equals(t);
+        if ("DEVELOPER".equals(a)) return true;
+        if ("AMIN_KHEDMA".equals(a)) return !"DEVELOPER".equals(t);
         return false;
     }
 }

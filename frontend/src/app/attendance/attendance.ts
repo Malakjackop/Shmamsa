@@ -142,6 +142,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   attendanceContext: AttendanceContext | null = null;
 
   scannerOverlayVisible = false;
+  scannerConstraints: MediaTrackConstraints = { facingMode: 'environment' };
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
@@ -268,11 +269,36 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
 
+    this.findUltrawideCamera();
+
     this.auth.getUserData().subscribe((u) => {
       this.me = u;
       this.loadContext();
       this.startCountdownTicker();
     });
+  }
+
+  private async findUltrawideCamera(): Promise<void> {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+
+      const ultrawide = videoInputs.find(d =>
+        /ultra|wide|0\.5|0.5|wide.angle|back.*wide|wide.*back/i.test(d.label)
+      );
+      if (ultrawide) {
+        this.scannerConstraints = { deviceId: { exact: ultrawide.deviceId }, facingMode: 'environment' };
+        return;
+      }
+
+      const backCamera = videoInputs.find(d =>
+        /back|rear|environment|traseira|arrière|hátsó|背面|背面/i.test(d.label)
+      );
+      if (backCamera) {
+        this.scannerConstraints = { deviceId: { exact: backCamera.deviceId }, facingMode: 'environment' };
+      }
+    } catch {}
   }
 
   ngOnDestroy(): void {

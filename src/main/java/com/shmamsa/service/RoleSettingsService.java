@@ -54,8 +54,7 @@ public class RoleSettingsService {
                     "MANAGE_IFTEKAD", "TRANSFER_MEMBERS", "MANAGE_ROLES",
                     "START_NEW_YEAR", "MANAGE_KHORS", "VIEW_GRADES",
                     "VIEW_ATTENDANCE_HISTORY", "MANAGE_ATTENDANCE_ACCESS")),
-            Map.entry("DEVELOPER", ALL_PERMISSIONS),
-            Map.entry("ADMIN", ALL_PERMISSIONS)
+            Map.entry("DEVELOPER", ALL_PERMISSIONS)
     );
 
     private static final Map<String, String> ROLE_DISPLAY_NAMES = Map.of(
@@ -63,12 +62,11 @@ public class RoleSettingsService {
             "KHADIM", "خادم",
             "AMIN_OSRA", "أمين الأسرة",
             "AMIN_KHEDMA", "أمين الخدمة",
-            "DEVELOPER", "مبرمج",
-            "ADMIN", "مدير"
+            "DEVELOPER", "مبرمج"
     );
 
     private static final List<String> DEFAULT_ORDER = List.of(
-            "MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER", "ADMIN"
+            "MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA", "DEVELOPER"
     );
 
     @PostConstruct

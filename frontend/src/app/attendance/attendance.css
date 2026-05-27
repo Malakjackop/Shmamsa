@@ -1079,6 +1079,8 @@ textarea {
   position: fixed;
   inset: 0;
   background: rgba(19, 14, 11, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1095,6 +1097,7 @@ textarea {
   border-radius: 24px;
   background: #fffdfb;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  border: 1px solid #eadfd8;
 }
 
 .scanner-popup__head {
@@ -1103,6 +1106,33 @@ textarea {
   justify-content: space-between;
   gap: 12px;
   font-size: 18px;
+  font-weight: 700;
+  color: #5e2b20;
+}
+
+.scanner-close-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #8b4533;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #5e2b20, #8b4533);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.18s ease;
+  flex-shrink: 0;
+}
+
+.scanner-close-btn:hover {
+  background: linear-gradient(135deg, #4a2018, #753a2a);
+  border-color: #753a2a;
+  transform: translateY(-1px);
+}
+
+.scanner-close-btn i {
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -2795,6 +2825,7 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
+  margin-bottom: 16px;
 }
 
 @media (max-width: 768px) {
@@ -2811,4 +2842,15 @@ textarea {
   .person-grant-schedules {
     grid-template-columns: 1fr;
   }
+}
+
+.grant-permanent-box ::ng-deep .attendance-date-input .p-inputtext,
+.grant-permanent-box ::ng-deep .attendance-date-input__field {
+  border-color: #d4bdb0 !important;
+  background: #ffffff !important;
+}
+
+.grant-permanent-box ::ng-deep .attendance-date-input .p-inputtext:focus,
+.grant-permanent-box ::ng-deep .attendance-date-input__field:focus {
+  border-color: #8d5144 !important;
 }

@@ -327,7 +327,6 @@ export class FamilyComponent implements OnInit {
     const currentRole = normalizeRole(member?.role);
     return (this.allRoles || []).filter((role) => {
       const candidate = normalizeRole(role);
-      if (candidate === 'ADMIN') return false;
       if (candidate === 'DEVELOPER') return false;
       if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
       return true;

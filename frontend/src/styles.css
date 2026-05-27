@@ -50,6 +50,12 @@ textarea {
   width: 100%;
 }
 
+.attendance-date-input .p-datepicker {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
 .attendance-date-input .p-inputtext,
 .attendance-date-input__field {
   min-height: 44px;
@@ -62,7 +68,9 @@ textarea {
   font-size: 1.02rem;
   font-weight: 700;
   padding-inline: 14px !important;
+  padding-left: 44px !important;
   box-shadow: none !important;
+  cursor: pointer;
 }
 
 .attendance-date-input .p-inputtext:focus,
@@ -73,10 +81,23 @@ textarea {
 
 .attendance-date-input .p-datepicker-dropdown,
 .attendance-date-input .p-button {
-  border-color: #8d5144 !important;
-  background: #8d5144 !important;
-  color: #ffffff !important;
-  border-radius: 10px !important;
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border: none !important;
+  background: transparent !important;
+  color: #8d5144 !important;
+  border-radius: 8px !important;
+  z-index: 1;
+  cursor: pointer;
+}
+
+.attendance-date-input .p-datepicker-dropdown:hover,
+.attendance-date-input .p-button:hover {
+  background: rgba(141, 81, 68, 0.08) !important;
 }
 
 .attendanceDatePanel,
