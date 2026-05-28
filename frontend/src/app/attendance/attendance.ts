@@ -142,7 +142,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   attendanceContext: AttendanceContext | null = null;
 
   scannerOverlayVisible = false;
-  scannerConstraints: MediaTrackConstraints = { facingMode: 'environment' };
+  scannerConstraints: MediaTrackConstraints = {
+    facingMode: 'environment',
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    zoom: { ideal: 1 }
+  } as MediaTrackConstraints;
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
@@ -288,7 +293,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         /back|rear|environment|traseira|arrière|hátsó|背面|背面/i.test(d.label)
       );
       if (backCamera) {
-        this.scannerConstraints = { deviceId: { exact: backCamera.deviceId }, facingMode: 'environment' };
+        this.scannerConstraints = {
+          deviceId: { exact: backCamera.deviceId },
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          zoom: { ideal: 1 }
+        } as MediaTrackConstraints;
       }
     } catch {}
   }

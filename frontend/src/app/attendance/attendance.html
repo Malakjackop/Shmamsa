@@ -253,7 +253,10 @@
               </button>
             </div>
             <div class="scanner-popup__body">
-              <zxing-scanner [videoConstraints]="scannerConstraints" (scanSuccess)="onScannerResult($event)"></zxing-scanner>
+              <zxing-scanner
+  [videoConstraints]="scannerConstraints"
+  (scanSuccess)="onCodeResult($event)"
+></zxing-scanner>
             </div>
           </div>
         </div>
