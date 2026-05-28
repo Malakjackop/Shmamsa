@@ -254,7 +254,9 @@
             </div>
             <div class="scanner-popup__body">
               <zxing-scanner
-  [videoConstraints]="scannerConstraints"
+  #qrScanner
+  [device]="scannerDevice"
+  (autostarted)="onScannerAutostarted()"
   (scanSuccess)="onCodeResult($event)"
 ></zxing-scanner>
             </div>

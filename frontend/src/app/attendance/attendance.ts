@@ -1,6 +1,6 @@
-﻿import { Component, OnDestroy, OnInit, inject, Inject, PLATFORM_ID } from '@angular/core';
+﻿import { Component, OnDestroy, OnInit, inject, Inject, PLATFORM_ID, ViewChild } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { ViewChild } from '@angular/core';
+import { ZXingScannerComponent } from '@zxing/ngx-scanner';
 import {
   AttendanceService,
   AttendanceType,
@@ -142,9 +142,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   attendanceContext: AttendanceContext | null = null;
 
   scannerOverlayVisible = false;
-  scannerConstraints: MediaTrackConstraints = {
-    facingMode: 'environment'
-  };
+  scannerDevice: any;
+  @ViewChild('qrScanner') scannerComponent?: ZXingScannerComponent;
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
@@ -286,17 +285,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoInputs = devices.filter(d => d.kind === 'videoinput');
 
-      const backCamera = videoInputs.find(d => {
+      const goodCamera = videoInputs.find(d => {
         const label = d.label.toLowerCase();
         const isBack = /back|rear|environment|traseira|arrière|hátsó|背面/i.test(label);
         const isUltraWide = /ultra\s*wide|0\.5|wide.?angle/i.test(label);
         return isBack && !isUltraWide;
       });
-      if (backCamera) {
-        this.scannerConstraints = {
-          deviceId: { exact: backCamera.deviceId },
-          facingMode: 'environment'
-        };
+      if (goodCamera) {
+        this.scannerDevice = goodCamera;
       }
     } catch {}
   }
@@ -2202,9 +2198,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return date.getTime() < this.startOfToday().getTime();
   }
 
-  toggleScan() {
+  async toggleScan() {
     if (this.isSelfCheckinMode() || !!this.blockedMessage) return;
+    if (!this.scannerDevice) {
+      await this.findBackCamera();
+    }
     this.scannerOverlayVisible = true;
+  }
+
+  onScannerAutostarted(): void {
+    if (this.scannerDevice) {
+      this.scannerDevice = { deviceId: this.scannerDevice.deviceId };
+    }
   }
 
   onScannerResult(resultString: string): void {
