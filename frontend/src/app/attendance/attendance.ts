@@ -143,11 +143,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   scannerOverlayVisible = false;
   scannerConstraints: MediaTrackConstraints = {
-    facingMode: 'environment',
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
-    zoom: { ideal: 1 }
-  } as MediaTrackConstraints;
+    facingMode: 'environment'
+  };
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
@@ -289,17 +286,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoInputs = devices.filter(d => d.kind === 'videoinput');
 
-      const backCamera = videoInputs.find(d =>
-        /back|rear|environment|traseira|arrière|hátsó|背面|背面/i.test(d.label)
-      );
+      const backCamera = videoInputs.find(d => {
+        const label = d.label.toLowerCase();
+        const isBack = /back|rear|environment|traseira|arrière|hátsó|背面/i.test(label);
+        const isUltraWide = /ultra\s*wide|0\.5|wide.?angle/i.test(label);
+        return isBack && !isUltraWide;
+      });
       if (backCamera) {
         this.scannerConstraints = {
           deviceId: { exact: backCamera.deviceId },
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          zoom: { ideal: 1 }
-        } as MediaTrackConstraints;
+          facingMode: 'environment'
+        };
       }
     } catch {}
   }
