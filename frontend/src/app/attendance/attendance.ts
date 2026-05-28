@@ -143,6 +143,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   scannerOverlayVisible = false;
   scannerDevice: any;
+  scannerConstraints: MediaTrackConstraints = {
+    facingMode: 'environment',
+    zoom: { exact: 1 }
+  } as MediaTrackConstraints;
   @ViewChild('qrScanner') scannerComponent?: ZXingScannerComponent;
   selectedDate: Date | null = null;
   minDate!: Date;
@@ -289,11 +293,18 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         const label = d.label.toLowerCase();
         const isBack = /back|rear|environment|traseira|arrière|hátsó|背面/i.test(label);
         const isUltraWide = /ultra\s*wide|0\.5|wide.?angle/i.test(label);
-        return isBack && !isUltraWide;
+        return !!label && isBack && !isUltraWide;
       });
       if (goodCamera) {
         this.scannerDevice = goodCamera;
       }
+    } catch {}
+  }
+
+  private async ensureCameraPermission(): Promise<void> {
+    try {
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      tempStream.getTracks().forEach(t => t.stop());
     } catch {}
   }
 
@@ -2200,16 +2211,27 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   async toggleScan() {
     if (this.isSelfCheckinMode() || !!this.blockedMessage) return;
-    if (!this.scannerDevice) {
-      await this.findBackCamera();
-    }
+    await this.ensureCameraPermission();
+    await this.findBackCamera();
     this.scannerOverlayVisible = true;
   }
 
-  onScannerAutostarted(): void {
-    if (this.scannerDevice) {
-      this.scannerDevice = { deviceId: this.scannerDevice.deviceId };
+  async onScannerAutostarted(): Promise<void> {
+    if (this.scannerDevice && this.scannerComponent) {
+      this.scannerComponent.device = this.scannerDevice;
     }
+    await this.applyZoomConstraint();
+  }
+
+  private async applyZoomConstraint(): Promise<void> {
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      const el = document.querySelector('.scanner-popup__body video') as HTMLVideoElement;
+      const track = (el?.srcObject as MediaStream)?.getVideoTracks()?.[0];
+      if (track?.applyConstraints) {
+        await track.applyConstraints({ zoom: { exact: 1 } } as any);
+      }
+    } catch {}
   }
 
   onScannerResult(resultString: string): void {

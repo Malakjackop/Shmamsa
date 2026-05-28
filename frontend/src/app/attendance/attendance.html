@@ -256,6 +256,7 @@
               <zxing-scanner
   #qrScanner
   [device]="scannerDevice"
+  [videoConstraints]="scannerConstraints"
   (autostarted)="onScannerAutostarted()"
   (scanSuccess)="onCodeResult($event)"
 ></zxing-scanner>
