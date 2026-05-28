@@ -143,10 +143,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   scannerOverlayVisible = false;
   scannerDevice: any;
-  scannerConstraints: MediaTrackConstraints = {
-    facingMode: 'environment',
-    zoom: { exact: 1 }
-  } as MediaTrackConstraints;
   @ViewChild('qrScanner') scannerComponent?: ZXingScannerComponent;
   selectedDate: Date | null = null;
   minDate!: Date;
@@ -2220,17 +2216,31 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (this.scannerDevice && this.scannerComponent) {
       this.scannerComponent.device = this.scannerDevice;
     }
-    await this.applyZoomConstraint();
+    await this.force1xZoom();
   }
 
-  private async applyZoomConstraint(): Promise<void> {
+  private async force1xZoom(): Promise<void> {
     try {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 600));
       const el = document.querySelector('.scanner-popup__body video') as HTMLVideoElement;
-      const track = (el?.srcObject as MediaStream)?.getVideoTracks()?.[0];
-      if (track?.applyConstraints) {
-        await track.applyConstraints({ zoom: { exact: 1 } } as any);
-      }
+      const oldStream = el?.srcObject as MediaStream;
+      const track = oldStream?.getVideoTracks()?.[0];
+      if (!track) return;
+
+      const deviceId = track.getSettings().deviceId;
+      if (!deviceId) return;
+
+      oldStream.getTracks().forEach(t => t.stop());
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: deviceId },
+          facingMode: 'environment',
+          zoom: { ideal: 1 }
+        }
+      } as any);
+
+      el.srcObject = newStream;
     } catch {}
   }
 
