@@ -130,24 +130,14 @@ textarea {
 }
 
 .attendanceDatePanel .p-datepicker-header {
-  display: grid;
-  grid-template-columns: 36px 1fr 36px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   min-height: 58px;
   padding: 12px 14px !important;
   border-bottom: 1px solid #eadfd9 !important;
   background: #fffaf6 !important;
   color: #5e2b20 !important;
-}
-
-.attendanceDatePanel .p-datepicker-prev-button {
-  grid-column: 3;
-  justify-self: end;
-}
-
-.attendanceDatePanel .p-datepicker-next-button {
-  grid-column: 1;
-  justify-self: start;
 }
 
 .attendanceDatePanel .p-datepicker-title,
@@ -164,11 +154,12 @@ textarea {
 }
 
 .attendanceDatePanel .p-datepicker-title {
-  grid-column: 2;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .attendanceDatePanel .p-datepicker-title button,

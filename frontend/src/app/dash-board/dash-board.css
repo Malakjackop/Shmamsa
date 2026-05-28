@@ -1901,9 +1901,22 @@
     padding: 24px 22px 32px;
   }
 
+  .services-grid {
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .services-grid::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
   .service-card {
     flex-basis: calc((100% - 18px) / 2);
     min-width: min(260px, 100%);
+    width: auto;
   }
 
   .notice-card__top {
