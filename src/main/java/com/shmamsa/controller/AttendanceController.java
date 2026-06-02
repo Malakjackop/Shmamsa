@@ -5,6 +5,8 @@ import com.shmamsa.model.AttendanceArchive;
 import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
+import com.shmamsa.model.AttendanceCancellation;
+import com.shmamsa.model.AttendanceSchedule;
 import com.shmamsa.model.GradeSheet;
 import com.shmamsa.model.User;
 import com.shmamsa.model.UserFamilyAssignmentView;
@@ -12,10 +14,13 @@ import com.shmamsa.model.AttendanceGrantKind;
 import com.shmamsa.model.AttendanceAccessGrant;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.AttendanceArchiveRepository;
+import com.shmamsa.repository.AttendanceCancellationRepository;
+import com.shmamsa.repository.AttendanceScheduleRepository;
 import com.shmamsa.repository.GradeSheetRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.AttendanceAccessGrantService;
 import com.shmamsa.service.AttendanceConfigService;
+import com.shmamsa.service.AttendanceScheduleService;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.QrTokenService;
 import com.shmamsa.service.UserFamilyRoleService;
@@ -61,6 +66,9 @@ public class AttendanceController {
     private final ObjectMapper objectMapper;
     private final AttendanceConfigService attendanceConfigService;
     private final AttendanceAccessGrantService attendanceAccessGrantService;
+    private final AttendanceCancellationRepository attendanceCancellationRepo;
+    private final AttendanceScheduleRepository attendanceScheduleRepo;
+    private final AttendanceScheduleService attendanceScheduleService;
 
     private static final String TITLE_META_SEPARATOR = "::max::";
     private static final List<String> PREFERRED_FAMILY_ORDER = List.of(
@@ -568,6 +576,17 @@ public class AttendanceController {
         ));
     }
 
+    @PutMapping("/config")
+    public ResponseEntity<?> saveAttendanceConfig(@RequestBody AttendanceConfigService.AttendanceConfigPayload payload, Authentication auth) {
+        User me = requireAuthenticatedUser(auth);
+        String role = normRole(me.getRole());
+        boolean canManage = "DEVELOPER".equals(role) || "DEV".equals(role) || hasAminKhedmaPrivilege(me);
+        if (!canManage) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "ليس لديك صلاحية تعديل الإعدادات");
+        }
+        return ResponseEntity.ok(attendanceConfigService.saveAttendanceConfig(payload, me.getUsername()));
+    }
+
     @PutMapping("/config/family-days")
     public ResponseEntity<?> saveFamilyTypeDays(@RequestBody FamilyDaysRequest request, Authentication auth) {
         User me = requireAuthenticatedUser(auth);
@@ -599,8 +618,35 @@ public class AttendanceController {
         Set<AttendanceType> selfTypes = attendanceAccessGrantService.visibleAllowedTypes(me.getId(), AttendanceGrantKind.SELF_CHECKIN);
         Set<AttendanceType> takeTypes = attendanceAccessGrantService.visibleAllowedTypes(me.getId(), AttendanceGrantKind.TAKE_ATTENDANCE);
 
+        List<AttendanceSchedule> allSchedules = attendanceScheduleRepo.findAll();
+        Map<String, Map<String, List<Integer>>> scheduleDays = new LinkedHashMap<>();
+        Map<String, Map<String, Map<String, String>>> scheduleTimes = new LinkedHashMap<>();
+        Map<String, Map<String, Map<String, String>>> scheduleCreatedDates = new LinkedHashMap<>();
+        for (AttendanceSchedule s : allSchedules) {
+            if (!s.isEnabled()) continue;
+            scheduleDays
+                .computeIfAbsent(s.getFamilyBase(), k -> new LinkedHashMap<>())
+                .computeIfAbsent(s.getType().name(), k -> new ArrayList<>())
+                .add(s.getDayOfWeek());
+            if (s.getTime() != null) {
+                scheduleTimes
+                    .computeIfAbsent(s.getFamilyBase(), k -> new LinkedHashMap<>())
+                    .computeIfAbsent(s.getType().name(), k -> new LinkedHashMap<>())
+                    .put(String.valueOf(s.getDayOfWeek()), s.getTime().toString());
+            }
+            if (s.getCreatedAt() != null) {
+                scheduleCreatedDates
+                    .computeIfAbsent(s.getFamilyBase(), k -> new LinkedHashMap<>())
+                    .computeIfAbsent(s.getType().name(), k -> new LinkedHashMap<>())
+                    .put(String.valueOf(s.getDayOfWeek()), s.getCreatedAt().toLocalDate().toString());
+            }
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("config", attendanceConfigService.getAttendanceConfig());
+        out.put("scheduleDays", scheduleDays);
+        out.put("scheduleTimes", scheduleTimes);
+        out.put("scheduleCreatedDates", scheduleCreatedDates);
         out.put("role", me.getRole());
         out.put("todayOpenForServant", attendanceConfigService.isTodayOpenForServant());
         out.put("activeGrants", visibleGrants.stream().map(attendanceAccessGrantService::toView).toList());
@@ -610,6 +656,48 @@ public class AttendanceController {
         out.put("takeAllowedTypes", takeTypes.stream().map(Enum::name).toList());
         out.put("canUseCustomEvent", canUseCustomEvent(me));
         return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/cancelled-dates")
+    public ResponseEntity<?> getCancelledDates(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam String type,
+            @RequestParam(required = false) String family,
+            Authentication auth
+    ) {
+        requireAttendanceActor(auth);
+
+        AttendanceType attType;
+        try {
+            attType = AttendanceType.valueOf(type);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
+        }
+
+        LocalDate fromDate;
+        LocalDate toDate;
+        try {
+            fromDate = LocalDate.parse(from);
+            toDate = LocalDate.parse(to);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date range");
+        }
+
+        List<AttendanceCancellation> cancellations;
+        if (family != null && !family.isBlank()) {
+            cancellations = attendanceCancellationRepo.findByDateBetweenAndTypeAndFamilyBaseIn(fromDate, toDate, attType, List.of(family));
+        } else {
+            cancellations = List.of();
+        }
+
+        List<String> dates = cancellations.stream()
+                .map(c -> c.getDate().toString())
+                .distinct()
+                .sorted()
+                .toList();
+
+        return ResponseEntity.ok(Map.of("dates", dates));
     }
 
     @PostMapping("/self-checkin")
@@ -890,6 +978,256 @@ public class AttendanceController {
     }
 
 
+    // ===== Cancel day (exclude date+type+family from counts) =====
+
+    @PostMapping("/cancel-day")
+    public ResponseEntity<?> cancelDay(@RequestBody Map<String, Object> body, Authentication auth) {
+        User servant = requireAttendanceActor(auth);
+        if (body == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Missing body");
+
+        Object dateObj = body.get("date");
+        Object typeObj = body.get("type");
+        @SuppressWarnings("unchecked")
+        List<String> families = body.get("families") instanceof List ? (List<String>) body.get("families") : null;
+
+        if (dateObj == null || typeObj == null || families == null || families.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "date/type/families are required");
+        }
+
+        if (families.stream().anyMatch(f -> f == null || f.isBlank())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "family names must not be blank");
+        }
+
+        AttendanceType type;
+        try {
+            type = AttendanceType.valueOf(typeObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
+        }
+
+        LocalDate selectedDate;
+        try {
+            selectedDate = LocalDate.parse(dateObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
+        }
+
+        enforceTakeAttendanceGrantIfNeeded(servant, type);
+
+        boolean isGlobal = hasGlobalAttendancePrivilege(servant);
+        String roleNorm = normRole(servant.getRole());
+
+        if (!isGlobal && !"AMIN_OSRA".equals(roleNorm) && !hasAminOsraPrivilege(servant)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not authorized to cancel attendance days");
+        }
+
+        // For non-global users, restrict to their managed families
+        if (!isGlobal) {
+            List<String> managed = familyAccessService.servingBasesOf(servant);
+            for (String f : families) {
+                if (managed.stream().noneMatch(m -> m.equals(f))) {
+                    throw new ApiException(HttpStatus.FORBIDDEN,
+                            "Not authorized to cancel attendance for family: " + f);
+                }
+            }
+        }
+
+        List<AttendanceCancellation> cancellations = new ArrayList<>();
+        for (String familyBase : families) {
+            boolean already = attendanceCancellationRepo.existsByDateAndTypeAndFamilyBase(
+                    selectedDate, type, familyBase);
+            if (!already) {
+                AttendanceCancellation ac = new AttendanceCancellation();
+                ac.setDate(selectedDate);
+                ac.setType(type);
+                ac.setFamilyBase(familyBase);
+                ac.setCancelledBy(servant);
+                cancellations.add(ac);
+            }
+        }
+
+        if (!cancellations.isEmpty()) {
+            attendanceCancellationRepo.saveAll(cancellations);
+        }
+
+        return ResponseEntity.ok(Map.of("ok", true, "cancelled", cancellations.size()));
+    }
+
+    @DeleteMapping("/cancel-day")
+    public ResponseEntity<?> undoCancelDay(@RequestBody Map<String, Object> body, Authentication auth) {
+        User servant = requireAttendanceActor(auth);
+        if (body == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Missing body");
+
+        Object dateObj = body.get("date");
+        Object typeObj = body.get("type");
+        @SuppressWarnings("unchecked")
+        List<String> families = body.get("families") instanceof List ? (List<String>) body.get("families") : null;
+
+        if (dateObj == null || typeObj == null || families == null || families.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "date/type/families are required");
+        }
+
+        AttendanceType type;
+        try {
+            type = AttendanceType.valueOf(typeObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
+        }
+
+        LocalDate selectedDate;
+        try {
+            selectedDate = LocalDate.parse(dateObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
+        }
+
+        enforceTakeAttendanceGrantIfNeeded(servant, type);
+
+        boolean isGlobal = hasGlobalAttendancePrivilege(servant);
+        if (!isGlobal && !"AMIN_OSRA".equals(normRole(servant.getRole())) && !hasAminOsraPrivilege(servant)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not authorized to undo cancellations");
+        }
+
+        if (!isGlobal) {
+            List<String> managed = familyAccessService.servingBasesOf(servant);
+            for (String f : families) {
+                if (managed.stream().noneMatch(m -> m.equals(f))) {
+                    throw new ApiException(HttpStatus.FORBIDDEN,
+                            "Not authorized to undo cancellation for family: " + f);
+                }
+            }
+        }
+
+        long removed = attendanceCancellationRepo.deleteByDateAndTypeAndFamilyBaseIn(selectedDate, type, families);
+        return ResponseEntity.ok(Map.of("ok", true, "removed", removed));
+    }
+
+    @GetMapping("/cancellations")
+    public ResponseEntity<?> getCancellations(
+            @RequestParam String date,
+            @RequestParam String type,
+            Authentication auth
+    ) {
+        requireAttendanceActor(auth);
+
+        AttendanceType attType;
+        try {
+            attType = AttendanceType.valueOf(type);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
+        }
+
+        LocalDate selectedDate;
+        try {
+            selectedDate = LocalDate.parse(date);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
+        }
+
+        List<AttendanceCancellation> list = attendanceCancellationRepo.findByDateAndType(selectedDate, attType);
+        List<String> familyBases = list.stream().map(AttendanceCancellation::getFamilyBase).toList();
+        return ResponseEntity.ok(Map.of("cancellations", familyBases));
+    }
+
+
+    // ===== Attendance schedules (weekly recurring) =====
+
+    @GetMapping("/schedules")
+    public ResponseEntity<?> getSchedules(
+            @RequestParam(required = false) String familyBase,
+            Authentication auth
+    ) {
+        User user = requireAttendanceActor(auth);
+
+        if (familyBase != null && !familyBase.isBlank()) {
+            assertCanManageAttendanceConfig(user, familyBase);
+            return ResponseEntity.ok(attendanceScheduleRepo.findByFamilyBase(familyBase));
+        }
+
+        if (hasGlobalAttendancePrivilege(user)) {
+            return ResponseEntity.ok(attendanceScheduleRepo.findAll());
+        }
+
+        List<String> bases = familyAccessService.servingBasesOf(user);
+        return ResponseEntity.ok(attendanceScheduleRepo.findByFamilyBaseIn(bases));
+    }
+
+    @PostMapping("/schedules")
+    public ResponseEntity<?> createOrUpdateSchedule(@RequestBody Map<String, Object> body, Authentication auth) {
+        User user = requireAttendanceActor(auth);
+        if (body == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Missing body");
+
+        String familyBase = body.get("familyBase") instanceof String s ? s.trim() : null;
+        Object typeObj = body.get("type");
+        Object dayOfWeekObj = body.get("dayOfWeek");
+        Object timeObj = body.get("time");
+
+        if (familyBase == null || familyBase.isBlank() || typeObj == null || dayOfWeekObj == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "familyBase/type/dayOfWeek are required");
+        }
+
+        assertCanManageAttendanceConfig(user, familyBase);
+
+        AttendanceType type;
+        try {
+            type = AttendanceType.valueOf(typeObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid type");
+        }
+
+        int dayOfWeek;
+        try {
+            dayOfWeek = Integer.parseInt(dayOfWeekObj.toString());
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid dayOfWeek");
+        }
+
+        java.time.LocalTime time = timeObj != null ? java.time.LocalTime.parse(timeObj.toString()) : null;
+
+        AttendanceSchedule existing = attendanceScheduleRepo
+                .findByFamilyBaseAndTypeAndDayOfWeek(familyBase, type, dayOfWeek).orElse(null);
+
+        AttendanceSchedule sched;
+        if (existing != null) {
+            sched = existing;
+        } else {
+            sched = new AttendanceSchedule();
+            sched.setFamilyBase(familyBase);
+            sched.setType(type);
+            sched.setDayOfWeek(dayOfWeek);
+            sched.setCreatedBy(user);
+        }
+
+        if (time != null) sched.setTime(time);
+        if (body.containsKey("enabled")) {
+            sched.setEnabled(Boolean.TRUE.equals(body.get("enabled")));
+        }
+
+        attendanceScheduleRepo.save(sched);
+        return ResponseEntity.ok(sched);
+    }
+
+    @DeleteMapping("/schedules/{id}")
+    public ResponseEntity<?> deleteSchedule(@PathVariable Long id, Authentication auth) {
+        User user = requireAttendanceActor(auth);
+        AttendanceSchedule sched = attendanceScheduleRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Schedule not found"));
+
+        assertCanManageAttendanceConfig(user, sched.getFamilyBase());
+        attendanceScheduleRepo.delete(sched);
+        return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @PostMapping("/schedules/generate")
+    public ResponseEntity<?> generateToday(Authentication auth) {
+        requireAttendanceActor(auth);
+        LocalDate today = LocalDate.now();
+        int dayOfWeek = today.getDayOfWeek().getValue() % 7;
+        int created = attendanceScheduleService.generateForDay(today, dayOfWeek);
+        return ResponseEntity.ok(Map.of("ok", true, "created", created));
+    }
+
+
     private List<String> manageableFamiliesForConfig(User user) {
         if (user == null) return List.of();
         String roleNorm = normRole(user.getRole());
@@ -925,6 +1263,49 @@ public class AttendanceController {
         }
 
         throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "غير مسموح لك بتعديل مواعيد هذه الأسرة");
+    }
+
+    @PutMapping("/records/{id}")
+    public ResponseEntity<?> updateAttendanceDate(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
+        User servant = requireAttendanceActor(auth);
+
+        String dateStr = body.get("date");
+        if (dateStr == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "date is required");
+        }
+
+        LocalDate newDate;
+        try {
+            newDate = LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
+        }
+
+        if (newDate.isAfter(LocalDate.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot set attendance in the future");
+        }
+
+        AttendanceRecord record = attendanceRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Record not found"));
+
+        if (record.isArchived()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot edit archived record");
+        }
+
+        boolean isAdmin = Set.of("AMIN_KHEDMA", "DEVELOPER", "DEV").contains(normRole(servant.getRole()));
+        boolean isTaker = record.getTakenBy() != null && record.getTakenBy().getId().equals(servant.getId());
+        if (!isAdmin && !isTaker) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Not allowed to edit this record");
+        }
+
+        record.setDate(newDate);
+        attendanceRepo.save(record);
+
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "id", record.getId(),
+                "date", newDate.toString()
+        ));
     }
 
     // ===== helpers =====

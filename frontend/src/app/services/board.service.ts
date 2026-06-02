@@ -31,20 +31,6 @@ export type BoardEvent = {
   canSeeParticipants?: boolean;
 };
 
-export type BoardAnnouncement = {
-  id?: number | null;
-  title?: string;
-  description?: string | null;
-  targetFamily?: string;
-  targetAudience?: EventAudience | string;
-  status?: string;
-  publishedAt?: string | null;
-  createdAt?: string | null;
-  canPublish?: boolean;
-  canEdit?: boolean;
-  canDelete?: boolean;
-};
-
 export type BoardParticipantMember = {
   id?: number;
   fullName?: string;
@@ -124,28 +110,5 @@ export class BoardService {
 
   participants(id: number): Observable<BoardParticipantGroup[]> {
     return this.http.get<BoardParticipantGroup[]>(`/api/events/${id}/participants`, { withCredentials: true });
-  }
-
-  listAnnouncements(family?: string, audience?: string): Observable<BoardAnnouncement[]> {
-    let params = new HttpParams();
-    if (family) params = params.set('family', family);
-    if (audience) params = params.set('audience', audience);
-    return this.http.get<BoardAnnouncement[]>('/api/announcements', { params, withCredentials: true });
-  }
-
-  createAnnouncement(payload: BoardItemPayload): Observable<unknown> {
-    return this.http.post('/api/announcements', payload, { withCredentials: true });
-  }
-
-  updateAnnouncement(id: number, payload: BoardItemPayload): Observable<unknown> {
-    return this.http.put(`/api/announcements/${id}`, payload, { withCredentials: true });
-  }
-
-  publishAnnouncement(id: number): Observable<unknown> {
-    return this.http.post(`/api/announcements/${id}/publish`, {}, { withCredentials: true });
-  }
-
-  deleteAnnouncement(id: number): Observable<unknown> {
-    return this.http.delete(`/api/announcements/${id}`, { withCredentials: true });
   }
 }

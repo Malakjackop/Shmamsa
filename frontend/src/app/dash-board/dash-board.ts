@@ -10,7 +10,6 @@ import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
 import { AuthUser } from '../services/auth.service';
 import { take } from 'rxjs';
 import {
-  BoardAnnouncement as AnnouncementView,
   BoardEvent as EventView,
   BoardParticipantGroup as ParticipantGroup,
   BoardService
@@ -52,14 +51,6 @@ type EventForm = {
   removeAt: Date | null;
   reminderBeforeValue: number | null;
   imageUrl: string | null;
-  targetFamily: string;
-  targetAudience: string;
-};
-
-type AnnouncementForm = {
-  id: number | null;
-  title: string;
-  description: string;
   targetFamily: string;
   targetAudience: string;
 };
@@ -178,17 +169,13 @@ export class DashBoard implements OnInit, OnDestroy {
 
   monthCursor: Date = new Date();
   events: EventView[] = [];
-  announcements: AnnouncementView[] = [];
 
   showEventDialog = false;
   showJoinDialog = false;
   showParticipantsDialog = false;
   showUnpublishDialog = false;
-  showAnnDialog = false;
-  showAnnDetailsDialog = false;
 
   selectedJoinEvent: EventView | null = null;
-  selectedAnn: AnnouncementView | null = null;
   participantsGroups: ParticipantGroup[] = [];
   selectedEventImageFile: File | null = null;
   selectedEventImageName = '';
@@ -221,15 +208,6 @@ export class DashBoard implements OnInit, OnDestroy {
   get eventDialogTitle(): string {
     return this.eventForm?.id ? 'تعديل الموعد' : 'إضافة موعد';
   }
-
-  annForm: AnnouncementForm = {
-    id: null,
-    title: '',
-    description: '',
-    targetFamily: 'ALL',
-    targetAudience: 'EVERYONE'
-  };
-  annTargetScope = 'ALL_USERS';
 
   stats: {
     FRIDAY_LITURGY: number;
@@ -744,16 +722,9 @@ export class DashBoard implements OnInit, OnDestroy {
   private syncFormsWithScope(): void {
     const cfg = this.currentScopeConfig();
     this.eventTargetScope = this.scopeFamily;
-    this.annTargetScope = this.scopeFamily;
 
     this.eventForm = {
       ...this.eventForm,
-      targetFamily: cfg.targetFamily,
-      targetAudience: cfg.targetAudience
-    };
-
-    this.annForm = {
-      ...this.annForm,
       targetFamily: cfg.targetFamily,
       targetAudience: cfg.targetAudience
     };
@@ -774,32 +745,17 @@ export class DashBoard implements OnInit, OnDestroy {
     return 'FAMILY_MEMBERS';
   }
 
-  private applyTargetScope(kind: 'event' | 'announcement'): void {
-    const scope = kind === 'event' ? this.eventTargetScope : this.annTargetScope;
-    const cfg = this.currentScopeConfig(scope);
-
-    if (kind === 'event') {
-      this.eventForm = {
-        ...this.eventForm,
-        targetFamily: cfg.targetFamily,
-        targetAudience: cfg.targetAudience
-      };
-      return;
-    }
-
-    this.annForm = {
-      ...this.annForm,
+  private applyTargetScope(): void {
+    const cfg = this.currentScopeConfig(this.eventTargetScope);
+    this.eventForm = {
+      ...this.eventForm,
       targetFamily: cfg.targetFamily,
       targetAudience: cfg.targetAudience
     };
   }
 
   onEventTargetScopeChange(): void {
-    this.applyTargetScope('event');
-  }
-
-  onAnnouncementTargetScopeChange(): void {
-    this.applyTargetScope('announcement');
+    this.applyTargetScope();
   }
 
   private ensureScopeValue(): void {
@@ -1044,7 +1000,6 @@ export class DashBoard implements OnInit, OnDestroy {
         this.syncFormsWithScope();
         this.rebuildFamilyMeetingCards();
         this.loadMonthBoards();
-        this.loadAnnouncements();
       },
       error: () => this.router.navigate(['/login'])
     });
@@ -1301,21 +1256,9 @@ export class DashBoard implements OnInit, OnDestroy {
     });
   }
 
-  private loadAnnouncements(): void {
-    const scope = this.currentScopeConfig();
-    this.boardService.listAnnouncements(scope.requestFamily, scope.requestAudience).subscribe({
-      next: (rows) => this.announcements = rows || [],
-      error: (err) => {
-        this.announcements = [];
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'حصل خطأ أثناء تحميل التنبيهات.') });
-      }
-    });
-  }
-
   onScopeChange(): void {
     this.syncFormsWithScope();
     this.loadMonthBoards();
-    this.loadAnnouncements();
   }
 
   openScopeSelect(select: ScopeSelectHandle | null | undefined): void {
@@ -1440,7 +1383,7 @@ export class DashBoard implements OnInit, OnDestroy {
   }
 
   saveEvent(): void {
-    this.applyTargetScope('event');
+    this.applyTargetScope();
     const cfg = this.currentScopeConfig();
     const payload = {
       title: String(this.eventForm?.title || '').trim(),
@@ -1668,106 +1611,6 @@ export class DashBoard implements OnInit, OnDestroy {
     });
   }
 
-  openCreateAnnouncement(): void {
-    const cfg = this.currentScopeConfig();
-    this.annTargetScope = this.scopeFamily;
-    this.annForm = {
-      id: null,
-      title: '',
-      description: '',
-      targetFamily: cfg.targetFamily,
-      targetAudience: cfg.targetAudience
-    };
-    this.showAnnDialog = true;
-  }
-
-  openEditAnnouncement(a: AnnouncementView): void {
-    const cfg = this.currentScopeConfig();
-    this.annTargetScope = this.scopeValueFromTarget(a?.targetFamily || cfg.targetFamily, a?.targetAudience || cfg.targetAudience);
-    this.annForm = {
-      id: a?.id ?? null,
-      title: a?.title || '',
-      description: a?.description || '',
-      targetFamily: a?.targetFamily || cfg.targetFamily,
-      targetAudience: a?.targetAudience || cfg.targetAudience
-    };
-    this.showAnnDialog = true;
-  }
-
-  saveAnnouncement(): void {
-    this.applyTargetScope('announcement');
-    const cfg = this.currentScopeConfig();
-    const payload = {
-      title: String(this.annForm?.title || '').trim(),
-      description: this.annForm?.description || null,
-      targetFamily: String(this.annForm?.targetFamily || cfg.targetFamily || 'ALL').trim(),
-      targetFamilyId: this.familyIdForTarget(this.annForm?.targetFamily || cfg.targetFamily || 'ALL'),
-      targetAudience: String(this.annForm?.targetAudience || cfg.targetAudience || 'EVERYONE').trim()
-    };
-
-    if (!payload.title && !this.hasText(payload.description)) {
-      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اكتب عنوان أو وصف للتنبيه قبل الحفظ.' });
-      return;
-    }
-    if (!payload.title) {
-      this.messageService.add({ severity: 'warn', summary: 'بيانات ناقصة', detail: 'اكتب عنوان التنبيه.' });
-      return;
-    }
-
-    const id = this.annForm?.id;
-    const req$ = id
-      ? this.boardService.updateAnnouncement(id, payload)
-      : this.boardService.createAnnouncement(payload);
-
-    req$.subscribe({
-      next: () => {
-        this.showAnnDialog = false;
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ التنبيه.' });
-        this.loadAnnouncements();
-      },
-      error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل حفظ التنبيه.') });
-      }
-    });
-  }
-
-  publishAnnouncement(a: AnnouncementView): void {
-    if (!a?.id) {
-      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن نشر التنبيه حالياً.' });
-      return;
-    }
-    this.boardService.publishAnnouncement(a.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر التنبيه.' });
-        this.loadAnnouncements();
-      },
-      error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل نشر التنبيه.') });
-      }
-    });
-  }
-
-  deleteAnnouncement(a: AnnouncementView): void {
-    if (!a?.id) {
-      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن مسح التنبيه حالياً.' });
-      return;
-    }
-    this.boardService.deleteAnnouncement(a.id).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح التنبيه.' });
-        this.loadAnnouncements();
-      },
-      error: (err) => {
-        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل مسح التنبيه.') });
-      }
-    });
-  }
-
-  openAnnDetails(a: AnnouncementView): void {
-    this.selectedAnn = a;
-    this.showAnnDetailsDialog = true;
-  }
-
   pendingEventAlarmLabel(e: EventView | null | undefined): string {
     if (!e || e.status !== 'PENDING') return '';
 
@@ -1812,8 +1655,4 @@ export class DashBoard implements OnInit, OnDestroy {
     return `منذ ${diff} يوم`;
   }
 
-  annDaysLabel(a: AnnouncementView | null | undefined): string {
-    const ref = a?.publishedAt || a?.createdAt;
-    return this.daysAgo(ref);
-  }
 }

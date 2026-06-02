@@ -45,6 +45,18 @@ public class AttendanceConfigService {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    public static class AttendanceRuleGroup {
+        private String name;
+        private List<String> types;
+        private boolean allRequired;
+        private boolean bonusAllowed;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
     public static class AttendanceConfigPayload {
         @Builder.Default
         private List<Integer> servantEntryOpenDays = new ArrayList<>(List.of(4, 5, 6, 0, 1));
@@ -72,6 +84,9 @@ public class AttendanceConfigService {
 
         @Builder.Default
         private List<CustomEventConfig> customEvents = new ArrayList<>();
+
+        @Builder.Default
+        private List<AttendanceRuleGroup> attendanceRuleGroups = new ArrayList<>();
     }
 
     public AttendanceConfigPayload getAttendanceConfig() {
@@ -281,6 +296,10 @@ public class AttendanceConfigService {
 
         List<CustomEventConfig> customEvents = normalizeCustomEvents(cfg.getCustomEvents());
 
+        List<AttendanceRuleGroup> ruleGroups = cfg.getAttendanceRuleGroups() == null
+                ? new ArrayList<>()
+                : cfg.getAttendanceRuleGroups();
+
         return AttendanceConfigPayload.builder()
                 .servantEntryOpenDays(openDays)
                 .servantSelectableEventDays(computeSelectableEventDays(typeDays, familyTypeDays, customEvents))
@@ -291,6 +310,7 @@ public class AttendanceConfigService {
                 .familyAbsenceAllowedDays(familyAbsenceAllowedDays)
                 .familyAbsenceOpenDays(familyAbsenceOpenDays)
                 .customEvents(customEvents)
+                .attendanceRuleGroups(ruleGroups)
                 .build();
     }
 

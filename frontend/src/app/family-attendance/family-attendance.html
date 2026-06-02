@@ -2,7 +2,8 @@
 
 <div class="page">
   <div class="pageHead">
-    <h1>حضور الأعضاء</h1>
+    <h1>حضور الأسره 
+    </h1>
     <button *ngIf="exportMode" pButton type="button" class="p-button-secondary" label="إلغاء" (click)="cancelExport()"></button>
   </div>
 
@@ -94,8 +95,7 @@
     <div class="modalCard">
       <div class="modalHead">
         <div>
-          <div class="title">حضور اليوم</div>
-          <div class="sub" *ngIf="dailyType">النوع: {{ dailyTypeLabel(dailyType) }}</div>
+          <div class="title">تسجيل حضور</div>
         </div>
         <div class="legacy-modal__head-actions">
           <button type="button" class="legacy-modal__close" (click)="closeDailyAttendance()" aria-label="إغلاق">
@@ -105,103 +105,237 @@
       </div>
 
       <div class="dailyControls">
+        <div class="dailyField" *ngIf="dailyEvents.length">
+          <label>المناسبة</label>
+          <select
+            [(ngModel)]="dailySelectedEventKey"
+            (change)="onDailyEventSelect(dailySelectedEventKey)"
+            [ngModelOptions]="{ standalone: true }"
+          >
+            <option value="" disabled *ngIf="!dailySelectedEventKey">اختار المناسبة</option>
+            <option *ngFor="let ev of dailyEvents" [value]="ev.key">{{ ev.label }}</option>
+          </select>
+        </div>
+
         <div class="dailyField">
           <label>اليوم</label>
           <p-datepicker
+            #dailyDatePicker
             [(ngModel)]="dailyDate"
-            (ngModelChange)="onDailyDateChange()"
+            (onSelect)="onDailyDateChange()"
+            (onBlur)="onDailyDateChange()"
             [ngModelOptions]="{ standalone: true }"
             [showIcon]="true"
-            panelStyleClass="attendanceDatePanel"
+            [showOnFocus]="true"
+            styleClass="attendance-date-input"
+            inputStyleClass="attendance-date-input__field"
+            panelStyleClass="attendanceGrantDatePanel"
             [readonlyInput]="true"
             [showButtonBar]="true"
+            [minDate]="dailyMinDate"
             [maxDate]="dailyMaxDate"
-            [disabledDays]="dailyDisabledWeekDays"
+            [disabledDates]="dailyDisabledDates"
             [firstDayOfWeek]="1"
-            dateFormat="سنة-شهر-يوم"
-            placeholder="اختر اليوم"
+            dateFormat="yy-mm-dd"
+            placeholder="اختار اليوم"
+            [hideOnDateTimeSelect]="true"
             appendTo="body"
-          ></p-datepicker>
+          >
+            <ng-template pTemplate="buttonbar">
+              <div class="attendance-picker-actions">
+                <button type="button" class="attendance-picker-btn attendance-picker-btn--ghost"
+                  aria-label="مسح" title="مسح"
+                  (click)="dailyDatePicker.overlayVisible = false; dailyDate = null; onDailyDateChange()">
+                  <i class="pi pi-times"></i>
+                </button>
+                <button type="button" class="attendance-picker-btn attendance-picker-btn--primary"
+                  aria-label="تأكيد" title="تأكيد"
+                  (click)="dailyDatePicker.overlayVisible = false; onDailyDateChange()">
+                  <i class="pi pi-check"></i>
+                </button>
+              </div>
+            </ng-template>
+          </p-datepicker>
+        </div>
+
+        <div class="dailyField dailyField--cancel" *ngIf="dailyDate && dailyType">
+          <label>&nbsp;</label>
+          <button
+            type="button"
+            class="dailyCancelBtn"
+            (click)="onCancelDayClick()"
+            [disabled]="dailyCancelSaving"
+          >
+            <i class="pi pi-ban"></i>
+            إلغاء هذا اليوم
+          </button>
         </div>
 
         <div class="dailyField">
-          <label>النوع</label>
-          <select
-            [(ngModel)]="dailyType"
-            (change)="onDailyTypeChange()"
-            [ngModelOptions]="{ standalone: true }"
+          <label>&nbsp;</label>
+          <button
+            type="button"
+            class="dailyScheduleBtn"
+            (click)="openDailyScheduleSection()"
           >
-            <option [ngValue]="null" disabled [hidden]="!!dailyType">اختار النوع</option>
-            <option *ngFor="let t of dailyTypeOptions()" [ngValue]="t">{{ dailyTypeLabel(t) }}</option>
-          </select>
+            <i class="pi pi-clock"></i>
+            {{ showDailyScheduleSection ? 'إخفاء المواعيد' : 'إدارة المواعيد' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Schedule management section -->
+      <div class="dailyScheduleSection" *ngIf="showDailyScheduleSection">
+        <div class="dailyScheduleForm">
+          <div class="scheduleField">
+            <label>المناسبة</label>
+            <select [(ngModel)]="scheduleForm.type" [ngModelOptions]="{ standalone: true }">
+              <option *ngFor="let opt of scheduleTypeOptions" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="scheduleField">
+            <label>اليوم</label>
+            <select [(ngModel)]="scheduleForm.dayOfWeek" [ngModelOptions]="{ standalone: true }">
+              <option *ngFor="let opt of scheduleDayOptions" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div class="scheduleField">
+            <label>الوقت</label>
+            <p-datepicker [(ngModel)]="scheduleForm.time" [timeOnly]="true" placeholder="اختر الوقت" [ngModelOptions]="{ standalone: true }"></p-datepicker>
+          </div>
+          <div class="scheduleField">
+            <label>&nbsp;</label>
+          </div>
         </div>
 
-        <div class="dailyField" *ngIf="dailyType === 'CUSTOM_EVENT'">
-          <label>المناسبة المخصصة</label>
-          <select
-            [(ngModel)]="selectedDailyCustomEventId"
-            (change)="onDailyCustomEventChange()"
-            [ngModelOptions]="{ standalone: true }"
-          >
-            <option value="" disabled [hidden]="!!selectedDailyCustomEventId">اختار المناسبة</option>
-            <option *ngFor="let event of availableDailyCustomEvents" [ngValue]="event.id">{{ event.title }}</option>
-          </select>
+        <div class="dailyScheduleList" *ngIf="scheduleItems.length; else noSchedules">
+          <div class="scheduleItem" *ngFor="let s of scheduleItems">
+            <span class="scheduleItemType">{{ scheduleTypeLabel(s.type) }}</span>
+            <span class="scheduleItemDay">{{ scheduleDayLabel(s.dayOfWeek) }}</span>
+            <span class="scheduleItemDate" *ngIf="s.createdAt">{{ formatRecordedAt(s.createdAt) }}</span>
+            <span class="scheduleItemTime" *ngIf="s.time">{{ s.time }}</span>
+            <span class="scheduleItemStatus" [class.active]="s.enabled">{{ s.enabled ? 'مفعل' : 'معطل' }}</span>
+            <button type="button" class="scheduleItemDelete" (click)="deleteSchedule(s)" title="حذف">
+              <i class="pi pi-trash"></i>
+            </button>
+          </div>
+        </div>
+        <ng-template #noSchedules>
+          <p class="hint">لا توجد مواعيد أسبوعية. أضف موعدًا جديدًا باستخدام الحقول أعلاه.</p>
+        </ng-template>
+
+        <div class="scheduleActions">
+          <button type="button" class="action-btn" (click)="addSchedule()" [disabled]="scheduleSaving">
+            <i class="pi pi-plus"></i>
+            {{ scheduleSaving ? 'جاري الحفظ...' : 'إضافة موعد' }}
+          </button>
         </div>
       </div>
 
       <div *ngIf="dailyLoading" class="hint">جاري التحميل...</div>
 
-      <ng-container *ngIf="!dailyLoading && dailyType">
-        <div class="dailyStats">
-          <div class="stat">
-            <div class="statNum">{{ dailyPresentCount }}</div>
-            <div class="statLbl">حضور</div>
-          </div>
-          <div class="stat">
-            <div class="statNum">{{ dailyAbsentCount }}</div>
-            <div class="statLbl">غياب</div>
-          </div>
-          <div class="stat">
-            <div class="statNum" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
-            <div class="statLbl">المجموع</div>
-          </div>
+      <ng-container *ngIf="!dailyLoading && dailyDate && dailyType">
+        <div class="dailyCancelledBanner" *ngIf="dailyCancelledFamilies.length">
+          <i class="pi pi-ban"></i>
+          <span>ملغي لهذه العائلات: <b>{{ dailyCancelledFamilies.join('، ') }}</b></span>
+          <button
+            *ngIf="isAminKhedmaOrDev()"
+            type="button"
+            class="dailyCancelUndoBtn"
+            (click)="undoCancelDay()"
+          >إلغاء الإلغاء</button>
         </div>
 
-        <div class="dailyBoxes">
-          <div class="attBox">
-            <div class="attBoxHead">الحضور</div>
-            <div class="attBoxBody" *ngIf="dailyPresent?.length; else noPresent">
-              <div class="attRow" *ngFor="let p of dailyPresent">
-                <span class="attName">{{ p.fullName }}</span>
-                <button
-                  *ngIf="canEditDailyAttendance()"
-                  type="button"
-                  class="miniDanger"
-                  title="تحويل إلى غياب"
-                  (click)="askDailyMarkAbsent(p)"
-                >−</button>
-              </div>
+        <ng-container *ngIf="!dailyCancelledFamilies.length; else dayCancelled">
+          <div class="dailyStats">
+            <div class="stat">
+              <div class="statNum">{{ dailyPresentCount }}</div>
+              <div class="statLbl">حضور</div>
             </div>
-            <ng-template #noPresent>
-              <div class="attEmpty">لا يوجد حضور</div>
-            </ng-template>
+            <div class="stat">
+              <div class="statNum">{{ dailyAbsentCount }}</div>
+              <div class="statLbl">غياب</div>
+            </div>
+            <div class="stat">
+              <div class="statNum" *ngIf="dailyTotal">حضر {{ dailyPresentCount }} من أصل {{ dailyTotal }}</div>
+              <div class="statLbl">المجموع</div>
+            </div>
           </div>
 
-          <div class="attBox">
-            <div class="attBoxHead">الغياب</div>
-            <div class="attBoxBody" *ngIf="dailyAbsent?.length; else noAbsent">
-              <div class="attRow" *ngFor="let a of dailyAbsent">
-                <span class="attName">{{ a.fullName }}</span>
+          <div class="dailyBoxes">
+            <div class="attBox">
+              <div class="attBoxHead">الحضور</div>
+              <div class="attBoxBody" *ngIf="dailyPresent?.length; else noPresent">
+                <div class="attRow" *ngFor="let p of dailyPresent">
+                  <span class="attName">{{ p.fullName }}</span>
+                  <button
+                    *ngIf="canEditDailyAttendance()"
+                    type="button"
+                    class="miniDanger"
+                    title="تحويل إلى غياب"
+                    (click)="askDailyMarkAbsent(p)"
+                  >−</button>
+                </div>
               </div>
+              <ng-template #noPresent>
+                <div class="attEmpty">لا يوجد حضور</div>
+              </ng-template>
             </div>
-            <ng-template #noAbsent>
-              <div class="attEmpty">لا يوجد غياب</div>
-            </ng-template>
-          </div>
-        </div>
 
-        <div class="hint" *ngIf="dailyRecordsCount === 0">لا يوجد تسجيلات لهذا اليوم (غالبًا لم يتم عقد الاجتماع).</div>
+            <div class="attBox">
+              <div class="attBoxHead">الغياب</div>
+              <div class="attBoxBody" *ngIf="dailyAbsent?.length; else noAbsent">
+                <div class="attRow" *ngFor="let a of dailyAbsent">
+                  <span class="attName">{{ a.fullName }}</span>
+                </div>
+              </div>
+              <ng-template #noAbsent>
+                <div class="attEmpty">لا يوجد غياب</div>
+              </ng-template>
+            </div>
+          </div>
+
+          <div class="hint" *ngIf="dailyRecordsCount === 0">لا يوجد تسجيلات لهذا اليوم (غالبًا لم يتم عقد الاجتماع).</div>
+        </ng-container>
+
+        <ng-template #dayCancelled>
+          <div class="dailyCancelledMessage">
+            <i class="pi pi-ban"></i>
+            <span>هذا اليوم ملغي ولا يحتسب في الإحصاءات</span>
+          </div>
+        </ng-template>
       </ng-container>
+
+      <!-- Cancel day confirmation -->
+      <div class="confirmOverlay" *ngIf="showCancelDayConfirm">
+        <div class="confirmBox">
+          <div class="confirmTitle">إلغاء هذا اليوم</div>
+          <div class="confirmText">
+            هل تريد إلغاء هذا اليوم (<b>{{ displayDateOnly(dailyDate) }}</b>) لـ
+            <b>{{ dailyCancelEventLabel }}</b>؟
+          </div>
+          <div class="cancelFamiliesList" *ngIf="dailyCancelFamilies.length > 1">
+            <label class="cancelAllLabel">
+              <input type="checkbox" [checked]="dailyCancelAllSelected" (change)="onCancelSelectAll($event)" />
+              <span>الكل</span>
+            </label>
+            <label class="cancelFamilyItem" *ngFor="let f of dailyCancelFamilies">
+              <input
+                type="checkbox"
+                [checked]="dailyCancelSelectedFamilies.has(f)"
+                (change)="onCancelFamilyToggle(f)"
+              />
+              <span>{{ f }}</span>
+            </label>
+          </div>
+          <div class="confirmActions">
+            <button type="button" class="dangerBtn" [disabled]="dailyCancelSaving" (click)="confirmCancelDay()">
+              {{ dailyCancelSaving ? 'جاري الإلغاء...' : 'تأكيد الإلغاء' }}
+            </button>
+            <button type="button" class="cancelBtn2" [disabled]="dailyCancelSaving" (click)="cancelCancelDay()">إلغاء</button>
+          </div>
+        </div>
+      </div>
 
       <div class="confirmOverlay" *ngIf="showDailyRemoveConfirm && dailyRemoveTarget">
         <div class="confirmBox">
@@ -237,7 +371,7 @@
               <option value="ATHANASIUS_KHORS" *ngIf="isAttendanceTypeAllowedForMember(detailsFor, 'ATHANASIUS_KHORS')">خورس البابا اثناسيوس</option>
               <option value="TASBEEHA">تسبحة</option>
               <option value="FAMILY_MEETING" *ngIf="showFamilyMeetingColumn">اجتماع الأسرة</option>
-              <option value="CUSTOM_EVENT">مناسبة مخصصة</option>
+              <option *ngFor="let t of uniqueCustomEventTitles()" [value]="'CUSTOM_EVENT:' + t">{{ t }}</option>
             </select>
           </div>
           <button type="button" class="legacy-modal__close" (click)="closeDetails()" aria-label="إغلاق">
@@ -247,26 +381,49 @@
       </div>
 
       <ng-container *ngIf="detailsType === ''; else singleType">
-        <div class="cards">
-          <div class="typeCard" *ngFor="let t of visibleAttendanceTypes()">
-            <div class="cardTitle">{{ titleForType(t) }}</div>
-            <div class="detailList" *ngIf="filteredDetails(t).length; else noType">
-              <div class="detailRow" *ngFor="let d of filteredDetails(t)">
-                <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock">
-                  <div class="dTitle">غياب</div>
-                  <div class="dSub">يوم الغياب: {{ d.date }}</div>
-                </ng-container>
-                <ng-template #presentBlock>
-                  <div class="dTitle">حضور</div>
-                  <div class="dSub">يوم الحضور: {{ d.date }}</div>
-                  <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
-                  <div class="dSub" *ngIf="d.takenBy">الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})</div>
-                </ng-template>
+        <div class="detailsSections">
+          <div class="detailsSection" *ngFor="let item of detailsDisplayItems()"
+               [class.open]="isExpanded(item)">
+            <button type="button" class="detailsSectionHead" (click)="toggleDetailsSection(item)">
+              <span>{{ item.label }}</span>
+              <span class="detailsSectionCount">{{ filteredDetailsForItem(item).length }}</span>
+              <i class="pi pi-chevron-down detailsSectionArrow"></i>
+            </button>
+            <div class="detailsSectionBody" *ngIf="isExpanded(item)">
+              <div class="detailList">
+                <div class="detailRow" *ngFor="let d of filteredDetailsForItem(item)">
+                  <ng-container *ngIf="editingAttendanceId === d.id; else viewBlock2">
+                    <div class="dEditForm">
+                      <p-datepicker [(ngModel)]="editingAttendanceDate" dateFormat="yy-mm-dd" [ngModelOptions]="{ standalone: true }"></p-datepicker>
+                      <div class="dEditActions">
+                        <button type="button" class="miniDanger miniDanger--sm" (click)="saveEditAttendanceDate()" [disabled]="editingAttendanceSaving">
+                          <i class="pi pi-check"></i>
+                        </button>
+                        <button type="button" class="editCancelBtn" (click)="cancelEditAttendanceDate()">
+                          <i class="pi pi-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </ng-container>
+                  <ng-template #viewBlock2>
+                    <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock">
+                      <div class="dTitle">غياب</div>
+                      <div class="dSub">يوم الغياب: {{ d.date }}</div>
+                    </ng-container>
+                    <ng-template #presentBlock>
+                      <div class="dTitle">حضور</div>
+                      <div class="dSub">يوم الحضور: {{ d.date }}</div>
+                      <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
+                      <div class="dSub" *ngIf="d.takenBy">الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})</div>
+                    </ng-template>
+                    <button type="button" class="editRecordBtn" title="تعديل التاريخ" (click)="startEditAttendanceDate(d)">
+                      <i class="pi pi-pencil"></i>
+                    </button>
+                  </ng-template>
+                </div>
               </div>
+              <div class="hint" *ngIf="!filteredDetailsForItem(item).length">لا يوجد سجلات.</div>
             </div>
-            <ng-template #noType>
-              <div class="hint">لا يوجد سجلات.</div>
-            </ng-template>
           </div>
         </div>
       </ng-container>
@@ -274,15 +431,33 @@
       <ng-template #singleType>
         <div class="detailList" *ngIf="details.length; else noDetails">
           <div class="detailRow" *ngFor="let d of details">
-            <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock2">
-              <div class="dTitle">{{ attendanceRowLabel(d) }} • غياب</div>
-              <div class="dSub">يوم الغياب: {{ d.date }}</div>
+            <ng-container *ngIf="editingAttendanceId === d.id; else viewBlock">
+              <div class="dEditForm">
+                <p-datepicker [(ngModel)]="editingAttendanceDate" dateFormat="yy-mm-dd" [ngModelOptions]="{ standalone: true }"></p-datepicker>
+                <div class="dEditActions">
+                  <button type="button" class="miniDanger miniDanger--sm" (click)="saveEditAttendanceDate()" [disabled]="editingAttendanceSaving">
+                    <i class="pi pi-check"></i>
+                  </button>
+                  <button type="button" class="editCancelBtn" (click)="cancelEditAttendanceDate()">
+                    <i class="pi pi-times"></i>
+                  </button>
+                </div>
+              </div>
             </ng-container>
-            <ng-template #presentBlock2>
-              <div class="dTitle">{{ attendanceRowLabel(d) }} • حضور</div>
-              <div class="dSub">يوم الحضور: {{ d.date }}</div>
-              <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
-              <div class="dSub" *ngIf="d.takenBy">الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})</div>
+            <ng-template #viewBlock>
+              <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock2">
+                <div class="dTitle">{{ attendanceRowLabel(d) }} • غياب</div>
+                <div class="dSub">يوم الغياب: {{ d.date }}</div>
+              </ng-container>
+              <ng-template #presentBlock2>
+                <div class="dTitle">{{ attendanceRowLabel(d) }} • حضور</div>
+                <div class="dSub">يوم الحضور: {{ d.date }}</div>
+                <div class="dSub" *ngIf="d.createdAt">يوم التسجيل: {{ formatRecordedAt(d.createdAt) }}</div>
+                <div class="dSub" *ngIf="d.takenBy">الخادم: {{ d.takenBy.fullName }} ({{ d.takenBy.role | roleLabel }})</div>
+              </ng-template>
+              <button type="button" class="editRecordBtn" title="تعديل التاريخ" (click)="startEditAttendanceDate(d)">
+                <i class="pi pi-pencil"></i>
+              </button>
             </ng-template>
           </div>
         </div>

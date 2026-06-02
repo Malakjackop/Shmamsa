@@ -73,6 +73,16 @@
   border-color: #7f3d2b !important;
 }
 
+.todayAttendanceBtn:focus-visible {
+  outline: 2px solid #5e2b20;
+  outline-offset: 2px;
+}
+
+.todayAttendanceBtn:active {
+  background: #4a2018 !important;
+  border-color: #4a2018 !important;
+}
+
 .hint {
   color: #6c6459;
   padding: 16px;
@@ -92,19 +102,18 @@
 /* ===== Card grid ===== */
 .memberGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 180px));
+  gap: 10px;
 }
 
 .memberCard {
   position: relative;
   width: 100%;
-  max-width: 252px;
-  min-height: 250px;
-  height: 250px;
+  min-height: 150px;
+  height: 150px;
   justify-self: center;
   border: none;
-  border-radius: 18px;
+  border-radius: 14px;
   background: #ffffff;
   overflow: hidden;
   cursor: pointer;
@@ -127,17 +136,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 3px;
   height: 100%;
-  padding: 22px 16px;
+  padding: 10px 8px;
   text-align: center;
 }
 
 .memberCard__name {
   margin: 0;
-  min-height: 60px;
+  min-height: 32px;
   text-align: center;
-  font-size: 24px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.2;
   display: -webkit-box;
@@ -150,9 +159,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   direction: ltr;
-  min-height: 22px;
+  min-height: 16px;
 }
 
 .memberCard__phoneRow--empty {
@@ -160,8 +169,8 @@
 }
 
 .memberCard__copy {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   padding: 0;
   border: none;
   background: transparent;
@@ -173,11 +182,11 @@
 }
 
 .memberCard__copy .pi {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .memberCard__phoneValue {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #2b2b2b;
 }
@@ -185,7 +194,7 @@
 .memberCard__attendanceLines {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   width: 100%;
 }
 
@@ -193,10 +202,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
   background: #f9f7f4;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .attLabel {
@@ -211,13 +220,13 @@
 
 .memberCard__checkbox {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 4px;
+  right: 4px;
 }
 
 .memberCard__checkbox input {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   cursor: pointer;
 }
 
@@ -301,6 +310,15 @@
   cursor: pointer;
 }
 
+.legacy-modal__close:focus-visible {
+  outline: 2px solid #5f574d;
+  outline-offset: 2px;
+}
+
+.legacy-modal__close:active {
+  background: #f0ede8;
+}
+
 .legacy-modal__head-actions {
   display: flex;
   align-items: center;
@@ -308,99 +326,575 @@
 }
 
 /* ===== Attendance details cards ===== */
-.cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.detailsSections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   max-height: 62vh;
   overflow: auto;
-  padding-right: 6px;
+  padding-right: 4px;
 }
 
-.typeCard {
-  border: 1px solid #ede6dc;
+.detailsSection {
+  border: 1px solid #d9c8bf;
   border-radius: 14px;
-  padding: 12px;
   background: #fffdfb;
+  overflow: hidden;
 }
 
-.cardTitle {
+.detailsSection.open {
+  border-color: #8bc49a;
+  background: #f0fbf3;
+}
+
+.detailsSectionHead {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  cursor: pointer;
   font-weight: 800;
-  margin-bottom: 10px;
+  font-size: 15px;
+  color: #5e2b20;
   text-align: right;
-  font-size: 14px;
+}
+
+.detailsSectionHead:focus-visible {
+  outline: 2px solid #5e2b20;
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
+.detailsSectionCount {
+  margin-inline-start: auto;
+  font-weight: 700;
+  font-size: 13px;
+  color: #8b6f5a;
+  min-width: 20px;
+  text-align: center;
+}
+
+.detailsSectionArrow {
+  font-size: 13px;
+  color: #8b6f5a;
+  transition: transform 180ms ease;
+}
+
+.detailsSection.open .detailsSectionArrow {
+  transform: rotate(180deg);
+}
+
+.detailsSectionBody {
+  border-top: 1px solid #d9c8bf;
+  padding: 8px 12px 12px;
+  background: #ffffff;
 }
 
 .detailList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   max-height: 54vh;
   overflow: auto;
-  padding-right: 6px;
+  padding-right: 4px;
+}
+
+.detailList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.detailList::-webkit-scrollbar-track {
+  background: #f3f3f3;
+  border-radius: 999px;
+}
+
+.detailList::-webkit-scrollbar-thumb {
+  background: #c7c7c7;
+  border-radius: 999px;
 }
 
 .detailRow {
-  border: 1px solid #ede6dc;
+  border: 1px solid #ececec;
   border-radius: 12px;
-  padding: 10px 12px;
-  background: #fafafa;
+  padding: 8px 10px;
+  background: #ffffff;
 }
 
 .dTitle {
   font-weight: 700;
   font-size: 13px;
+  color: #2f2723;
 }
 
 .dSub {
   font-size: 12px;
   color: #6c6459;
-  margin-top: 6px;
+  margin-top: 4px;
   line-height: 1.5;
+}
+
+.editRecordBtn {
+  margin-top: 6px;
+  background: none;
+  border: 1px solid #e4ddd2;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: #5f574d;
+  font-size: 12px;
+  transition: background 120ms ease;
+}
+
+.editRecordBtn:hover {
+  background: #f5ede8;
+}
+
+.editRecordBtn:focus-visible {
+  outline: 2px solid #5f574d;
+  outline-offset: 2px;
+}
+
+.editRecordBtn:active {
+  background: #e8dfd8;
+}
+
+.dEditForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dEditActions {
+  display: flex;
+  gap: 4px;
+}
+
+.miniDanger.miniDanger--sm {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+
+.editCancelBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d0c0b0;
+  border-radius: 8px;
+  background: #fff;
+  color: #6c6459;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: background 120ms ease;
+}
+
+.editCancelBtn:hover {
+  background: #f5ede8;
+}
+
+.editCancelBtn:focus-visible {
+  outline: 2px solid #6c6459;
+  outline-offset: 2px;
+}
+
+.editCancelBtn:active {
+  background: #e8dfd8;
 }
 
 .modalCard .detailList {
   margin-top: 6px;
 }
 
-/* ===== Daily attendance (matching main attendance page style) ===== */
+/* ===== Daily attendance (dropdown + calendar toggle) ===== */
 .dailyControls {
-  background: #fff;
-  border: 1px solid #ececec;
-  border-radius: 16px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
-  padding: 14px;
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: flex-end;
+  margin-bottom: 12px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
 }
 
 .dailyField {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dailyField label {
+  font-size: 12px;
   font-weight: 700;
-  font-size: 13px;
-  color: #333;
+  color: #5e2b20;
 }
 
-.dailyField input,
 .dailyField select {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid #d4d4d4;
-  padding: 11px 12px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #d0c0b0;
   background: #fff;
-  color: #111;
-  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f2723;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+
+
+.dailyField--cancel .dailyCancelBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid #d0c0b0;
+  background: #fef0f0;
+  color: #a73232;
   font-size: 13px;
-  box-sizing: border-box;
-  outline: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.dailyField--cancel .dailyCancelBtn:hover:not(:disabled) {
+  background: #ffe0e0;
+}
+
+.dailyField--cancel .dailyCancelBtn:focus-visible {
+  outline: 2px solid #a73232;
+  outline-offset: 2px;
+}
+
+.dailyField--cancel .dailyCancelBtn:active:not(:disabled) {
+  background: #fcd0d0;
+}
+
+.dailyField--cancel .dailyCancelBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dailyScheduleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid #d0c0b0;
+  background: #f0f4fe;
+  color: #2b4f8a;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+  white-space: nowrap;
+}
+
+.dailyScheduleBtn:hover {
+  background: #dce6fa;
+}
+
+.dailyScheduleBtn:focus-visible {
+  outline: 2px solid #2b4f8a;
+  outline-offset: 2px;
+}
+
+.dailyScheduleBtn:active {
+  background: #c8d6f5;
+}
+
+.dailyScheduleSection {
+  background: #fbf8f2;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.dailyScheduleForm {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.scheduleField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scheduleField label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5e2b20;
+}
+
+.scheduleField select,
+.scheduleField input {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #d0c0b0;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f2723;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.scheduleField .action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid #3a7c3a;
+  background: #eff8ef;
+  color: #2d6a2d;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+  white-space: nowrap;
+}
+
+.scheduleField .action-btn:hover:not(:disabled) {
+  background: #dff0df;
+}
+
+.scheduleField .action-btn:focus-visible {
+  outline: 2px solid #2d6a2d;
+  outline-offset: 2px;
+}
+
+.scheduleField .action-btn:active:not(:disabled) {
+  background: #cce5cc;
+}
+
+.scheduleField .action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dailyScheduleList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scheduleActions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.scheduleActions .action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid #3a7c3a;
+  background: #eff8ef;
+  color: #2d6a2d;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+  white-space: nowrap;
+}
+
+.scheduleActions .action-btn:hover:not(:disabled) {
+  background: #dff0df;
+}
+
+.scheduleActions .action-btn:focus-visible {
+  outline: 2px solid #2d6a2d;
+  outline-offset: 2px;
+}
+
+.scheduleActions .action-btn:active:not(:disabled) {
+  background: #cce5cc;
+}
+
+.scheduleActions .action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scheduleItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e4ddd2;
+}
+
+.scheduleItemType {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2f2723;
+  min-width: 100px;
+}
+
+.scheduleItemDay {
+  font-size: 13px;
+  color: #6c6459;
+  min-width: 60px;
+}
+
+.scheduleItemTime {
+  font-size: 13px;
+  color: #6c6459;
+  min-width: 50px;
+}
+
+.scheduleItemDate {
+  font-size: 12px;
+  color: #6c6459;
+  min-width: 120px;
+}
+
+.scheduleItemStatus {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f0f0f0;
+  color: #888;
+  font-weight: 600;
+}
+
+.scheduleItemStatus.active {
+  background: #eff8ef;
+  color: #2d6a2d;
+}
+
+.scheduleItemDelete {
+  margin-right: auto;
+  background: none;
+  border: none;
+  color: #a73232;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: background 120ms ease;
+}
+
+.scheduleItemDelete:hover {
+  background: #fef0f0;
+}
+
+.scheduleItemDelete:focus-visible {
+  outline: 2px solid #a73232;
+  outline-offset: 2px;
+}
+
+.scheduleItemDelete:active {
+  background: #fcc;
+}
+
+.cancelFamiliesList {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cancelAllLabel,
+.cancelFamilyItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f2723;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+
+.cancelAllLabel:hover,
+.cancelFamilyItem:hover {
+  background: #f5ede8;
+}
+
+.cancelAllLabel input,
+.cancelFamilyItem input {
+  width: 18px;
+  height: 18px;
+  accent-color: #5e2b20;
+}
+
+.dailyCancelledBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fef0f0;
+  border: 1px solid #f0d0d0;
+  color: #a73232;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.dailyCancelledBanner i {
+  font-size: 16px;
+}
+
+.dailyCancelUndoBtn {
+  margin-right: auto;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #d0b0b0;
+  background: #fff;
+  color: #a73232;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.dailyCancelUndoBtn:hover {
+  background: #ffe8e8;
+}
+
+.dailyCancelUndoBtn:focus-visible {
+  outline: 2px solid #a73232;
+  outline-offset: 2px;
+}
+
+.dailyCancelUndoBtn:active {
+  background: #fcd0d0;
+}
+
+.dailyCancelledMessage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: #a73232;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dailyCancelledMessage i {
+  font-size: 32px;
 }
 
 .dailyStats {
@@ -516,6 +1010,16 @@
   transform: translateY(-1px);
 }
 
+.miniDanger:focus-visible {
+  outline: 2px solid #a73232;
+  outline-offset: 2px;
+}
+
+.miniDanger:active {
+  background: #fcc;
+  transform: translateY(0);
+}
+
 /* ===== Confirm overlay ===== */
 .confirmOverlay {
   position: absolute;
@@ -562,6 +1066,15 @@
   cursor: pointer;
 }
 
+.dangerBtn:focus-visible {
+  outline: 2px solid #e53935;
+  outline-offset: 2px;
+}
+
+.dangerBtn:active {
+  background: #c62828;
+}
+
 .cancelBtn2 {
   background: #777;
   color: #fff;
@@ -569,6 +1082,15 @@
   border-radius: 10px;
   padding: 8px 14px;
   cursor: pointer;
+}
+
+.cancelBtn2:focus-visible {
+  outline: 2px solid #777;
+  outline-offset: 2px;
+}
+
+.cancelBtn2:active {
+  background: #555;
 }
 
 .dangerBtn:disabled,
@@ -681,15 +1203,30 @@
 
 /* ===== Responsive ===== */
 @media (max-width: 700px) {
-  .cards { grid-template-columns: 1fr; }
+  .dailyControls { flex-direction: column; align-items: stretch; }
+  .dailyField select { width: 100%; }
+    .dailyField .attendance-date-input__field { width: 100% !important; }
+  .dailyField--cancel .dailyCancelBtn { width: 100%; }
+  .dailyScheduleBtn { width: 100%; justify-content: center; }
+  .dailyScheduleForm { flex-direction: column; }
+  .scheduleField select { width: 100%; }
+  .scheduleField .action-btn { width: 100%; justify-content: center; }
   .dailyBoxes { grid-template-columns: 1fr; }
   .dailyStats { grid-template-columns: 1fr; }
   .filtersBar { flex-direction: column; align-items: stretch; }
-
 }
 
-@media (max-width: 520px) {
-  .memberGrid { grid-template-columns: 1fr; }
-  .memberCard { max-width: 320px; margin: 0 auto; min-height: 244px; height: 244px; border-radius: 16px; }
-  .memberCard__name { min-height: 54px; font-size: 22px; }
+@media (max-width: 600px) {
+  .memberGrid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .memberCard { min-height: 120px; height: 120px; border-radius: 12px; }
+  .memberCard__content { padding: 8px 6px; gap: 2px; }
+  .memberCard__name { min-height: 26px; font-size: 12px; }
+  .memberCard__phoneRow { min-height: 14px; gap: 3px; }
+  .memberCard__phoneValue { font-size: 11px; }
+  .memberCard__copy { width: 12px; height: 12px; }
+  .memberCard__copy .pi { font-size: 10px; }
+  .memberCard__attItem { padding: 1px 4px; font-size: 10px; gap: 2px; }
+  .memberCard__attendanceLines { gap: 1px; }
+  .memberCard__checkbox { top: 2px; right: 2px; }
+  .memberCard__checkbox input { width: 12px; height: 12px; }
 }

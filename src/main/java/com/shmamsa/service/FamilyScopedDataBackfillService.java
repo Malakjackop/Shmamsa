@@ -1,11 +1,9 @@
 package com.shmamsa.service;
 
 import com.shmamsa.model.AttendanceRecord;
-import com.shmamsa.model.Announcement;
 import com.shmamsa.model.Event;
 import com.shmamsa.model.GradeSheet;
 import com.shmamsa.model.ResourceFile;
-import com.shmamsa.repository.AnnouncementRepository;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.EventRepository;
 import com.shmamsa.repository.GradeSheetRepository;
@@ -22,7 +20,6 @@ public class FamilyScopedDataBackfillService {
     private final AttendanceRepository attendanceRepository;
     private final GradeSheetRepository gradeSheetRepository;
     private final ResourceFileRepository resourceFileRepository;
-    private final AnnouncementRepository announcementRepository;
     private final EventRepository eventRepository;
     private final FamilyAccessService familyAccessService;
 
@@ -35,7 +32,6 @@ public class FamilyScopedDataBackfillService {
         backfillAttendance();
         backfillGradeSheets();
         backfillResources();
-        backfillAnnouncements();
         backfillEvents();
     }
 
@@ -70,17 +66,6 @@ public class FamilyScopedDataBackfillService {
             file.setFamilyId(resolvedId);
             file.setFamily(resolvedName);
             resourceFileRepository.save(file);
-        }
-    }
-
-    private void backfillAnnouncements() {
-        for (Announcement item : announcementRepository.findAll()) {
-            Long resolvedId = resolvedTargetFamilyId(item.getTargetFamilyId(), item.getTargetFamily());
-            String resolvedName = resolvedTargetFamilyName(resolvedId, item.getTargetFamily());
-            if (same(item.getTargetFamilyId(), resolvedId) && same(item.getTargetFamily(), resolvedName)) continue;
-            item.setTargetFamilyId(resolvedId);
-            item.setTargetFamily(resolvedName);
-            announcementRepository.save(item);
         }
     }
 

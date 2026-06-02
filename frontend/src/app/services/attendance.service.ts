@@ -55,6 +55,13 @@ export type AttendanceMutationResponse = {
   [key: string]: unknown;
 } | null;
 
+export type AttendanceRuleGroup = {
+  name: string;
+  types: AttendanceType[];
+  allRequired: boolean;
+  bonusAllowed: boolean;
+};
+
 export type AttendanceConfig = {
   servantEntryOpenDays: number[];
   servantSelectableEventDays: number[];
@@ -64,6 +71,7 @@ export type AttendanceConfig = {
   familyTypeDays?: Record<string, Partial<Record<AttendanceType, number[]>>>;
   familyAbsenceAllowedDays?: Record<string, number[]>;
   familyAbsenceOpenDays?: Record<string, number[]>;
+  attendanceRuleGroups?: AttendanceRuleGroup[];
 };
 
 export type AttendanceAccessGrant = {
@@ -93,6 +101,9 @@ export type AttendanceAccessGrant = {
 
 export type AttendanceContext = {
   config: AttendanceConfig;
+  scheduleDays?: Record<string, Partial<Record<AttendanceType, number[]>>>;
+  scheduleTimes?: Record<string, Partial<Record<AttendanceType, Record<string, string>>>>;
+  scheduleCreatedDates?: Record<string, Partial<Record<AttendanceType, Record<string, string>>>>;
   role?: string;
   todayOpenForServant: boolean;
   activeGrants: AttendanceAccessGrant[];
@@ -204,6 +215,15 @@ export class AttendanceService {
     return this.http.post<AttendanceMutationResponse>(
       `${this.baseUrl}/mark-absent`,
       { userId, date, type, family, customTitle },
+      { withCredentials: true }
+    );
+  }
+
+  updateAttendanceDate(id: number, date: string): Observable<{ ok: boolean; id: number; date: string }> {
+    if (!this.isBrowser) return of({ ok: true, id, date });
+    return this.http.put<{ ok: boolean; id: number; date: string }>(
+      `${this.baseUrl}/records/${id}`,
+      { date },
       { withCredentials: true }
     );
   }
@@ -353,6 +373,13 @@ export class AttendanceService {
     );
   }
 
+  saveFullAttendanceConfig(config: AttendanceConfig): Observable<AttendanceConfig> {
+    if (!this.isBrowser) {
+      return of(config);
+    }
+    return this.http.put<AttendanceConfig>(`${this.baseUrl}/config`, config, { withCredentials: true });
+  }
+
   getMyStats(): Observable<{
     FRIDAY_LITURGY: number;
     MARMARKOS_KHORS?: number;
@@ -431,5 +458,84 @@ export class AttendanceService {
 
   archivePdfUrl(id: number): string {
     return `${this.baseUrl}/archives/${id}/pdf`;
+  }
+
+  cancelDay(
+    date: string,
+    type: AttendanceType,
+    families: string[]
+  ): Observable<{ ok: boolean; cancelled: number }> {
+    if (!this.isBrowser) return of({ ok: true, cancelled: 0 });
+    return this.http.post<{ ok: boolean; cancelled: number }>(
+      `${this.baseUrl}/cancel-day`,
+      { date, type, families },
+      { withCredentials: true }
+    );
+  }
+
+  undoCancelDay(
+    date: string,
+    type: AttendanceType,
+    families: string[]
+  ): Observable<{ ok: boolean; removed: number }> {
+    if (!this.isBrowser) return of({ ok: true, removed: 0 });
+    return this.http.delete<{ ok: boolean; removed: number }>(
+      `${this.baseUrl}/cancel-day`,
+      { body: { date, type, families }, withCredentials: true }
+    );
+  }
+
+  getSchedules(familyBase?: string): Observable<any[]> {
+    if (!this.isBrowser) return of([]);
+    const params: Record<string, string> = {};
+    if (familyBase) params['familyBase'] = familyBase;
+    return this.http.get<any[]>(`${this.baseUrl}/schedules`, { params, withCredentials: true });
+  }
+
+  createSchedule(payload: {
+    familyBase: string;
+    type: AttendanceType;
+    dayOfWeek: number;
+    time?: string;
+    enabled?: boolean;
+  }): Observable<any> {
+    if (!this.isBrowser) return of(null);
+    return this.http.post<any>(`${this.baseUrl}/schedules`, payload, { withCredentials: true });
+  }
+
+  deleteSchedule(id: number): Observable<{ ok: boolean }> {
+    if (!this.isBrowser) return of({ ok: true });
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/schedules/${id}`, { withCredentials: true });
+  }
+
+  generateSchedules(): Observable<{ ok: boolean; created: number }> {
+    if (!this.isBrowser) return of({ ok: true, created: 0 });
+    return this.http.post<{ ok: boolean; created: number }>(`${this.baseUrl}/schedules/generate`, {}, { withCredentials: true });
+  }
+
+  getCancellations(
+    date: string,
+    type: AttendanceType
+  ): Observable<{ cancellations: string[] }> {
+    if (!this.isBrowser) return of({ cancellations: [] });
+    return this.http.get<{ cancellations: string[] }>(
+      `${this.baseUrl}/cancellations`,
+      { params: { date, type }, withCredentials: true }
+    );
+  }
+
+  getCancelledDatesInRange(
+    from: string,
+    to: string,
+    type: AttendanceType,
+    family?: string
+  ): Observable<{ dates: string[] }> {
+    if (!this.isBrowser) return of({ dates: [] });
+    let params: Record<string, string> = { from, to, type };
+    if (family) params['family'] = family;
+    return this.http.get<{ dates: string[] }>(
+      `${this.baseUrl}/cancelled-dates`,
+      { params, withCredentials: true }
+    );
   }
 }

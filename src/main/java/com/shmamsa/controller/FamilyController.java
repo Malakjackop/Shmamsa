@@ -1189,6 +1189,7 @@ public class  FamilyController {
             row.put("time", r.getTime());
             row.put("createdAt", r.getCreatedAt());
             row.put("status", r.getStatus() == null ? "PRESENT" : r.getStatus().name());
+            row.put("customTitle", r.getCustomTitle());
 
             if (r.getTakenBy() != null) {
                 Map<String, Object> tb = new LinkedHashMap<>();

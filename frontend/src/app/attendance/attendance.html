@@ -64,25 +64,6 @@
 
     <div class="layout">
       <aside class="sidebar">
-        <div class="side-card">
-          <div class="side-title">نطاق التسجيل</div>
-
-          <ng-container *ngIf="!isSelfCheckinMode(); else fixedFamilyBlock">
-            <label class="field-label">الأسرة</label>
-            <select class="familyDrop" [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
-              <option value="" *ngIf="!hasRestrictedFamilyScope()">كل الأسر</option>
-              <option *ngFor="let f of families" [value]="f">{{ f }}</option>
-            </select>
-          </ng-container>
-
-          <ng-template #fixedFamilyBlock>
-            <label class="field-label">الأسرة</label>
-            <div class="readonly-box">{{ displayScopeFamilyLabel() || 'غير محددة' }}</div>
-            <p class="side-hint" *ngIf="isSelfCheckinMode()">الأسرة مأخوذة من التخصيص المفتوح لك الآن.</p>
-            <p class="side-hint" *ngIf="isDelegatedAttendanceMode()">الأسر الظاهرة هنا مأخوذة من التخصيص المفتوح لك الآن.</p>
-          </ng-template>
-        </div>
-
         <div class="side-card grant-status-sidebar" *ngIf="!blockedMessage && shouldShowGrantTypeStatuses()">
           <div class="side-title">حالة الأنواع</div>
             <div class="grant-type-status-list">
@@ -97,7 +78,7 @@
             </div>
          </div>
 
-          <div class="side-card" *ngIf="canManageAccessGrants() || canUseCustomEvent()">
+          <div class="side-card settings-card" *ngIf="canManageAccessGrants() || canUseCustomEvent()">
             <div class="side-title">الإعدادات</div>
 
             <button type="button" class="action-btn" (click)="openCreateGrant()" *ngIf="canManageAccessGrants()">
@@ -105,18 +86,42 @@
               إدارة التخصيصات
             </button>
 
-           <ng-container *ngIf="canUseCustomEvent()">
-              <button type="button" class="action-btn side-btn-mt" (click)="openCreateCustomEvent()">
+            <ng-container *ngIf="canUseCustomEvent()">
+              <button type="button" class="action-btn" (click)="openCreateCustomEvent()">
                 <i class="pi pi-calendar-plus"></i>
                 ادارة المناسبات
               </button>
             </ng-container>
+
+            <button type="button" class="action-btn" (click)="openScheduleDialog()" *ngIf="canManageSchedules()">
+              <i class="pi pi-clock"></i>
+              إدارة المواعيد
+            </button>
+
+            <button type="button" class="action-btn" (click)="openRuleGroupsDialog()" *ngIf="canManageAttendanceConfig()">
+              <i class="pi pi-cog"></i>
+              قواعد الحضور
+            </button>
         </div>
       </aside>
 
       <section class="content">
         <div class="controls-card">
-          <div class="controls-grid">
+          <div class="controls-grid controls-grid--four">
+            <div class="control-field">
+              <label>الأسرة</label>
+              <ng-container *ngIf="!isSelfCheckinMode(); else fixedFamilyBlock">
+                <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
+                  <option *ngFor="let f of families" [value]="f">{{ f }}</option>
+                </select>
+              </ng-container>
+              <ng-template #fixedFamilyBlock>
+                <div class="readonly-box">{{ displayScopeFamilyLabel() || 'غير محددة' }}</div>
+                <p class="hint" *ngIf="isSelfCheckinMode()">الأسرة مأخوذة من التخصيص المفتوح لك الآن.</p>
+                <p class="hint" *ngIf="isDelegatedAttendanceMode()">الأسر الظاهرة هنا مأخوذة من التخصيص المفتوح لك الآن.</p>
+              </ng-template>
+            </div>
+
             <div class="control-field">
               <label>النوع</label>
               <select [(ngModel)]="selectedType" [disabled]="enabledTypeOptionsCount() <= 1" (change)="onTypeChange()">
@@ -142,7 +147,6 @@
                 [firstDayOfWeek]="firstDayOfWeek"
                 dateFormat="yy-mm-dd"
                 placeholder="اختار يوم التسجيل"
-                [showButtonBar]="true"
                 [hideOnDateTimeSelect]="false"
                 [readonlyInput]="true"
               >
@@ -193,14 +197,11 @@
               placeholder="اكتب اسم المخدوم أو الخادم..."
               aria-label="بحث"
             />
+            <label class="search-all-checkbox">
+              <input type="checkbox" [(ngModel)]="searchAllFamilies" (change)="onSearchAllFamiliesChange()" />
+              كل الأسر
+            </label>
           </span>
-
-          <div class="scope">
-            <ng-template #allScope>
-              البحث في: <b>كل الأسر</b>
-              <span class="loading" *ngIf="searching">(بيبحث...)</span>
-            </ng-template>
-          </div>
         </div>
 
         <div class="summary-bar" *ngIf="selected.length">
@@ -211,8 +212,8 @@
           </button>
         </div>
 
-        <h2 class="listTitle" *ngIf="selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
-        <h2 class="listTitle" *ngIf="!selectedFamily && searchText.trim()">نتائج البحث</h2>
+        <h2 class="listTitle" *ngIf="searchText.trim()">نتائج البحث</h2>
+        <h2 class="listTitle" *ngIf="!searchText.trim() && selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
 
         <div class="list member-list" *ngIf="displayedMembers.length; else empty">
           <div class="row" *ngFor="let u of displayedMembers">
@@ -264,20 +265,20 @@
         </div>
 
         <ng-template #empty>
-          <p class="hint" *ngIf="!selectedFamily && !searchText.trim()">
-            اختار أسرة من القائمة أو اكتب اسم علشان يدور في كل الأسر.
-          </p>
-          <p class="hint" *ngIf="!selectedFamily && searchText.trim() && !displayedMembers.length && !searching">
-            مفيش نتائج للاسم ده.
-          </p>
-          <p class="hint" *ngIf="selectedFamily && membersLoading">
+          <p class="hint" *ngIf="!searchText.trim() && membersLoading">
             جاري تحميل أسماء الأسرة...
           </p>
-          <p class="hint" *ngIf="selectedFamily && !membersLoading && membersLoadError">
+          <p class="hint" *ngIf="searchText.trim() && membersLoading">
+            جاري البحث...
+          </p>
+          <p class="hint" *ngIf="!membersLoading && membersLoadError">
             {{ membersLoadError }}
           </p>
-          <p class="hint" *ngIf="selectedFamily && !membersLoading && !membersLoadError && !members.length">
+          <p class="hint" *ngIf="!membersLoading && !membersLoadError && !searchText.trim() && !members.length">
             مفيش حد مسجل في الأسرة دي.
+          </p>
+          <p class="hint" *ngIf="!membersLoading && !membersLoadError && searchText.trim() && !displayedMembers.length">
+            مفيش نتائج للاسم ده.
           </p>
         </ng-template>
 
@@ -1134,6 +1135,260 @@
       <button type="button" class="mini-btn danger" (click)="confirmDeleteCustomEventGroup()">
         <i class="pi pi-trash"></i>
         حذف
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  [header]="'إدارة المواعيد'"
+  [(visible)]="scheduleDialogVisible"
+  [modal]="true"
+  [style]="{ width: '560px', maxWidth: '95vw' }"
+  styleClass="app-surface-dialog"
+  [baseZIndex]="10000"
+  [draggable]="false"
+  [resizable]="false"
+  dir="rtl"
+  (onHide)="closeScheduleDialog()"
+>
+  <div class="dialog-body">
+    <div class="dialog-grid">
+      <div class="form-group" *ngIf="isAminKhedmaOrDeveloper()">
+        <label>الأسرة</label>
+        <select [(ngModel)]="scheduleForm.familyBase" (ngModelChange)="onScheduleFamilyChange()">
+          <option *ngFor="let f of scheduleFamilies" [value]="f">{{ f }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>نوع المناسبة</label>
+        <select [(ngModel)]="scheduleForm.type" (ngModelChange)="onScheduleTypeChange()">
+          <option value="" disabled>اختر نوع المناسبة</option>
+          <option *ngFor="let opt of scheduleTypeOptions" [value]="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>اليوم</label>
+        <select [(ngModel)]="scheduleForm.dayOfWeek" [disabled]="!scheduleForm.type">
+          <option *ngFor="let opt of scheduleAvailableDayOptions" [value]="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>الوقت</label>
+        <p-datepicker
+          #scheduleTimePicker
+          [(ngModel)]="scheduleForm.time"
+          [disabledDays]="[]"
+          [minDate]="null"
+          [showIcon]="false"
+          [timeOnly]="true"
+          [showTime]="true"
+          [showOtherMonths]="true"
+          [selectOtherMonths]="true"
+          hourFormat="12"
+          [stepMinute]="1"
+          [readonlyInput]="false"
+          [showButtonBar]="true"
+          [hideOnDateTimeSelect]="false"
+          appendTo="body"
+          styleClass="schedule-time-input"
+          inputStyleClass="schedule-time-input__field"
+          panelStyleClass="scheduleTimePanel"
+          placeholder="اختر الوقت"
+        >
+          <ng-template pTemplate="buttonbar">
+            <div class="attendance-picker-actions">
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--ghost"
+                aria-label="مسح" title="مسح"
+                (click)="cancelScheduleTime(scheduleTimePicker)">
+                <i class="pi pi-times"></i>
+              </button>
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--primary"
+                aria-label="تأكيد" title="تأكيد"
+                (click)="confirmScheduleTime(scheduleTimePicker)">
+                <i class="pi pi-check"></i>
+              </button>
+            </div>
+          </ng-template>
+        </p-datepicker>
+      </div>
+    </div>
+
+    <div class="schedule-dialog-items" *ngIf="scheduleItems.length">
+      <div class="schedule-section-title">المواعيد الحالية</div>
+      <div class="schedule-item" *ngFor="let s of scheduleItems; trackBy: trackScheduleItem">
+        <div class="schedule-item__info">
+          <span class="schedule-item__type">{{ scheduleTypeLabel(s.type) }}</span>
+          <span class="schedule-item__day">{{ scheduleDayLabel(s.dayOfWeek) }}</span>
+          <span class="schedule-item__time">{{ scheduleTimeLabel(s.time) }}</span>
+        </div>
+        <div class="schedule-item__actions" *ngIf="s.id">
+          <button type="button" class="mini-btn" (click)="editSchedule(s)" aria-label="تعديل" title="تعديل">
+            <i class="pi pi-pencil"></i>
+          </button>
+          <button type="button" class="mini-btn danger" (click)="deleteSchedule(s)" aria-label="حذف" title="حذف">
+            <i class="pi pi-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer dialog-footer--split">
+      <button type="button" class="action-btn" (click)="addSchedule()" [disabled]="!scheduleForm.type || scheduleSaving">
+        <i class="pi pi-plus"></i>
+        {{ scheduleSaving ? 'جارٍ الحفظ...' : 'إضافة ميعاد' }}
+      </button>
+      <button type="button" class="mini-btn" (click)="closeScheduleDialog()">
+        إغلاق
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  header="تعديل الميعاد"
+  [(visible)]="editScheduleDialogVisible"
+  [modal]="true"
+  [style]="{ width: '420px', maxWidth: '95vw' }"
+  styleClass="app-surface-dialog"
+  [baseZIndex]="10010"
+  [draggable]="false"
+  [resizable]="false"
+  dir="rtl"
+  (onHide)="closeEditScheduleDialog()"
+>
+  <div class="dialog-body" *ngIf="editScheduleItem">
+    <div class="form-group">
+      <label>نوع المناسبة</label>
+      <div class="readonly-box">{{ scheduleTypeLabel(editScheduleItem.type) }}</div>
+    </div>
+    <div class="form-group">
+      <label>اليوم</label>
+      <select [(ngModel)]="editScheduleDay">
+        <option *ngFor="let opt of editScheduleDayOptions" [value]="opt.value">{{ opt.label }}</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>الوقت</label>
+      <p-datepicker
+        #editScheduleTimePicker
+        [(ngModel)]="editScheduleTime"
+        [disabledDays]="[]"
+        [minDate]="null"
+        [showIcon]="false"
+        [timeOnly]="true"
+        [showTime]="true"
+        [showOtherMonths]="true"
+        [selectOtherMonths]="true"
+        hourFormat="12"
+        [stepMinute]="1"
+        [readonlyInput]="false"
+        [showButtonBar]="true"
+        [hideOnDateTimeSelect]="false"
+        appendTo="body"
+        styleClass="schedule-time-input"
+        inputStyleClass="schedule-time-input__field"
+        panelStyleClass="scheduleTimePanel"
+        placeholder="اختر الوقت"
+      >
+          <ng-template pTemplate="buttonbar">
+            <div class="attendance-picker-actions">
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--ghost"
+                aria-label="مسح" title="مسح"
+                (click)="cancelEditScheduleTime(editScheduleTimePicker)">
+                <i class="pi pi-times"></i>
+              </button>
+              <button type="button" class="attendance-picker-btn attendance-picker-btn--primary"
+                aria-label="تأكيد" title="تأكيد"
+                (click)="confirmEditScheduleTime(editScheduleTimePicker)">
+                <i class="pi pi-check"></i>
+              </button>
+            </div>
+          </ng-template>
+        </p-datepicker>
+      </div>
+    </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button type="button" class="mini-btn" (click)="closeEditScheduleDialog()">إلغاء</button>
+      <button type="button" class="action-btn" (click)="saveEditedSchedule()" [disabled]="scheduleSaving">
+        <i class="pi pi-check"></i>
+        {{ scheduleSaving ? 'جارٍ الحفظ...' : 'حفظ' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<p-dialog
+  header="قواعد الحضور"
+  [(visible)]="ruleGroupsDialogVisible"
+  [modal]="true"
+  [style]="{ width: '560px', maxWidth: '95vw' }"
+  styleClass="app-surface-dialog"
+  [baseZIndex]="10020"
+  [draggable]="false"
+  [resizable]="false"
+  dir="rtl"
+>
+  <div class="dialog-body">
+    <p class="hint" style="margin-bottom:16px">
+      حدد مجموعات من الأنواع التي تعتبر بدائل عن بعضها. مثلاً: إذا حضن القداس يكتفي به ولا يحتاج للتسبحة.
+    </p>
+
+    <div *ngIf="!editableRuleGroups.length" class="hint" style="text-align:center;padding:24px 0">
+      لا توجد مجموعات بعد. أضف مجموعة جديدة.
+    </div>
+
+    <div *ngFor="let group of editableRuleGroups; let i = index" class="rule-group-card">
+      <div class="rule-group-card__head">
+        <input type="text" [(ngModel)]="group.name" placeholder="اسم المجموعة (مثلاً: قداس + تسبحة)" class="rule-group-card__name" />
+        <button type="button" class="mini-btn danger" (click)="removeRuleGroup(i)" aria-label="حذف المجموعة">
+          <i class="pi pi-trash"></i>
+        </button>
+      </div>
+
+      <div class="rule-group-card__types">
+        <label class="rule-group-card__label">الأنواع في هذه المجموعة:</label>
+        <div class="rule-group-card__chips">
+          <button
+            *ngFor="let opt of availableTypesForRuleGroup()"
+            type="button"
+            class="rule-group-chip"
+            [class.rule-group-chip--selected]="group.types.includes(opt.value)"
+            (click)="toggleRuleGroupType(group, opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="rule-group-card__options">
+        <label class="rule-group-card__toggle">
+          <input type="checkbox" [(ngModel)]="group.allRequired" />
+          كل الأنواع مطلوبة (غير بديلة)
+        </label>
+        <label class="rule-group-card__toggle">
+          <input type="checkbox" [(ngModel)]="group.bonusAllowed" [disabled]="group.allRequired" />
+          الحضور الإضافي يُحتسب كإضافي (Bonus)
+        </label>
+      </div>
+    </div>
+
+    <button type="button" class="action-btn secondary" style="margin-top:12px;width:100%" (click)="addRuleGroup()">
+      <i class="pi pi-plus"></i>
+      إضافة مجموعة
+    </button>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button type="button" class="mini-btn" (click)="cancelRuleGroups()">إلغاء</button>
+      <button type="button" class="action-btn" (click)="saveRuleGroups()" [disabled]="configSaving">
+        <i class="pi pi-check"></i>
+        {{ configSaving ? 'جارٍ الحفظ...' : 'حفظ' }}
       </button>
     </div>
   </ng-template>

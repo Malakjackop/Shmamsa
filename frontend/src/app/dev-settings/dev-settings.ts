@@ -274,6 +274,7 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   /* ── Dialog helpers ──────────────────────────────────── */
   openCreate(): void {
     this.dialogMode = 'create';
+    this.ensureFamilyOptionsLoaded();
     this.editingField = {
       fieldKey: '',
       labelAr: '',
@@ -298,9 +299,7 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   }
 
   openEdit(f: CustomField): void {
-    if (this.getManagedFamilyFieldAudience(f.fieldKey)) {
-      this.ensureFamilyOptionsLoaded();
-    }
+    this.ensureFamilyOptionsLoaded();
     this.dialogMode = 'edit';
     this.selectedRequiredRules = this.parseRequiredRules(f.requiredRule);
     this.visibilityConditions = this.deserializeVisibilityConditions(f);

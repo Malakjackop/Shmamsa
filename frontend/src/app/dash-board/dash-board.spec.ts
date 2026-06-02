@@ -46,7 +46,6 @@ describe('DashBoard', () => {
           provide: BoardService,
           useValue: {
             listEvents: () => of([]),
-            listAnnouncements: () => of([]),
             createEvent: () => of({}),
             updateEvent: () => of({}),
             publishEvent: () => of({}),
@@ -54,11 +53,7 @@ describe('DashBoard', () => {
             deleteEvent: () => of({}),
             joinEvent: () => of({}),
             unjoinEvent: () => of({}),
-            participants: () => of([]),
-            createAnnouncement: () => of({}),
-            updateAnnouncement: () => of({}),
-            publishAnnouncement: () => of({}),
-            deleteAnnouncement: () => of({})
+            participants: () => of([])
           }
         }
       ],

@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AuthService, AuthUser } from '../services/auth.service';
 import { MessageService } from 'primeng/api';
@@ -87,6 +87,19 @@ type AttendanceArchiveLike = {
   archivedAt?: string;
   archiveDate?: string;
 };
+type DailyEventItem = {
+  key: string;
+  type: AttendanceType;
+  label: string;
+  customEventId?: number;
+  dayOfWeek: number;
+};
+
+type DetailsDisplayItem = {
+  type: AttendanceRow['type'];
+  label: string;
+  customTitle?: string;
+};
 type ProfileView = {
   username?: string;
   email?: string;
@@ -155,7 +168,10 @@ export class FamilyAttendanceComponent implements OnInit {
 
   detailsFor: Member | null = null;
   details: AttendanceRow[] = [];
-  detailsType: '' | AttendanceType = '';
+  detailsType = '';
+  detailsCustomTitle: string | null = null;
+  expandedDetailsItem: string | null = null;
+  allCustomEvents: AttendanceCustomEvent[] = [];
 
   profileFor: Member | null = null;
   profile: ProfileView | null = null;
@@ -174,9 +190,50 @@ export class FamilyAttendanceComponent implements OnInit {
   dailyPresent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
   dailyAbsent: Array<{ id: number; fullName: string; role?: string; familyName?: string; deaconFamily?: string; familyAssignments?: Array<{ familyName?: string }> }> = [];
   dailyMaxDate: Date = this.buildDailyMaxDate();
+  dailyMinDate: Date | null = null;
   familyCustomEvents: AttendanceCustomEvent[] = [];
   availableDailyCustomEvents: AttendanceCustomEvent[] = [];
   selectedDailyCustomEventId: number | '' = '';
+
+  dailyEvents: DailyEventItem[] = [];
+  dailySelectedEventKey = '';
+  dailyDisabledDates: Date[] = [];
+  dailyCancelledFamilies: string[] = [];
+  private scheduleDays: Record<string, Partial<Record<AttendanceType, number[]>>> = {};
+  private scheduleTimes: Record<string, Partial<Record<AttendanceType, Record<string, string>>>> = {};
+  private scheduleCreatedDates: Record<string, Partial<Record<AttendanceType, Record<string, string>>>> = {};
+
+  // schedule management within daily modal
+  showDailyScheduleSection = false;
+  scheduleSaving = false;
+  scheduleItems: any[] = [];
+  scheduleForm: { familyBase: string; type: AttendanceType; dayOfWeek: number; time: Date | null } = {
+    familyBase: '',
+    type: 'FRIDAY_LITURGY',
+    dayOfWeek: 5,
+    time: null
+  };
+  readonly scheduleTypeOptions: { value: AttendanceType; label: string }[] = [
+    { value: 'FRIDAY_LITURGY', label: 'قداس الجمعة' },
+    { value: 'TASBEEHA', label: 'تسبحة' },
+    { value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' },
+    { value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' },
+    { value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' },
+  ];
+  readonly scheduleDayOptions: { value: number; label: string }[] = [
+    { value: 0, label: 'الأحد' },
+    { value: 1, label: 'الاثنين' },
+    { value: 2, label: 'الثلاثاء' },
+    { value: 3, label: 'الأربعاء' },
+    { value: 4, label: 'الخميس' },
+    { value: 5, label: 'الجمعة' },
+    { value: 6, label: 'السبت' },
+  ];
+
+  // edit attendance record date
+  editingAttendanceId: number | null = null;
+  editingAttendanceDate: Date | null = null;
+  editingAttendanceSaving = false;
 
   arDatePickerLocale = {
     firstDayOfWeek: 1,
@@ -193,6 +250,14 @@ export class FamilyAttendanceComponent implements OnInit {
   showDailyRemoveConfirm = false;
   dailyRemoveTarget: { id: number; fullName: string } | null = null;
   dailyRemoveSaving = false;
+
+  // cancel day
+  showCancelDayConfirm = false;
+  dailyCancelSaving = false;
+  dailyCancelFamilies: string[] = [];
+  dailyCancelSelectedFamilies = new Set<string>();
+  dailyCancelAllSelected = false;
+  dailyCancelEventLabel = '';
 
   // ===== Iftekad (visitation) =====
   iftekadFor: Member | null = null;
@@ -331,26 +396,22 @@ export class FamilyAttendanceComponent implements OnInit {
           this.families = sortFamiliesByPreferredOrder(f || [], this.preferredFamilyOrder);
           if (this.families.length) {
             this.selectedFamily = this.families[0];
-            this.loadFamilyCustomEvents();
             this.loadMembers();
           }
         },
         error: () => {
           this.families = [];
           this.selectedFamily = '';
-          this.loadFamilyCustomEvents();
           this.loadMembers();
         }
       });
     } else {
       this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
-      this.loadFamilyCustomEvents();
       this.loadMembers();
     }
   }
 
   onFamilyChange() {
-    this.loadFamilyCustomEvents();
     this.loadMembers();
   }
 
@@ -436,21 +497,72 @@ export class FamilyAttendanceComponent implements OnInit {
   openDetails(member: Member) {
     this.detailsFor = member;
     this.detailsType = '';
+    this.detailsCustomTitle = null;
+    this.expandedDetailsItem = null;
+    this.loadCustomEventsForDetails();
     this.reloadDetails();
   }
 
-  reloadDetails() {
+  private loadCustomEventsForDetails(): void {
+    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
+    this.attendanceSvc.listCustomEvents(famParam).subscribe({
+      next: (events) => { this.allCustomEvents = events || []; },
+      error: () => { this.allCustomEvents = []; }
+    });
+  }
+
+  toggleDetailsSection(item: DetailsDisplayItem): void {
+    const key = this.itemKey(item);
+    this.expandedDetailsItem = this.expandedDetailsItem === key ? null : key;
+  }
+
+  isExpanded(item: DetailsDisplayItem): boolean {
+    return this.expandedDetailsItem === this.itemKey(item);
+  }
+
+  private itemKey(item: DetailsDisplayItem): string {
+    return item.customTitle ? `CUSTOM_EVENT:${item.customTitle}` : item.type;
+  }
+
+  uniqueCustomEventTitles(): string[] {
+    const titles = new Set<string>();
+    for (const event of this.allCustomEvents) {
+      if (event.title) titles.add(event.title);
+    }
+    for (const d of this.details || []) {
+      if (d.type === 'CUSTOM_EVENT' && d.customTitle) {
+        titles.add(d.customTitle);
+      }
+    }
+    return [...titles];
+  }
+
+reloadDetails(): void {
     if (!this.detailsFor) return;
 
-    // لو نوع الفلتر مش مسموح للعضو ده (مثلا مش في خورس) رجّعه للكل
-    if (this.detailsType && !this.isAttendanceTypeAllowedForMember(this.detailsFor, this.detailsType)) {
-      this.detailsType = '';
+    let apiType: string | undefined;
+    this.detailsCustomTitle = null;
+
+    if (this.detailsType?.startsWith('CUSTOM_EVENT:')) {
+      this.detailsCustomTitle = this.detailsType.replace('CUSTOM_EVENT:', '');
+      apiType = 'CUSTOM_EVENT';
+    } else if (this.detailsType) {
+      if (!this.isAttendanceTypeAllowedForMember(this.detailsFor, this.detailsType as AttendanceType)) {
+        this.detailsType = '';
+        return this.reloadDetails();
+      }
+      apiType = this.detailsType;
     }
 
     const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
-
-    this.familySvc.memberAttendance(this.detailsFor.id, famParam, this.detailsType || undefined).subscribe({
-      next: (d) => (this.details = this.mapAttendanceRows(d || [])),
+    this.familySvc.memberAttendance(this.detailsFor.id, famParam, apiType).subscribe({
+      next: (d) => {
+        let rows = this.mapAttendanceRows(d || []);
+        if (this.detailsCustomTitle) {
+          rows = rows.filter((r) => r.type === 'CUSTOM_EVENT' && r.customTitle === this.detailsCustomTitle);
+        }
+        this.details = rows;
+      },
       error: () => (this.details = [])
     });
   }
@@ -613,8 +725,47 @@ export class FamilyAttendanceComponent implements OnInit {
     return baseTypes.filter((t) => this.isAttendanceTypeAllowedForMember(this.detailsFor!, t));
   }
 
+  detailsDisplayItems(): DetailsDisplayItem[] {
+    const items: DetailsDisplayItem[] = [];
+    const allowed = this.visibleAttendanceTypes();
+
+    for (const t of allowed) {
+      if (t === 'CUSTOM_EVENT') continue;
+      items.push({ type: t, label: this.titleForType(t) });
+    }
+
+    const usedTitles = new Set(
+      (this.details || [])
+        .filter(d => d.type === 'CUSTOM_EVENT')
+        .map(d => d.customTitle || '')
+        .filter(Boolean)
+    );
+
+    const allCustomTitles = new Set<string>();
+    for (const event of this.allCustomEvents) {
+      if (event.title) allCustomTitles.add(event.title);
+    }
+    for (const t of usedTitles) {
+      allCustomTitles.add(t);
+    }
+
+    for (const title of allCustomTitles) {
+      items.push({ type: 'CUSTOM_EVENT', label: title, customTitle: title });
+    }
+
+    return items;
+  }
+
   filteredDetails(t: AttendanceRow['type']): AttendanceRow[] {
     return (this.details || []).filter((d) => d?.type === t);
+  }
+
+  filteredDetailsForItem(item: DetailsDisplayItem): AttendanceRow[] {
+    return (this.details || []).filter((d) => {
+      if (d.type !== item.type) return false;
+      if (item.customTitle) return d.customTitle === item.customTitle;
+      return true;
+    });
   }
 
   trackByMember(_: number, m: Member): number {
@@ -877,12 +1028,320 @@ export class FamilyAttendanceComponent implements OnInit {
     return day === 4 || day === 5 || day === 6;
   }
 
+  private scheduleDaysForType(t: AttendanceType, family?: string): number[] {
+    const base = family || this.dailyFamilyParam() || '';
+    return this.scheduleDays?.[base]?.[t] || [];
+  }
+
+  private dayOfWeekForType(t: AttendanceType): number {
+    if (t === 'FRIDAY_LITURGY' || t === 'MARMARKOS_KHORS' || t === 'ATHANASIUS_KHORS') return 5;
+    if (t === 'TASBEEHA') return 6;
+    if (t === 'FAMILY_MEETING') return 4;
+    return 5;
+  }
+
+  buildDailyEvents(): void {
+    const items: DailyEventItem[] = [];
+    const types = this.dailyTypeOptions();
+    const family = this.dailyFamilyParam() || '';
+
+    for (const t of types) {
+      if (t === 'CUSTOM_EVENT') {
+        for (const ce of this.availableDailyCustomEvents) {
+          items.push({
+            key: `CUSTOM_EVENT:${ce.id}`,
+            type: 'CUSTOM_EVENT',
+            label: ce.title || '',
+            customEventId: ce.id,
+            dayOfWeek: Number(ce.dayOfWeek ?? 5)
+          });
+        }
+      } else {
+        const scheduleDays = this.scheduleDays?.[family]?.[t];
+        if (!scheduleDays || !scheduleDays.length) continue;
+        items.push({
+          key: t,
+          type: t,
+          label: this.dailyTypeLabel(t),
+          dayOfWeek: this.dayOfWeekForType(t)
+        });
+      }
+    }
+    this.dailyEvents = items;
+    if (items.length && !this.dailySelectedEventKey) {
+      this.onDailyEventSelect(items[0].key);
+    } else if (!items.length) {
+      this.dailySelectedEventKey = '';
+      this.dailyType = null;
+      this.dailyDate = null;
+      this.clearDailyAttendanceData();
+    }
+  }
+
+  onDailyEventSelect(key: string): void {
+    this.dailySelectedEventKey = key;
+    const event = this.dailyEvents.find(e => e.key === key);
+    if (!event) return;
+
+    this.dailyType = event.type;
+    if (event.type === 'CUSTOM_EVENT') {
+      this.selectedDailyCustomEventId = event.customEventId ?? '';
+    } else {
+      this.selectedDailyCustomEventId = '';
+    }
+    this.selectedDailyCustomEventId = event.customEventId ?? '';
+
+    this.dailyDisabledDates = this.buildDisabledDatesForEvent(event);
+    this.dailyMinDate = this.computeDailyMinDate(event.type);
+    this.dailyDate = null;
+    this.clearDailyAttendanceData();
+    this.loadCancelledDatesForRange(event.type);
+  }
+
+  private computeDailyMinDate(type: AttendanceType | null): Date | null {
+    if (!type || type === 'CUSTOM_EVENT') return null;
+    const family = this.dailyFamilyParam() || '';
+    if (!family) return null;
+    const dates = this.scheduleCreatedDates?.[family]?.[type] || {};
+    const dateValues = Object.values(dates).filter(Boolean) as string[];
+    if (!dateValues.length) return null;
+    return dateValues.reduce((min, d) => {
+      const dt = new Date(d + 'T00:00:00');
+      return dt < min ? dt : min;
+    }, new Date(dateValues[0] + 'T00:00:00'));
+  }
+
+  private buildDisabledDatesForEvent(event: DailyEventItem): Date[] {
+    const disabled: Date[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setFullYear(start.getFullYear() - 1);
+
+    const family = this.dailyFamilyParam() || '';
+    const hasAnySchedules = Object.keys(this.scheduleDays || {}).length > 0;
+    const scheduleDays = event.type === 'CUSTOM_EVENT'
+      ? (event.dayOfWeek != null ? [event.dayOfWeek] : [])
+      : this.scheduleDaysForType(event.type, family);
+
+    const allowedDays = scheduleDays.length > 0
+      ? scheduleDays
+      : (hasAnySchedules ? [] : [event.dayOfWeek]);
+
+    const scheduleCreated = this.scheduleCreatedDates?.[family]?.[event.type] || {};
+
+    const cursor = new Date(start);
+    while (cursor <= today) {
+      if (!allowedDays.includes(cursor.getDay())) {
+        disabled.push(new Date(cursor));
+      } else {
+        const createdDateStr = scheduleCreated[String(cursor.getDay())];
+        if (createdDateStr) {
+          const createdDate = new Date(createdDateStr + 'T00:00:00');
+          createdDate.setHours(0, 0, 0, 0);
+          if (cursor < createdDate) {
+            disabled.push(new Date(cursor));
+          }
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const now = new Date();
+    const todayDow = today.getDay();
+    if (allowedDays.includes(todayDow)) {
+      const scheduleTimeStr = this.scheduleTimes?.[family]?.[event.type]?.[String(todayDow)];
+      if (scheduleTimeStr) {
+        const [h, m] = scheduleTimeStr.split(':').map(Number);
+        const scheduleDt = new Date(today);
+        scheduleDt.setHours(h, m, 0, 0);
+        if (now < scheduleDt) {
+          disabled.push(new Date(today));
+        }
+      }
+    }
+
+    return disabled;
+  }
+
+  private loadScheduleData(): void {
+    this.attendanceSvc.context().subscribe({
+      next: (ctx) => {
+        this.scheduleDays = ctx.scheduleDays || {};
+        this.scheduleTimes = ctx.scheduleTimes || {};
+        this.scheduleCreatedDates = ctx.scheduleCreatedDates || {};
+        this.dailyMinDate = this.computeDailyMinDate(this.dailyType);
+        this.buildDailyEvents();
+      },
+      error: () => {
+        this.scheduleDays = {};
+        this.scheduleTimes = {};
+        this.scheduleCreatedDates = {};
+      }
+    });
+  }
+
+  private loadCancelledDatesForRange(type: AttendanceType, family?: string): void {
+    if (type === 'CUSTOM_EVENT') return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setFullYear(start.getFullYear() - 1);
+
+    const from = this.toIsoDateOnly(start);
+    const to = this.toIsoDateOnly(today);
+
+    this.attendanceSvc.getCancelledDatesInRange(from, to, type, family || this.dailyFamilyParam()).subscribe({
+      next: (res) => {
+        const cancelledDates = (res.dates || []).map((d) => {
+          const dt = new Date(d + 'T00:00:00');
+          dt.setHours(0, 0, 0, 0);
+          return dt;
+        });
+        const added = cancelledDates.filter(cd => !this.dailyDisabledDates.some(dd => dd.getTime() === cd.getTime()));
+        if (added.length) {
+          this.dailyDisabledDates = [...this.dailyDisabledDates, ...added];
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  // ===== Schedule management within daily modal =====
+  openDailyScheduleSection(): void {
+    this.showDailyScheduleSection = !this.showDailyScheduleSection;
+    if (this.showDailyScheduleSection) {
+      const family = this.dailyFamilyParam() || '';
+      this.scheduleForm.familyBase = family;
+      this.scheduleForm.type = 'FRIDAY_LITURGY';
+      this.scheduleForm.dayOfWeek = 5;
+      this.scheduleForm.time = null;
+      this.loadScheduleItems();
+    }
+  }
+
+  private loadScheduleItems(): void {
+    const base = this.scheduleForm.familyBase;
+    if (!base) {
+      this.scheduleItems = [];
+      return;
+    }
+    this.attendanceSvc.getSchedules(base).subscribe({
+      next: (list: any[]) => {
+        this.scheduleItems = list || [];
+      },
+      error: () => {
+        this.scheduleItems = [];
+      }
+    });
+  }
+
+  addSchedule(): void {
+    const base = this.scheduleForm.familyBase;
+    if (!base) return;
+
+    this.scheduleSaving = true;
+    const timeStr = this.scheduleForm.time
+      ? `${String(this.scheduleForm.time.getHours()).padStart(2, '0')}:${String(this.scheduleForm.time.getMinutes()).padStart(2, '0')}`
+      : undefined;
+    this.attendanceSvc.createSchedule({
+      familyBase: base,
+      type: this.scheduleForm.type,
+      dayOfWeek: this.scheduleForm.dayOfWeek,
+      time: timeStr
+    }).subscribe({
+      next: () => {
+        this.scheduleSaving = false;
+        this.loadScheduleItems();
+        this.refreshDailyScheduleData();
+      },
+      error: () => {
+        this.scheduleSaving = false;
+      }
+    });
+  }
+
+  deleteSchedule(s: any): void {
+    if (!s.id) return;
+    this.attendanceSvc.deleteSchedule(s.id).subscribe({
+      next: () => {
+        this.loadScheduleItems();
+        this.refreshDailyScheduleData();
+      },
+      error: () => {}
+    });
+  }
+
+  private refreshDailyScheduleData(): void {
+    this.attendanceSvc.context().subscribe({
+      next: (ctx) => {
+        this.scheduleDays = ctx.scheduleDays || {};
+        this.scheduleTimes = ctx.scheduleTimes || {};
+        this.scheduleCreatedDates = ctx.scheduleCreatedDates || {};
+        this.dailyMinDate = this.computeDailyMinDate(this.dailyType);
+        this.buildDailyEvents();
+      },
+      error: () => {}
+    });
+  }
+
+  scheduleTypeLabel(t: string): string {
+    const opt = this.scheduleTypeOptions.find(o => o.value === t);
+    return opt ? opt.label : t;
+  }
+
+  scheduleDayLabel(day: number): string {
+    const opt = this.scheduleDayOptions.find(d => d.value === day);
+    return opt ? opt.label : String(day);
+  }
+
+  // ===== Edit attendance record date =====
+  startEditAttendanceDate(record: AttendanceRow): void {
+    this.editingAttendanceId = record.id;
+    this.editingAttendanceDate = new Date(record.date + 'T00:00:00');
+    this.editingAttendanceSaving = false;
+  }
+
+  cancelEditAttendanceDate(): void {
+    this.editingAttendanceId = null;
+    this.editingAttendanceDate = null;
+    this.editingAttendanceSaving = false;
+  }
+
+  saveEditAttendanceDate(): void {
+    if (!this.editingAttendanceId || !this.editingAttendanceDate) return;
+    const newDate = this.toIsoDateOnly(this.editingAttendanceDate);
+    if (!newDate) return;
+    this.editingAttendanceSaving = true;
+    this.attendanceSvc.updateAttendanceDate(this.editingAttendanceId, newDate).subscribe({
+      next: () => {
+        this.editingAttendanceSaving = false;
+        this.cancelEditAttendanceDate();
+        this.reloadDetails();
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل التاريخ' });
+      },
+      error: (err) => {
+        this.editingAttendanceSaving = false;
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'خطأ في تعديل التاريخ'
+        });
+      }
+    });
+  }
+
   openDailyAttendance() {
     this.showDaily = true;
     this.dailyDate = null;
     this.dailyType = null;
+    this.dailySelectedEventKey = '';
+    this.dailyEvents = [];
+    this.dailyDisabledDates = [];
     this.dailyMaxDate = this.buildDailyMaxDate();
     this.clearDailyAttendanceData();
+    this.loadScheduleData();
+    this.loadFamilyCustomEvents();
   }
 
   closeDailyAttendance() {
@@ -918,10 +1377,12 @@ export class FamilyAttendanceComponent implements OnInit {
       next: (events) => {
         this.familyCustomEvents = (events || []).filter((event) => this.canManageCustomEvent(event));
         this.refreshDailyCustomEvents();
+        this.buildDailyEvents();
       },
       error: () => {
         this.familyCustomEvents = [];
         this.refreshDailyCustomEvents();
+        this.buildDailyEvents();
       }
     });
   }
@@ -1019,15 +1480,6 @@ export class FamilyAttendanceComponent implements OnInit {
   }
 
   onDailyDateChange() {
-    this.refreshDailyCustomEvents();
-    this.reloadDaily();
-  }
-
-  onDailyTypeChange() {
-    this.reloadDaily();
-  }
-
-  onDailyCustomEventChange() {
     this.reloadDaily();
   }
 
@@ -1038,16 +1490,6 @@ export class FamilyAttendanceComponent implements OnInit {
 
     if (!this.dailyDate || !this.dailyType || !isoDate) {
       this.clearDailyAttendanceData();
-      return;
-    }
-
-    if (!this.isAllowedDailyDate(this.dailyDate)) {
-      this.clearDailyAttendanceData();
-      this.message.add({
-        severity: 'warn',
-        summary: 'تنبيه',
-        detail: 'مسموح فقط بالخميس والجمعة والسبت من الأيام السابقة أو اليوم.'
-      });
       return;
     }
 
@@ -1085,6 +1527,7 @@ export class FamilyAttendanceComponent implements OnInit {
           this.dailyAbsentCount = 0;
         }
 
+        this.loadDailyCancellations(isoDate);
         this.dailyLoading = false;
       },
       error: (err) => {
@@ -1094,6 +1537,18 @@ export class FamilyAttendanceComponent implements OnInit {
           summary: 'خطأ',
           detail: err?.error?.error || 'خطأ في التحميل'
         });
+      }
+    });
+  }
+
+  private loadDailyCancellations(isoDate: string) {
+    if (!this.dailyType) return;
+    this.attendanceSvc.getCancellations(isoDate, this.dailyType).subscribe({
+      next: (res) => {
+        this.dailyCancelledFamilies = res?.cancellations || [];
+      },
+      error: () => {
+        this.dailyCancelledFamilies = [];
       }
     });
   }
@@ -1131,6 +1586,126 @@ export class FamilyAttendanceComponent implements OnInit {
       error: (err) => {
         this.dailyRemoveSaving = false;
         this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في التحميل' });
+      }
+    });
+  }
+
+  // ===== Cancel day =====
+  onCancelDayClick() {
+    const isoDate = this.toIsoDateOnly(this.dailyDate);
+    if (!this.dailyType || !isoDate) return;
+
+    const event = this.dailyEvents.find(e => e.key === this.dailySelectedEventKey);
+    this.dailyCancelEventLabel = event?.label || this.dailyType;
+
+    const isGlobal = this.isAminKhedmaOrDev();
+
+    if (isGlobal) {
+      // Service coordinator: show family list
+      this.familySvc.families().subscribe({
+        next: (list) => {
+          this.dailyCancelFamilies = list;
+          this.dailyCancelSelectedFamilies = new Set(list);
+          this.dailyCancelAllSelected = true;
+          this.showCancelDayConfirm = true;
+        },
+        error: () => {
+          this.message.add({
+            severity: 'error',
+            summary: 'خطأ',
+            detail: 'فشل تحميل قائمة العائلات'
+          });
+        }
+      });
+    } else {
+      // Family coordinator: just their own family
+      const raw = this.assignmentsOf(this.me)[0]?.familyName || '';
+      const myFamily = this.mainFamily(raw);
+      this.dailyCancelFamilies = myFamily ? [myFamily] : [];
+      this.dailyCancelSelectedFamilies = new Set(myFamily ? [myFamily] : []);
+      this.dailyCancelAllSelected = true;
+      this.showCancelDayConfirm = true;
+    }
+  }
+
+  onCancelSelectAll(event: Event) {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.dailyCancelAllSelected = checked;
+    if (checked) {
+      this.dailyCancelSelectedFamilies = new Set(this.dailyCancelFamilies);
+    } else {
+      this.dailyCancelSelectedFamilies = new Set();
+    }
+  }
+
+  onCancelFamilyToggle(family: string) {
+    if (this.dailyCancelSelectedFamilies.has(family)) {
+      this.dailyCancelSelectedFamilies.delete(family);
+    } else {
+      this.dailyCancelSelectedFamilies.add(family);
+    }
+    this.dailyCancelAllSelected = this.dailyCancelFamilies.length > 0
+      && this.dailyCancelFamilies.every(f => this.dailyCancelSelectedFamilies.has(f));
+  }
+
+  cancelCancelDay() {
+    this.showCancelDayConfirm = false;
+    this.dailyCancelSaving = false;
+    this.dailyCancelFamilies = [];
+    this.dailyCancelSelectedFamilies = new Set();
+    this.dailyCancelAllSelected = false;
+    this.dailyCancelledFamilies = [];
+  }
+
+  confirmCancelDay() {
+    const isoDate = this.toIsoDateOnly(this.dailyDate);
+    if (!this.dailyType || !isoDate) return;
+
+    const families = Array.from(this.dailyCancelSelectedFamilies).filter(f => f);
+    if (!families.length) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'اختر عائلة واحدة على الأقل' });
+      return;
+    }
+
+    this.dailyCancelSaving = true;
+    this.attendanceSvc.cancelDay(isoDate, this.dailyType, families).subscribe({
+      next: () => {
+        this.dailyCancelSaving = false;
+        this.dailyCancelledFamilies = families;
+        this.cancelCancelDay();
+        this.clearDailyAttendanceData();
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء هذا اليوم بنجاح' });
+      },
+      error: (err) => {
+        this.dailyCancelSaving = false;
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'فشل إلغاء هذا اليوم'
+        });
+      }
+    });
+  }
+
+  undoCancelDay() {
+    const isoDate = this.toIsoDateOnly(this.dailyDate);
+    if (!this.dailyType || !isoDate) return;
+
+    this.dailyCancelSaving = true;
+    this.attendanceSvc.undoCancelDay(isoDate, this.dailyType, [...this.dailyCancelledFamilies]).subscribe({
+      next: () => {
+        this.dailyCancelSaving = false;
+        this.dailyCancelledFamilies = [];
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء الإلغاء بنجاح' });
+        this.reloadDaily();
+      },
+      error: (err) => {
+        this.dailyCancelSaving = false;
+        this.message.add({
+          severity: 'error',
+          summary: 'خطأ',
+          detail: err?.error?.error || 'فشل إلغاء الإلغاء'
+        });
       }
     });
   }

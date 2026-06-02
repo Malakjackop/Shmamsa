@@ -7,7 +7,8 @@ import {
   AttendanceContext,
   AttendanceAccessGrant,
   AttendanceConfig,
-  AttendanceCustomEvent
+  AttendanceCustomEvent,
+  AttendanceRuleGroup
 } from '../services/attendance.service';
 import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
@@ -148,6 +149,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   minDate!: Date;
   maxDate!: Date;
   disabledDays: number[] = [0, 1, 2, 3];
+  cancelledDisabledDates: Date[] = [];
   firstDayOfWeek = 1;
   selectedType = 'FRIDAY_LITURGY';
   typeOptions: TypeOption[] = [];
@@ -166,8 +168,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   membersLoadError = '';
   globalResults: PickUser[] = [];
   searchText = '';
-  private searchTimer: any = null;
+  searchTimer: any = null;
   searching = false;
+  searchAllFamilies = false;
   selected: PickUser[] = [];
   private lastScannedToken = '';
   private lastScannedAt = 0;
@@ -218,6 +221,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   selectedConfigFamily = '';
   selectedScheduleConfigType: AttendanceType | '' = '';
   configPanelOpen = false;
+  ruleGroupsDialogVisible = false;
+  editableRuleGroups: AttendanceRuleGroup[] = [];
   scheduleEditableTypeOptions: { value: AttendanceType; label: string }[] = [];
   configurableTypeOptions: { value: AttendanceType; label: string }[] = [
     { value: 'FRIDAY_LITURGY', label: 'القداس' },
@@ -233,6 +238,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     { value: 5, label: 'الجمعة' },
     { value: 6, label: 'السبت' }
   ];
+
+  // schedule management
+  scheduleDialogVisible = false;
+  scheduleSaving = false;
+  scheduleItems: any[] = [];
+  scheduleFamilies: string[] = [];
+  editingScheduleId: number | null = null;
+  editScheduleDialogVisible = false;
+  editScheduleItem: any = null;
+  editScheduleTime: Date | null = null;
+  editScheduleDay: number = 5;
+  scheduleForm: { familyBase: string; type: AttendanceType | ''; dayOfWeek: number; time: Date | null } = {
+    familyBase: '',
+    type: '',
+    dayOfWeek: 5,
+    time: null
+  };
 
   countdownGrant: AttendanceAccessGrant | null = null;
   countdownText = '';
@@ -1343,6 +1365,60 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  openRuleGroupsDialog(): void {
+    this.editableRuleGroups = this.configEditor.attendanceRuleGroups
+      ? this.configEditor.attendanceRuleGroups.map(g => ({ ...g, types: [...g.types] }))
+      : [];
+    this.ruleGroupsDialogVisible = true;
+  }
+
+  addRuleGroup(): void {
+    this.editableRuleGroups.push({ name: '', types: [], allRequired: false, bonusAllowed: false });
+  }
+
+  removeRuleGroup(index: number): void {
+    this.editableRuleGroups.splice(index, 1);
+  }
+
+  availableTypesForRuleGroup(): { value: AttendanceType; label: string }[] {
+    return this.configurableTypeOptions;
+  }
+
+  toggleRuleGroupType(group: AttendanceRuleGroup, type: AttendanceType): void {
+    const idx = group.types.indexOf(type);
+    if (idx >= 0) {
+      group.types.splice(idx, 1);
+    } else {
+      group.types.push(type);
+    }
+  }
+
+  saveRuleGroups(): void {
+    this.configSaving = true;
+    const updated = { ...this.configEditor, attendanceRuleGroups: this.editableRuleGroups.map(g => ({ ...g, types: [...g.types] })) };
+    this.attendance.saveFullAttendanceConfig(updated).subscribe({
+      next: (cfg) => {
+        const merged = this.mergeConfig(cfg);
+        this.configEditor = merged;
+        if (this.attendanceContext) {
+          this.attendanceContext = { ...this.attendanceContext, config: merged };
+        }
+        this.configSaving = false;
+        this.ruleGroupsDialogVisible = false;
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ قواعد الحضور بنجاح' });
+      },
+      error: (err) => {
+        this.configSaving = false;
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || err?.error?.message || 'فشل حفظ قواعد الحضور' });
+      }
+    });
+  }
+
+  cancelRuleGroups(): void {
+    this.ruleGroupsDialogVisible = false;
+    this.editableRuleGroups = [];
+  }
+
   private updateBlockedMessage(): void {
     this.blockedMessage = this.pageBlockedMessage || this.runtimeBlockedMessage || '';
     if (this.blockedMessage) this.scannerOverlayVisible = false;
@@ -1844,7 +1920,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private configuredTypeHasDays(type: AttendanceType, family = this.selectedFamily): boolean {
-    return this.configDaysForType(type, family).length > 0;
+    const scheduleDays = this.attendanceContext?.scheduleDays?.[family]?.[type];
+    if (scheduleDays && scheduleDays.length > 0) return true;
+    return false;
   }
 
   private customEventsForCurrentFamily(): AttendanceCustomEvent[] {
@@ -1953,9 +2031,17 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     const grantDays = this.shouldEnforceGrantWindow() ? this.grantOccasionDaysForType(selectedType) : [];
     if (grantDays.length) return grantDays;
 
-    if (this.selectedType === 'MARMARKOS_KHORS') return this.configDaysForType('MARMARKOS_KHORS', 'خورس مارمرقس');
-    if (this.selectedType === 'ATHANASIUS_KHORS') return this.configDaysForType('ATHANASIUS_KHORS', 'خورس البابا أثناسيوس');
-    return this.configDaysForType(selectedType);
+    let family = this.selectedFamily;
+    if (this.selectedType === 'MARMARKOS_KHORS') family = 'خورس مارمرقس';
+    if (this.selectedType === 'ATHANASIUS_KHORS') family = 'خورس البابا أثناسيوس';
+
+    const scheduleDays = this.attendanceContext?.scheduleDays?.[family]?.[selectedType];
+    if (scheduleDays && scheduleDays.length > 0) return scheduleDays;
+
+    if (!this.attendanceContext?.scheduleDays || Object.keys(this.attendanceContext.scheduleDays).length === 0) {
+      return this.configDaysForType(selectedType, family);
+    }
+    return [];
   }
 
   private canOverrideAbsenceOpenClose(): boolean {
@@ -2005,6 +2091,69 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       }
     }
     return bounds;
+  }
+
+  private loadCancelledDates(): void {
+    const selectedType = this.selectedAttendanceType();
+    if (!selectedType || selectedType === 'CUSTOM_EVENT' || this.isSelfCheckinMode()) {
+      this.cancelledDisabledDates = [];
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setFullYear(start.getFullYear() - 1);
+
+    const from = this.toIsoDate(start);
+    const to = this.toIsoDate(today);
+
+    const family = this.selectedFamily;
+
+    const scheduleCreated = this.attendanceContext?.scheduleCreatedDates?.[family || '']?.[selectedType];
+    const scheduleCreatedDatesMap = scheduleCreated || {};
+
+    this.attendance.getCancelledDatesInRange(from, to, selectedType, family).subscribe({
+      next: (res) => {
+        const disabled = (res.dates || []).map((d) => {
+          const dt = new Date(d + 'T00:00:00');
+          dt.setHours(0, 0, 0, 0);
+          return dt;
+        });
+
+        const now = new Date();
+        const todayDow = today.getDay();
+
+        const cursor = new Date(start);
+        while (cursor <= today) {
+          const dow = String(cursor.getDay());
+          const createdDateStr = scheduleCreatedDatesMap[dow];
+          if (createdDateStr) {
+            const createdDate = new Date(createdDateStr + 'T00:00:00');
+            createdDate.setHours(0, 0, 0, 0);
+            if (cursor < createdDate) {
+              disabled.push(new Date(cursor));
+            }
+          }
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+        if (family) {
+          const scheduleTimeStr = this.attendanceContext?.scheduleTimes?.[family]?.[selectedType]?.[String(todayDow)];
+          if (scheduleTimeStr) {
+            const [h, m] = scheduleTimeStr.split(':').map(Number);
+            const scheduleDt = new Date(today);
+            scheduleDt.setHours(h, m, 0, 0);
+            if (now < scheduleDt) {
+              disabled.push(new Date(today));
+            }
+          }
+        }
+
+        this.cancelledDisabledDates = disabled;
+      },
+      error: () => (this.cancelledDisabledDates = [])
+    });
   }
 
   private updateCalendarForSelectedType(keepCurrentDate = false): void {
@@ -2057,12 +2206,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (bounds.max && bounds.max < maxDate) maxDate = bounds.max;
     this.minDate = minDate;
     this.maxDate = maxDate;
+
+    this.loadCancelledDates();
+
     if (keepCurrentDate && current && current >= minDate && current <= maxDate && this.dateMatchesSelectedType(current)) {
       this.refreshAvailableCustomEvents();
       return;
     }
 
-    this.selectedDate = this.findLatestAllowedTypeDate(today, minDate, maxDate);
+    this.selectedDate = null;
     this.refreshAvailableCustomEvents();
   }
 
@@ -2100,22 +2252,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const canOverrideWeekClose = this.canOverrideAbsenceOpenClose();
-
-    if (!canOverrideWeekClose && !this.shouldEnforceGrantWindow() && !this.configAbsenceOpenDays().includes(today.getDay())) {
+    if (!this.canOverrideAbsenceOpenClose() && !this.shouldEnforceGrantWindow() && !this.configAbsenceOpenDays().includes(today.getDay())) {
       this.pageBlockedMessage = 'تسجيل الغياب مقفول اليوم حسب الإعدادات الحالية لهذه الأسرة.';
     }
 
-    const todayDay = today.getDay();
-    const diffToMonday = (todayDay + 6) % 7;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - diffToMonday);
-
-    this.minDate = canOverrideWeekClose ? new Date(2000, 0, 1) : monday;
-
-    if (this.isKhadim()) {
-      this.minDate = new Date(2000, 0, 1);
-    }
+    this.minDate = today;
 
     this.updateCalendarForSelectedType(false);
     this.updateBlockedMessage();
@@ -2265,6 +2406,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.refreshTypeOptions();
     this.loadMembersForFamily();
     this.loadCustomEventsForFamily();
+    this.loadScheduleItemsForFamily();
     this.initCalendarRules();
     this.refreshRuntimeState();
   }
@@ -2275,9 +2417,52 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.searchTimer = setTimeout(() => this.runSearch(), 250);
   }
 
+  onSearchAllFamiliesChange(): void {
+    const q = (this.searchText || '').trim();
+    if (!q) return;
+    if (this.searchAllFamilies) {
+      this.runSearch();
+    } else {
+      this.loadMembersForFamily();
+    }
+  }
+
   private runSearch() {
     const q = (this.searchText || '').trim();
-    if (!q) this.globalResults = [];
+    if (!q) {
+      this.globalResults = [];
+      this.searching = false;
+      this.loadMembersForFamily();
+      return;
+    }
+    if (!this.searchAllFamilies) {
+      this.searching = false;
+      return;
+    }
+    this.searching = true;
+    this.membersLoading = true;
+    const allFamilies = this.families;
+    const requests = allFamilies.map((family) =>
+      this.familySvc.members(family, true, 'attendance').pipe(
+        catchError((err) => {
+          console.error('Failed to load attendance family members', family, err);
+          return of([] as any[]);
+        })
+      )
+    );
+    forkJoin(requests.length ? requests : [of([] as any[])]).subscribe({
+      next: (groups) => {
+        const merged = groups.flatMap((group: any) => Array.isArray(group) ? group : []);
+        const unique = Array.from(new Map(merged.map((user: any) => [Number(user?.id), user])).values());
+        this.members = unique.map(this.toPickUser);
+        this.membersLoading = false;
+        this.searching = false;
+      },
+      error: () => {
+        this.membersLoading = false;
+        this.searching = false;
+      }
+    });
   }
 
   private loadFamilies() {
@@ -2770,6 +2955,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   private grantDaysForType(type: AttendanceType): number[] {
     if (type === 'CUSTOM_EVENT') return [];
     const family = this.grantPrimaryScopeFamily();
+    const scheduleDays = this.attendanceContext?.scheduleDays?.[family]?.[type];
+    if (scheduleDays && scheduleDays.length > 0) return scheduleDays;
     return this.configDaysForType(type, family);
   }
 
@@ -3071,16 +3258,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.grantSelectedWeekday = selectedDay;
     this.grantForm.dayOfWeek = selectedDay;
 
-    const anchor = this.nextMatchingWeekday(selectedDay, this.grantStartsAtDate || new Date());
+    const family = this.grantPrimaryScopeFamily();
+    const selectedType = (this.grantForm.allowedTypes || [])[0] || 'FRIDAY_LITURGY';
+    const scheduleTimeStr = this.attendanceContext?.scheduleTimes?.[family]?.[selectedType]?.[String(selectedDay)];
 
-    if (!this.grantStartsAtDate) {
+    if (!this.grantStartsAtDate && scheduleTimeStr) {
+      const [h, m] = scheduleTimeStr.split(':').map(Number);
+      const sz = this.nextMatchingWeekday(selectedDay, new Date());
+      sz.setHours(h, m, 0, 0);
+      this.onGrantStartDateChange(sz);
+    } else if (!this.grantStartsAtDate) {
+      const anchor = this.nextMatchingWeekday(selectedDay, new Date());
       this.onGrantStartDateChange(this.withDatePart(null, anchor));
     }
+
     if (!this.grantEndsAtDate) {
-      const endBase = this.withDatePart(null, this.grantStartsAtDate || anchor);
-      if (!this.grantStartsAtDate || endBase.getTime() <= this.grantStartsAtDate.getTime()) {
-        endBase.setHours(endBase.getHours() + 2);
-      }
+      const endBase = new Date(this.grantStartsAtDate || this.nextMatchingWeekday(selectedDay, new Date()));
+      endBase.setHours(endBase.getHours() + 2);
       this.onGrantEndDateChange(endBase);
     }
 
@@ -3967,6 +4161,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const family = this.grantPrimaryScopeFamily();
+    const selectedType = (this.grantForm.allowedTypes || [])[0] || 'FRIDAY_LITURGY';
+    const beforeSchedule = windows.find((item) => {
+      const schedTime = this.attendanceContext?.scheduleTimes?.[family]?.[selectedType]?.[String(item.day)];
+      if (!schedTime || !item.startsAt) return false;
+      const [h, m] = schedTime.split(':').map(Number);
+      const schedDt = new Date(item.startsAt);
+      schedDt.setHours(h, m, 0, 0);
+      return item.startsAt.getTime() < schedDt.getTime();
+    });
+    if (beforeSchedule) {
+      this.message.add({ severity: 'warn', summary: 'تنبيه', detail: `لا يمكن ان يكون التخصيص قبل ميعاد المناسبة يوم ${this.dayLabel(beforeSchedule.day)}` });
+      return;
+    }
+
     const pastWindow = this.grantDialogMode === 'create'
       ? windows.find((item) => this.isBeforeToday(item.startsAt) || this.isBeforeToday(item.endsAt))
       : null;
@@ -4754,36 +4963,27 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   private loadCustomEventDialogScopeEvents(forceNewSelection = false, preferredKey = ''): void {
     const familyBase = String(this.customEventForm.familyBase || '').trim();
-    const request$ = familyBase
-      ? this.attendance.listCustomEvents(familyBase)
-      : this.attendance.listCustomEvents();
+    const events = this.cachedAllCustomEvents || [];
+    this.useDialogEvents(events, familyBase, forceNewSelection, preferredKey);
+  }
 
-    request$.subscribe({
-      next: (events) => {
-        const filtered = this.filterAthanasiusVisibilityForEvents(
-          this.uniqueCustomEvents(this.filterCustomEventsForDialogScope(events || [], familyBase))
-        );
-        this.customEventDialogEvents = filtered;
-        this.customEventDialogGroups = this.groupCustomEvents(filtered);
+  private useDialogEvents(events: AttendanceCustomEvent[], familyBase: string, forceNewSelection: boolean, preferredKey: string): void {
+    const filtered = this.filterAthanasiusVisibilityForEvents(
+      this.uniqueCustomEvents(this.filterCustomEventsForDialogScope(events || [], familyBase))
+    );
+    this.customEventDialogEvents = filtered;
+    this.customEventDialogGroups = this.groupCustomEvents(filtered);
 
-        const wantedKey = preferredKey || this.customEventDialogSelection;
-        if (wantedKey.startsWith('DEFAULT:')) return;
-        const matched = this.customEventDialogGroups.find((group) => group.key === wantedKey);
-        if (!forceNewSelection && matched) {
-          this.customEventDialogSelection = matched.key;
-          this.applyCustomEventGroupToForm(matched);
-          return;
-        }
+    const wantedKey = preferredKey || this.customEventDialogSelection;
+    if (wantedKey.startsWith('DEFAULT:')) return;
+    const matched = this.customEventDialogGroups.find((group) => group.key === wantedKey);
+    if (!forceNewSelection && matched) {
+      this.customEventDialogSelection = matched.key;
+      this.applyCustomEventGroupToForm(matched);
+      return;
+    }
 
-        this.selectFirstCustomEventOption();
-      },
-      error: () => {
-        this.customEventDialogEvents = [];
-        this.customEventDialogGroups = [];
-        if (this.customEventDialogSelection.startsWith('DEFAULT:')) return;
-        this.selectFirstCustomEventOption();
-      }
-    });
+    this.selectFirstCustomEventOption();
   }
 
   private selectFirstCustomEventOption(): void {
@@ -5047,20 +5247,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
             ? `تم حفظ المناسبة لأيام: ${this.customEventSelectedDaysLabel()}`
             : 'تم حفظ المناسبة بنجاح'
         });
-        const savedEvents = responses.slice(0, selectedDays.length) as AttendanceCustomEvent[];
-        const baseEvents = [...(this.cachedAllCustomEvents || [])]
-          .filter((ev) => !removeIds.has(Number(ev.id)));
-        for (const saved of savedEvents) {
-          if (!saved) continue;
-          const idx = baseEvents.findIndex((ev) => Number(ev.id) === Number(saved.id));
-          if (idx >= 0) {
-            baseEvents[idx] = saved;
-          } else {
-            baseEvents.push(saved);
-          }
-        }
-        this.applyCustomEventsToView(baseEvents);
-        this.onDateChange();
+        this.loadCustomEventsForFamily();
       },
       error: (err) => {
         this.customEventSaving = false;
@@ -5245,5 +5432,313 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       minute: '2-digit',
       hour12: true
     }).format(date);
+  }
+
+  // ===== Schedule management =====
+
+  canManageSchedules(): boolean {
+    return this.canManageAccessGrants() || this.canUseCustomEvent() || this.isAminKhedmaOrDeveloper();
+  }
+
+  loadScheduleItemsForFamily(): void {
+    if (!this.selectedFamily) {
+      this.scheduleItems = [];
+      return;
+    }
+    this.attendance.getSchedules(this.selectedFamily).subscribe({
+      next: (list: any[]) => {
+        this.scheduleItems = list || [];
+      },
+      error: () => {
+        this.scheduleItems = [];
+      }
+    });
+  }
+
+  get scheduleTypeOptions(): { value: AttendanceType; label: string }[] {
+    return this.configurableTypeOptions;
+  }
+
+  get scheduleDayOptions(): { value: number; label: string }[] {
+    return this.attendanceDayOptions;
+  }
+
+  get scheduleAvailableDayOptions(): { value: number; label: string }[] {
+    const type = this.scheduleForm.type;
+    if (!type) return this.scheduleDayOptions;
+    const validDays = this.configDaysForType(type as AttendanceType, this.scheduleForm.familyBase || undefined);
+    if (!validDays || !validDays.length) return this.scheduleDayOptions;
+    return this.scheduleDayOptions.filter(d => validDays.includes(d.value));
+  }
+
+  get editScheduleDayOptions(): { value: number; label: string }[] {
+    const item = this.editScheduleItem;
+    if (!item?.type) return this.scheduleDayOptions;
+    const validDays = this.configDaysForType(item.type as AttendanceType, item.familyBase || this.selectedFamily || undefined);
+    if (!validDays || !validDays.length) return this.scheduleDayOptions;
+    return this.scheduleDayOptions.filter(d => validDays.includes(d.value));
+  }
+
+  scheduleTypeLabel(type: string): string {
+    const opt = this.scheduleTypeOptions.find(t => t.value === type);
+    return opt?.label || type;
+  }
+
+  scheduleDayLabel(day: number): string {
+    const opt = this.scheduleDayOptions.find(d => d.value === day);
+    return opt?.label || String(day);
+  }
+
+  scheduleTimeLabel(time: string): string {
+    if (!time) return '';
+    const parts = time.split(':');
+    if (parts.length < 2) return time;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return time;
+    const period = h >= 12 ? 'م' : 'ص';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  }
+
+  onScheduleFamilyChange(): void {
+    this.loadScheduleItems();
+  }
+
+  onScheduleTypeChange(): void {
+    const options = this.scheduleAvailableDayOptions;
+    if (options.length && !options.some(d => d.value === this.scheduleForm.dayOfWeek)) {
+      this.scheduleForm.dayOfWeek = options[0].value;
+    }
+  }
+
+  confirmScheduleTime(picker: any): void {
+    picker.overlayVisible = false;
+  }
+
+  cancelScheduleTime(picker: any): void {
+    this.scheduleForm.time = null;
+    picker.overlayVisible = false;
+  }
+
+  openScheduleDialog(): void {
+    this.scheduleForm = { familyBase: '', type: '', dayOfWeek: 5, time: null };
+    this.scheduleItems = [];
+    this.scheduleSaving = false;
+    this.editingScheduleId = null;
+
+    if (this.isAminKhedmaOrDeveloper()) {
+      this.familySvc.families().subscribe({
+        next: (list) => {
+          this.scheduleFamilies = list;
+          if (list.length) {
+            this.scheduleForm.familyBase = (this.selectedFamily && list.includes(this.selectedFamily))
+              ? this.selectedFamily
+              : list[0];
+            this.loadScheduleItems();
+          }
+          this.scheduleDialogVisible = true;
+        },
+        error: () => {
+          this.scheduleFamilies = [];
+          this.scheduleDialogVisible = true;
+        }
+      });
+    } else {
+      const myFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
+      const base = String(myFamily).replace(/ [أب]$/, '').trim();
+      this.scheduleFamilies = base ? [base] : [];
+      if (base) this.scheduleForm.familyBase = base;
+      this.loadScheduleItems();
+      this.scheduleDialogVisible = true;
+    }
+  }
+
+  closeScheduleDialog(): void {
+    this.scheduleDialogVisible = false;
+    this.scheduleItems = [];
+    this.scheduleFamilies = [];
+    this.editingScheduleId = null;
+  }
+
+  private loadScheduleItems(): void {
+    const base = this.scheduleForm.familyBase;
+    if (!base) {
+      this.scheduleItems = [];
+      return;
+    }
+    this.attendance.getSchedules(base).subscribe({
+      next: (list: any[]) => {
+        this.scheduleItems = list || [];
+      },
+      error: () => {
+        this.scheduleItems = [];
+      }
+    });
+  }
+
+  private refreshFromScheduleChanges(): void {
+    this.attendance.context().subscribe({
+      next: (ctx) => {
+        this.attendanceContext = { ...this.attendanceContext!, ...ctx, config: this.mergeConfig(ctx?.config) };
+        this.configEditor = this.mergeConfig(ctx?.config);
+        this.initCalendarRules();
+        this.loadCancelledDates();
+        this.refreshRuntimeState();
+      },
+      error: () => {}
+    });
+  }
+
+  addSchedule(): void {
+    const base = this.scheduleForm.familyBase;
+    const type = this.scheduleForm.type;
+    if (!base || !type) return;
+
+    this.scheduleSaving = true;
+    const timeStr = this.scheduleForm.time
+      ? `${String(this.scheduleForm.time.getHours()).padStart(2, '0')}:${String(this.scheduleForm.time.getMinutes()).padStart(2, '0')}`
+      : undefined;
+
+    const deleteOld = this.editingScheduleId
+      ? this.attendance.deleteSchedule(this.editingScheduleId)
+      : undefined;
+
+    const doCreate = () => this.attendance.createSchedule({
+      familyBase: base,
+      type: type as AttendanceType,
+      dayOfWeek: this.scheduleForm.dayOfWeek,
+      time: timeStr
+    });
+
+    const onDone = () => {
+      this.scheduleSaving = false;
+      this.editingScheduleId = null;
+      this.loadScheduleItems();
+      this.refreshFromScheduleChanges();
+    };
+
+    if (deleteOld) {
+      deleteOld.subscribe({
+        next: () => doCreate().subscribe({
+          next: () => onDone(),
+          error: (err: any) => {
+            this.scheduleSaving = false;
+            console.error('Failed to create schedule after delete', err);
+          }
+        }),
+        error: (err: any) => {
+          this.scheduleSaving = false;
+          console.error('Failed to delete old schedule', err);
+        }
+      });
+    } else {
+      doCreate().subscribe({
+        next: () => onDone(),
+        error: (err: any) => {
+          this.scheduleSaving = false;
+          console.error('Failed to create schedule', err);
+        }
+      });
+    }
+  }
+
+  editSchedule(s: any): void {
+    this.editScheduleItem = s;
+    this.editScheduleDay = s.dayOfWeek;
+    if (s.time) {
+      const [h, m] = s.time.split(':').map(Number);
+      const d = new Date();
+      d.setHours(h, m, 0, 0);
+      this.editScheduleTime = d;
+    } else {
+      this.editScheduleTime = null;
+    }
+    this.editScheduleDialogVisible = true;
+  }
+
+  confirmEditScheduleTime(picker: any): void {
+    picker.overlayVisible = false;
+  }
+
+  cancelEditScheduleTime(picker: any): void {
+    this.editScheduleTime = null;
+    picker.overlayVisible = false;
+  }
+
+  closeEditScheduleDialog(): void {
+    this.editScheduleDialogVisible = false;
+    this.editScheduleItem = null;
+    this.editScheduleTime = null;
+    this.editScheduleDay = 5;
+  }
+
+  saveEditedSchedule(): void {
+    const s = this.editScheduleItem;
+    if (!s || !s.id) return;
+    this.scheduleSaving = true;
+    const timeStr = this.editScheduleTime
+      ? `${String(this.editScheduleTime.getHours()).padStart(2, '0')}:${String(this.editScheduleTime.getMinutes()).padStart(2, '0')}`
+      : undefined;
+    this.attendance.deleteSchedule(s.id).subscribe({
+      next: () => {
+        this.attendance.createSchedule({
+          familyBase: s.familyBase,
+          type: s.type as AttendanceType,
+          dayOfWeek: this.editScheduleDay,
+          time: timeStr
+        }).subscribe({
+          next: () => {
+            this.scheduleSaving = false;
+            this.closeEditScheduleDialog();
+            this.loadScheduleItems();
+            this.refreshFromScheduleChanges();
+          },
+          error: (err: any) => {
+            this.scheduleSaving = false;
+            console.error('Failed to create edited schedule', err);
+          }
+        });
+      },
+      error: (err: any) => {
+        this.scheduleSaving = false;
+        console.error('Failed to delete old schedule for edit', err);
+      }
+    });
+  }
+
+  trackScheduleItem(_: number, item: any): number {
+    return item.id || _;
+  }
+
+  toggleSchedule(s: any): void {
+    this.attendance.createSchedule({
+      familyBase: s.familyBase,
+      type: s.type as AttendanceType,
+      dayOfWeek: s.dayOfWeek,
+      time: s.time,
+      enabled: !s.enabled
+    }).subscribe({
+      next: () => {
+        this.loadScheduleItems();
+        this.refreshFromScheduleChanges();
+      },
+      error: (err: any) => {
+        console.error('Failed to toggle schedule', err);
+      }
+    });
+  }
+
+  deleteSchedule(s: any): void {
+    if (!s.id) return;
+    this.attendance.deleteSchedule(s.id).subscribe({
+      next: () => {
+        this.loadScheduleItems();
+        this.refreshFromScheduleChanges();
+      },
+      error: (err: any) => {
+        console.error('Failed to delete schedule', err);
+      }
+    });
   }
 }
