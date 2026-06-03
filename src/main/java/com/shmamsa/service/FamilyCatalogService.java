@@ -38,15 +38,20 @@ public class FamilyCatalogService {
             item.setSortOrder(def.getSortOrder());
             item.setServantSelectable(def.getServantSelectable());
             item.setMemberSelectable(def.getMemberSelectable());
+            item.setKhorsSelectable(def.getKhorsSelectable());
+            item.setAttendKhorsSelectable(def.getAttendKhorsSelectable());
             familyCatalogRepository.save(item);
         }
     }
 
     public List<FamilyOptionDto> listForAudience(String audience) {
         String normalized = String.valueOf(audience == null ? "" : audience).trim().toUpperCase(Locale.ROOT);
-        List<FamilyCatalog> items = "SERVANT".equals(normalized)
-                ? familyCatalogRepository.findByActiveTrueAndServantSelectableTrueOrderBySortOrderAscNameArAsc()
-                : familyCatalogRepository.findByActiveTrueAndMemberSelectableTrueOrderBySortOrderAscNameArAsc();
+        List<FamilyCatalog> items = switch (normalized) {
+            case "SERVANT" -> familyCatalogRepository.findByActiveTrueAndServantSelectableTrueOrderBySortOrderAscNameArAsc();
+            case "KHORS" -> familyCatalogRepository.findByActiveTrueAndKhorsSelectableTrueOrderBySortOrderAscNameArAsc();
+            case "KHORS_ATTEND" -> familyCatalogRepository.findByActiveTrueAndAttendKhorsSelectableTrueOrderBySortOrderAscNameArAsc();
+            default -> familyCatalogRepository.findByActiveTrueAndMemberSelectableTrueOrderBySortOrderAscNameArAsc();
+        };
         return items.stream().map(this::toDto).toList();
     }
 
@@ -224,6 +229,7 @@ public class FamilyCatalogService {
 
     private FamilyCatalog family(String code, String nameAr, String baseName, String branch, String category,
                                  int sortOrder, boolean servantSelectable, boolean memberSelectable) {
+        boolean isKhors = "KHORS".equals(category);
         return FamilyCatalog.builder()
                 .code(code)
                 .nameAr(nameAr)
@@ -234,6 +240,8 @@ public class FamilyCatalogService {
                 .sortOrder(sortOrder)
                 .servantSelectable(servantSelectable)
                 .memberSelectable(memberSelectable)
+                .khorsSelectable(isKhors)
+                .attendKhorsSelectable(isKhors)
                 .build();
     }
 }

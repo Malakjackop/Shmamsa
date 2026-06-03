@@ -196,6 +196,8 @@ export interface FamilyCatalog {
   sortOrder: number;
   servantSelectable: boolean;
   memberSelectable: boolean;
+  khorsSelectable: boolean;
+  attendKhorsSelectable: boolean;
   directJoinGrades?: string;
   directJoinFrom?: string;
   directJoinUntil?: string;

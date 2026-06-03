@@ -17,6 +17,10 @@
       <i class="pi pi-key"></i>
       <span>إنشاء كود سري</span>
     </button>
+    <button class="tab-btn" [class.active]="activeTab === 'permissions'" (click)="loadRoles(); activeTab = 'permissions'">
+      <i class="pi pi-lock"></i>
+      <span>الصلاحيات</span>
+    </button>
   </div>
 
   <!-- ── Main Content Area ─────────────────────────────── -->
@@ -51,14 +55,17 @@
               <h2> حقول التسجيل</h2>
             </div>
 
-            <div class="sections-stack">
-              <section class="fields-section" *ngFor="let section of groupedSections">
-                <div class="fields-section__head">
-                  <h3>{{ section.title }}</h3>
-                  <span>{{ section.fields.length }} حقل</span>
+            <div class="sections-stack" cdkDropList [cdkDropListData]="groupedSections" (cdkDropListDropped)="dropCategory($event)">
+              <section class="fields-section" *ngFor="let section of groupedSections" cdkDrag cdkDragLockAxis="y" [class.is-expanded]="!collapsedSectionIds.has(section.id)">
+                <div class="fields-section__trigger" (click)="toggleSection(section.id)">
+                  <span class="section-drag-handle" cdkDragHandle><span class="drag-dots"></span></span>
+                  <span class="fields-section__title">{{ section.title }}</span>
+                  <span class="fields-section__count">{{ section.fields.length }} حقل</span>
+                  <i class="pi" [class.pi-chevron-up]="!collapsedSectionIds.has(section.id)" [class.pi-chevron-down]="collapsedSectionIds.has(section.id)"></i>
                 </div>
 
-                <div class="fields-list" cdkDropList [cdkDropListData]="section.fields" (cdkDropListDropped)="dropSection($event, section.id)">
+                <div class="fields-section__panel" *ngIf="!collapsedSectionIds.has(section.id)">
+                  <div class="fields-list" cdkDropList [cdkDropListData]="section.fields" (cdkDropListDropped)="dropSection($event, section.id)">
                   <div class="field-wrapper" *ngFor="let f of section.fields" cdkDrag cdkDragLockAxis="y" [class.disabled-field]="!f.enabled">
                     <div class="field-actions-overlay">
                       <div class="field-main">
@@ -85,6 +92,7 @@
                     </div>
 
                     <div *cdkDragPlaceholder class="field-placeholder"></div>
+                  </div>
                   </div>
                 </div>
               </section>
@@ -188,30 +196,42 @@
             الأسر المسجلة
           </div>
 
-          <div class="families-list" *ngIf="families.length > 0">
-            <div class="family-card" *ngFor="let f of families; let i = index" [class.inactive]="!f.active">
-              <div class="family-card__main">
-                <div class="family-card__order-controls">
-                  <button class="order-btn" (click)="moveFamilyUp(i)" [disabled]="i === 0" title="تحريك لأعلى">
-                    <i class="pi pi-chevron-up"></i>
-                  </button>
-                  <span class="order-num">{{ i + 1 }}</span>
-                  <button class="order-btn" (click)="moveFamilyDown(i)" [disabled]="i === families.length - 1" title="تحريك لأسفل">
-                    <i class="pi pi-chevron-down"></i>
-                  </button>
-                </div>
-                <div class="family-card__info">
-                  <div class="family-card__name">{{ f.nameAr }}</div>
+          <div class="sections-stack" *ngIf="families.length > 0">
+            <section class="fields-section" *ngFor="let group of familiesGrouped" [class.is-expanded]="!familyCategoryCollapsedIds.has(group.category)">
+              <div class="fields-section__trigger" (click)="toggleFamilyCategory(group.category)">
+                <span class="fields-section__title">{{ group.label }}</span>
+                <span class="fields-section__count">{{ group.families.length }}</span>
+                <i class="pi" [class.pi-chevron-up]="!familyCategoryCollapsedIds.has(group.category)" [class.pi-chevron-down]="familyCategoryCollapsedIds.has(group.category)"></i>
+              </div>
+
+              <div class="fields-section__panel" *ngIf="!familyCategoryCollapsedIds.has(group.category)">
+                <div class="families-list">
+                  <div class="family-card" *ngFor="let f of group.families; let i = index" [class.inactive]="!f.active">
+                    <div class="family-card__main">
+                      <div class="family-card__order-controls">
+                        <button class="order-btn" (click)="moveFamilyUp(getFamilyIndex(f))" [disabled]="getFamilyIndex(f) === 0" title="تحريك لأعلى">
+                          <i class="pi pi-chevron-up"></i>
+                        </button>
+                        <span class="order-num">{{ getFamilyIndex(f) + 1 }}</span>
+                        <button class="order-btn" (click)="moveFamilyDown(getFamilyIndex(f))" [disabled]="getFamilyIndex(f) === families.length - 1" title="تحريك لأسفل">
+                          <i class="pi pi-chevron-down"></i>
+                        </button>
+                      </div>
+                      <div class="family-card__info">
+                        <div class="family-card__name">{{ f.nameAr }}</div>
+                      </div>
+                    </div>
+                    <div class="action-btns-overlay">
+                      <button class="toggle-btn" [class.on]="f.active" (click)="toggleFamilyActive(f)" title="تفعيل / تعطيل">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                      </button>
+                      <button class="icon-btn edit" (click)="openEditFamily(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
+                      <button class="icon-btn delete" (click)="deleteFamily(f)" title="حذف"><i class="pi pi-trash"></i></button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="action-btns-overlay">
-                <button class="toggle-btn" [class.on]="f.active" (click)="toggleFamilyActive(f)" title="تفعيل / تعطيل">
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                </button>
-                <button class="icon-btn edit" (click)="openEditFamily(f)" title="تعديل"><i class="pi pi-pencil"></i></button>
-                <button class="icon-btn delete" (click)="deleteFamily(f)" title="حذف"><i class="pi pi-trash"></i></button>
-              </div>
-            </div>
+            </section>
           </div>
 
           <div class="empty-state" *ngIf="!familiesLoading && families.length === 0">
@@ -220,6 +240,70 @@
               <p>لا توجد أسر مسجلة بعد</p>
             </div>
           </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- ══ Permissions Tab ═══════════════════════════════════ -->
+    <ng-container *ngIf="activeTab === 'permissions'">
+      <div class="page-header">
+        <div class="header-content">
+          <div class="header-icon">
+            <i class="pi pi-lock"></i>
+          </div>
+          <div>
+            <h1>إدارة الصلاحيات</h1>
+            <p>تحكم في الأدوار والصلاحيات المتاحة لكل دور</p>
+          </div>
+        </div>
+        <button class="btn-add" (click)="openCreateRole()">
+          <i class="pi pi-plus"></i>
+          إضافة دور جديد
+        </button>
+      </div>
+
+      <div class="builder-container">
+        <div class="form-preview">
+          <div class="section-title">
+            <i class="pi pi-list"></i>
+            الأدوار الحالية
+          </div>
+
+          <div class="roles-list" *ngIf="!roleLoading; else roleLoadingTpl">
+            <div class="role-card" *ngFor="let r of roles; let i = index" [class.inactive]="!r.active">
+              <div class="role-card__main">
+                <div class="role-card__order-controls">
+                  <button class="order-btn" (click)="moveRoleUp(i)" [disabled]="i === 0" title="تحريك لأعلى">
+                    <i class="pi pi-chevron-up"></i>
+                  </button>
+                  <span class="order-num">{{ i + 1 }}</span>
+                  <button class="order-btn" (click)="moveRoleDown(i)" [disabled]="i === roles.length - 1" title="تحريك لأسفل">
+                    <i class="pi pi-chevron-down"></i>
+                  </button>
+                </div>
+                <div class="role-card__info">
+                  <div class="role-card__name">{{ r.displayNameAr }}</div>
+                  <div class="role-card__code">{{ r.name }}</div>
+                </div>
+              </div>
+              <div class="action-btns-overlay">
+                <button class="toggle-btn" [class.on]="r.active" (click)="toggleRoleActive(r)" title="تفعيل / تعطيل">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </button>
+                <button class="icon-btn edit" (click)="openEditRole(r)" title="تعديل"><i class="pi pi-pencil"></i></button>
+                <button class="icon-btn delete" (click)="deleteRole(r)" title="حذف"><i class="pi pi-trash"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #roleLoadingTpl>
+            <div class="empty-state">
+              <div class="dashed-box">
+                <i class="pi pi-spin pi-spinner"></i>
+                <p>جاري التحميل...</p>
+              </div>
+            </div>
+          </ng-template>
         </div>
       </div>
     </ng-container>
@@ -279,14 +363,28 @@
     <div class="form-group checkbox-group">
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="editingFamily.servantSelectable" />
-        <span>يظهر في اختيارات الخدام</span>
+        <span>يظهر في قائمة  بتخدم فين </span>
       </label>
     </div>
 
     <div class="form-group checkbox-group">
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="editingFamily.memberSelectable" />
-        <span>يظهر في اختيارات المخدومين</span>
+        <span>يظهر في قائمة الأسر</span>
+      </label>
+    </div>
+
+    <div class="form-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="editingFamily.khorsSelectable" />
+        <span>يظهر في قائمة الخورس</span>
+      </label>
+    </div>
+
+    <div class="form-group checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="editingFamily.attendKhorsSelectable" />
+        <span>يظهر في حضور الخورس</span>
       </label>
     </div>
 
@@ -351,6 +449,53 @@
       <button class="btn-save" (click)="saveFamily()">
         <i class="pi pi-check"></i>
         {{ familyDialogMode === 'create' ? 'إنشاء' : 'حفظ التعديلات' }}
+      </button>
+    </div>
+  </ng-template>
+</p-dialog>
+
+<!-- ══ ROLE CREATE / EDIT DIALOG ═════════════════════════ -->
+<p-dialog
+  [header]="roleDialogMode === 'create' ? 'إضافة دور جديد' : 'تعديل الدور'"
+  [(visible)]="roleDialogVisible"
+  [modal]="true"
+  [blockScroll]="true"
+  [style]="{ width: '580px' }"
+  [baseZIndex]="10000"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="dev-dialog app-surface-dialog"
+  dir="rtl">
+
+  <div class="dialog-body">
+    <div class="form-group" *ngIf="roleDialogMode === 'create'">
+      <label>اسم الدور (بالإنجليزي)</label>
+      <input type="text" [(ngModel)]="editingRole.name" placeholder="مثال: SERVANT" dir="ltr" />
+      <small>حروف إنجليزية كبيرة وأرقام و _ فقط</small>
+    </div>
+
+    <div class="form-group">
+      <label>اسم الدور (بالعربي)</label>
+      <input type="text" [(ngModel)]="editingRole.displayNameAr" placeholder="مثال: خادم" />
+    </div>
+
+    <div class="form-group">
+      <label>الصلاحيات</label>
+      <div class="perms-grid">
+        <label class="perm-checkbox" *ngFor="let perm of allPermissions">
+          <input type="checkbox" [checked]="hasPermission(perm)" (change)="togglePermission(perm, $event.target.checked)" />
+          <span>{{ permissionLabel(perm) }}</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <button class="btn-cancel" (click)="roleDialogVisible = false">إلغاء</button>
+      <button class="btn-save" (click)="saveRole()">
+        <i class="pi pi-check"></i>
+        {{ roleDialogMode === 'create' ? 'إنشاء' : 'حفظ التعديلات' }}
       </button>
     </div>
   </ng-template>

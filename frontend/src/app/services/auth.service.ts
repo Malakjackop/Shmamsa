@@ -111,7 +111,7 @@ export class AuthService {
     );
   }
 
-  getFamilyOptions(audience: 'SERVANT' | 'MEMBER'): Observable<FamilyOption[]> {
+  getFamilyOptions(audience: 'SERVANT' | 'MEMBER' | 'KHORS' | 'KHORS_ATTEND'): Observable<FamilyOption[]> {
     if (!this.isBrowser) return of([]);
     return this.http.get<FamilyOption[]>(`${this.baseUrl}/family-options?audience=${audience}`, { withCredentials: true }).pipe(
       map((res) => (Array.isArray(res) ? res : [])),

@@ -82,6 +82,8 @@ export class RegisterComponent implements OnInit {
   showConfirmPassword = false;
   memberFamilyOptions: FamilyOption[] = [];
   servantWhereOptions: FamilyOption[] = [];
+  khorsFamilyOptions: FamilyOption[] = [];
+  attendKhorsFamilyOptions: FamilyOption[] = [];
 
   orderedFields: CustomField[] = [];
   private devSettingsService = inject(DevSettingsService);
@@ -133,6 +135,26 @@ export class RegisterComponent implements OnInit {
 
   get servingWhereValue(): string {
     return this.familyNameFromValue(this.registerForm?.get('servingWhere')?.value, this.servantWhereOptions);
+  }
+
+  get khorsOptionValues(): FamilyOption[] {
+    return [...this.khorsFamilyOptions, { nameAr: 'بدون خورس' }];
+  }
+
+  get attendKhorsOptionValues(): FamilyOption[] {
+    return [...this.attendKhorsFamilyOptions, { nameAr: 'بدون خورس' }];
+  }
+
+  isKhorsServingWhere(): boolean {
+    return this.khorsFamilyOptions.some(k => k.nameAr === this.servingWhereValue);
+  }
+
+  get firstKhorsName(): string {
+    return this.khorsFamilyOptions.length > 0 ? this.khorsFamilyOptions[0].nameAr : '';
+  }
+
+  get secondKhorsName(): string {
+    return this.khorsFamilyOptions.length > 1 ? this.khorsFamilyOptions[1].nameAr : '';
   }
   private buildForm() {
     const minAge = this.isServant ? 16 : 6;
@@ -223,6 +245,24 @@ export class RegisterComponent implements OnInit {
           }
         }
       });
+    this.http.get<FamilyOption[]>(`/api/auth/family-options?audience=KHORS`, { withCredentials: true })
+      .subscribe({
+        next: (options) => {
+          this.khorsFamilyOptions = Array.isArray(options) && options.length ? options : this.fallbackKhorsOptions();
+        },
+        error: () => {
+          this.khorsFamilyOptions = this.fallbackKhorsOptions();
+        }
+      });
+    this.http.get<FamilyOption[]>(`/api/auth/family-options?audience=KHORS_ATTEND`, { withCredentials: true })
+      .subscribe({
+        next: (options) => {
+          this.attendKhorsFamilyOptions = Array.isArray(options) && options.length ? options : this.fallbackAttendKhorsOptions();
+        },
+        error: () => {
+          this.attendKhorsFamilyOptions = this.fallbackAttendKhorsOptions();
+        }
+      });
   }
 
   private fallbackMemberFamilyOptions(): FamilyOption[] {
@@ -251,6 +291,20 @@ export class RegisterComponent implements OnInit {
       { nameAr: 'اسرة القديس البابا كيرلس' },
       { nameAr: 'اسرة القديس الانبا ابرام' },
       { nameAr: 'اسرة القديس اسطفانوس' },
+      { nameAr: 'خورس مارمرقس' },
+      { nameAr: 'خورس البابا اثناسيوس' }
+    ];
+  }
+
+  private fallbackKhorsOptions(): FamilyOption[] {
+    return [
+      { nameAr: 'خورس مارمرقس' },
+      { nameAr: 'خورس البابا اثناسيوس' }
+    ];
+  }
+
+  private fallbackAttendKhorsOptions(): FamilyOption[] {
+    return [
       { nameAr: 'خورس مارمرقس' },
       { nameAr: 'خورس البابا اثناسيوس' }
     ];
@@ -587,29 +641,29 @@ onServingWhereChange() {
   const khorsCtrl = this.registerForm.get('khors');
   const attendCtrl = this.registerForm.get('attendKhors');
 
-  if (where === 'خورس مارمرقس') {
+  if (where === this.firstKhorsName) {
     scopeCtrl?.setValue('KHORS_ONLY', { emitEvent: false });
-    famCtrl?.setValue('خورس مارمرقس', { emitEvent: false });
-    khorsCtrl?.setValue('MARMARKOS', { emitEvent: false });
+    famCtrl?.setValue(where, { emitEvent: false });
+    khorsCtrl?.setValue(where, { emitEvent: false });
 
-    attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
+    attendCtrl?.setValue(this.secondKhorsName, { emitEvent: false });
     attendCtrl?.disable({ emitEvent: false });
 
-  } else if (where === 'خورس البابا اثناسيوس') {
+  } else if (this.isKhorsServingWhere()) {
     scopeCtrl?.setValue('KHORS_ONLY', { emitEvent: false });
-    famCtrl?.setValue('خورس البابا اثناسيوس', { emitEvent: false });
-    khorsCtrl?.setValue('ATHANASIUS', { emitEvent: false });
+    famCtrl?.setValue(where, { emitEvent: false });
+    khorsCtrl?.setValue(where, { emitEvent: false });
 
-    attendCtrl?.setValue('NONE', { emitEvent: false });
+    attendCtrl?.setValue('', { emitEvent: false });
     attendCtrl?.enable({ emitEvent: false });
 
   } else {
     scopeCtrl?.setValue('FAMILY_ONLY', { emitEvent: false });
     famCtrl?.setValue(where, { emitEvent: false });
-    khorsCtrl?.setValue('NONE', { emitEvent: false });
+    khorsCtrl?.setValue('', { emitEvent: false });
 
     attendCtrl?.enable({ emitEvent: false });
-    if (!String(attendCtrl?.value || '').trim() || String(attendCtrl?.value || '').trim() === 'NONE') {
+    if (!String(attendCtrl?.value || '').trim()) {
       attendCtrl?.setValue('', { emitEvent: false });
     }
   }
@@ -664,11 +718,11 @@ onServingWhereChange() {
 
     if (scope === 'FAMILY_ONLY') {
       khorsCtrl?.clearValidators();
-      khorsCtrl?.setValue('NONE', { emitEvent: false });
+      khorsCtrl?.setValue('', { emitEvent: false });
     } else {
       khorsCtrl?.setValidators([Validators.required]);
-      const khorsValue = String(khorsCtrl?.value || '').toUpperCase();
-      if (khorsValue === 'NONE' || (scope !== 'KHORS_ONLY' && khorsValue === 'BOTH')) {
+      const khorsValue = String(khorsCtrl?.value || '').trim();
+      if (!khorsValue || (scope !== 'KHORS_ONLY')) {
         khorsCtrl?.setValue('', { emitEvent: false });
       }
     }
@@ -682,7 +736,7 @@ onServingWhereChange() {
       }
     } else {
       attendCtrl?.clearValidators();
-      attendCtrl?.setValue('NONE', { emitEvent: false });
+      attendCtrl?.setValue('', { emitEvent: false });
       attendCtrl?.enable({ emitEvent: false });
     }
     attendCtrl?.updateValueAndValidity({ emitEvent: true });
@@ -697,7 +751,7 @@ onServingWhereChange() {
     const scope = String(this.registerForm.get('servingScope')?.value || '').trim();
     if (!scope) return;
 
-    const kh = String(this.registerForm.get('khors')?.value || '').toUpperCase();
+    const kh = String(this.registerForm.get('khors')?.value || '').trim();
     const attendCtrl = this.registerForm.get('attendKhors');
 
     if (scope === 'FAMILY_ONLY') {
@@ -705,13 +759,13 @@ onServingWhereChange() {
       return;
     }
 
-    if (kh === 'MARMARKOS') {
+    if (kh === this.firstKhorsName) {
       attendCtrl?.clearValidators();
-      attendCtrl?.setValue('ATHANASIUS', { emitEvent: false });
-      attendCtrl?.disable({ emitEvent: false }); 
+      attendCtrl?.setValue(this.secondKhorsName, { emitEvent: false });
+      attendCtrl?.disable({ emitEvent: false });
     } else {
       attendCtrl?.clearValidators();
-      attendCtrl?.setValue('NONE', { emitEvent: false });
+      attendCtrl?.setValue('', { emitEvent: false });
       attendCtrl?.enable({ emitEvent: false });
     }
 

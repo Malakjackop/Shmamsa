@@ -71,14 +71,16 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
 
   fields: CustomField[] = [];
   groupedSections: FieldSection[] = [];
+  collapsedSectionIds: Set<string> = new Set();
   loading = true;
 
   /* ── Tab state ────────────────────────────────────────── */
-  activeTab: 'fields' | 'families' | 'secret' = 'fields';
+  activeTab: 'fields' | 'families' | 'secret' | 'permissions' = 'fields';
 
   /* ── Families state ───────────────────────────────────── */
   families: FamilyCatalog[] = [];
   familiesLoading = false;
+  familyCategoryCollapsedIds: Set<string> = new Set();
   familyDialogVisible = false;
   familyDialogMode: 'create' | 'edit' = 'create';
   editingFamily: Partial<FamilyCatalog> = {};
@@ -116,7 +118,53 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   visibilityConditions: VisibilityConditionDraft[] = [];
   memberFamilyOptions: string[] = [];
   servantFamilyOptions: string[] = [];
+  khorsFamilyOptions: string[] = [];
+  attendKhorsFamilyOptions: string[] = [];
   private familyOptionsLoaded = false;
+
+  /* ── Role Settings state ────────────────────────────── */
+  roles: Array<{
+    id?: number;
+    name: string;
+    displayNameAr: string;
+    sortOrder: number;
+    active: boolean;
+    permissions: string;
+  }> = [];
+  allPermissions: string[] = [];
+  roleLoading = false;
+  roleDialogVisible = false;
+  roleDialogMode: 'create' | 'edit' = 'create';
+  editingRole: Partial<{
+    id?: number;
+    name: string;
+    displayNameAr: string;
+    sortOrder: number;
+    active: boolean;
+    permissions: string;
+  }> = {};
+  selectedPermissions: string[] = [];
+
+  permissionLabels: Record<string, string> = {
+    VIEW_ATTENDANCE: 'عرض الحضور',
+    TAKE_ATTENDANCE: 'تسجيل الحضور',
+    VIEW_FAMILY_INFO: 'عرض بيانات الأسر',
+    MANAGE_FAMILY_INFO: 'تعديل بيانات الأسر',
+    MANAGE_EVENTS: 'إدارة المناسبات',
+    MANAGE_ANNOUNCEMENTS: 'إدارة الإعلانات',
+    MANAGE_IFTEKAD: 'إدارة الافتقاد',
+    TRANSFER_MEMBERS: 'نقل الأعضاء',
+    MANAGE_ROLES: 'إدارة الصلاحيات',
+    START_NEW_YEAR: 'بدء سنة جديدة',
+    MANAGE_KHORS: 'إدارة الخورس',
+    VIEW_GRADES: 'عرض الدرجات',
+    MANAGE_REGISTRATION_FIELDS: 'إدارة حقول التسجيل',
+    MANAGE_FAMILIES: 'إدارة الأسر',
+    MANAGE_SECRET_CODE: 'إدارة الكود السري',
+    MANAGE_RESOURCES: 'إدارة الملفات',
+    VIEW_ATTENDANCE_HISTORY: 'عرض تاريخ الحضور',
+    MANAGE_ATTENDANCE_ACCESS: 'إدارة صلاحيات الحضور'
+  };
 
   categoryOptions: string[] = [];
   selectedCategory: string = '';
@@ -174,8 +222,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   private readonly visibilityDependencyFallbackOptions: Record<string, string[]> = {
     gender: ['MALE', 'FEMALE'],
     deaconDegree: ['مش مرشوم', 'ابصالتس', 'اغنسطس', 'ايبودياكون'],
-    khors: ['MARMARKOS', 'ATHANASIUS', 'NONE'],
-    attendKhors: ['MARMARKOS', 'ATHANASIUS', 'NONE'],
     status: ['student', 'graduate'],
     studyType: ['school', 'university'],
     schoolGrade: ['أولى ابتدائي', 'تانية ابتدائي', 'تالتة ابتدائي', 'رابعة ابتدائي', 'خامسة ابتدائي', 'سادسة ابتدائي', 'أولى إعدادي', 'تانية إعدادي', 'تالتة إعدادي', 'أولى ثانوي', 'تانية ثانوي', 'تالتة ثانوي', 'other'],
@@ -185,7 +231,7 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   private readonly sectionDefinitions: Array<Omit<FieldSection, 'fields'>> = [
     {
       id: 'personal',
-      title: 'بيانات شخصية للجميع',
+      title: 'بيانات شخصية ',
       fieldKeys: [
         'username',
         'fullName',
@@ -245,6 +291,9 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
       } else if (tab === 'secret') {
         this.activeTab = 'secret';
         this.loadSecretCode();
+      } else if (tab === 'permissions') {
+        this.activeTab = 'permissions';
+        this.loadRoles();
       } else {
         this.activeTab = 'fields';
       }
@@ -565,11 +614,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
       if (normalizedValue === 'true') return 'نعم';
       if (normalizedValue === 'false') return 'لا';
     }
-    if (normalizedFieldKey === 'khors' || normalizedFieldKey === 'attendKhors') {
-      if (normalizedValue === 'MARMARKOS') return 'خورس مارمرقس';
-      if (normalizedValue === 'ATHANASIUS') return 'خورس البابا أثناسيوس';
-      if (normalizedValue === 'NONE') return 'بدون خورس';
-    }
     if (normalizedFieldKey === 'schoolGrade' && normalizedValue === 'other') {
       return 'أخرى';
     }
@@ -888,6 +932,46 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleSection(sectionId: string): void {
+    if (this.collapsedSectionIds.has(sectionId)) {
+      this.collapsedSectionIds.delete(sectionId);
+    } else {
+      this.collapsedSectionIds.add(sectionId);
+    }
+  }
+
+  dropCategory(event: CdkDragDrop<FieldSection[]>) {
+    if (event.previousIndex === event.currentIndex) return;
+
+    moveItemInArray(this.groupedSections, event.previousIndex, event.currentIndex);
+
+    const orderedFields = this.groupedSections.flatMap(s => s.fields).map((field, index) => ({
+      ...field,
+      displayOrder: index
+    }));
+
+    this.fields = orderedFields;
+
+    const reorderItems = orderedFields
+      .filter(field => field.id != null)
+      .map(field => ({ id: field.id!, displayOrder: field.displayOrder }));
+
+    if (!reorderItems.length) {
+      this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تحديث ترتيب التصنيفات' });
+      return;
+    }
+
+    this.svc.reorderFields(reorderItems).subscribe({
+      next: () => {
+        this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تحديث ترتيب التصنيفات' });
+      },
+      error: () => {
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ ترتيب التصنيفات' });
+        this.loadFields();
+      }
+    });
+  }
+
   /* ── Families management ─────────────────────────────── */
   loadFamilies(): void {
     this.familiesLoading = true;
@@ -917,7 +1001,9 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
       category: 'FAMILY',
       active: true,
       servantSelectable: true,
-      memberSelectable: true
+      memberSelectable: true,
+      khorsSelectable: false,
+      attendKhorsSelectable: false
     };
     this.familyDialogVisible = true;
   }
@@ -1006,6 +1092,8 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
         category: this.editingFamily.category || 'FAMILY',
         servantSelectable: this.editingFamily.servantSelectable,
         memberSelectable: this.editingFamily.memberSelectable,
+        khorsSelectable: this.editingFamily.khorsSelectable,
+        attendKhorsSelectable: this.editingFamily.attendKhorsSelectable,
         directJoinGrades: joinGrades,
         directJoinFrom: this.familyDirectJoinEnabled ? this.formatDate(this.familyDateFrom) : null,
         directJoinUntil: this.familyDirectJoinEnabled ? this.formatDate(this.familyDateUntil) : null
@@ -1127,6 +1215,200 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     if (cat === 'KHORS') return 'خورس';
     if (cat === 'FAMILY') return 'عائلة';
     return cat || 'عائلة';
+  }
+
+  get familiesGrouped(): Array<{ category: string; label: string; families: FamilyCatalog[] }> {
+    const groups: Array<{ category: string; label: string; families: FamilyCatalog[] }> = [];
+    const familyGroup = this.families.filter(f => f.category !== 'KHORS');
+    if (familyGroup.length) {
+      groups.push({ category: 'FAMILY', label: 'الأسر', families: familyGroup });
+    }
+    const khorsGroup = this.families.filter(f => f.category === 'KHORS');
+    if (khorsGroup.length) {
+      groups.push({ category: 'KHORS', label: 'الخورس', families: khorsGroup });
+    }
+    return groups;
+  }
+
+  getFamilyIndex(f: FamilyCatalog): number {
+    return this.families.indexOf(f);
+  }
+
+  toggleFamilyCategory(category: string): void {
+    if (this.familyCategoryCollapsedIds.has(category)) {
+      this.familyCategoryCollapsedIds.delete(category);
+    } else {
+      this.familyCategoryCollapsedIds.add(category);
+    }
+  }
+
+  /* ── Role Settings methods ──────────────────────────── */
+  loadRoles(): void {
+    this.roleLoading = true;
+    this.svc.getAllRoles().subscribe({
+      next: (data) => {
+        this.roles = data || [];
+        this.roleLoading = false;
+      },
+      error: () => {
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الأدوار' });
+        this.roleLoading = false;
+      }
+    });
+    this.svc.getAllPermissions().subscribe({
+      next: (data) => {
+        this.allPermissions = data || [];
+      }
+    });
+  }
+
+  openCreateRole(): void {
+    this.roleDialogMode = 'create';
+    this.editingRole = {
+      name: '',
+      displayNameAr: '',
+      active: true,
+      permissions: ''
+    };
+    this.selectedPermissions = [];
+    this.roleDialogVisible = true;
+  }
+
+  openEditRole(r: typeof this.roles[0]): void {
+    this.roleDialogMode = 'edit';
+    this.editingRole = { ...r };
+    this.selectedPermissions = (r.permissions || '')
+      .split(',')
+      .map(p => p.trim())
+      .filter(Boolean);
+    this.roleDialogVisible = true;
+  }
+
+  saveRole(): void {
+    if (!this.editingRole.name?.trim()) {
+      this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اسم الدور مطلوب' });
+      return;
+    }
+    if (!this.editingRole.displayNameAr?.trim()) {
+      this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'الاسم بالعربي مطلوب' });
+      return;
+    }
+
+    if (this.roleDialogMode === 'create') {
+      const nameRegex = /^[A-Z][A-Z0-9_]*$/;
+      if (!nameRegex.test(this.editingRole.name.trim())) {
+        this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اسم الدور يجب أن يكون حروف إنجليزية كبيرة وأرقام و _ فقط' });
+        return;
+      }
+      this.svc.createRole({
+        name: this.editingRole.name.trim(),
+        displayNameAr: this.editingRole.displayNameAr.trim(),
+        permissions: this.selectedPermissions.join(',')
+      }).subscribe({
+        next: () => {
+          this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم إنشاء الدور بنجاح' });
+          this.roleDialogVisible = false;
+          this.loadRoles();
+        },
+        error: (err) => {
+          const detail = err?.error?.message || 'فشل إنشاء الدور';
+          this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+        }
+      });
+    } else {
+      this.svc.updateRole(this.editingRole.id!, {
+        displayNameAr: this.editingRole.displayNameAr?.trim(),
+        active: this.editingRole.active,
+        permissions: this.selectedPermissions.join(',')
+      }).subscribe({
+        next: () => {
+          this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الدور بنجاح' });
+          this.roleDialogVisible = false;
+          this.loadRoles();
+        },
+        error: (err) => {
+          const detail = err?.error?.message || 'فشل تعديل الدور';
+          this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+        }
+      });
+    }
+  }
+
+  toggleRoleActive(r: typeof this.roles[0]): void {
+    this.svc.updateRole(r.id!, { active: !r.active, displayNameAr: r.displayNameAr, permissions: r.permissions }).subscribe({
+      next: () => {
+        r.active = !r.active;
+        const status = r.active ? 'مفعل' : 'معطل';
+        this.msg.add({ severity: 'info', summary: 'تم', detail: `الدور ${status}` });
+      },
+      error: () => {
+        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحديث الحالة' });
+      }
+    });
+  }
+
+  deleteRole(r: typeof this.roles[0]): void {
+    this.confirm.confirm({
+      message: `هل أنت متأكد من حذف الدور "${r.displayNameAr}"؟`,
+      header: 'تأكيد الحذف',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'حذف',
+      rejectLabel: 'إلغاء',
+      accept: () => {
+        this.svc.deleteRole(r.id!).subscribe({
+          next: () => {
+            this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم حذف الدور' });
+            this.loadRoles();
+          },
+          error: (err) => {
+            const detail = err?.error?.message || 'فشل حذف الدور';
+            this.msg.add({ severity: 'error', summary: 'خطأ', detail });
+          }
+        });
+      }
+    });
+  }
+
+  moveRoleUp(index: number): void {
+    if (index <= 0) return;
+    const ids = this.roles.map(r => r.id!);
+    const tmp = ids[index];
+    ids[index] = ids[index - 1];
+    ids[index - 1] = tmp;
+    this.svc.reorderRoles(ids).subscribe({
+      next: () => this.loadRoles(),
+      error: () => this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ الترتيب' })
+    });
+  }
+
+  moveRoleDown(index: number): void {
+    if (index >= this.roles.length - 1) return;
+    const ids = this.roles.map(r => r.id!);
+    const tmp = ids[index];
+    ids[index] = ids[index + 1];
+    ids[index + 1] = tmp;
+    this.svc.reorderRoles(ids).subscribe({
+      next: () => this.loadRoles(),
+      error: () => this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ الترتيب' })
+    });
+  }
+
+  hasPermission(perm: string): boolean {
+    return this.selectedPermissions.includes(perm);
+  }
+
+  togglePermission(perm: string, checked: boolean): void {
+    if (checked) {
+      if (!this.selectedPermissions.includes(perm)) {
+        this.selectedPermissions = [...this.selectedPermissions, perm];
+      }
+    } else {
+      this.selectedPermissions = this.selectedPermissions.filter(p => p !== perm);
+    }
+  }
+
+  permissionLabel(perm: string): string {
+    return this.permissionLabels[perm] || perm;
   }
 
   /* ── Secret Code ─────────────────────────────────────── */
@@ -1257,8 +1539,15 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
 
     const categorySections = new Map<string, FieldSection>();
 
+    const categoryAliases: Record<string, string> = {
+      'بيانات شخصية للجميع': 'بيانات شخصية',
+    };
+
     for (const field of sortedFields) {
-      const cat = field.category?.trim();
+      let cat = field.category?.trim();
+      if (cat && categoryAliases[cat]) {
+        cat = categoryAliases[cat];
+      }
       if (cat) {
         const predef = this.sectionDefinitions.find(s => s.title === cat);
         if (predef) {
@@ -1308,6 +1597,12 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
       });
     }
 
+    sections.sort((a, b) => {
+      const minA = a.fields.length > 0 ? Math.min(...a.fields.map(f => f.displayOrder ?? 0)) : Infinity;
+      const minB = b.fields.length > 0 ? Math.min(...b.fields.map(f => f.displayOrder ?? 0)) : Infinity;
+      return minA - minB;
+    });
+
     this.groupedSections = sections;
   }
 
@@ -1334,16 +1629,22 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   private loadFamilyOptionSources(): void {
     forkJoin({
       member: this.authService.getFamilyOptions('MEMBER'),
-      servant: this.authService.getFamilyOptions('SERVANT')
+      servant: this.authService.getFamilyOptions('SERVANT'),
+      khors: this.authService.getFamilyOptions('KHORS'),
+      attendKhors: this.authService.getFamilyOptions('KHORS_ATTEND')
     }).subscribe({
-      next: ({ member, servant }) => {
+      next: ({ member, servant, khors, attendKhors }) => {
         this.memberFamilyOptions = this.extractFamilyNames(member || []);
         this.servantFamilyOptions = this.extractFamilyNames(servant || []);
+        this.khorsFamilyOptions = this.extractFamilyNames(khors || []);
+        this.attendKhorsFamilyOptions = this.extractFamilyNames(attendKhors || []);
         this.refreshManagedFieldOptionsIfNeeded();
       },
       error: () => {
         this.memberFamilyOptions = [];
         this.servantFamilyOptions = [];
+        this.khorsFamilyOptions = [];
+        this.attendKhorsFamilyOptions = [];
       }
     });
   }
@@ -1356,10 +1657,12 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     ));
   }
 
-  private getManagedFamilyFieldAudience(fieldKey?: string | null): 'MEMBER' | 'SERVANT' | null {
+  private getManagedFamilyFieldAudience(fieldKey?: string | null): 'MEMBER' | 'SERVANT' | 'KHORS' | 'KHORS_ATTEND' | null {
     const normalized = String(fieldKey || '').trim();
     if (normalized === 'deaconFamily') return 'MEMBER';
     if (normalized === 'servingWhere') return 'SERVANT';
+    if (normalized === 'khors') return 'KHORS';
+    if (normalized === 'attendKhors') return 'KHORS_ATTEND';
     return null;
   }
 
@@ -1370,6 +1673,12 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     }
     if (audience === 'SERVANT') {
       return [...this.servantFamilyOptions];
+    }
+    if (audience === 'KHORS') {
+      return [...this.khorsFamilyOptions, 'بدون خورس'];
+    }
+    if (audience === 'KHORS_ATTEND') {
+      return [...this.attendKhorsFamilyOptions, 'بدون خورس'];
     }
     return [];
   }

@@ -57,6 +57,8 @@ public class FamilyDevController {
             String category,
             Boolean servantSelectable,
             Boolean memberSelectable,
+            Boolean khorsSelectable,
+            Boolean attendKhorsSelectable,
             String directJoinGrades,
             String directJoinFrom,
             String directJoinUntil
@@ -69,6 +71,8 @@ public class FamilyDevController {
             String category,
             Boolean servantSelectable,
             Boolean memberSelectable,
+            Boolean khorsSelectable,
+            Boolean attendKhorsSelectable,
             Integer branchCount,
             String directJoinGrades,
             String directJoinFrom,
@@ -176,6 +180,8 @@ public class FamilyDevController {
                 .sortOrder(sortOrder)
                 .servantSelectable(req.servantSelectable() != null && req.servantSelectable())
                 .memberSelectable(req.memberSelectable() != null && req.memberSelectable())
+                .khorsSelectable(req.khorsSelectable() != null && req.khorsSelectable())
+                .attendKhorsSelectable(req.attendKhorsSelectable() != null && req.attendKhorsSelectable())
                 .directJoinGrades(req.directJoinGrades())
                 .directJoinFrom(req.directJoinFrom() != null ? java.time.LocalDate.parse(req.directJoinFrom()) : null)
                 .directJoinUntil(req.directJoinUntil() != null ? java.time.LocalDate.parse(req.directJoinUntil()) : null)
@@ -195,6 +201,8 @@ public class FamilyDevController {
                 .sortOrder(sortOrder)
                 .servantSelectable(servantSelectable)
                 .memberSelectable(memberSelectable)
+                .khorsSelectable(false)
+                .attendKhorsSelectable(false)
                 .build();
     }
 
@@ -227,6 +235,12 @@ public class FamilyDevController {
         }
         if (req.memberSelectable() != null) {
             family.setMemberSelectable(req.memberSelectable());
+        }
+        if (req.khorsSelectable() != null) {
+            family.setKhorsSelectable(req.khorsSelectable());
+        }
+        if (req.attendKhorsSelectable() != null) {
+            family.setAttendKhorsSelectable(req.attendKhorsSelectable());
         }
         family.setDirectJoinGrades(req.directJoinGrades() != null ? req.directJoinGrades().trim() : null);
         family.setDirectJoinFrom(req.directJoinFrom() != null

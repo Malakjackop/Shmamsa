@@ -45,6 +45,12 @@ public class FamilyCatalog {
     @Column(name = "member_selectable", nullable = false)
     private Boolean memberSelectable;
 
+    @Column(name = "khors_selectable")
+    private Boolean khorsSelectable;
+
+    @Column(name = "attend_khors_selectable")
+    private Boolean attendKhorsSelectable;
+
     @Column(name = "direct_join_grades", length = 500)
     private String directJoinGrades;
 

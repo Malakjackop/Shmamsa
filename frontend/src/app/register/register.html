@@ -16,7 +16,8 @@
             <!-- fullName -->
             <ng-container *ngSwitchCase="'fullName'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('fullName')" type="text" formControlName="fullName" [placeholder]="fieldLabel('fullName', 'الاسم بالكامل بالعربي')" [required]="fieldRequired('fullName', true)"
+                <label class="field-label">{{ fieldLabel('fullName', 'الاسم بالكامل بالعربي') }}<span class="required-star" *ngIf="fieldRequired('fullName', true)"> *</span></label>
+                <input *ngIf="!isSelectField('fullName')" type="text" formControlName="fullName"
                        (click)="markInteracted('fullName')" (blur)="markTouched('fullName')" />
                 <select *ngIf="isSelectField('fullName')" formControlName="fullName" [required]="fieldRequired('fullName', true)" (change)="markTouchedFromList('fullName')">
                   <option value="" disabled>{{ fieldLabel('fullName', 'الاسم بالكامل بالعربي') }}</option>
@@ -29,7 +30,8 @@
             <!-- username -->
             <ng-container *ngSwitchCase="'username'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('username')" type="text" formControlName="username" [placeholder]="fieldLabel('username', 'اسم المستخدم')" [required]="fieldRequired('username', true)"
+                <label class="field-label">{{ fieldLabel('username', 'اسم المستخدم') }}<span class="required-star" *ngIf="fieldRequired('username', true)"> *</span></label>
+                <input *ngIf="!isSelectField('username')" type="text" formControlName="username"
                        (click)="markInteracted('username')" (blur)="markTouched('username')" />
                 <select *ngIf="isSelectField('username')" formControlName="username" [required]="fieldRequired('username', true)" (change)="markTouchedFromList('username')">
                   <option value="" disabled>{{ fieldLabel('username', 'اسم المستخدم') }}</option>
@@ -42,7 +44,8 @@
             <!-- phoneNumber -->
             <ng-container *ngSwitchCase="'phoneNumber'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('phoneNumber')" type="text" formControlName="phoneNumber" [placeholder]="fieldLabel('phoneNumber', 'رقم الهاتف')"
+                <label class="field-label">{{ fieldLabel('phoneNumber', 'رقم الهاتف') }}</label>
+                <input *ngIf="!isSelectField('phoneNumber')" type="text" formControlName="phoneNumber"
                        (click)="markInteracted('phoneNumber')" (blur)="markTouched('phoneNumber')" />
                 <select *ngIf="isSelectField('phoneNumber')" formControlName="phoneNumber" (change)="markTouchedFromList('phoneNumber')">
                   <option value="" disabled>{{ fieldLabel('phoneNumber', 'رقم الهاتف') }}</option>
@@ -55,7 +58,8 @@
             <!-- address -->
             <ng-container *ngSwitchCase="'address'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('address')" type="text" formControlName="address" [placeholder]="fieldLabel('address', 'العنوان')"
+                <label class="field-label">{{ fieldLabel('address', 'العنوان') }}</label>
+                <input *ngIf="!isSelectField('address')" type="text" formControlName="address"
                        (click)="markInteracted('address')" (blur)="markTouched('address')" />
                 <select *ngIf="isSelectField('address')" formControlName="address" (change)="markTouchedFromList('address')">
                   <option value="" disabled>{{ fieldLabel('address', 'العنوان') }}</option>
@@ -68,7 +72,8 @@
             <!-- nationalId -->
             <ng-container *ngSwitchCase="'nationalId'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('nationalId')" type="text" formControlName="nationalId" name="national-id" autocomplete="off" [placeholder]="fieldLabel('nationalId', 'الرقم القومي')"
+                <label class="field-label">{{ fieldLabel('nationalId', 'الرقم القومي') }}<span class="required-star" *ngIf="fieldRequired('nationalId', true)"> *</span></label>
+                <input *ngIf="!isSelectField('nationalId')" type="text" formControlName="nationalId" name="national-id" autocomplete="off"
                        (click)="markInteracted('nationalId')"
                        (blur)="onNationalIdBlur(); markTouched('nationalId')" />
                 <select *ngIf="isSelectField('nationalId')" formControlName="nationalId" (change)="markTouchedFromList('nationalId')">
@@ -82,7 +87,8 @@
             <!-- email -->
             <ng-container *ngSwitchCase="'email'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('email')" type="email" formControlName="email" [placeholder]="fieldLabel('email', 'البريد الإلكتروني')" [required]="fieldRequired('email', true)"
+                <label class="field-label">{{ fieldLabel('email', 'البريد الإلكتروني') }}<span class="required-star" *ngIf="fieldRequired('email', true)"> *</span></label>
+                <input *ngIf="!isSelectField('email')" type="email" formControlName="email"
                        (click)="markInteracted('email')" (blur)="markTouched('email')" />
                 <select *ngIf="isSelectField('email')" formControlName="email" [required]="fieldRequired('email', true)" (change)="markTouchedFromList('email')">
                   <option value="" disabled>{{ fieldLabel('email', 'البريد الإلكتروني') }}</option>
@@ -95,21 +101,24 @@
             <!-- dateOfBirth -->
             <ng-container *ngSwitchCase="'dateOfBirth'">
               <div class="input-group small">
-                <input type="date" readonly formControlName="dateOfBirth" class="locked-derived" placeholder="تاريخ الميلاد" autocomplete="off" tabindex="-1" />
+                <label class="field-label">تاريخ الميلاد</label>
+                <input type="date" readonly formControlName="dateOfBirth" class="locked-derived" autocomplete="off" tabindex="-1" />
               </div>
             </ng-container>
 
             <!-- gender -->
             <ng-container *ngSwitchCase="'gender'">
               <div class="input-group small">
-                <input type="text" formControlName="gender" class="locked-derived" placeholder="النوع" autocomplete="off" tabindex="-1" />
+                <label class="field-label">النوع</label>
+                <input type="text" formControlName="gender" class="locked-derived" autocomplete="off" tabindex="-1" />
               </div>
             </ng-container>
 
             <!-- deaconDegree -->
             <ng-container *ngSwitchCase="'deaconDegree'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('deaconDegree')" type="text" formControlName="deaconDegree" [placeholder]="fieldLabel('deaconDegree', 'ما هي رتبة الشماس؟')"
+                <label class="field-label">{{ fieldLabel('deaconDegree', 'ما هي رتبة الشماس؟') }}<span class="required-star" *ngIf="fieldRequired('deaconDegree', true)"> *</span></label>
+                <input *ngIf="!isSelectField('deaconDegree')" type="text" formControlName="deaconDegree"
                        (click)="markInteracted('deaconDegree')" (blur)="markTouched('deaconDegree')" />
                 <select *ngIf="isSelectField('deaconDegree')" formControlName="deaconDegree" [required]="fieldRequired('deaconDegree', true)" (change)="markTouchedFromList('deaconDegree')">
                   <option value="" disabled>{{ fieldLabel('deaconDegree', 'ما هي رتبة الشماس؟') }}</option>
@@ -124,6 +133,7 @@
             <!-- deaconFamily -->
             <ng-container *ngSwitchCase="'deaconFamily'">
               <div class="input-group small" *ngIf="!isServant">
+                <label class="field-label">{{ fieldLabel('deaconFamily', 'الأسرة') }}<span class="required-star" *ngIf="fieldRequired('deaconFamily', true)"> *</span></label>
                 <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
                   <option value="" disabled>اختار الأسرة</option>
                   <option *ngFor="let family of memberFamilyOptions" [ngValue]="familyOptionValue(family)">{{ family.nameAr }}</option>
@@ -135,11 +145,10 @@
             <!-- khors -->
             <ng-container *ngSwitchCase="'khors'">
               <div class="input-group small" *ngIf="!isServant">
+                <label class="field-label">{{ fieldLabel('khors', 'الخورس') }}<span class="required-star" *ngIf="fieldRequired('khors', true)"> *</span></label>
                 <select formControlName="khors" (change)="markTouchedFromList('khors')">
                   <option value="" disabled>الخورس</option>
-                  <option value="MARMARKOS">خورس مارمارقس الرسولي</option>
-                  <option value="ATHANASIUS">خورس البابا اثناسيوس</option>
-                  <option value="NONE">مش موجود ف أي خورس من دول</option>
+                  <option *ngFor="let khors of khorsOptionValues" [value]="familyOptionValue(khors)">{{ khors.nameAr }}</option>
                 </select>
                 <small class="error-text" *ngIf="shouldShowError('khors')">
                   {{ errorText('khors','الخورس') }}
@@ -150,6 +159,7 @@
             <!-- servingWhere -->
             <ng-container *ngSwitchCase="'servingWhere'">
               <div class="input-group small" *ngIf="isServant">
+                <label class="field-label">{{ fieldLabel('servingWhere', 'بتخدم فين؟') }}<span class="required-star" *ngIf="fieldRequired('servingWhere', true)"> *</span></label>
                 <select
                   formControlName="servingWhere"
                   (change)="onServingWhereChange(); markTouchedFromList('servingWhere')">
@@ -164,20 +174,20 @@
 
             <!-- attendKhors -->
             <ng-container *ngSwitchCase="'attendKhors'">
-              <div class="input-group small" *ngIf="isServant && servingWhereValue && servingWhereValue !== 'خورس مارمرقس' && servingWhereValue !== 'خورس البابا اثناسيوس'">
+              <div class="input-group small" *ngIf="isServant && servingWhereValue && !isKhorsServingWhere()">
+                <label class="field-label">{{ fieldLabel('attendKhors', 'بحضر في انهي خورس؟') }}<span class="required-star" *ngIf="fieldRequired('attendKhors', true)"> *</span></label>
                 <select formControlName="attendKhors" (change)="markTouchedFromList('attendKhors')">
                   <option value="" disabled>بحضر في انهي خورس؟</option>
-                  <option value="MARMARKOS">بحضر في خورس مارمارقس الرسولي</option>
-                  <option value="ATHANASIUS">بحضر في خورس البابا اثناسيوس الرسولي</option>
-                  <option value="NONE">مش موجود في ولا خورس</option>
+                  <option *ngFor="let khors of attendKhorsOptionValues" [value]="familyOptionValue(khors)">{{ khors.nameAr }}</option>
                 </select>
                 <small class="error-text" *ngIf="shouldShowError('attendKhors')">
                   {{ errorText('attendKhors','خورس الحضور') }}
                 </small>
               </div>
-              <div class="input-group small" *ngIf="isServant && servingWhereValue === 'خورس مارمرقس'">
+              <div class="input-group small" *ngIf="isServant && servingWhereValue === firstKhorsName && firstKhorsName">
+                <label class="field-label">{{ fieldLabel('attendKhors', 'بحضر في انهي خورس؟') }}</label>
                 <select formControlName="attendKhors" [disabled]="true">
-                  <option value="ATHANASIUS">بحضر خورس البابا اثناسيوس الرسولي</option>
+                  <option [value]="secondKhorsName">{{ secondKhorsName }}</option>
                 </select>
               </div>
             </ng-container>
@@ -185,7 +195,8 @@
             <!-- status -->
             <ng-container *ngSwitchCase="'status'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('status')" type="text" formControlName="status" [placeholder]="fieldLabel('status', 'اختر الحالة')"
+                <label class="field-label">{{ fieldLabel('status', 'اختر الحالة') }}<span class="required-star" *ngIf="fieldRequired('status', true)"> *</span></label>
+                <input *ngIf="!isSelectField('status')" type="text" formControlName="status"
                        (click)="markInteracted('status')" (blur)="onStatusChange(); markTouched('status')" />
                 <select *ngIf="isSelectField('status')" formControlName="status" (change)="onStatusChange(); markTouchedFromList('status')">
                   <option value="" disabled>{{ fieldLabel('status', 'اختر الحالة') }}</option>
@@ -198,7 +209,8 @@
             <!-- graduatedFrom -->
             <ng-container *ngSwitchCase="'graduatedFrom'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('graduatedFrom')" type="text" formControlName="graduatedFrom" [placeholder]="fieldLabel('graduatedFrom', 'تخرج من (مثال: اسم الجامعة)')"
+                <label class="field-label">{{ fieldLabel('graduatedFrom', 'تخرج من (مثال: اسم الجامعة)') }}</label>
+                <input *ngIf="!isSelectField('graduatedFrom')" type="text" formControlName="graduatedFrom"
                        (click)="markInteracted('graduatedFrom')" (blur)="markTouched('graduatedFrom')" />
                 <select *ngIf="isSelectField('graduatedFrom')" formControlName="graduatedFrom" (change)="markTouchedFromList('graduatedFrom')">
                   <option value="" disabled>{{ fieldLabel('graduatedFrom', 'تخرج من (مثال: اسم الجامعة)') }}</option>
@@ -211,7 +223,8 @@
             <!-- graduateJob -->
             <ng-container *ngSwitchCase="'graduateJob'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('graduateJob')" type="text" formControlName="graduateJob" [placeholder]="fieldLabel('graduateJob', 'الوظيفة الحالية')"
+                <label class="field-label">{{ fieldLabel('graduateJob', 'الوظيفة الحالية') }}</label>
+                <input *ngIf="!isSelectField('graduateJob')" type="text" formControlName="graduateJob"
                        (click)="markInteracted('graduateJob')" (blur)="markTouched('graduateJob')" />
                 <select *ngIf="isSelectField('graduateJob')" formControlName="graduateJob" (change)="markTouchedFromList('graduateJob')">
                   <option value="" disabled>{{ fieldLabel('graduateJob', 'الوظيفة الحالية') }}</option>
@@ -224,7 +237,8 @@
             <!-- studyType -->
             <ng-container *ngSwitchCase="'studyType'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('studyType')" type="text" formControlName="studyType" [placeholder]="fieldLabel('studyType', 'الدراسة في')"
+                <label class="field-label">{{ fieldLabel('studyType', 'الدراسة في') }}<span class="required-star" *ngIf="fieldRequired('studyType', true)"> *</span></label>
+                <input *ngIf="!isSelectField('studyType')" type="text" formControlName="studyType"
                        (click)="markInteracted('studyType')" (blur)="onStudyTypeChange(); markTouched('studyType')" />
                 <select *ngIf="isSelectField('studyType')" formControlName="studyType" (change)="onStudyTypeChange(); markTouchedFromList('studyType')">
                   <option value="" disabled>{{ fieldLabel('studyType', 'الدراسة في') }}</option>
@@ -237,7 +251,8 @@
             <!-- schoolName -->
             <ng-container *ngSwitchCase="'schoolName'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('schoolName')" type="text" formControlName="schoolName" [placeholder]="fieldLabel('schoolName', 'اسم المدرسة')"
+                <label class="field-label">{{ fieldLabel('schoolName', 'اسم المدرسة') }}</label>
+                <input *ngIf="!isSelectField('schoolName')" type="text" formControlName="schoolName"
                        (click)="markInteracted('schoolName')" (blur)="markTouched('schoolName')" />
                 <select *ngIf="isSelectField('schoolName')" formControlName="schoolName" (change)="markTouchedFromList('schoolName')">
                   <option value="" disabled>{{ fieldLabel('schoolName', 'اسم المدرسة') }}</option>
@@ -250,7 +265,8 @@
             <!-- schoolGrade -->
             <ng-container *ngSwitchCase="'schoolGrade'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('schoolGrade')" type="text" formControlName="schoolGrade" [placeholder]="fieldLabel('schoolGrade', 'اختر الصف')"
+                <label class="field-label">{{ fieldLabel('schoolGrade', 'اختر الصف') }}<span class="required-star" *ngIf="fieldRequired('schoolGrade', true)"> *</span></label>
+                <input *ngIf="!isSelectField('schoolGrade')" type="text" formControlName="schoolGrade"
                        (click)="markInteracted('schoolGrade')" (blur)="markTouched('schoolGrade')" />
                 <select *ngIf="isSelectField('schoolGrade')" class="form-select" formControlName="schoolGrade" (change)="markTouchedFromList('schoolGrade')">
                   <option value="" disabled>{{ fieldLabel('schoolGrade', 'اختر الصف') }}</option>
@@ -263,9 +279,9 @@
             <!-- otherGrade -->
             <ng-container *ngSwitchCase="'otherGrade'">
               <div class="input-group small">
+                <label class="field-label">{{ fieldLabel('otherGrade', 'اكتب الصف الدراسي') }}</label>
                 <input *ngIf="!isSelectField('otherGrade')" type="text"
                        formControlName="otherGrade"
-                       [placeholder]="fieldLabel('otherGrade', 'اكتب الصف الدراسي')"
                        (click)="markInteracted('otherGrade')" (blur)="markTouched('otherGrade')" />
                 <select *ngIf="isSelectField('otherGrade')" formControlName="otherGrade" (change)="markTouchedFromList('otherGrade')">
                   <option value="" disabled>{{ fieldLabel('otherGrade', 'اكتب الصف الدراسي') }}</option>
@@ -278,7 +294,8 @@
             <!-- universityName -->
             <ng-container *ngSwitchCase="'universityName'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('universityName')" type="text" formControlName="universityName" [placeholder]="fieldLabel('universityName', 'اسم الجامعة')"
+                <label class="field-label">{{ fieldLabel('universityName', 'اسم الجامعة') }}<span class="required-star" *ngIf="fieldRequired('universityName', true)"> *</span></label>
+                <input *ngIf="!isSelectField('universityName')" type="text" formControlName="universityName"
                        (click)="markInteracted('universityName')" (blur)="markTouched('universityName')" />
                 <select *ngIf="isSelectField('universityName')" formControlName="universityName" (change)="markTouchedFromList('universityName')">
                   <option value="" disabled>{{ fieldLabel('universityName', 'اسم الجامعة') }}</option>
@@ -291,7 +308,8 @@
             <!-- faculty -->
             <ng-container *ngSwitchCase="'faculty'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('faculty')" type="text" formControlName="faculty" [placeholder]="fieldLabel('faculty', 'الكلية')"
+                <label class="field-label">{{ fieldLabel('faculty', 'الكلية') }}<span class="required-star" *ngIf="fieldRequired('faculty', true)"> *</span></label>
+                <input *ngIf="!isSelectField('faculty')" type="text" formControlName="faculty"
                        (click)="markInteracted('faculty')" (blur)="markTouched('faculty')" />
                 <select *ngIf="isSelectField('faculty')" formControlName="faculty" (change)="markTouchedFromList('faculty')">
                   <option value="" disabled>{{ fieldLabel('faculty', 'الكلية') }}</option>
@@ -304,7 +322,8 @@
             <!-- universityGrade -->
             <ng-container *ngSwitchCase="'universityGrade'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('universityGrade')" type="text" formControlName="universityGrade" [placeholder]="fieldLabel('universityGrade', 'السنة/الفرقة')"
+                <label class="field-label">{{ fieldLabel('universityGrade', 'السنة/الفرقة') }}<span class="required-star" *ngIf="fieldRequired('universityGrade', true)"> *</span></label>
+                <input *ngIf="!isSelectField('universityGrade')" type="text" formControlName="universityGrade"
                        (click)="markInteracted('universityGrade')" (blur)="markTouched('universityGrade')" />
                 <select *ngIf="isSelectField('universityGrade')" formControlName="universityGrade" (change)="markTouchedFromList('universityGrade')">
                   <option value="" disabled>{{ fieldLabel('universityGrade', 'السنة/الفرقة') }}</option>
@@ -317,6 +336,7 @@
             <!-- isWorking -->
             <ng-container *ngSwitchCase="'isWorking'">
               <div class="input-group small">
+                <label class="field-label">{{ fieldLabel('isWorking', 'هل تعمل؟') }}<span class="required-star" *ngIf="fieldRequired('isWorking', true)"> *</span></label>
                 <select formControlName="isWorking" (change)="markTouchedFromList('isWorking')">
                   <option value="" disabled>هل تعمل؟</option>
                   <option [ngValue]="false">لا</option>
@@ -329,7 +349,18 @@
             <!-- workDetails -->
             <ng-container *ngSwitchCase="'workDetails'">
               <div class="input-group small">
-                <input type="text" formControlName="workDetails" placeholder="ما هي وظيفتك؟"
+                <label class="field-label">{{ fieldLabel('workDetails', 'ما هي وظيفتك؟') }}</label>
+                <input type="text" formControlName="workDetails"
+                       (click)="markInteracted('workDetails')" (blur)="markTouched('workDetails')" />
+                <small class="error-text" *ngIf="shouldShowError('workDetails')">{{ errorText('workDetails','الوظيفة') }}</small>
+              </div>
+            </ng-container>
+
+            <!-- workDetails -->
+            <ng-container *ngSwitchCase="'workDetails'">
+              <div class="input-group small">
+                <label class="field-label">{{ fieldLabel('workDetails', 'ما هي وظيفتك؟') }}</label>
+                <input type="text" formControlName="workDetails"
                        (click)="markInteracted('workDetails')" (blur)="markTouched('workDetails')" />
                 <small class="error-text" *ngIf="shouldShowError('workDetails')">{{ errorText('workDetails','الوظيفة') }}</small>
               </div>
@@ -338,7 +369,8 @@
             <!-- guardiansPhone -->
             <ng-container *ngSwitchCase="'guardiansPhone'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('guardiansPhone')" type="text" formControlName="guardiansPhone" [placeholder]="fieldLabel('guardiansPhone', 'هاتف ولي الأمر')" [required]="fieldRequired('guardiansPhone', true)"
+                <label class="field-label">{{ fieldLabel('guardiansPhone', 'هاتف ولي الأمر') }}<span class="required-star" *ngIf="fieldRequired('guardiansPhone', true)"> *</span></label>
+                <input *ngIf="!isSelectField('guardiansPhone')" type="text" formControlName="guardiansPhone"
                        (click)="markInteracted('guardiansPhone')" (blur)="markTouched('guardiansPhone')" />
                 <select *ngIf="isSelectField('guardiansPhone')" formControlName="guardiansPhone" [required]="fieldRequired('guardiansPhone', true)" (change)="markTouchedFromList('guardiansPhone')">
                   <option value="" disabled>{{ fieldLabel('guardiansPhone', 'هاتف ولي الأمر') }}</option>
@@ -351,7 +383,8 @@
             <!-- guardianRelation -->
             <ng-container *ngSwitchCase="'guardianRelation'">
               <div class="input-group small">
-                <input *ngIf="!isSelectField('guardianRelation')" type="text" formControlName="guardianRelation" [placeholder]="fieldLabel('guardianRelation', 'مين صاحب رقم ولي الأمر؟')"
+                <label class="field-label">{{ fieldLabel('guardianRelation', 'مين صاحب رقم ولي الأمر؟') }}</label>
+                <input *ngIf="!isSelectField('guardianRelation')" type="text" formControlName="guardianRelation"
                        (click)="markInteracted('guardianRelation')" (blur)="markTouched('guardianRelation')" />
                 <select *ngIf="isSelectField('guardianRelation')" formControlName="guardianRelation" (change)="markTouchedFromList('guardianRelation')">
                   <option value="" disabled>{{ fieldLabel('guardianRelation', 'مين صاحب رقم ولي الأمر؟') }}</option>
@@ -364,15 +397,14 @@
             <!-- ── Dynamic Custom Fields ────────────────────────────────────── -->
             <ng-container *ngSwitchDefault>
               <div class="input-group small" *ngIf="!f.isSystem">
+                <label class="field-label">{{ f.labelAr }}<span class="required-star" *ngIf="customFieldRequired(f)"> *</span></label>
                 <input *ngIf="f.fieldType === 'TEXT'"
                        type="text"
                        [formControlName]="'custom_' + f.fieldKey"
-                       [placeholder]="f.labelAr"
                        [required]="customFieldRequired(f)"
                        (blur)="markTouched('custom_' + f.fieldKey)" />
 
                 <ng-container *ngIf="f.fieldType === 'DATE'">
-                  <label class="custom-field-label">{{ f.labelAr }}</label>
                   <input type="date" readonly
                          [formControlName]="'custom_' + f.fieldKey"
                          [required]="customFieldRequired(f)"
@@ -400,10 +432,10 @@
       <!-- Password Section -->
       <div class="input-row">
         <div class="input-group small password-group">
+          <label class="field-label">كلمة المرور <span class="required-star"> *</span></label>
           <input
             [type]="showPassword ? 'text' : 'password'"
             formControlName="password"
-            placeholder="كلمة المرور"
             required (click)="markInteracted('password')" (blur)="markTouched('password')" />
           <span class="password-eye" (click)="togglePassword()">
             <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
@@ -412,10 +444,10 @@
         </div>
 
         <div class="input-group small password-group">
+          <label class="field-label">تأكيد كلمة المرور <span class="required-star"> *</span></label>
           <input
             [type]="showConfirmPassword ? 'text' : 'password'"
             formControlName="confirmPassword"
-            placeholder="تأكيد كلمة المرور"
             required (click)="markInteracted('confirmPassword')" (blur)="markTouched('confirmPassword')" />
           <span class="password-eye" (click)="toggleConfirmPassword()">
             <i class="fa" [ngClass]="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
@@ -425,7 +457,8 @@
       </div>
 
       <div class="input-group" *ngIf="isServant">
-        <input id="secret" type="password" formControlName="secret" placeholder="أدخل الكود السري"
+        <label class="field-label">الكود السري <span class="required-star"> *</span></label>
+        <input id="secret" type="password" formControlName="secret"
                (click)="markInteracted('secret')" (blur)="markTouched('secret')" />
         <small class="error-text" *ngIf="shouldShowError('secret')">{{ errorText('secret','الكود السري') }}</small>
       </div>
