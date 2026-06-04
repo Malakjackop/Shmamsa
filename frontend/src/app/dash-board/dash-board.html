@@ -354,7 +354,6 @@
     </ng-template>
   </p-dialog>
 
-  <!-- Dialogs زي ما هم عندك (ما غيرتهمش) -->
   <!-- Event Dialog -->
   <p-dialog [(visible)]="showEventDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog event-dialog" [header]="eventDialogTitle">
     <div style="display:flex; flex-direction:column; gap:10px;">
@@ -371,7 +370,7 @@
         [showIcon]="true"
         [showTime]="true"
         hourFormat="12"
-        [minDate]="todayCalendarMinDate"
+        [minDate]="todayMinDate"
         dateFormat="dd/mm/yy"
         [showButtonBar]="true"
         [hideOnDateTimeSelect]="false"
@@ -533,7 +532,7 @@
         [showIcon]="true"
         [showTime]="true"
         hourFormat="12"
-        [minDate]="todayCalendarMinDate"
+        [minDate]="todayMinDate"
         dateFormat="dd/mm/yy"
         placeholder="اليوم / الشهر / السنة - الساعة"
         [showButtonBar]="true"

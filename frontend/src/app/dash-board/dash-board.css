@@ -352,8 +352,7 @@
   font-weight: 700;
 }
 
-.dashboard-footer__group a,
-.dashboard-footer__muted {
+.dashboard-footer__group a {
   color: rgba(255, 244, 238, 0.94);
   font-size: 0.94rem;
   line-height: 1.65;
@@ -364,10 +363,6 @@
 .dashboard-footer__group a:hover,
 .dashboard-footer__group a:focus-visible {
   color: #ffffff;
-}
-
-.dashboard-footer__muted {
-  opacity: 0.78;
 }
 
 @media (min-width: 900px) {
@@ -563,7 +558,8 @@
 }
 
 .notice-card {
-  padding: 22px 18px 18px;
+  padding-block: 22px 18px;
+  padding-inline: 28px 18px;
   border: 1px solid #eadfd9;
   border-inline-start: 10px solid transparent;
   border-radius: 8px;
@@ -1042,13 +1038,6 @@
   color: #8c7a72;
 }
 
-.target-preview {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  opacity: 0.9;
-}
-
 .target-scope-select,
 :host ::ng-deep p-select.target-scope-select,
 :host ::ng-deep .target-scope-select.p-select,
@@ -1250,20 +1239,6 @@
   }
 }
 
-/* Dashboard event fixes */
-.notice-card {
-  padding-inline-start: 28px;
-  padding-inline-end: 18px;
-  border-radius: 8px;
-}
-
-.notice-card--hot,
-.notice-card--cancelled,
-.notice-card--pending,
-.notice-card--published {
-  border-inline-start-width: 10px;
-}
-
 .event-warning--reminder strong {
   display: block;
   margin-top: 4px;
@@ -1281,12 +1256,6 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
-
-.reminder-unit-label {
-  color: #7a4033;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .reminder-row input[type="number"]::-webkit-outer-spin-button,

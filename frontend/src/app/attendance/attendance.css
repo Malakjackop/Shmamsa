@@ -380,22 +380,175 @@ textarea {
   flex: 1;
 }
 
-.search-all-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #5e2b20;
-  cursor: pointer;
-  white-space: nowrap;
+.family-multiselect,
+:host ::ng-deep p-multiselect.family-multiselect {
+  width: 100%;
+  min-width: 0;
 }
 
-.search-all-checkbox input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  cursor: pointer;
+:host ::ng-deep p-multiselect.family-multiselect,
+:host ::ng-deep .family-multiselect.p-multiselect,
+:host ::ng-deep .family-multiselect .p-multiselect {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d4d4d4;
+  border-radius: 12px;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  color: #111 !important;
+  direction: rtl;
+}
+
+:host ::ng-deep .family-multiselect .p-multiselect-label {
+  color: #111 !important;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-align: right;
+  line-height: 44px;
+  padding-block: 0;
+  padding-inline: 0.8rem 2.4rem;
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:host ::ng-deep .family-multiselect .p-multiselect-label-empty {
+  color: #666 !important;
+}
+
+:host ::ng-deep .family-multiselect .p-multiselect-trigger {
+  color: #666;
+}
+
+:host ::ng-deep .family-multiselect .p-multiselect-token {
+  display: none;
+}
+
+.family-multiselect-panel {
+  border: 1px solid #d4d4d4 !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  background: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  direction: rtl !important;
+  margin-top: 4px !important;
+}
+
+.family-multiselect-panel .p-multiselect-items-wrapper {
+  direction: rtl !important;
+}
+
+::ng-deep .family-multiselect-panel,
+::ng-deep .family-multiselect-panel.p-multiselect-overlay,
+::ng-deep .p-multiselect-overlay.family-multiselect-panel,
+::ng-deep .family-multiselect-panel.p-multiselect-panel,
+::ng-deep .p-multiselect-panel.family-multiselect-panel {
+  background: #ffffff !important;
+  border: 1px solid #d4d4d4 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  direction: rtl !important;
+  margin-top: 4px !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-items-wrapper,
+::ng-deep .family-multiselect-panel .p-multiselect-list,
+::ng-deep .family-multiselect-panel .p-multiselect-list-container,
+::ng-deep .family-multiselect-panel .p-scroller,
+::ng-deep .family-multiselect-panel .p-virtualscroller {
+  direction: rtl !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-items-wrapper::-webkit-scrollbar,
+::ng-deep .family-multiselect-panel .p-multiselect-list::-webkit-scrollbar,
+::ng-deep .family-multiselect-panel .p-multiselect-list-container::-webkit-scrollbar,
+::ng-deep .family-multiselect-panel .p-scroller::-webkit-scrollbar,
+::ng-deep .family-multiselect-panel .p-virtualscroller::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-item,
+::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-highlight="true"],
+::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-focus="true"],
+::ng-deep .family-multiselect-panel li[role="option"] {
+  color: #000 !important;
+  background: #ffffff !important;
+  justify-content: flex-start !important;
+  padding: 0.65rem 0.75rem !important;
+  font-size: 0.9rem !important;
+  gap: 8px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  direction: rtl !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-item:hover,
+::ng-deep .family-multiselect-panel .p-multiselect-item:focus,
+::ng-deep .family-multiselect-panel .p-multiselect-item.p-highlight,
+::ng-deep .family-multiselect-panel .p-multiselect-item.p-highlight:hover,
+::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-highlight="true"],
+::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-highlight="true"]:hover,
+::ng-deep .family-multiselect-panel .p-multiselect-item.p-focus,
+::ng-deep .family-multiselect-panel li[role="option"]:hover,
+::ng-deep .family-multiselect-panel li[role="option"][aria-selected="true"] {
+  color: #000 !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+::ng-deep .family-multiselect-panel .p-checkbox-box,
+::ng-deep .family-multiselect-panel .p-checkbox .p-checkbox-box {
+  border-radius: 3px !important;
+  width: 16px !important;
+  height: 16px !important;
+  border: 1px solid #666 !important;
+  background: #ffffff !important;
+}
+
+::ng-deep .family-multiselect-panel .p-checkbox-box.p-highlight,
+::ng-deep .family-multiselect-panel .p-checkbox-box[data-p-highlight="true"],
+::ng-deep .family-multiselect-panel .p-checkbox .p-checkbox-box.p-highlight {
+  background: #ffffff !important;
+  border-color: #666 !important;
+}
+
+::ng-deep .family-multiselect-panel .p-checkbox-box:not(.p-highlight):hover,
+::ng-deep .family-multiselect-panel .p-checkbox .p-checkbox-box:not(.p-highlight):hover {
+  border-color: #666 !important;
+}
+
+::ng-deep .family-multiselect-panel .p-checkbox-icon,
+::ng-deep .family-multiselect-panel .p-checkbox .p-checkbox-icon {
+  color: #000 !important;
+  font-size: 0.75rem !important;
+}
+
+::ng-deep .family-multiselect-panel .p-checkbox,
+::ng-deep .family-multiselect-panel .p-checkbox-icon-wrapper {
+  transition: none !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e8e8e8 !important;
+  color: #000 !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-header .p-checkbox {
+  margin-left: 8px !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-header-label,
+::ng-deep .family-multiselect-panel .p-multiselect-header .p-checkbox-label {
+  color: #000 !important;
 }
 
 .scope {

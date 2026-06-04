@@ -111,9 +111,21 @@
             <div class="control-field">
               <label>الأسرة</label>
               <ng-container *ngIf="!isSelfCheckinMode(); else fixedFamilyBlock">
-                <select [(ngModel)]="selectedFamily" (change)="onFamilyChange()">
-                  <option *ngFor="let f of families" [value]="f">{{ f }}</option>
-                </select>
+                <p-multiSelect
+                  [options]="familySelectOptions"
+                  [(ngModel)]="selectedFamilies"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder=" "
+                  [showHeader]="false"
+                  [filter]="false"
+                  selectedItemsLabel="{0} أسر مختارة"
+                  [maxSelectedLabels]="1"
+                  scrollHeight="280px"
+                  panelStyleClass="family-multiselect-panel"
+                  (onChange)="onFamilyChanged()"
+                  class="family-multiselect"
+                ></p-multiSelect>
               </ng-container>
               <ng-template #fixedFamilyBlock>
                 <div class="readonly-box">{{ displayScopeFamilyLabel() || 'غير محددة' }}</div>
@@ -197,10 +209,7 @@
               placeholder="اكتب اسم المخدوم أو الخادم..."
               aria-label="بحث"
             />
-            <label class="search-all-checkbox">
-              <input type="checkbox" [(ngModel)]="searchAllFamilies" (change)="onSearchAllFamiliesChange()" />
-              كل الأسر
-            </label>
+
           </span>
         </div>
 
@@ -213,7 +222,8 @@
         </div>
 
         <h2 class="listTitle" *ngIf="searchText.trim()">نتائج البحث</h2>
-        <h2 class="listTitle" *ngIf="!searchText.trim() && selectedFamily">أسماء المسجلين في: {{ selectedFamily }}</h2>
+        <h2 class="listTitle" *ngIf="!searchText.trim() && selectedFamilies.length === 1">أسماء المسجلين في: {{ selectedFamilies[0] }}</h2>
+        <h2 class="listTitle" *ngIf="!searchText.trim() && selectedFamilies.length > 1">أسماء المسجلين في الأسر المختارة</h2>
 
         <div class="list member-list" *ngIf="displayedMembers.length; else empty">
           <div class="row" *ngFor="let u of displayedMembers">
@@ -274,7 +284,7 @@
           <p class="hint" *ngIf="!membersLoading && membersLoadError">
             {{ membersLoadError }}
           </p>
-          <p class="hint" *ngIf="!membersLoading && !membersLoadError && !searchText.trim() && !members.length">
+          <p class="hint" *ngIf="!membersLoading && !membersLoadError && !searchText.trim() && selectedFamilies.length && !members.length">
             مفيش حد مسجل في الأسرة دي.
           </p>
           <p class="hint" *ngIf="!membersLoading && !membersLoadError && searchText.trim() && !displayedMembers.length">
@@ -927,10 +937,21 @@
   <div class="dialog-body">
     <div class="dialog-grid">
       <div class="form-group">
-        <label>الأسرة / الخورس</label>
-        <select [(ngModel)]="customEventForm.familyBase" (ngModelChange)="onCustomEventFamilyChange()" [disabled]="isCustomEventFamilyLocked()">
-          <option *ngFor="let family of customEventFamilyOptions()" [value]="family.value">{{ family.label }}</option>
-        </select>
+        <label>الأسر / الخورس</label>
+        <p-multiSelect
+          [options]="customEventFamilyOptions()"
+          [(ngModel)]="customEventForm.familyBases"
+          optionLabel="label"
+          optionValue="value"
+          placeholder=" "
+          [showHeader]="false"
+          [filter]="false"
+          selectedItemsLabel="{0} أسر مختارة"
+          [maxSelectedLabels]="1"
+          panelStyleClass="family-multiselect-panel"
+          (onChange)="onCustomEventFamilyChange()"
+          class="family-multiselect"
+        ></p-multiSelect>
       </div>
 
       <div class="form-group">

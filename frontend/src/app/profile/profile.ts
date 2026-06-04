@@ -63,20 +63,6 @@ export class ProfileComponent implements OnInit {
     'ايبودياكون',
   ];
 
-  readonly khorsOptions = [
-    { value: 'ATHANASIUS', label: 'خورس البابا اثناسيوس' },
-    { value: 'MARMARKOS', label: 'خورس مارمرقس' },
-    { value: 'NONE', label: 'مش موجود في خورس' }
-  ];
-
-  readonly khorsYearOptions = [
-    { value: 1, label: 'سنه اوله' },
-    { value: 2, label: 'سنه تانيه' },
-    { value: 3, label: 'سنه تالته' },
-    { value: 4, label: 'سنه رابعه' },
-    { value: 5, label: 'سنه خامسه' }
-  ];
-
   profileForm = this.fb.group({
     fullName: [{ value: '', disabled: true }, Validators.required],
     email: [{ value: '', disabled: true }, [Validators.required, Validators.email]],
@@ -151,14 +137,6 @@ export class ProfileComponent implements OnInit {
       .filter(entry => this.editMode || entry.value !== '');
   }
 
-  isServantOrAbove(): boolean {
-    return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.normalizeRole(this.user?.role));
-  }
-
-  isServant(): boolean {
-    return ['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.normalizeRole(this.user?.role));
-  }
-
   isSchool(): boolean {
     return this.profileForm.get('studyType')?.value === 'school';
   }
@@ -178,21 +156,6 @@ export class ProfileComponent implements OnInit {
   canSelectSchoolOption(): boolean {
     if (!this.editMode) return true;
     return !this.isUniversity();
-  }
-
-  isMarmarkosKhors(): boolean {
-    return String(this.profileForm.get('khors')?.value || '').toUpperCase() === 'MARMARKOS';
-  }
-
-  isMinor(): boolean {
-    const dob = this.user?.dateOfBirth;
-    if (!dob) return false;
-    const d = new Date(dob);
-    const now = new Date();
-    let age = now.getFullYear() - d.getFullYear();
-    const m = now.getMonth() - d.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-    return age < 18;
   }
 
   private normalizeRole(v: any): string {
@@ -338,38 +301,6 @@ export class ProfileComponent implements OnInit {
           summary: 'خطأ',
           detail: err.error?.error || 'تحديث فاشل'
         })
-    });
-  }
-
-  async copyPhone(value: any) {
-    const phone = String(value ?? '').trim();
-    if (!phone) return;
-
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(phone);
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = phone;
-        textarea.setAttribute('readonly', '');
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-      }
-
-      this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نسخ الرقم' });
-    } catch {
-      this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'فشل نسخ الرقم' });
-    }
-  }
-
-  logout() {
-    this.authService.logout().subscribe(() => {
-      localStorage.clear();
-      window.location.href = '/login';
     });
   }
 

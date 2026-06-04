@@ -4,8 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
 import { Router } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
-import { FamilyService } from '../services/family.service';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { normalizeAssignmentRole, normalizeRole } from '../shared/role-utils';
 import { AuthUser } from '../services/auth.service';
 import { take } from 'rxjs';
@@ -92,7 +91,6 @@ type DatePickerHandle = {
 export class DashBoard implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
-  private familyService = inject(FamilyService);
   private boardService = inject(BoardService);
   private router = inject(Router);
   private messageService = inject(MessageService);
@@ -129,7 +127,7 @@ export class DashBoard implements OnInit, OnDestroy {
     d.setHours(0, 0, 0, 0);
     return d;
   })();
-  readonly todayCalendarMinDate: Date = this.todayMinDate;
+
 
   // ===== Roles =====
   private normRole(role: unknown): string {
@@ -163,7 +161,6 @@ export class DashBoard implements OnInit, OnDestroy {
   // ===== UI State =====
   scopeOptions: Array<{ label: string; value: string }> = [];
   scopeFamily: string = 'FAMILY_ALL';
-  scopeLocked: boolean = true;
   private scopeSelectHideTimer: ReturnType<typeof setTimeout> | null = null;
   private scopePanelHoverBound = false;
 
@@ -258,11 +255,6 @@ export class DashBoard implements OnInit, OnDestroy {
     if (v === null || v === undefined || v === '') return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
-  }
-
-  attendanceLabel(present: number, total: number | null): string {
-    if (total == null) return `${present ?? 0}`;
-    return `${present ?? 0}/${total}`;
   }
 
   absenceLabel(present: number, total: number | null): string {
@@ -480,30 +472,8 @@ export class DashBoard implements OnInit, OnDestroy {
     this.clearUnpublishNoticeDate(picker);
   }
 
-  setEventDateNow(field: 'eventAt' | 'removeAt', picker?: DatePickerHandle | null): void {
-    const now = new Date();
-
-    if (field === 'eventAt') {
-      this.eventForm = { ...this.eventForm, eventAt: now };
-      this.closeDatePicker(picker);
-      return;
-    }
-
-    const minRemoveAt = this.removeCalendarMinDate;
-    const removeAt = now <= minRemoveAt ? new Date(minRemoveAt.getTime() + 60 * 60 * 1000) : now;
-    this.eventForm = { ...this.eventForm, removeAt };
-    this.closeDatePicker(picker);
-  }
-
   clearEventDate(field: 'eventAt' | 'removeAt', picker?: DatePickerHandle | null): void {
     this.eventForm = { ...this.eventForm, [field]: null };
-    this.closeDatePicker(picker);
-  }
-
-  setUnpublishNoticeNow(picker?: DatePickerHandle | null): void {
-    const minUntil = new Date();
-    minUntil.setHours(minUntil.getHours() + 1, 0, 0, 0);
-    this.unpublishForm = { ...this.unpublishForm, noticeUntil: minUntil };
     this.closeDatePicker(picker);
   }
 
@@ -834,10 +804,6 @@ export class DashBoard implements OnInit, OnDestroy {
     return out;
   }
 
-  get hasRealFamily(): boolean {
-    return this.userFamilies().length > 0;
-  }
-
   get showFamilyMeetingCard(): boolean {
     // ✅ لو خادم في الخورس فقط (وملوش أسرة) ما نظهرش كارت اجتماع الأسرة
     return this.userFamilies().length > 0;
@@ -957,10 +923,6 @@ export class DashBoard implements OnInit, OnDestroy {
     return out;
   }
 
-  get showAnyKhorsCards(): boolean {
-    return this.khorsCards.length > 0;
-  }
-
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     this.startCountdownTimer();
@@ -981,8 +943,6 @@ export class DashBoard implements OnInit, OnDestroy {
           return;
         }
         this.user = data;
-
-        this.scopeLocked = !this.showScopeSelector;
 
         if (this.isAtLeast('AMIN_KHEDMA')) {
           this.scopeFamily = 'ALL_USERS';
@@ -1291,13 +1251,6 @@ export class DashBoard implements OnInit, OnDestroy {
     }
   }
 
-  onMonthChange(offset: number): void {
-    const next = new Date(this.monthCursor);
-    next.setMonth(next.getMonth() + Number(offset || 0));
-    this.monthCursor = next;
-    this.loadMonthBoards();
-  }
-
   openCreateEvent(): void {
     const cfg = this.currentScopeConfig();
     this.eventTargetScope = this.scopeFamily;
@@ -1560,11 +1513,6 @@ export class DashBoard implements OnInit, OnDestroy {
     this.openJoin(e);
   }
 
-  joinFromCard(e: EventView): void {
-    this.selectedJoinEvent = e;
-    this.confirmJoin();
-  }
-
   confirmJoin(): void {
     if (!this.selectedJoinEvent?.id) {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'الموعد غير متاح للانضمام الآن.' });
@@ -1641,18 +1589,6 @@ export class DashBoard implements OnInit, OnDestroy {
       minute: '2-digit',
       hour12: true
     });
-  }
-
-  daysAgo(value: string | number | Date | null | undefined): string {
-    if (!value) return '';
-    const created = new Date(value);
-    if (Number.isNaN(created.getTime())) return '';
-    const diff = Math.floor((Date.now() - created.getTime()) / 86400000);
-    if (diff <= 0) return 'اليوم';
-    if (diff === 1) return 'منذ يوم';
-    if (diff === 2) return 'منذ يومين';
-    if (diff < 11) return `منذ ${diff} أيام`;
-    return `منذ ${diff} يوم`;
   }
 
 }
