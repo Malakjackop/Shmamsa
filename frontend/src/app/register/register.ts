@@ -249,17 +249,10 @@ export class RegisterComponent implements OnInit {
       .subscribe({
         next: (options) => {
           this.khorsFamilyOptions = Array.isArray(options) && options.length ? options : this.fallbackKhorsOptions();
+          this.attendKhorsFamilyOptions = this.khorsFamilyOptions;
         },
         error: () => {
           this.khorsFamilyOptions = this.fallbackKhorsOptions();
-        }
-      });
-    this.http.get<FamilyOption[]>(`/api/auth/family-options?audience=KHORS_ATTEND`, { withCredentials: true })
-      .subscribe({
-        next: (options) => {
-          this.attendKhorsFamilyOptions = Array.isArray(options) && options.length ? options : this.fallbackAttendKhorsOptions();
-        },
-        error: () => {
           this.attendKhorsFamilyOptions = this.fallbackAttendKhorsOptions();
         }
       });

@@ -1,8 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
 import { AttendanceService } from '../services/attendance.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { normalizeRole } from '../shared/role-utils';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-start-new-year',
@@ -11,11 +12,12 @@ import { normalizeRole } from '../shared/role-utils';
   styleUrls: ['./start-new-year.css'],
   providers: [MessageService, ConfirmationService]
 })
-export class StartNewYearComponent implements OnInit {
+export class StartNewYearComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   attendanceSvc = inject(AttendanceService);
   private msg = inject(MessageService);
   private confirm = inject(ConfirmationService);
+  private userSub?: Subscription;
 
   me: any = null;
   running = false;
@@ -24,13 +26,17 @@ export class StartNewYearComponent implements OnInit {
   archivesList: any[] = [];
 
   ngOnInit(): void {
-    this.auth.getUserData().subscribe({
+    this.userSub = this.auth.getUserData().subscribe({
       next: (u) => {
         this.me = u;
         if (this.isAllowed()) this.loadArchives();
       },
       error: () => (this.me = null)
     });
+  }
+
+  ngOnDestroy(): void {
+    this.userSub?.unsubscribe();
   }
 
   isAllowed(): boolean {

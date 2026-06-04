@@ -53,7 +53,7 @@ export class ResourcesComponent implements OnInit {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.auth.getUserData(true).subscribe({
+    this.auth.getUserData().subscribe({
       next: (u) => {
         this.user = u;
         this.initPage();

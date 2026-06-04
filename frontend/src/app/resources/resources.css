@@ -443,6 +443,61 @@
   font-size: 1.05rem;
 }
 
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirmdialog-accept-button,
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirm-dialog-accept {
+  background: #8d5144 !important;
+  border-color: #8d5144 !important;
+  color: #ffffff !important;
+  min-width: 98px !important;
+  min-height: 42px !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+}
+
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirmdialog-accept-button:hover,
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirm-dialog-accept:hover {
+  background: #6d3326 !important;
+  border-color: #6d3326 !important;
+  color: #ffffff !important;
+}
+
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirmdialog-reject-button,
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirm-dialog-reject {
+  background: #f7f3ec !important;
+  border-color: #eadfd9 !important;
+  color: #6d3326 !important;
+  min-width: 98px !important;
+  min-height: 42px !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+}
+
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirmdialog-reject-button:hover,
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer .p-confirm-dialog-reject:hover {
+  background: #efe4de !important;
+  border-color: #d8c7bd !important;
+  color: #5e2b20 !important;
+}
+
+:host ::ng-deep .resource-confirm-dialog .p-confirmdialog-message,
+:host ::ng-deep .resource-confirm-dialog .p-confirm-dialog-message {
+  color: #5e2b20 !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  line-height: 1.8 !important;
+}
+
+:host ::ng-deep .resource-confirm-dialog .p-confirmdialog-icon,
+:host ::ng-deep .resource-confirm-dialog .p-confirm-dialog-icon {
+  color: #8d5144 !important;
+  font-size: 1.35rem !important;
+}
+
+:host ::ng-deep .resource-confirm-dialog .p-dialog-footer {
+  justify-content: flex-start !important;
+  gap: 10px !important;
+}
+
 @media (max-width: 700px) {
   .category-filter-bar {
     grid-template-columns: repeat(4, minmax(0, 1fr));
