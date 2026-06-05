@@ -117,7 +117,7 @@
                   optionLabel="label"
                   optionValue="value"
                   placeholder=" "
-                  [showHeader]="false"
+                  [showHeader]="true"
                   [filter]="false"
                   selectedItemsLabel="{0} أسر مختارة"
                   [maxSelectedLabels]="1"
@@ -125,7 +125,14 @@
                   panelStyleClass="family-multiselect-panel"
                   (onChange)="onFamilyChanged()"
                   class="family-multiselect"
-                ></p-multiSelect>
+                >
+                  <ng-template pTemplate="header">
+                    <div class="family-multiselect-all" (click)="toggleAllFamilies()">
+                      <i class="pi" [class.pi-check-square]="allFamiliesSelected" [class.pi-square]="!allFamiliesSelected"></i>
+                      <span>كل الأسر</span>
+                    </div>
+                  </ng-template>
+                </p-multiSelect>
               </ng-container>
               <ng-template #fixedFamilyBlock>
                 <div class="readonly-box">{{ displayScopeFamilyLabel() || 'غير محددة' }}</div>
@@ -944,14 +951,23 @@
           optionLabel="label"
           optionValue="value"
           placeholder=" "
-          [showHeader]="false"
+          [showHeader]="true"
           [filter]="false"
           selectedItemsLabel="{0} أسر مختارة"
           [maxSelectedLabels]="1"
+          scrollHeight="280px"
+          appendTo="body"
           panelStyleClass="family-multiselect-panel"
           (onChange)="onCustomEventFamilyChange()"
           class="family-multiselect"
-        ></p-multiSelect>
+        >
+          <ng-template pTemplate="header">
+            <div class="family-multiselect-all" (click)="toggleAllCustomEventFamilies()">
+              <i class="pi" [class.pi-check-square]="allCustomEventFamiliesSelected" [class.pi-square]="!allCustomEventFamiliesSelected"></i>
+              <span>كل الأسر</span>
+            </div>
+          </ng-template>
+        </p-multiSelect>
       </div>
 
       <div class="form-group">
@@ -1174,13 +1190,33 @@
   (onHide)="closeScheduleDialog()"
 >
   <div class="dialog-body">
+    <div class="form-group full-width" *ngIf="isAminKhedmaOrDeveloper()">
+      <label>الأسرة</label>
+      <p-multiSelect
+        [options]="scheduleFamilySelectOptions"
+        [(ngModel)]="selectedScheduleFamilies"
+        optionLabel="label"
+        optionValue="value"
+        placeholder=" "
+        [showHeader]="true"
+        [filter]="false"
+        selectedItemsLabel="{0} أسر مختارة"
+        [maxSelectedLabels]="1"
+        scrollHeight="280px"
+        appendTo="body"
+        panelStyleClass="family-multiselect-panel"
+        (onChange)="onScheduleFamilyChange()"
+        class="family-multiselect"
+      >
+        <ng-template pTemplate="header">
+          <div class="family-multiselect-all" (click)="toggleAllScheduleFamilies()">
+            <i class="pi" [class.pi-check-square]="allScheduleFamiliesSelected" [class.pi-square]="!allScheduleFamiliesSelected"></i>
+            <span>كل الأسر</span>
+          </div>
+        </ng-template>
+      </p-multiSelect>
+    </div>
     <div class="dialog-grid">
-      <div class="form-group" *ngIf="isAminKhedmaOrDeveloper()">
-        <label>الأسرة</label>
-        <select [(ngModel)]="scheduleForm.familyBase" (ngModelChange)="onScheduleFamilyChange()">
-          <option *ngFor="let f of scheduleFamilies" [value]="f">{{ f }}</option>
-        </select>
-      </div>
       <div class="form-group">
         <label>نوع المناسبة</label>
         <select [(ngModel)]="scheduleForm.type" (ngModelChange)="onScheduleTypeChange()">
@@ -1239,6 +1275,7 @@
       <div class="schedule-section-title">المواعيد الحالية</div>
       <div class="schedule-item" *ngFor="let s of scheduleItems; trackBy: trackScheduleItem">
         <div class="schedule-item__info">
+          <span class="schedule-item__family" *ngIf="selectedScheduleFamilies.length > 1">{{ s.familyBase }}</span>
           <span class="schedule-item__type">{{ scheduleTypeLabel(s.type) }}</span>
           <span class="schedule-item__day">{{ scheduleDayLabel(s.dayOfWeek) }}</span>
           <span class="schedule-item__time">{{ scheduleTimeLabel(s.time) }}</span>

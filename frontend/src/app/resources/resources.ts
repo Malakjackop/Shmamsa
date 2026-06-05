@@ -31,7 +31,6 @@ export class ResourcesComponent implements OnInit {
   families: string[] = [];
   selectedFamily: string = '';
   familyMenuLocked = false;
-  familyMenuHovered = false;
 
   resources: any[] = [];
   readonly categoryOptions: Array<{ value: ResourceCategory; label: string }> = [
@@ -43,7 +42,6 @@ export class ResourcesComponent implements OnInit {
   selectedUploadCategory: ResourceCategory = 'GENERAL';
 
   title: string = '';
-  description: string = '';
   pickedFile: File | null = null;
 
   editing: any = null;
@@ -107,20 +105,6 @@ export class ResourcesComponent implements OnInit {
     return family === 'ALL' ? 'كل الاسر' : family;
   }
 
-  private getLongestFamilyLabelLength(): number {
-    return this.families
-      .map((family) => this.getFamilyLabel(family).length)
-      .reduce((longest, current) => Math.max(longest, current), this.getFamilyLabel(this.selectedFamily).length);
-  }
-
-  getFilterWidth(): string {
-    const labelLength = this.familyMenuHovered
-      ? this.getLongestFamilyLabelLength()
-      : this.getFamilyLabel(this.selectedFamily).length;
-
-    return `calc(${labelLength + 2}ch + 52px)`;
-  }
-
   selectFamily(family: string): void {
     this.familyMenuLocked = true;
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
@@ -136,12 +120,7 @@ export class ResourcesComponent implements OnInit {
   }
 
   unlockFamilyMenu(): void {
-    this.familyMenuHovered = false;
     this.familyMenuLocked = false;
-  }
-
-  onFamilyMenuEnter(): void {
-    this.familyMenuHovered = true;
   }
 
   initPage() {
@@ -255,7 +234,6 @@ export class ResourcesComponent implements OnInit {
   openEdit(r: any) {
     this.editing = r;
     this.title = r?.title || '';
-    this.description = r?.description || '';
     this.selectedUploadCategory = this.normalizeCategory(r?.category);
     this.pickedFile = null;
     this.resetFileInput();
@@ -273,7 +251,6 @@ export class ResourcesComponent implements OnInit {
 
     const fd = new FormData();
     fd.append('title', trimmedTitle);
-    fd.append('description', this.description || '');
     fd.append('category', this.selectedUploadCategory);
     if (this.pickedFile) fd.append('file', this.pickedFile);
 
@@ -321,7 +298,6 @@ export class ResourcesComponent implements OnInit {
   private resetForm(): void {
     this.editing = null;
     this.title = '';
-    this.description = '';
     this.selectedUploadCategory = 'GENERAL';
     this.pickedFile = null;
     this.resetFileInput();

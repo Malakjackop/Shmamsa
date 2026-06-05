@@ -8,8 +8,6 @@
     <label class="sr-only" for="familyFilter">الاسرة</label>
     <div
       class="filter-select"
-      [class.menu-locked]="familyMenuLocked"
-      (mouseenter)="onFamilyMenuEnter()"
       (mouseleave)="unlockFamilyMenu()"
     >
       <div id="familyFilter" class="filter-select__trigger" aria-haspopup="listbox" aria-expanded="false">
@@ -56,8 +54,7 @@
   <div #uploadPanel class="upload-panel" *ngIf="isUploader() && !isMakhdom()">
     <div class="panel-head">
       <h3>{{ editing ? 'تعديل ملف' : 'رفع الملفات (' + selectedUploadCategoryLabel + ')' }}</h3>
-      <div class="panel-head__left">
-      </div>
+
     </div>
 
     <div class="edit-note" *ngIf="editing">

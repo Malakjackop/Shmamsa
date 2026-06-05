@@ -356,16 +356,6 @@
               </div>
             </ng-container>
 
-            <!-- workDetails -->
-            <ng-container *ngSwitchCase="'workDetails'">
-              <div class="input-group small">
-                <label class="field-label">{{ fieldLabel('workDetails', 'ما هي وظيفتك؟') }}</label>
-                <input type="text" formControlName="workDetails"
-                       (click)="markInteracted('workDetails')" (blur)="markTouched('workDetails')" />
-                <small class="error-text" *ngIf="shouldShowError('workDetails')">{{ errorText('workDetails','الوظيفة') }}</small>
-              </div>
-            </ng-container>
-
             <!-- guardiansPhone -->
             <ng-container *ngSwitchCase="'guardiansPhone'">
               <div class="input-group small">

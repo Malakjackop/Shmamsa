@@ -7,9 +7,6 @@ import { MessageService } from 'primeng/api';
 import { DevSettingsService, CustomField, VisibilityCondition } from '../services/dev-settings.service';
 
 import { ToastModule } from 'primeng/toast';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { InputIconModule } from 'primeng/inputicon';
 
 interface FamilyOption {
   id?: number;
@@ -59,10 +56,7 @@ const FALLBACK_SYSTEM_FIELD_KEYS = new Set([
     CommonModule,
     RouterModule,
     ReactiveFormsModule,
-    ToastModule,
-    ButtonModule,
-    InputTextModule,
-    InputIconModule
+    ToastModule
   ],
   providers: [MessageService]
 })

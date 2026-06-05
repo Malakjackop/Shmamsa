@@ -14,6 +14,7 @@ import { AuthService } from '../services/auth.service';
 import { FamilyService } from '../services/family.service';
 import { MessageService } from 'primeng/api';
 import { Select } from 'primeng/select';
+import { DatePicker } from 'primeng/datepicker';
 import { assignmentRolesOf, normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
 import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { forkJoin, from, of } from 'rxjs';
@@ -146,6 +147,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   scannerOverlayVisible = false;
   scannerDevice: any;
   @ViewChild('qrScanner') scannerComponent?: ZXingScannerComponent;
+  @ViewChild('attendanceDatePicker') attendanceDatePicker?: DatePicker;
   selectedDate: Date | null = null;
   minDate!: Date;
   maxDate!: Date;
@@ -164,6 +166,19 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   selectedFamily = '';
   selectedFamilies: string[] = [];
   private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
+
+  get allFamiliesSelected(): boolean {
+    return this.selectedFamilies.length === this.families.length;
+  }
+
+  toggleAllFamilies(): void {
+    if (this.allFamiliesSelected) {
+      this.selectedFamilies = [];
+    } else {
+      this.selectedFamilies = [...this.families];
+    }
+    this.onFamilyChanged();
+  }
 
   get familySelectOptions(): Array<{ label: string; value: string }> {
     return this.families.map((f) => ({ label: f, value: f }));
@@ -249,6 +264,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   scheduleSaving = false;
   scheduleItems: any[] = [];
   scheduleFamilies: string[] = [];
+  selectedScheduleFamilies: string[] = [];
   editingScheduleId: number | null = null;
   editScheduleDialogVisible = false;
   editScheduleItem: any = null;
@@ -1928,6 +1944,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   private configuredTypeHasDays(type: AttendanceType, family = this.selectedFamily): boolean {
     const scheduleDays = this.attendanceContext?.scheduleDays?.[family]?.[type];
     if (scheduleDays && scheduleDays.length > 0) return true;
+    if (!family) {
+      return (this.configDaysForType(type) || []).length > 0;
+    }
     return false;
   }
 
@@ -2417,7 +2436,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.globalResults = [];
     this.familyCustomEvents = [];
     this.availableCustomEvents = [];
-    this.selectedCustomEventId = '';
     this.customTitle = '';
     this.refreshTypeOptions();
     this.loadMembersForFamily();
@@ -2425,6 +2443,9 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.loadScheduleItemsForFamily();
     this.initCalendarRules();
     this.refreshRuntimeState();
+    if (!this.selectedDate && this.attendanceDatePicker) {
+      this.attendanceDatePicker.overlayVisible = true;
+    }
   }
 
   onSearchChange(v: string) {
@@ -4585,9 +4606,26 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return this.isAminKhedmaOrDeveloper();
   }
 
+  get allCustomEventFamiliesSelected(): boolean {
+    const familyValues = this.customEventFamilyOptions().map(o => o.value).filter(Boolean);
+    if (!familyValues.length) return false;
+    const selected = this.customEventForm.familyBases || [];
+    return familyValues.every(f => selected.includes(f));
+  }
+
+  toggleAllCustomEventFamilies(): void {
+    const familyValues = this.customEventFamilyOptions().map(o => o.value).filter(Boolean);
+    if (this.allCustomEventFamiliesSelected) {
+      this.customEventForm.familyBases = [];
+    } else {
+      this.customEventForm.familyBases = [...familyValues];
+    }
+    this.onCustomEventFamilyChange();
+  }
+
   customEventFamilyOptions(): Array<{ label: string; value: string }> {
     const options = this.isAminKhedmaOrDeveloper()
-      ? [{ label: 'كل الأسر', value: '' }, ...this.filterAthanasiusVisibility(this.families).map((family) => ({ label: family, value: family }))]
+      ? this.filterAthanasiusVisibility(this.families).map((family) => ({ label: family, value: family }))
       : this.filterAthanasiusVisibility(this.aminOsraFamilies()).filter(Boolean).map((family) => ({ label: family, value: family }));
     return options;
   }
@@ -5521,7 +5559,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   get scheduleAvailableDayOptions(): { value: number; label: string }[] {
     const type = this.scheduleForm.type;
     if (!type) return this.scheduleDayOptions;
-    const validDays = this.configDaysForType(type as AttendanceType, this.scheduleForm.familyBase || undefined);
+    const base = this.selectedScheduleFamilies[0];
+    const validDays = this.configDaysForType(type as AttendanceType, base || undefined);
     if (!validDays || !validDays.length) return this.scheduleDayOptions;
     return this.scheduleDayOptions.filter(d => validDays.includes(d.value));
   }
@@ -5576,6 +5615,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     picker.overlayVisible = false;
   }
 
+  get allScheduleFamiliesSelected(): boolean {
+    return this.selectedScheduleFamilies.length === this.scheduleFamilies.length;
+  }
+
+  toggleAllScheduleFamilies(): void {
+    if (this.allScheduleFamiliesSelected) {
+      this.selectedScheduleFamilies = [];
+    } else {
+      this.selectedScheduleFamilies = [...this.scheduleFamilies];
+    }
+    this.onScheduleFamilyChange();
+  }
+
+  get scheduleFamilySelectOptions(): Array<{ label: string; value: string }> {
+    return this.scheduleFamilies.map((f) => ({ label: f, value: f }));
+  }
+
   openScheduleDialog(): void {
     this.scheduleForm = { familyBase: '', type: '', dayOfWeek: 5, time: null };
     this.scheduleItems = [];
@@ -5587,15 +5643,16 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         next: (list) => {
           this.scheduleFamilies = list;
           if (list.length) {
-            this.scheduleForm.familyBase = (this.selectedFamily && list.includes(this.selectedFamily))
-              ? this.selectedFamily
-              : list[0];
+            this.selectedScheduleFamilies = (this.selectedFamily && list.includes(this.selectedFamily))
+              ? [this.selectedFamily]
+              : [list[0]];
             this.loadScheduleItems();
           }
           this.scheduleDialogVisible = true;
         },
         error: () => {
           this.scheduleFamilies = [];
+          this.selectedScheduleFamilies = [];
           this.scheduleDialogVisible = true;
         }
       });
@@ -5603,6 +5660,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       const myFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
       const base = String(myFamily).replace(/ [أب]$/, '').trim();
       this.scheduleFamilies = base ? [base] : [];
+      this.selectedScheduleFamilies = base ? [base] : [];
       if (base) this.scheduleForm.familyBase = base;
       this.loadScheduleItems();
       this.scheduleDialogVisible = true;
@@ -5613,18 +5671,21 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.scheduleDialogVisible = false;
     this.scheduleItems = [];
     this.scheduleFamilies = [];
+    this.selectedScheduleFamilies = [];
     this.editingScheduleId = null;
   }
 
   private loadScheduleItems(): void {
-    const base = this.scheduleForm.familyBase;
-    if (!base) {
+    const bases = this.selectedScheduleFamilies;
+    if (!bases.length) {
       this.scheduleItems = [];
       return;
     }
-    this.attendance.getSchedules(base).subscribe({
-      next: (list: any[]) => {
-        this.scheduleItems = list || [];
+    forkJoin(bases.map((base) => this.attendance.getSchedules(base))).subscribe({
+      next: (results: any[][]) => {
+        this.scheduleItems = results.flat().filter((item, index, arr) =>
+          arr.findIndex((s: any) => s.id === item.id) === index
+        );
       },
       error: () => {
         this.scheduleItems = [];
@@ -5646,55 +5707,48 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   addSchedule(): void {
-    const base = this.scheduleForm.familyBase;
+    const bases = this.selectedScheduleFamilies;
     const type = this.scheduleForm.type;
-    if (!base || !type) return;
+    if (!bases.length || !type) return;
 
     this.scheduleSaving = true;
     const timeStr = this.scheduleForm.time
       ? `${String(this.scheduleForm.time.getHours()).padStart(2, '0')}:${String(this.scheduleForm.time.getMinutes()).padStart(2, '0')}`
       : undefined;
 
-    const deleteOld = this.editingScheduleId
-      ? this.attendance.deleteSchedule(this.editingScheduleId)
-      : undefined;
-
-    const doCreate = () => this.attendance.createSchedule({
-      familyBase: base,
-      type: type as AttendanceType,
-      dayOfWeek: this.scheduleForm.dayOfWeek,
-      time: timeStr
-    });
-
-    const onDone = () => {
-      this.scheduleSaving = false;
-      this.editingScheduleId = null;
-      this.loadScheduleItems();
-      this.refreshFromScheduleChanges();
+    const createAll = () => {
+      const requests = bases.map((base) =>
+        this.attendance.createSchedule({
+          familyBase: base,
+          type: type as AttendanceType,
+          dayOfWeek: this.scheduleForm.dayOfWeek,
+          time: timeStr
+        })
+      );
+      forkJoin(requests).subscribe({
+        next: () => {
+          this.scheduleSaving = false;
+          this.editingScheduleId = null;
+          this.loadScheduleItems();
+          this.refreshFromScheduleChanges();
+        },
+        error: (err: any) => {
+          this.scheduleSaving = false;
+          console.error('Failed to create schedule', err);
+        }
+      });
     };
 
-    if (deleteOld) {
-      deleteOld.subscribe({
-        next: () => doCreate().subscribe({
-          next: () => onDone(),
-          error: (err: any) => {
-            this.scheduleSaving = false;
-            console.error('Failed to create schedule after delete', err);
-          }
-        }),
+    if (this.editingScheduleId) {
+      this.attendance.deleteSchedule(this.editingScheduleId).subscribe({
+        next: () => createAll(),
         error: (err: any) => {
           this.scheduleSaving = false;
           console.error('Failed to delete old schedule', err);
         }
       });
     } else {
-      doCreate().subscribe({
-        next: () => onDone(),
-        error: (err: any) => {
-          this.scheduleSaving = false;
-          console.error('Failed to create schedule', err);
-        }
-      });
+      createAll();
     }
   }
 

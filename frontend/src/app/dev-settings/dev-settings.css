@@ -154,11 +154,6 @@
   margin: 0 0 1.5rem;
 }
 
-.btn-add.small {
-  padding: 0.6rem 1.2rem;
-  font-size: 0.9rem;
-  border-radius: 10px;
-}
 
 /* ── Fields Preview ───────────────────────────── */
 .fields-preview {
@@ -188,11 +183,6 @@
   color: #1d2b44;
 }
 
-.fields-preview__head p {
-  margin: 0.35rem 0 0;
-  color: #756b66;
-  font-size: 0.92rem;
-}
 
 .sections-stack {
   display: flex;
@@ -404,7 +394,7 @@
 }
 .badge-type { background: #eef3ff; color: #3556a8; }
 .badge-req { background: #ffebee; color: #c62828; }
-.badge-system { background: #eceff1; color: #455a64; }
+
 .badge-muted { background: #f1f3f5; color: #67727d; }
 
 .action-btns-overlay {
@@ -853,22 +843,6 @@
   font-weight: 700;
   font-size: 0.98rem;
   color: #2f241f;
-}
-
-.family-card__meta {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.family-code {
-  font-size: 0.72rem;
-  color: #999;
-  font-family: monospace;
-  background: #f5f5f5;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
 }
 
 .join-grades-grid {

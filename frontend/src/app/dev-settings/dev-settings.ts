@@ -177,16 +177,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     { label: 'تاريخ (Date)', value: 'DATE' }
   ];
 
-  visibilityOptions = [
-    { label: 'يظهر دايماً', value: 'ALWAYS' },
-    { label: 'مخدوم بس', value: 'MEMBER_ONLY' },
-    { label: 'خادم بس', value: 'SERVANT_ONLY' },
-    { label: 'طالب (أي نوع)', value: 'STUDENT_ONLY' },
-    { label: 'طالب مدرسة', value: 'STUDENT_SCHOOL' },
-    { label: 'طالب جامعة', value: 'STUDENT_UNIVERSITY' },
-    { label: 'خريج بس', value: 'GRADUATE_ONLY' }
-  ];
-
   requiredRuleOptions = [
     { label: 'مخدوم بس', value: 'MEMBER_ONLY' },
     { label: 'خادم بس', value: 'SERVANT_ONLY' },
@@ -867,34 +857,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
-  moveUp(index: number): void {
-    if (index <= 0) return;
-    const curr = this.fields[index];
-    const prev = this.fields[index - 1];
-    const tmpOrder = curr.displayOrder;
-    curr.displayOrder = prev.displayOrder;
-    prev.displayOrder = tmpOrder;
-
-    this.svc.reorderFields([
-      { id: curr.id!, displayOrder: curr.displayOrder },
-      { id: prev.id!, displayOrder: prev.displayOrder }
-    ]).subscribe();
-  }
-
-  moveDown(index: number): void {
-    if (index >= this.fields.length - 1) return;
-    const curr = this.fields[index];
-    const next = this.fields[index + 1];
-    const tmpOrder = curr.displayOrder;
-    curr.displayOrder = next.displayOrder;
-    next.displayOrder = tmpOrder;
-
-    this.svc.reorderFields([
-      { id: curr.id!, displayOrder: curr.displayOrder },
-      { id: next.id!, displayOrder: next.displayOrder }
-    ]).subscribe();
-  }
-
   /* ── Drag & Drop ────────────────────────────────────── */
   dropSection(event: CdkDragDrop<CustomField[]>, sectionId: string) {
     if (event.previousIndex === event.currentIndex) return;
@@ -1211,12 +1173,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     });
   }
 
-  familyCategoryLabel(cat?: string): string {
-    if (cat === 'KHORS') return 'خورس';
-    if (cat === 'FAMILY') return 'عائلة';
-    return cat || 'عائلة';
-  }
-
   get familiesGrouped(): Array<{ category: string; label: string; families: FamilyCatalog[] }> {
     const groups: Array<{ category: string; label: string; families: FamilyCatalog[] }> = [];
     const familyGroup = this.families.filter(f => f.category !== 'KHORS');
@@ -1501,30 +1457,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     const m = Math.floor((this.remainingSeconds % 3600) / 60);
     const s = this.remainingSeconds % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-
-  /* ── Label helpers ──────────────────────────────────── */
-  enabledCount(): number {
-    return this.fields.filter(f => f.enabled).length;
-  }
-
-  visibilityLabel(rule: string): string {
-    return this.visibilityOptions.find(o => o.value === rule)?.label || rule;
-  }
-
-  showInLabel(val: string): string {
-    const normalized = this.normalizeConfiguredShowInValue(val);
-    if (normalized === 'NONE') {
-      return 'متظهرش';
-    }
-
-    return parseShowInTargets(normalized)
-      .map(target => this.showInTargetLabels[target] || target)
-      .join(' + ');
-  }
-
-  typeLabel(type: string): string {
-    return this.fieldTypeOptions.find(o => o.value === type)?.label || type;
   }
 
   private rebuildSections(): void {
