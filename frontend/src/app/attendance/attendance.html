@@ -117,7 +117,7 @@
                   optionLabel="label"
                   optionValue="value"
                   placeholder=" "
-                  [showHeader]="true"
+                  [showHeader]="false"
                   [filter]="false"
                   selectedItemsLabel="{0} أسر مختارة"
                   [maxSelectedLabels]="1"
@@ -128,7 +128,9 @@
                 >
                   <ng-template pTemplate="header">
                     <div class="family-multiselect-all" (click)="toggleAllFamilies()">
-                      <i class="pi" [class.pi-check-square]="allFamiliesSelected" [class.pi-square]="!allFamiliesSelected"></i>
+                      <span class="family-multiselect-all__checkbox" [class.is-checked]="allFamiliesSelected" aria-hidden="true">
+                        <i class="pi pi-check" *ngIf="allFamiliesSelected"></i>
+                      </span>
                       <span>كل الأسر</span>
                     </div>
                   </ng-template>
@@ -953,7 +955,7 @@
           optionLabel="label"
           optionValue="value"
           placeholder=" "
-          [showHeader]="true"
+          [showHeader]="false"
           [filter]="false"
           selectedItemsLabel="{0} أسر مختارة"
           [maxSelectedLabels]="1"
@@ -965,7 +967,9 @@
         >
           <ng-template pTemplate="header">
             <div class="family-multiselect-all" (click)="toggleAllCustomEventFamilies()">
-              <i class="pi" [class.pi-check-square]="allCustomEventFamiliesSelected" [class.pi-square]="!allCustomEventFamiliesSelected"></i>
+              <span class="family-multiselect-all__checkbox" [class.is-checked]="allCustomEventFamiliesSelected" aria-hidden="true">
+                <i class="pi pi-check" *ngIf="allCustomEventFamiliesSelected"></i>
+              </span>
               <span>كل الأسر</span>
             </div>
           </ng-template>
@@ -1200,7 +1204,7 @@
         optionLabel="label"
         optionValue="value"
         placeholder=" "
-        [showHeader]="true"
+        [showHeader]="false"
         [filter]="false"
         selectedItemsLabel="{0} أسر مختارة"
         [maxSelectedLabels]="1"
@@ -1212,7 +1216,9 @@
       >
         <ng-template pTemplate="header">
           <div class="family-multiselect-all" (click)="toggleAllScheduleFamilies()">
-            <i class="pi" [class.pi-check-square]="allScheduleFamiliesSelected" [class.pi-square]="!allScheduleFamiliesSelected"></i>
+            <span class="family-multiselect-all__checkbox" [class.is-checked]="allScheduleFamiliesSelected" aria-hidden="true">
+              <i class="pi pi-check" *ngIf="allScheduleFamiliesSelected"></i>
+            </span>
             <span>كل الأسر</span>
           </div>
         </ng-template>

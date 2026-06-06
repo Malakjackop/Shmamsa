@@ -476,9 +476,15 @@ textarea {
 ::ng-deep .family-multiselect-panel .p-multiselect-item,
 ::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-highlight="true"],
 ::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-focus="true"],
+::ng-deep .family-multiselect-panel .p-multiselect-option,
+::ng-deep .family-multiselect-panel .p-multiselect-option[data-p-highlight="true"],
+::ng-deep .family-multiselect-panel .p-multiselect-option[data-p-focus="true"],
 ::ng-deep .family-multiselect-panel li[role="option"] {
   color: #000 !important;
   background: #ffffff !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
   justify-content: flex-start !important;
   padding: 0.65rem 0.75rem !important;
   font-size: 0.9rem !important;
@@ -489,13 +495,44 @@ textarea {
   direction: rtl !important;
 }
 
+::ng-deep .family-multiselect-panel .p-multiselect-item .p-checkbox,
+::ng-deep .family-multiselect-panel li[role="option"] .p-checkbox,
+::ng-deep .family-multiselect-panel .p-multiselect-option .p-checkbox {
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  margin-inline: 0 !important;
+}
+
+::ng-deep .family-multiselect-panel .p-multiselect-item .p-multiselect-item-label,
+::ng-deep .family-multiselect-panel .p-multiselect-item .p-multiselect-option-label,
+::ng-deep .family-multiselect-panel li[role="option"] .p-multiselect-item-label,
+::ng-deep .family-multiselect-panel li[role="option"] .p-multiselect-option-label,
+::ng-deep .family-multiselect-panel .p-multiselect-option-label,
+::ng-deep .family-multiselect-panel .p-multiselect-option > span,
+::ng-deep .family-multiselect-panel li[role="option"] > span {
+  flex: 0 1 auto !important;
+  margin: 0 !important;
+  margin-inline: 0 !important;
+  padding: 0 !important;
+  text-align: right !important;
+  width: auto !important;
+  max-width: calc(100% - 28px) !important;
+}
+
 ::ng-deep .family-multiselect-panel .p-multiselect-item:hover,
 ::ng-deep .family-multiselect-panel .p-multiselect-item:focus,
 ::ng-deep .family-multiselect-panel .p-multiselect-item.p-highlight,
 ::ng-deep .family-multiselect-panel .p-multiselect-item.p-highlight:hover,
 ::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-highlight="true"],
 ::ng-deep .family-multiselect-panel .p-multiselect-item[data-p-highlight="true"]:hover,
+::ng-deep .family-multiselect-panel .p-multiselect-option:hover,
+::ng-deep .family-multiselect-panel .p-multiselect-option:focus,
+::ng-deep .family-multiselect-panel .p-multiselect-option.p-multiselect-option-selected,
+::ng-deep .family-multiselect-panel .p-multiselect-option.p-multiselect-option-selected:hover,
+::ng-deep .family-multiselect-panel .p-multiselect-option[data-p-highlight="true"],
+::ng-deep .family-multiselect-panel .p-multiselect-option[data-p-highlight="true"]:hover,
 ::ng-deep .family-multiselect-panel .p-multiselect-item.p-focus,
+::ng-deep .family-multiselect-panel .p-multiselect-option.p-focus,
 ::ng-deep .family-multiselect-panel li[role="option"]:hover,
 ::ng-deep .family-multiselect-panel li[role="option"][aria-selected="true"] {
   color: #000 !important;
@@ -554,6 +591,7 @@ textarea {
 .family-multiselect-all {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   padding: 0.65rem 0.75rem;
   cursor: pointer;
@@ -567,7 +605,25 @@ textarea {
 }
 
 .family-multiselect-all i {
-  font-size: 1rem;
+  font-size: 0.68rem;
+}
+
+.family-multiselect-all__checkbox {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #666;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #000;
+}
+
+.family-multiselect-all__checkbox.is-checked {
+  border-color: #666;
+  background: #ffffff;
 }
 
 .scope {
@@ -2389,7 +2445,8 @@ textarea {
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 8px;
   min-height: 58px;
   padding: 12px 14px !important;
   border-bottom: 1px solid #eadfd9 !important;
@@ -2400,6 +2457,9 @@ textarea {
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button {
   flex-shrink: 0;
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-title,
@@ -2416,7 +2476,7 @@ textarea {
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-title {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3463,7 +3523,8 @@ textarea {
 ::ng-deep .attendanceDatePanel .p-datepicker-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 8px;
   min-height: 58px;
   padding: 12px 14px !important;
   border-bottom: 1px solid #eadfd9 !important;
@@ -3481,6 +3542,9 @@ textarea {
   color: #8d5144 !important;
   box-shadow: none !important;
   flex-shrink: 0;
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
 }
 
 ::ng-deep .attendanceDatePanel .p-datepicker-prev-button:hover,
@@ -3490,7 +3554,7 @@ textarea {
 }
 
 ::ng-deep .attendanceDatePanel .p-datepicker-title {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
