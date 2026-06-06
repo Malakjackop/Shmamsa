@@ -272,11 +272,13 @@
             </div>
             <div class="scanner-popup__body">
               <zxing-scanner
-  #qrScanner
-  [device]="scannerDevice"
-  (autostarted)="onScannerAutostarted()"
-  (scanSuccess)="onCodeResult($event)"
-></zxing-scanner>
+                #qrScanner
+                [device]="scannerDevice"
+                [videoConstraints]="scannerVideoConstraints"
+                [autostart]="false"
+                previewFitMode="cover"
+                (scanSuccess)="onCodeResult($event)"
+              ></zxing-scanner>
             </div>
           </div>
         </div>

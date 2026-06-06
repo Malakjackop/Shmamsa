@@ -1427,12 +1427,74 @@ textarea {
   justify-content: center;
   border-radius: 16px;
   overflow: hidden;
-  background: #000;
-  min-height: 300px;
+  background: #f7f0eb;
+  aspect-ratio: 4 / 3;
 }
 
 .scanner-popup__body zxing-scanner {
+  display: block;
   width: 100%;
+  height: 100%;
+}
+
+.scanner-popup__body ::ng-deep video {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.scanner-camera-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #eadfd8;
+  border-radius: 16px;
+  background: #f7f0eb;
+}
+
+.scanner-camera-picker p {
+  margin: 0;
+  color: #5e2b20;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.scanner-camera-picker__list {
+  display: grid;
+  gap: 10px;
+}
+
+.scanner-camera-option {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d9c7ba;
+  border-radius: 12px;
+  background: #fffdfb;
+  color: #4a241a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: start;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.scanner-camera-option:hover {
+  border-color: #8b4533;
+  box-shadow: 0 8px 18px rgba(94, 43, 32, 0.12);
+  transform: translateY(-1px);
+}
+
+.scanner-camera-option i {
+  color: #8b4533;
+  flex-shrink: 0;
+}
+
+.scanner-camera-option span {
+  overflow-wrap: anywhere;
 }
 
 .grant-popup-backdrop {
