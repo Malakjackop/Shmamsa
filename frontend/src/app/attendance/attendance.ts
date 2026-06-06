@@ -146,6 +146,15 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   scannerOverlayVisible = false;
   scannerDevice: any;
+  scannerCameraChoices: MediaDeviceInfo[] = [];
+  scannerNeedsCameraChoice = false;
+  scannerCameraChoiceMessage = '';
+  scannerVideoConstraints = {
+    facingMode: { ideal: 'environment' },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    zoom: { ideal: 1 }
+  } as MediaTrackConstraints;
   @ViewChild('qrScanner') scannerComponent?: ZXingScannerComponent;
   @ViewChild('attendanceDatePicker') attendanceDatePicker?: DatePicker;
   selectedDate: Date | null = null;
@@ -326,25 +335,108 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     try {
       if (!navigator.mediaDevices?.enumerateDevices) return;
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter(d => d.kind === 'videoinput');
-
-      const goodCamera = videoInputs.find(d => {
-        const label = d.label.toLowerCase();
-        const isBack = /back|rear|environment|traseira|arrière|hátsó|背面/i.test(label);
-        const isUltraWide = /ultra\s*wide|0\.5|wide.?angle/i.test(label);
-        return !!label && isBack && !isUltraWide;
-      });
-      if (goodCamera) {
-        this.scannerDevice = goodCamera;
-      }
+      const pick = this.pickNormalBackCamera(devices);
+      if (pick.confident && pick.device) this.scannerDevice = pick.device;
     } catch {}
+  }
+
+  private pickNormalBackCamera(devices: MediaDeviceInfo[]): { device?: MediaDeviceInfo; confident: boolean; choices: MediaDeviceInfo[] } {
+    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+    const scored = videoInputs
+      .map(device => ({ device, score: this.normalBackCameraScore(device), label: (device.label || '').toLowerCase() }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score);
+    const choices = scored.map(item => item.device);
+    const best = scored[0];
+
+    if (!best) {
+      return {
+        confident: videoInputs.length === 1,
+        device: videoInputs.length === 1 ? videoInputs[0] : undefined,
+        choices: videoInputs
+      };
+    }
+
+    const hasNormalSignal = /main|standard|normal|default|1x/i.test(best.label);
+    const clearlyBeatsNext = !scored[1] || best.score - scored[1].score >= 30;
+    return {
+      device: best.device,
+      confident: choices.length === 1 || hasNormalSignal || clearlyBeatsNext,
+      choices
+    };
+  }
+
+  private normalBackCameraScore(device: MediaDeviceInfo): number {
+    const label = (device.label || '').toLowerCase();
+    if (!label) return 0;
+
+    const isBack = /back|rear|environment|traseira|arrière|hatsó|hátsó|背面/i.test(label);
+    if (!isBack) return 0;
+
+    const isUltraWide = /ultra\s*wide|ultrawide|0\.5x?|wide.?angle/i.test(label);
+    const isTelephoto = /telephoto|tele\s*photo|2x|3x|5x/i.test(label);
+    const isMacro = /macro/i.test(label);
+    if (isUltraWide || isTelephoto || isMacro) return 0;
+
+    let score = 100;
+    if (/main|standard|normal|default|1x/i.test(label)) score += 40;
+    if (/back camera|rear camera|environment camera/i.test(label)) score += 20;
+    return score;
   }
 
   private async ensureCameraPermission(): Promise<void> {
     try {
-      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const tempStream = await navigator.mediaDevices.getUserMedia({
+        video: this.scannerVideoConstraints
+      });
       tempStream.getTracks().forEach(t => t.stop());
     } catch {}
+  }
+
+  private async prepareScannerCamera(): Promise<void> {
+    this.scannerNeedsCameraChoice = false;
+    this.scannerCameraChoiceMessage = '';
+    this.scannerCameraChoices = [];
+
+    await this.ensureCameraPermission();
+
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        this.scannerDevice = undefined;
+        this.scannerNeedsCameraChoice = true;
+        this.scannerCameraChoiceMessage = 'المتصفح مش مدي التطبيق أسماء الكاميرات، فمش هفتح كاميرا تلقائيًا عشان ما يختارش wide.';
+        return;
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const pick = this.pickNormalBackCamera(devices);
+      this.scannerCameraChoices = pick.choices;
+
+      if (pick.confident && pick.device) {
+        this.scannerDevice = pick.device;
+        return;
+      }
+
+      this.scannerDevice = undefined;
+      this.scannerNeedsCameraChoice = true;
+      this.scannerCameraChoiceMessage = pick.choices.length
+        ? 'اختار الكاميرا العادية. مش هفتح كاميرا تلقائيًا لأن أسماء العدسات مش واضحة كفاية.'
+        : 'مش قادر أحدد كاميرا مناسبة من المتصفح.';
+    } catch {
+      this.scannerDevice = undefined;
+      this.scannerNeedsCameraChoice = true;
+      this.scannerCameraChoiceMessage = 'تعذر قراءة الكاميرات من المتصفح.';
+    }
+  }
+
+  cameraDisplayName(device: MediaDeviceInfo, index: number): string {
+    return device.label || `كاميرا ${index + 1}`;
+  }
+
+  chooseScannerCamera(device: MediaDeviceInfo): void {
+    this.scannerDevice = device;
+    this.scannerNeedsCameraChoice = false;
+    this.scannerCameraChoiceMessage = '';
   }
 
   ngOnDestroy(): void {
@@ -2373,8 +2465,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   async toggleScan() {
     if (this.isSelfCheckinMode() || !!this.blockedMessage) return;
-    await this.ensureCameraPermission();
-    await this.findBackCamera();
+    await this.prepareScannerCamera();
     this.scannerOverlayVisible = true;
   }
 
@@ -2382,32 +2473,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (this.scannerDevice && this.scannerComponent) {
       this.scannerComponent.device = this.scannerDevice;
     }
-    await this.force1xZoom();
-  }
-
-  private async force1xZoom(): Promise<void> {
-    try {
-      await new Promise(r => setTimeout(r, 600));
-      const el = document.querySelector('.scanner-popup__body video') as HTMLVideoElement;
-      const oldStream = el?.srcObject as MediaStream;
-      const track = oldStream?.getVideoTracks()?.[0];
-      if (!track) return;
-
-      const deviceId = track.getSettings().deviceId;
-      if (!deviceId) return;
-
-      oldStream.getTracks().forEach(t => t.stop());
-
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: { exact: deviceId },
-          facingMode: 'environment',
-          zoom: { ideal: 1 }
-        }
-      } as any);
-
-      el.srcObject = newStream;
-    } catch {}
   }
 
   onScannerResult(resultString: string): void {
