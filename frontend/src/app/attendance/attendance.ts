@@ -357,7 +357,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       next: (ctx) => {
         this.attendanceContext = { ...ctx, config: this.mergeConfig(ctx?.config) };
         this.configEditor = this.mergeConfig(ctx?.config);
-        this.initCalendarRules();
         this.loadFamilies();
         this.refreshRuntimeState();
         if (this.canManageAccessGrants()) this.loadAccessGrants();
@@ -2506,6 +2505,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.selectedFamilies = this.selectedFamily ? [this.selectedFamily] : [];
       this.selected = [];
       if (this.selectedFamily) this.loadMembersForFamily();
+      this.initCalendarRules();
       this.refreshRuntimeState();
       return;
     }
@@ -4672,9 +4672,8 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.familyCustomEvents = [];
         this.familyCustomEventGroups = [];
         this.availableCustomEvents = [];
-        this.refreshTypeOptions();
-        this.updateCalendarForSelectedType(true);
-      }
+    this.refreshTypeOptions();
+  }
     });
   }
 
@@ -4687,7 +4686,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.familyCustomEvents = this.filterAthanasiusVisibilityForEvents(this.uniqueCustomEvents(relevant));
     this.familyCustomEventGroups = this.groupCustomEvents(this.familyCustomEvents);
     this.refreshTypeOptions();
-    this.updateCalendarForSelectedType(true);
     this.refreshAvailableCustomEvents();
   }
 
@@ -5639,23 +5637,14 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.editingScheduleId = null;
 
     if (this.isAminKhedmaOrDeveloper()) {
-      this.familySvc.families().subscribe({
-        next: (list) => {
-          this.scheduleFamilies = list;
-          if (list.length) {
-            this.selectedScheduleFamilies = (this.selectedFamily && list.includes(this.selectedFamily))
-              ? [this.selectedFamily]
-              : [list[0]];
-            this.loadScheduleItems();
-          }
-          this.scheduleDialogVisible = true;
-        },
-        error: () => {
-          this.scheduleFamilies = [];
-          this.selectedScheduleFamilies = [];
-          this.scheduleDialogVisible = true;
-        }
-      });
+      this.scheduleFamilies = [...this.families];
+      if (this.scheduleFamilies.length) {
+        this.selectedScheduleFamilies = (this.selectedFamily && this.scheduleFamilies.includes(this.selectedFamily))
+          ? [this.selectedFamily]
+          : [this.scheduleFamilies[0]];
+        this.loadScheduleItems();
+      }
+      this.scheduleDialogVisible = true;
     } else {
       const myFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
       const base = String(myFamily).replace(/ [أب]$/, '').trim();

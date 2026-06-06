@@ -2280,9 +2280,13 @@ textarea {
   width: 100%;
 }
 
+::ng-deep .attendanceDatePanel,
 ::ng-deep .attendanceGrantDatePanel,
+
 ::ng-deep .attendanceDatePanel.p-datepicker,
-::ng-deep .attendanceDatePanel.p-datepicker-panel {
+::ng-deep .attendanceDatePanel.p-datepicker-panel,
+::ng-deep .attendanceGrantDatePanel.p-datepicker,
+::ng-deep .attendanceGrantDatePanel.p-datepicker-panel {
   width: min(420px, calc(100vw - 28px)) !important;
   max-width: calc(100vw - 28px) !important;
   border: 1px solid #e7dad3 !important;
@@ -2305,172 +2309,7 @@ textarea {
 ::ng-deep .attendanceDatePanel tbody,
 ::ng-deep .attendanceDatePanel tr,
 ::ng-deep .attendanceDatePanel td,
-::ng-deep .attendanceDatePanel th {
-  background: #fffaf6 !important;
-  color: #5e2b20 !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-header {
-  display: flex;
-  align-items: center;
-  min-height: 58px;
-  padding: 12px 14px !important;
-  border-bottom: 1px solid #eadfd9 !important;
-  background: #fffaf6 !important;
-  color: #5e2b20 !important;
-  gap: 4px;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-prev-button,
-::ng-deep .attendanceDatePanel .p-datepicker-next-button {
-  flex-shrink: 0;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-title {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-title .p-datepicker-month,
-::ng-deep .attendanceDatePanel .p-datepicker-title .p-datepicker-year,
-::ng-deep .attendanceDatePanel .p-datepicker-title .p-datepicker-decade,
-::ng-deep .attendanceDatePanel .p-datepicker-select-month,
-::ng-deep .attendanceDatePanel .p-datepicker-select-year {
-  color: #5e2b20 !important;
-  font-weight: 900 !important;
-  opacity: 1 !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-title button,
-::ng-deep .attendanceDatePanel .p-datepicker-select-month,
-::ng-deep .attendanceDatePanel .p-datepicker-select-year {
-  border: 0 !important;
-  border-radius: 8px !important;
-  background: transparent !important;
-  color: #5e2b20 !important;
-  box-shadow: none !important;
-  cursor: pointer;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-title button:hover,
-::ng-deep .attendanceDatePanel .p-datepicker-title button:focus,
-::ng-deep .attendanceDatePanel .p-datepicker-select-month:hover,
-::ng-deep .attendanceDatePanel .p-datepicker-select-month:focus,
-::ng-deep .attendanceDatePanel .p-datepicker-select-year:hover,
-::ng-deep .attendanceDatePanel .p-datepicker-select-year:focus {
-  background: #fbf1eb !important;
-  color: #6d3326 !important;
-  box-shadow: none !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-prev-button > button,
-::ng-deep .attendanceDatePanel .p-datepicker-next-button > button,
-::ng-deep .attendanceDatePanel .p-datepicker-prev > button,
-::ng-deep .attendanceDatePanel .p-datepicker-next > button {
-  width: 36px !important;
-  height: 36px !important;
-  border: 0 !important;
-  border-radius: 50% !important;
-  background: #fbf1eb !important;
-  color: #8d5144 !important;
-  box-shadow: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-prev-button > button:hover,
-::ng-deep .attendanceDatePanel .p-datepicker-next-button > button:hover,
-::ng-deep .attendanceDatePanel .p-datepicker-prev > button:hover,
-::ng-deep .attendanceDatePanel .p-datepicker-next > button:hover {
-  background: #efe1da !important;
-  color: #6d3326 !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-prev-button svg,
-::ng-deep .attendanceDatePanel .p-datepicker-next-button svg {
-  display: block;
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-prev-button svg,
-::ng-deep .attendanceDatePanel .p-datepicker-next-button svg {
-  transform: scaleX(-1);
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-weekday,
 ::ng-deep .attendanceDatePanel th,
-::ng-deep .attendanceDatePanel thead th,
-::ng-deep .attendanceDatePanel .p-datepicker-weekheader {
-  color: #8d5144 !important;
-  font-weight: 900 !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-day,
-::ng-deep .attendanceDatePanel .p-datepicker-date,
-::ng-deep .attendanceDatePanel .p-datepicker-month,
-::ng-deep .attendanceDatePanel .p-datepicker-year {
-  background: transparent !important;
-  border-radius: 12px !important;
-  width: 48px !important;
-  height: 48px !important;
-  margin: auto;
-  transition: 0.1s ease;
-  font-weight: 500 !important;
-  font-size: 1rem !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-day:not(.p-disabled):not(.p-datepicker-day-selected):hover,
-::ng-deep .attendanceDatePanel .p-datepicker-date:not(.p-disabled):not(.p-highlight):hover,
-::ng-deep .attendanceDatePanel .p-datepicker-month:not(.p-disabled):not(.p-datepicker-month-selected):hover,
-::ng-deep .attendanceDatePanel .p-datepicker-year:not(.p-disabled):not(.p-datepicker-year-selected):hover,
-::ng-deep .attendanceDatePanel .p-datepicker-day:not(.p-disabled):focus {
-  background: #fbf1eb !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-day-selected,
-::ng-deep .attendanceDatePanel .p-datepicker-date.p-highlight,
-::ng-deep .attendanceDatePanel .p-datepicker-month-selected,
-::ng-deep .attendanceDatePanel .p-datepicker-year-selected {
-  background: #5e2b20 !important;
-  color: #fff9f5 !important;
-  font-weight: 900 !important;
-}
-
-::ng-deep .attendanceDatePanel td.p-datepicker-today > span:not(.p-datepicker-day-selected):not(.p-highlight),
-::ng-deep .attendanceDatePanel td.p-datepicker-today > button:not(.p-datepicker-day-selected):not(.p-highlight) {
-  background: #f3e7e0 !important;
-  color: #5e2b20 !important;
-  font-weight: 900 !important;
-}
-
-::ng-deep .attendanceDatePanel .p-datepicker-other-month,
-::ng-deep .attendanceDatePanel .p-datepicker-other-month .p-datepicker-day,
-::ng-deep .attendanceDatePanel .p-datepicker-other-month span {
-  color: #b8a59b !important;
-  opacity: 0.5 !important;
-}
-
-::ng-deep .attendanceGrantDatePanel.p-datepicker,
-::ng-deep .attendanceGrantDatePanel.p-datepicker-panel {
-  width: min(420px, calc(100vw - 28px)) !important;
-  max-width: calc(100vw - 28px) !important;
-  border: 1px solid #e7dad3 !important;
-  border-radius: 16px !important;
-  background: #fffaf6 !important;
-  color: #5e2b20 !important;
-  overflow: hidden !important;
-  box-shadow: 0 18px 45px rgba(39, 18, 13, 0.22) !important;
-  direction: rtl;
-  z-index: 20000 !important;
-  pointer-events: auto;
-}
-
 ::ng-deep .attendanceGrantDatePanel .p-datepicker,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-panel,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-group,
@@ -2486,9 +2325,9 @@ textarea {
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-header {
-  display: grid;
-  grid-template-columns: 36px 1fr 36px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   min-height: 58px;
   padding: 12px 14px !important;
   border-bottom: 1px solid #eadfd9 !important;
@@ -2496,14 +2335,9 @@ textarea {
   color: #5e2b20 !important;
 }
 
-::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button {
-  grid-column: 3;
-  justify-self: end;
-}
-
+::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-next-button {
-  grid-column: 1;
-  justify-self: start;
+  flex-shrink: 0;
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-title,
@@ -2520,7 +2354,7 @@ textarea {
 }
 
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-title {
-  grid-column: 2;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2570,6 +2404,14 @@ textarea {
   color: #6d3326 !important;
 }
 
+::ng-deep .attendanceDatePanel .p-datepicker-prev-button .p-button-icon,
+::ng-deep .attendanceDatePanel .p-datepicker-prev-button .pi,
+::ng-deep .attendanceDatePanel .p-datepicker-prev-button .p-icon,
+::ng-deep .attendanceDatePanel .p-datepicker-prev-button svg,
+::ng-deep .attendanceDatePanel .p-datepicker-next-button .p-button-icon,
+::ng-deep .attendanceDatePanel .p-datepicker-next-button .pi,
+::ng-deep .attendanceDatePanel .p-datepicker-next-button .p-icon,
+::ng-deep .attendanceDatePanel .p-datepicker-next-button svg,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button .p-button-icon,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button .pi,
 ::ng-deep .attendanceGrantDatePanel .p-datepicker-prev-button .p-icon,
@@ -3554,4 +3396,43 @@ textarea {
   height: 16px;
   margin: 0;
   cursor: pointer;
+}
+
+::ng-deep .attendanceDatePanel .p-datepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+::ng-deep .attendanceDatePanel .p-datepicker-prev-button,
+::ng-deep .attendanceDatePanel .p-datepicker-next-button {
+  width: 36px !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+  box-shadow: none !important;
+  flex-shrink: 0;
+}
+
+::ng-deep .attendanceDatePanel .p-datepicker-prev-button:hover,
+::ng-deep .attendanceDatePanel .p-datepicker-next-button:hover {
+  background: #efe1da !important;
+  color: #6d3326 !important;
+}
+
+::ng-deep .attendanceDatePanel .p-datepicker-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #5e2b20 !important;
+  font-weight: 900 !important;
 }
