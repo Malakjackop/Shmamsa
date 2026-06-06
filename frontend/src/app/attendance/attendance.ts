@@ -146,14 +146,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   scannerOverlayVisible = false;
   scannerDevice: any;
-  scannerCameraChoices: MediaDeviceInfo[] = [];
-  scannerNeedsCameraChoice = false;
-  scannerCameraChoiceMessage = '';
   scannerVideoConstraints = {
-    facingMode: { ideal: 'environment' },
+    facingMode: { exact: 'environment' },
     width: { ideal: 1280 },
     height: { ideal: 720 },
-    zoom: { ideal: 1 }
+    advanced: [{ zoom: 1 } as MediaTrackConstraintSet]
   } as MediaTrackConstraints;
   @ViewChild('qrScanner') scannerComponent?: ZXingScannerComponent;
   @ViewChild('attendanceDatePicker') attendanceDatePicker?: DatePicker;
@@ -336,34 +333,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       if (!navigator.mediaDevices?.enumerateDevices) return;
       const devices = await navigator.mediaDevices.enumerateDevices();
       const pick = this.pickNormalBackCamera(devices);
-      if (pick.confident && pick.device) this.scannerDevice = pick.device;
+      if (pick) this.scannerDevice = pick;
     } catch {}
   }
 
-  private pickNormalBackCamera(devices: MediaDeviceInfo[]): { device?: MediaDeviceInfo; confident: boolean; choices: MediaDeviceInfo[] } {
+  private pickNormalBackCamera(devices: MediaDeviceInfo[]): MediaDeviceInfo | undefined {
     const videoInputs = devices.filter(d => d.kind === 'videoinput');
     const scored = videoInputs
-      .map(device => ({ device, score: this.normalBackCameraScore(device), label: (device.label || '').toLowerCase() }))
+      .map((device, index) => ({
+        device,
+        index,
+        score: this.normalBackCameraScore(device),
+        label: (device.label || '').toLowerCase()
+      }))
       .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score);
-    const choices = scored.map(item => item.device);
-    const best = scored[0];
+      .sort((a, b) => b.score - a.score || a.index - b.index);
 
-    if (!best) {
-      return {
-        confident: videoInputs.length === 1,
-        device: videoInputs.length === 1 ? videoInputs[0] : undefined,
-        choices: videoInputs
-      };
-    }
-
-    const hasNormalSignal = /main|standard|normal|default|1x/i.test(best.label);
-    const clearlyBeatsNext = !scored[1] || best.score - scored[1].score >= 30;
-    return {
-      device: best.device,
-      confident: choices.length === 1 || hasNormalSignal || clearlyBeatsNext,
-      choices
-    };
+    return scored[0]?.device || videoInputs[0];
   }
 
   private normalBackCameraScore(device: MediaDeviceInfo): number {
@@ -381,6 +367,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     let score = 100;
     if (/main|standard|normal|default|1x/i.test(label)) score += 40;
     if (/back camera|rear camera|environment camera/i.test(label)) score += 20;
+    const genericCameraNumber = label.match(/camera\s*(\d+)/i);
+    if (genericCameraNumber) {
+      const cameraNumber = Number(genericCameraNumber[1]);
+      if (cameraNumber === 0) score += 35;
+      else if (!Number.isNaN(cameraNumber)) score += Math.max(0, 20 - cameraNumber * 5);
+    }
     return score;
   }
 
@@ -394,49 +386,20 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private async prepareScannerCamera(): Promise<void> {
-    this.scannerNeedsCameraChoice = false;
-    this.scannerCameraChoiceMessage = '';
-    this.scannerCameraChoices = [];
-
     await this.ensureCameraPermission();
 
     try {
       if (!navigator.mediaDevices?.enumerateDevices) {
         this.scannerDevice = undefined;
-        this.scannerNeedsCameraChoice = true;
-        this.scannerCameraChoiceMessage = 'المتصفح مش مدي التطبيق أسماء الكاميرات، فمش هفتح كاميرا تلقائيًا عشان ما يختارش wide.';
         return;
       }
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       const pick = this.pickNormalBackCamera(devices);
-      this.scannerCameraChoices = pick.choices;
-
-      if (pick.confident && pick.device) {
-        this.scannerDevice = pick.device;
-        return;
-      }
-
-      this.scannerDevice = undefined;
-      this.scannerNeedsCameraChoice = true;
-      this.scannerCameraChoiceMessage = pick.choices.length
-        ? 'اختار الكاميرا العادية. مش هفتح كاميرا تلقائيًا لأن أسماء العدسات مش واضحة كفاية.'
-        : 'مش قادر أحدد كاميرا مناسبة من المتصفح.';
+      this.scannerDevice = pick;
     } catch {
       this.scannerDevice = undefined;
-      this.scannerNeedsCameraChoice = true;
-      this.scannerCameraChoiceMessage = 'تعذر قراءة الكاميرات من المتصفح.';
     }
-  }
-
-  cameraDisplayName(device: MediaDeviceInfo, index: number): string {
-    return device.label || `كاميرا ${index + 1}`;
-  }
-
-  chooseScannerCamera(device: MediaDeviceInfo): void {
-    this.scannerDevice = device;
-    this.scannerNeedsCameraChoice = false;
-    this.scannerCameraChoiceMessage = '';
   }
 
   ngOnDestroy(): void {
@@ -2467,12 +2430,29 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     if (this.isSelfCheckinMode() || !!this.blockedMessage) return;
     await this.prepareScannerCamera();
     this.scannerOverlayVisible = true;
+    setTimeout(() => this.startScanner(), 0);
   }
 
-  async onScannerAutostarted(): Promise<void> {
-    if (this.scannerDevice && this.scannerComponent) {
-      this.scannerComponent.device = this.scannerDevice;
+  private async startScanner(): Promise<void> {
+    if (!this.scannerComponent) return;
+
+    try {
+      await this.scannerComponent.askForPermission();
+      if (this.scannerDevice) {
+        this.scannerComponent.device = this.scannerDevice;
+      }
+      setTimeout(() => this.applyNormalCameraConstraints(), 250);
+      setTimeout(() => this.applyNormalCameraConstraints(), 750);
+    } catch {
+      this.message.add({ severity: 'error', summary: 'خطأ', detail: 'تعذر تشغيل الكاميرا' });
     }
+  }
+
+  private applyNormalCameraConstraints(): void {
+    try {
+      if (!this.scannerComponent) return;
+      this.scannerComponent.videoConstraints = this.scannerVideoConstraints;
+    } catch {}
   }
 
   onScannerResult(resultString: string): void {

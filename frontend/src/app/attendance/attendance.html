@@ -270,32 +270,16 @@
                 <i class="pi pi-times"></i>
               </button>
             </div>
-            <div class="scanner-camera-picker" *ngIf="scannerNeedsCameraChoice; else scannerPreview">
-              <p>{{ scannerCameraChoiceMessage }}</p>
-              <div class="scanner-camera-picker__list" *ngIf="scannerCameraChoices.length">
-                <button
-                  type="button"
-                  class="scanner-camera-option"
-                  *ngFor="let camera of scannerCameraChoices; let i = index"
-                  (click)="chooseScannerCamera(camera)"
-                >
-                  <i class="pi pi-camera"></i>
-                  <span>{{ cameraDisplayName(camera, i) }}</span>
-                </button>
-              </div>
-            </div>
-            <ng-template #scannerPreview>
-              <div class="scanner-popup__body">
+            <div class="scanner-popup__body">
               <zxing-scanner
                 #qrScanner
                 [device]="scannerDevice"
                 [videoConstraints]="scannerVideoConstraints"
+                [autostart]="false"
                 previewFitMode="cover"
-                (autostarted)="onScannerAutostarted()"
                 (scanSuccess)="onCodeResult($event)"
               ></zxing-scanner>
-              </div>
-            </ng-template>
+            </div>
           </div>
         </div>
 
