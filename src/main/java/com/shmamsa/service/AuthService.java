@@ -10,16 +10,18 @@ import com.shmamsa.repository.UserRepository;
 import com.shmamsa.util.JwtUtils;
 import com.shmamsa.util.NationalIdUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import java.time.YearMonth;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -28,6 +30,7 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
+    private final WhatsAppService whatsAppService;
 
     private final KhorsJoinRequestService khorsJoinRequestService;
     private final AttendanceBackfillService attendanceBackfillService;
@@ -47,7 +50,6 @@ public class AuthService {
         }
     }
 
-
     private static class OtpData {
         String username;
         long expiresAt;
@@ -58,14 +60,26 @@ public class AuthService {
         }
     }
 
+    private static class WaCodeData {
+        String phoneNumber;
+        long expiresAt;
+
+        WaCodeData(String phoneNumber, long expiresAt) {
+            this.phoneNumber = phoneNumber;
+            this.expiresAt = expiresAt;
+        }
+    }
+
     private final Map<String, OtpData> otpStore = new ConcurrentHashMap<>();
     private final Map<String, Long> otpTimestamps = new ConcurrentHashMap<>();
     private final Map<String, RateWindow> hourlyRequests = new ConcurrentHashMap<>();
+    private final Map<String, WaCodeData> waCodeStore = new ConcurrentHashMap<>();
+    private final Map<String, String> monthlyResetTracker = new ConcurrentHashMap<>();
 
     private static final long OTP_TTL_MS = 5 * 60 * 1000;
+    private static final long WA_CODE_TTL_MS = 10 * 60 * 1000;
     private static final long COOLDOWN_MS = 45_000;
     private static final int HOURLY_LIMIT = 5;
-
 
     private static final Set<String> KHORS_VALUES = Set.of("MARMARKOS", "ATHANASIUS", "BOTH", "NONE");
     private static final Set<String> ATTEND_KHORS_VALUES = Set.of("MARMARKOS", "ATHANASIUS", "NONE");
@@ -93,7 +107,6 @@ public class AuthService {
         }
         return x;
     }
-
 
     public User register(RegisterRequest request) {
         if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
@@ -149,7 +162,6 @@ public class AuthService {
         user.setGraduatedFrom(request.getGraduatedFrom());
         user.setGraduateJob(request.getGraduateJob());
 
-
         LocalDate dob = NationalIdUtils.extractBirthDate(request.getNationalId());
         if (dob != null) user.setDateOfBirth(dob);
         String gender = NationalIdUtils.extractGender(request.getNationalId());
@@ -190,7 +202,6 @@ public class AuthService {
         return user;
     }
 
-
     public User registerServant(RegisterServantRequest request) {
         if (!servantSecretService.validateSecret(request.getSecret())) {
             throw new ApiException(
@@ -200,7 +211,6 @@ public class AuthService {
                     java.util.Map.of("secret", "كود التأكيد غير صحيح")
             );
         }
-
 
         if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "Passwords do not match");
@@ -236,6 +246,7 @@ public class AuthService {
                     java.util.Map.of("email", "الإيميل مسجل بالفعل")
             );
         });
+
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
@@ -264,7 +275,6 @@ public class AuthService {
 
         user.setDeaconDegree(request.getDeaconDegree());
         user.setRole("KHADIM");
-
         user.setServingScope(scope);
 
         if ("FAMILY_ONLY".equals(scope)) {
@@ -284,11 +294,9 @@ public class AuthService {
             if (attend.isBlank()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "ATTEND_KHORS_REQUIRED", "حضور الخورس مطلوب");
             }
-
             requestedAttendKhors = attend;
-            user.setAttendKhors("NONE"); // pending until approved
+            user.setAttendKhors("NONE");
         } else {
-
             if ("MARMARKOS".equalsIgnoreCase(user.getKhors())) {
                 user.setAttendKhors("ATHANASIUS");
             } else {
@@ -296,12 +304,10 @@ public class AuthService {
             }
         }
 
-
         user.setPhoneNumber(request.getPhoneNumber());
         user.setAddress(request.getAddress());
         user.setGuardiansPhone(request.getGuardiansPhone());
         user.setGuardianRelation(request.getGuardianRelation());
-
 
         if (request.getDateOfBirth() != null && !request.getDateOfBirth().isBlank()) {
             try { user.setDateOfBirth(java.time.LocalDate.parse(request.getDateOfBirth().trim())); } catch (Exception ignored) {}
@@ -320,17 +326,13 @@ public class AuthService {
 
         user.setStatus(request.getStatus());
         user.setStudyType(request.getStudyType());
-
         user.setUniversityName(request.getUniversityName());
         user.setFaculty(request.getFaculty());
         user.setUniversityGrade(request.getUniversityGrade());
-
         user.setGraduatedFrom(request.getGraduatedFrom());
         user.setGraduateJob(request.getGraduateJob());
-
         user.setIsWorking(request.getIsWorking());
         user.setWorkDetails(request.getWorkDetails());
-
 
         userRepository.save(user);
         List<UserFamilyAssignmentView> assignments = new ArrayList<>();
@@ -358,10 +360,7 @@ public class AuthService {
 
         khorsJoinRequestService.createForUserIfNeeded(user, requestedAttendKhors);
         return user;
-
     }
-
-
 
     public String login(String username, String password) {
         User user = userRepository.findByUsername(username)
@@ -374,78 +373,109 @@ public class AuthService {
         return jwtUtils.generateToken(user.getUsername(), user.getRole());
     }
 
-
     public User getUserFromToken(String token) {
         String username = jwtUtils.extractUsername(token);
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "المستخدم غير موجود", "المستخدم غير موجود"));
     }
 
-
-    public Map<String, Object> generateResetTokenByEmail(String email) {
-        if (email == null || email.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "الايميل مطلوب ", "الايميل مطلوب");
+    // ─── WaCode: بيتبعت للـ frontend عشان المستخدم يبعته على الواتساب ───
+    public Map<String, Object> generateWaCodeByPhone(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_REQUIRED", "رقم الهاتف مطلوب");
         }
 
-        User user = userRepository.findByEmail(email.trim()).orElse(null);
-
-        if (user != null) {
-            sendOtpForUserByEmail(user);
+        User user = userRepository.findByPhoneNumber(phoneNumber.trim()).orElse(null);
+        if (user == null) {
+            return Map.of("message", "إذا كان الرقم مسجلاً سيتم إرسال الكود");
         }
 
-        return Map.of("message", "إذا كان البريد الإلكتروني مسجلًا فسيتم إرسال رمز التحقق");
+        // Monthly limit: مرة واحدة في الشهر
+        String currentMonth = YearMonth.now().toString();
+        String lastMonth = monthlyResetTracker.get(user.getUsername());
+        if (currentMonth.equals(lastMonth)) {
+            throw new ApiException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "MONTHLY_LIMIT",
+                    "لقد استخدمت طلب استعادة كلمة المرور هذا الشهر. حاول مرة أخرى الشهر القادم."
+            );
+        }
+
+        String waCode = generateRandomCode();
+        waCodeStore.put(waCode, new WaCodeData(phoneNumber.trim(), System.currentTimeMillis() + WA_CODE_TTL_MS));
+        monthlyResetTracker.put(user.getUsername(), currentMonth);
+
+        return Map.of(
+                "waCode", waCode,
+                "message", "افتح واتساب وأرسل الكود"
+        );
     }
 
+    private String generateRandomCode() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        StringBuilder code = new StringBuilder();
+        for (int i = 0; i < 5; i++) {
+            code.append(chars.charAt(ThreadLocalRandom.current().nextInt(chars.length())));
+        }
+        return code.toString();
+    }
 
-    private void sendOtpForUserByEmail(User user) {
+    public void sendOtpByPhone(String whatsappPhone, String waCode) {
+        log.info("[WhatsApp] Looking for waCode: '{}', store size: {}", waCode, waCodeStore.size());
+
+        WaCodeData codeData = waCodeStore.get(waCode.trim().toUpperCase());
+        log.info("[WhatsApp] codeData found: {}", codeData != null);
+
+        if (codeData == null || System.currentTimeMillis() > codeData.expiresAt) {
+            waCodeStore.remove(waCode);
+            return;
+        }
+
+        String localPhone = toLocalPhone(whatsappPhone);
+        if (!codeData.phoneNumber.equals(localPhone)) {
+            return;
+        }
+
+        waCodeStore.remove(waCode);
+
+        User user = userRepository.findByPhoneNumber(localPhone).orElse(null);
+        if (user == null) return;
+
         String username = user.getUsername();
         long now = System.currentTimeMillis();
 
         if (otpTimestamps.containsKey(username)) {
-            long lastSent = otpTimestamps.get(username);
-            if (now - lastSent < COOLDOWN_MS) {
-                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_COOLDOWN", "انتظر 45 ثانية قبل طلب رمز آخر.");
-            }
-        }
-
-        RateWindow window = hourlyRequests.compute(username, (key, current) -> {
-            if (current == null || now - current.windowStartMs >= 3600_000) {
-                return new RateWindow(0, now);
-            }
-            return current;
-        });
-
-        synchronized (window) {
-            if (window.count >= HOURLY_LIMIT) {
-                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "OTP_LIMIT", "طلبات رمز التحقق كثيرة جدًا. حاول مرة أخرى بعد ساعة.");
-            }
-            window.count += 1;
+            if (now - otpTimestamps.get(username) < COOLDOWN_MS) return;
         }
 
         String code = String.format("%05d", ThreadLocalRandom.current().nextInt(100000));
-
         otpStore.put(code, new OtpData(username, now + OTP_TTL_MS));
-
         otpTimestamps.put(username, now);
 
-        emailService.sendOtpEmail(user.getEmail(), user.getFullName(), user.getUsername(), code);
+        whatsAppService.sendOtp(whatsappPhone, code);
     }
 
+    private String toLocalPhone(String whatsappPhone) {
+        if (whatsappPhone == null) return null;
+        if (whatsappPhone.startsWith("20") && whatsappPhone.length() == 12) {
+            return "0" + whatsappPhone.substring(2);
+        }
+        return whatsappPhone;
+    }
 
     public void resetPassword(String otp, String newPassword) {
         if (otp == null || otp.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "يلزم رمز التحقق", "يلزم رمز التحقق");
-        if (newPassword == null || newPassword.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "يلزم كلمة المرور", "يلزم كلمة المرور الجديدة ");
+        if (newPassword == null || newPassword.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "يلزم كلمة المرور", "يلزم كلمة المرور الجديدة");
 
         OtpData data = otpStore.get(otp);
-        if (data == null) throw new ApiException(HttpStatus.BAD_REQUEST, "رمز التحق خطأ", "رمز التحقق خطأ او منتهش الصلاحية");
+        if (data == null) throw new ApiException(HttpStatus.BAD_REQUEST, "رمز التحقق خطأ", "رمز التحقق خطأ او منتهي الصلاحية");
 
         if (System.currentTimeMillis() > data.expiresAt) {
             otpStore.remove(otp);
-            throw new ApiException(HttpStatus.BAD_REQUEST, "تم انتهاء مدء رمز التحقق", "تم انتهاء مدء رمز التحقق");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "تم انتهاء مدة رمز التحقق", "تم انتهاء مدة رمز التحقق");
         }
 
         String username = data.username;
-
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "المستخدم غير موجود", "المستخدم غير موجود"));
 
@@ -455,14 +485,12 @@ public class AuthService {
         otpStore.remove(otp);
     }
 
-
     public void purgeExpiredOtps() {
         long now = System.currentTimeMillis();
-
         otpStore.entrySet().removeIf(entry -> entry.getValue() == null || entry.getValue().expiresAt < now);
         otpTimestamps.entrySet().removeIf(e -> e.getValue() == null || now - e.getValue() > 10 * 60_000);
-
         hourlyRequests.entrySet().removeIf(e -> e.getValue() == null || now - e.getValue().windowStartMs > 2 * 3600_000);
+        waCodeStore.entrySet().removeIf(e -> e.getValue() == null || e.getValue().expiresAt < now);
     }
 
     public User findByUsername(String username) {
@@ -472,7 +500,6 @@ public class AuthService {
     public void saveUser(User user) {
         userRepository.save(user);
     }
-
 
     public boolean isEmailTakenByOther(String email, Long currentUserId) {
         return userRepository.findByEmail(email)

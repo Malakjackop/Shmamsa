@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/api/auth/custom-fields",
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password",
-                                "/api/auth/user"
+                                "/api/auth/user",
+                                "/api/whatsapp/webhook"
                         ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/attendance/history").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/attendance/my-stats").authenticated()

@@ -97,8 +97,8 @@ export class AuthService {
     );
   }
 
-  forgotPassword(email: string): Observable<unknown> {
-    return this.http.post(`${this.baseUrl}/forgot-password`, { email }, { withCredentials: true });
+  forgotPassword(phone: string): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/forgot-password`, { phoneNumber: phone }, { withCredentials: true });
   }
 
   resetPassword(token: string, newPassword: string): Observable<unknown> {

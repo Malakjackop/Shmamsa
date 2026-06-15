@@ -49,21 +49,10 @@ public class AuthController {
     );
     private static final java.util.Map<String, java.util.Set<String>> SYSTEM_FIELD_DEFAULT_SHOW_IN = buildSystemFieldDefaultShowIn();
     private static final java.util.Set<String> SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE = java.util.Set.of(
-            "email",
-            "phoneNumber",
-            "address",
-            "guardiansPhone",
-            "guardianRelation",
-            "schoolName",
-            "schoolGrade",
-            "universityName",
-            "faculty",
-            "universityGrade",
-            "graduatedFrom",
-            "graduateJob",
-            "workDetails"
+            "email", "phoneNumber", "address", "guardiansPhone", "guardianRelation",
+            "schoolName", "schoolGrade", "universityName", "faculty", "universityGrade",
+            "graduatedFrom", "graduateJob", "workDetails"
     );
-
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
@@ -79,12 +68,8 @@ public class AuthController {
     private final AttendanceConfigService attendanceConfigService;
 
     private record RegistrationRuleContext(
-            boolean servant,
-            String status,
-            String studyType,
-            String schoolGrade,
-            String servingWhere,
-            Boolean isWorking
+            boolean servant, String status, String studyType,
+            String schoolGrade, String servingWhere, Boolean isWorking
     ) {}
 
     private Map<String, Object> toCurrentUserView(User user) {
@@ -127,7 +112,6 @@ public class AuthController {
         out.put("deaconFamilyRole4", familyAccessService.fourthFamilyRole(user));
         out.put("familyAssignments", user.getFamilyAssignments());
 
-        // Attach custom field values
         List<CustomFieldValue> cfValues = customFieldValueRepo.findAllByUserId(user.getId());
         Map<String, String> customFields = new LinkedHashMap<>();
         for (CustomFieldValue cv : cfValues) {
@@ -145,7 +129,6 @@ public class AuthController {
         return out;
     }
 
-
     @GetMapping("/custom-fields")
     public ResponseEntity<List<CustomRegistrationField>> publicCustomFields() {
         return ResponseEntity.ok(customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc());
@@ -159,8 +142,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
-
-
     @PostMapping("/register-servant")
     public ResponseEntity<?> registerServant(@Valid @RequestBody RegisterServantRequest request) {
         validateConfiguredRequirements(toFieldValueMap(request), true);
@@ -171,14 +152,12 @@ public class AuthController {
 
     @GetMapping("/family-options")
     public ResponseEntity<java.util.List<FamilyOptionDto>> familyOptions(
-            @RequestParam(defaultValue = "MEMBER") String audience
-    ) {
+            @RequestParam(defaultValue = "MEMBER") String audience) {
         return ResponseEntity.ok(familyCatalogService.listForAudience(audience));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
-
         String token = authService.login(request.getUsername(), request.getPassword());
 
         ResponseCookie cookie = ResponseCookie.from("jwt", token)
@@ -195,7 +174,6 @@ public class AuthController {
 
     @GetMapping("/user")
     public ResponseEntity<?> getFullUser(Authentication authentication) {
-
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.ok(Map.of("authenticated", false));
         }
@@ -215,7 +193,6 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
-
         ResponseCookie cookie = ResponseCookie.from("jwt", "")
                 .httpOnly(true)
                 .secure(cookieSecure)
@@ -228,22 +205,21 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
+    // ─── التعديل: بياخد phoneNumber بدل email ───
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        Map<String, Object> result = authService.generateResetTokenByEmail(request.getEmail().trim());
+        Map<String, Object> result = authService.generateWaCodeByPhone(request.getPhoneNumber().trim());
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-
         authService.resetPassword(request.getToken().trim(), request.getNewPassword().trim());
         return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
     }
 
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@Valid @RequestBody ProfileUpdateRequest updated, Authentication authentication) {
-
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not authenticated");
         }
@@ -272,51 +248,21 @@ public class AuthController {
             }
         }
 
-        if (editableProfileFields.containsKey("phoneNumber")) {
-            existingUser.setPhoneNumber(updated.getPhoneNumber());
-        }
-        if (editableProfileFields.containsKey("address")) {
-            existingUser.setAddress(updated.getAddress());
-        }
-        if (editableProfileFields.containsKey("guardiansPhone")) {
-            existingUser.setGuardiansPhone(updated.getGuardiansPhone());
-        }
-        if (editableProfileFields.containsKey("guardianRelation")) {
-            existingUser.setGuardianRelation(updated.getGuardianRelation());
-        }
-        if (editableProfileFields.containsKey("deaconDegree")) {
-            existingUser.setDeaconDegree(updated.getDeaconDegree());
-        }
-        if (editableProfileFields.containsKey("status")) {
-            existingUser.setStatus(updated.getStatus());
-        }
-        if (editableProfileFields.containsKey("studyType")) {
-            existingUser.setStudyType(updated.getStudyType());
-        }
-        if (editableProfileFields.containsKey("schoolName")) {
-            existingUser.setSchoolName(updated.getSchoolName());
-        }
-        if (editableProfileFields.containsKey("schoolGrade")) {
-            existingUser.setSchoolGrade(updated.getSchoolGrade());
-        }
-        if (editableProfileFields.containsKey("universityName")) {
-            existingUser.setUniversityName(updated.getUniversityName());
-        }
-        if (editableProfileFields.containsKey("faculty")) {
-            existingUser.setFaculty(updated.getFaculty());
-        }
-        if (editableProfileFields.containsKey("universityGrade")) {
-            existingUser.setUniversityGrade(updated.getUniversityGrade());
-        }
-        if (editableProfileFields.containsKey("graduatedFrom")) {
-            existingUser.setGraduatedFrom(updated.getGraduatedFrom());
-        }
-        if (editableProfileFields.containsKey("graduateJob")) {
-            existingUser.setGraduateJob(updated.getGraduateJob());
-        }
-        if (editableProfileFields.containsKey("workDetails")) {
-            existingUser.setWorkDetails(updated.getWorkDetails());
-        }
+        if (editableProfileFields.containsKey("phoneNumber")) existingUser.setPhoneNumber(updated.getPhoneNumber());
+        if (editableProfileFields.containsKey("address")) existingUser.setAddress(updated.getAddress());
+        if (editableProfileFields.containsKey("guardiansPhone")) existingUser.setGuardiansPhone(updated.getGuardiansPhone());
+        if (editableProfileFields.containsKey("guardianRelation")) existingUser.setGuardianRelation(updated.getGuardianRelation());
+        if (editableProfileFields.containsKey("deaconDegree")) existingUser.setDeaconDegree(updated.getDeaconDegree());
+        if (editableProfileFields.containsKey("status")) existingUser.setStatus(updated.getStatus());
+        if (editableProfileFields.containsKey("studyType")) existingUser.setStudyType(updated.getStudyType());
+        if (editableProfileFields.containsKey("schoolName")) existingUser.setSchoolName(updated.getSchoolName());
+        if (editableProfileFields.containsKey("schoolGrade")) existingUser.setSchoolGrade(updated.getSchoolGrade());
+        if (editableProfileFields.containsKey("universityName")) existingUser.setUniversityName(updated.getUniversityName());
+        if (editableProfileFields.containsKey("faculty")) existingUser.setFaculty(updated.getFaculty());
+        if (editableProfileFields.containsKey("universityGrade")) existingUser.setUniversityGrade(updated.getUniversityGrade());
+        if (editableProfileFields.containsKey("graduatedFrom")) existingUser.setGraduatedFrom(updated.getGraduatedFrom());
+        if (editableProfileFields.containsKey("graduateJob")) existingUser.setGraduateJob(updated.getGraduateJob());
+        if (editableProfileFields.containsKey("workDetails")) existingUser.setWorkDetails(updated.getWorkDetails());
 
         authService.saveUser(existingUser);
         updateProfileCustomFieldValues(existingUser, updated.getCustomFields(), editableProfileFields);
@@ -325,15 +271,12 @@ public class AuthController {
         return ResponseEntity.ok(toCurrentUserView(existingUser));
     }
 
-    // ── Save custom field values for a newly registered user ──────────
     private void saveCustomFieldValues(User user, Map<String, String> customFields) {
         if (customFields == null || customFields.isEmpty() || user == null || user.getId() == null) return;
 
         List<CustomRegistrationField> enabledFields = customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc();
         var allowedKeys = new java.util.HashSet<String>();
-        for (CustomRegistrationField f : enabledFields) {
-            allowedKeys.add(f.getFieldKey());
-        }
+        for (CustomRegistrationField f : enabledFields) allowedKeys.add(f.getFieldKey());
 
         for (var entry : customFields.entrySet()) {
             String key = entry.getKey();
@@ -350,32 +293,19 @@ public class AuthController {
         }
     }
 
-    private void updateProfileCustomFieldValues(
-            User user,
-            Map<String, String> customFields,
-            Map<String, CustomRegistrationField> editableProfileFields
-    ) {
-        if (user == null || user.getId() == null || customFields == null || customFields.isEmpty()) {
-            return;
-        }
+    private void updateProfileCustomFieldValues(User user, Map<String, String> customFields, Map<String, CustomRegistrationField> editableProfileFields) {
+        if (user == null || user.getId() == null || customFields == null || customFields.isEmpty()) return;
 
         for (var entry : customFields.entrySet()) {
             String key = safe(entry.getKey());
-            if (key.isBlank()) {
-                continue;
-            }
+            if (key.isBlank()) continue;
 
             CustomRegistrationField field = editableProfileFields.get(key);
-            if (field == null || Boolean.TRUE.equals(field.getIsSystem())) {
-                continue;
-            }
+            if (field == null || Boolean.TRUE.equals(field.getIsSystem())) continue;
 
             String value = safe(entry.getValue());
             CustomFieldValue customFieldValue = customFieldValueRepo.findByUserIdAndFieldKey(user.getId(), key)
-                    .orElseGet(() -> CustomFieldValue.builder()
-                            .userId(user.getId())
-                            .fieldKey(key)
-                            .build());
+                    .orElseGet(() -> CustomFieldValue.builder().userId(user.getId()).fieldKey(key).build());
             customFieldValue.setValue(value);
             customFieldValueRepo.save(customFieldValue);
         }
@@ -386,17 +316,11 @@ public class AuthController {
         Map<String, String> errors = new LinkedHashMap<>();
 
         for (CustomRegistrationField field : customFieldRepo.findAllByEnabledTrueOrderByDisplayOrderAsc()) {
-            if (!isFieldVisibleForContext(field, context, values)) {
-                continue;
-            }
-            if (!isFieldRequiredForContext(field, context)) {
-                continue;
-            }
+            if (!isFieldVisibleForContext(field, context, values)) continue;
+            if (!isFieldRequiredForContext(field, context)) continue;
 
             String raw = values.get(field.getFieldKey());
-            if (raw != null && !raw.isBlank()) {
-                continue;
-            }
+            if (raw != null && !raw.isBlank()) continue;
 
             String controlKey = Boolean.TRUE.equals(field.getIsSystem())
                     ? field.getFieldKey()
@@ -405,12 +329,7 @@ public class AuthController {
         }
 
         if (!errors.isEmpty()) {
-            throw new ApiException(
-                    HttpStatus.BAD_REQUEST,
-                    "CONFIG_REQUIRED_FIELDS",
-                    "Some required fields are missing",
-                    errors
-            );
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CONFIG_REQUIRED_FIELDS", "Some required fields are missing", errors);
         }
     }
 
@@ -426,101 +345,53 @@ public class AuthController {
     }
 
     private boolean isFieldRequiredForContext(CustomRegistrationField field, RegistrationRuleContext context) {
-        boolean alwaysRequired = Boolean.TRUE.equals(field.getRequired());
-        boolean conditionalRequired = matchesAnyRule(field.getRequiredRule(), context);
-        return alwaysRequired || conditionalRequired;
+        return Boolean.TRUE.equals(field.getRequired()) || matchesAnyRule(field.getRequiredRule(), context);
     }
 
-    private boolean isFieldVisibleForContext(
-            CustomRegistrationField field,
-            RegistrationRuleContext context,
-            Map<String, String> values
-    ) {
+    private boolean isFieldVisibleForContext(CustomRegistrationField field, RegistrationRuleContext context, Map<String, String> values) {
         return matchesVisibilityConditions(field, context, values);
     }
 
-    private boolean matchesVisibilityConditions(
-            CustomRegistrationField field,
-            RegistrationRuleContext context,
-            Map<String, String> values
-    ) {
+    private boolean matchesVisibilityConditions(CustomRegistrationField field, RegistrationRuleContext context, Map<String, String> values) {
         List<VisibilityConditionConfig> conditions = field.getVisibilityConditions();
         if (conditions == null || conditions.isEmpty()) {
             return matchesRule(field.getVisibilityRule(), context) && matchesVisibilityDependency(field, values);
         }
-
         for (VisibilityConditionConfig condition : conditions) {
-            if (!matchesVisibilityCondition(condition, context, values)) {
-                return false;
-            }
+            if (!matchesVisibilityCondition(condition, context, values)) return false;
         }
-
         return true;
     }
 
-    private boolean matchesVisibilityCondition(
-            VisibilityConditionConfig condition,
-            RegistrationRuleContext context,
-            Map<String, String> values
-    ) {
-        if (condition == null) {
-            return true;
-        }
-
+    private boolean matchesVisibilityCondition(VisibilityConditionConfig condition, RegistrationRuleContext context, Map<String, String> values) {
+        if (condition == null) return true;
         String type = safe(condition.getType()).toUpperCase(Locale.ROOT);
-        if ("RULE".equals(type)) {
-            return matchesRule(condition.getRule(), context);
-        }
-
+        if ("RULE".equals(type)) return matchesRule(condition.getRule(), context);
         if ("FIELD".equals(type)) {
             String fieldKey = safe(condition.getFieldKey());
-            if (fieldKey.isBlank()) {
-                return false;
-            }
-
+            if (fieldKey.isBlank()) return false;
             List<String> valuesList = condition.getValues() == null ? List.of() : condition.getValues();
-            if (valuesList.isEmpty()) {
-                return false;
-            }
-
+            if (valuesList.isEmpty()) return false;
             String currentValue = normalizeVisibilityDependencyValue(values.get(fieldKey));
-            if (currentValue.isBlank()) {
-                return false;
-            }
-
+            if (currentValue.isBlank()) return false;
             for (String expectedValue : valuesList) {
-                if (normalizeVisibilityDependencyValue(expectedValue).equals(currentValue)) {
-                    return true;
-                }
+                if (normalizeVisibilityDependencyValue(expectedValue).equals(currentValue)) return true;
             }
             return false;
         }
-
         return true;
     }
 
     private boolean matchesVisibilityDependency(CustomRegistrationField field, Map<String, String> values) {
         String dependsOn = safe(field.getVisibilityDependsOn());
-        if (dependsOn.isBlank()) {
-            return true;
-        }
-
+        if (dependsOn.isBlank()) return true;
         String dependsValues = safe(field.getVisibilityDependsValues());
-        if (dependsValues.isBlank()) {
-            return false;
-        }
-
+        if (dependsValues.isBlank()) return false;
         String currentValue = normalizeVisibilityDependencyValue(values.get(dependsOn));
-        if (currentValue.isBlank()) {
-            return false;
-        }
-
+        if (currentValue.isBlank()) return false;
         for (String rawExpected : dependsValues.split(",")) {
-            if (normalizeVisibilityDependencyValue(rawExpected).equals(currentValue)) {
-                return true;
-            }
+            if (normalizeVisibilityDependencyValue(rawExpected).equals(currentValue)) return true;
         }
-
         return false;
     }
 
@@ -544,20 +415,12 @@ public class AuthController {
     }
 
     private boolean matchesAnyRule(String rules, RegistrationRuleContext context) {
-        if (rules == null || rules.isBlank()) {
-            return false;
-        }
-
+        if (rules == null || rules.isBlank()) return false;
         for (String rawRule : rules.split(",")) {
             String normalized = rawRule == null ? "" : rawRule.trim().toUpperCase(Locale.ROOT);
-            if (normalized.isBlank() || "NEVER".equals(normalized)) {
-                continue;
-            }
-            if (matchesRule(normalized, context)) {
-                return true;
-            }
+            if (normalized.isBlank() || "NEVER".equals(normalized)) continue;
+            if (matchesRule(normalized, context)) return true;
         }
-
         return false;
     }
 
@@ -590,9 +453,7 @@ public class AuthController {
         values.put("workDetails", safe(request.getWorkDetails()));
         values.put("guardiansPhone", safe(request.getGuardiansPhone()));
         values.put("guardianRelation", safe(request.getGuardianRelation()));
-        if (request.getCustomFields() != null) {
-            request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
-        }
+        if (request.getCustomFields() != null) request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
         return values;
     }
 
@@ -625,33 +486,22 @@ public class AuthController {
         values.put("workDetails", safe(request.getWorkDetails()));
         values.put("guardiansPhone", safe(request.getGuardiansPhone()));
         values.put("guardianRelation", safe(request.getGuardianRelation()));
-        if (request.getCustomFields() != null) {
-            request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
-        }
+        if (request.getCustomFields() != null) request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
         return values;
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value.trim();
-    }
-
-    private String normalizeRuleValue(String value) {
-        return safe(value).toLowerCase(Locale.ROOT);
-    }
+    private String safe(String value) { return value == null ? "" : value.trim(); }
+    private String normalizeRuleValue(String value) { return safe(value).toLowerCase(Locale.ROOT); }
 
     private String normalizeSchoolGradeRuleValue(String value) {
         String normalized = normalizeRuleValue(value);
-        if (normalized.isBlank()) {
-            return "";
-        }
+        if (normalized.isBlank()) return "";
         return KNOWN_SCHOOL_GRADES.contains(value == null ? "" : value.trim()) ? normalized : "other";
     }
 
     private String extractOtherGradeValue(String schoolGrade) {
         String safeGrade = safe(schoolGrade);
-        if (safeGrade.isBlank() || KNOWN_SCHOOL_GRADES.contains(safeGrade)) {
-            return "";
-        }
+        if (safeGrade.isBlank() || KNOWN_SCHOOL_GRADES.contains(safeGrade)) return "";
         return safeGrade;
     }
 
@@ -665,54 +515,33 @@ public class AuthController {
 
     private String deriveDateOfBirth(String rawDate, String nationalId) {
         String date = safe(rawDate);
-        if (!date.isBlank()) {
-            return date;
-        }
+        if (!date.isBlank()) return date;
         var derived = NationalIdUtils.extractBirthDate(safe(nationalId));
         return derived == null ? "" : derived.toString();
     }
 
     private String deriveGender(String rawGender, String nationalId) {
         String gender = safe(rawGender);
-        if (!gender.isBlank()) {
-            return gender;
-        }
+        if (!gender.isBlank()) return gender;
         String derived = NationalIdUtils.extractGender(safe(nationalId));
         return derived == null ? "" : derived;
     }
 
     private boolean isProfileEditableField(CustomRegistrationField field) {
-        if (field == null || !Boolean.TRUE.equals(field.getEnabled())) {
-            return false;
-        }
-
-        if (!effectiveShowInTargets(field).contains("PROFILE")) {
-            return false;
-        }
-
+        if (field == null || !Boolean.TRUE.equals(field.getEnabled())) return false;
+        if (!effectiveShowInTargets(field).contains("PROFILE")) return false;
         Boolean configuredEditable = field.getProfileEditable();
-        if (configuredEditable != null) {
-            return configuredEditable;
-        }
-
-        return Boolean.TRUE.equals(field.getIsSystem())
-                && SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE.contains(field.getFieldKey());
+        if (configuredEditable != null) return configuredEditable;
+        return Boolean.TRUE.equals(field.getIsSystem()) && SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE.contains(field.getFieldKey());
     }
 
     private java.util.Set<String> effectiveShowInTargets(CustomRegistrationField field) {
-        if (field == null) {
-            return java.util.Set.of();
-        }
-
+        if (field == null) return java.util.Set.of();
         java.util.Set<String> configuredTargets = parseShowInTargets(field.getShowIn());
-        if (!configuredTargets.isEmpty()) {
-            return configuredTargets;
-        }
-
+        if (!configuredTargets.isEmpty()) return configuredTargets;
         if (Boolean.TRUE.equals(field.getIsSystem()) && !Boolean.TRUE.equals(field.getShowInConfigured())) {
             return SYSTEM_FIELD_DEFAULT_SHOW_IN.getOrDefault(field.getFieldKey(), java.util.Set.of());
         }
-
         return java.util.Set.of();
     }
 
@@ -720,9 +549,7 @@ public class AuthController {
         java.util.LinkedHashSet<String> targets = new java.util.LinkedHashSet<>();
         for (String rawTarget : safe(showIn).split(",")) {
             String normalized = rawTarget.trim().toUpperCase(Locale.ROOT);
-            if (!normalized.isBlank() && !"NONE".equals(normalized)) {
-                targets.add(normalized);
-            }
+            if (!normalized.isBlank() && !"NONE".equals(normalized)) targets.add(normalized);
         }
         return targets;
     }

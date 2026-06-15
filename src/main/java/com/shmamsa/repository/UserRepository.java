@@ -21,7 +21,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     java.util.List<User> findByKhorsAndRoleIn(String khors, java.util.List<String> roles);
     java.util.List<User> findByKhorsInAndRoleIn(java.util.List<String> khors, java.util.List<String> roles);
-
+    Optional<User> findByPhoneNumber(String phoneNumber);
     @Query("""
             select distinct u from User u
             join UserFamilyRole ufr on ufr.user.id = u.id
