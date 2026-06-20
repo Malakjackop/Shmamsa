@@ -245,51 +245,94 @@
 
   <div class="modal" *ngIf="whatsappOpen" (click)="closeWhatsAppPanel()">
     <div class="modalCard whatsappModal" (click)="$event.stopPropagation()">
-      <div class="modalHead">
-        <div>
-          <h2>رسائل واتساب</h2>
-          <p>استخدم <b [textContent]="'{name}'"></b> مكان اسم الشخص.</p>
-         </div>
-        <button type="button" class="iconBtn" (click)="closeWhatsAppPanel()" aria-label="إغلاق">
-          <i class="pi pi-times"></i>
-        </button>
-      </div>
 
-      <label class="messageEditor">
-        نص الرسالة
-        <textarea [(ngModel)]="whatsappTemplate" (ngModelChange)="buildWhatsAppPreviews()" rows="4"></textarea>
-      </label>
-
-      <div class="whatsappActions">
-        <button type="button" class="primaryBtn" (click)="openAllWhatsApp()" [disabled]="!whatsappPreviews.length">
-          <i class="pi pi-whatsapp"></i>
-          إرسال للجميع
-        </button>
-      </div>
-
-      <div *ngIf="!selectedMembersCount()" class="smallHint">اختار أشخاص من الكروت الأول.</div>
-
-      <div class="previewList" *ngIf="whatsappPreviews.length">
-        <div class="previewItem previewItem--sample" *ngIf="whatsappPreviews[0] as preview">
+      <!-- ── وضع الإرسال: شخص بشخص ── -->
+      <ng-container *ngIf="whatsappSendIndex !== null && currentSendPreview as preview">
+        <div class="modalHead">
           <div>
-            <span class="previewLabel">مثال</span>
-            <div class="previewPersonLine">
-              <b>{{ preview.member.fullName }}</b>
-            </div>
-            <p>{{ preview.message }}</p>
+            <h2>{{ sendProgress.current }} / {{ sendProgress.total }}</h2>
+            <p>واتساب اتفتحلك — ابعت الرسالة وارجع هنا.</p>
           </div>
+          <button type="button" class="iconBtn" (click)="cancelSequentialSend()" aria-label="إلغاء">
+            <i class="pi pi-times"></i>
+          </button>
         </div>
 
-        <div class="previewNames" *ngIf="whatsappPreviews.length > 1">
-          <span>باقي المختارين</span>
-          <div class="previewNameChips">
-            <b *ngFor="let preview of whatsappPreviews.slice(1)">
-              {{ preview.member.fullName }}
-              <small *ngIf="!preview.url">رقم غير صالح</small>
-            </b>
+        <div class="sequentialCard">
+          <div class="sequentialName">{{ preview.member.fullName }}</div>
+          <p class="sequentialMessage">{{ preview.message }}</p>
+        </div>
+
+        <div class="sequentialActions">
+          <button type="button" class="primaryBtn" (click)="goToNext()">
+            <i class="pi pi-whatsapp"></i>
+            {{ sendProgress.current < sendProgress.total ? 'بعت — افتح التالي' : 'تم ✅' }}
+          </button>
+          <button type="button" class="softBtn" (click)="skipCurrent()">
+            تخطي
+          </button>
+        </div>
+
+        <div class="sequentialDots" *ngIf="sendProgress.total > 1">
+          <ng-container *ngFor="let p of whatsappPreviews; let i = index">
+            <span *ngIf="p.url"
+              class="dot"
+              [class.dot--done]="i < (whatsappSendIndex ?? 0)"
+              [class.dot--current]="i === whatsappSendIndex">
+            </span>
+          </ng-container>
+        </div>
+      </ng-container>
+
+      <!-- ── وضع الإعداد ── -->
+      <ng-container *ngIf="whatsappSendIndex === null">
+        <div class="modalHead">
+          <div>
+            <h2>رسائل واتساب</h2>
+            <p>استخدم <b [textContent]="'{name}'"></b> مكان اسم الشخص.</p>
+          </div>
+          <button type="button" class="iconBtn" (click)="closeWhatsAppPanel()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+
+        <label class="messageEditor">
+          نص الرسالة
+          <textarea [(ngModel)]="whatsappTemplate" (ngModelChange)="buildWhatsAppPreviews()" rows="4"></textarea>
+        </label>
+
+        <div class="whatsappActions">
+          <button type="button" class="primaryBtn" (click)="startSequentialSend()" [disabled]="!whatsappPreviews.length">
+            <i class="pi pi-whatsapp"></i>
+            إرسال للجميع ({{ whatsappPreviews.length }})
+          </button>
+        </div>
+
+        <div *ngIf="!selectedMembersCount()" class="smallHint">اختار أشخاص من الكروت الأول.</div>
+
+        <div class="previewList" *ngIf="whatsappPreviews.length">
+          <div class="previewItem previewItem--sample" *ngIf="whatsappPreviews[0] as preview">
+            <div>
+              <span class="previewLabel">مثال على الرسالة</span>
+              <div class="previewPersonLine">
+                <b>{{ preview.member.fullName }}</b>
+              </div>
+              <p>{{ preview.message }}</p>
+            </div>
+          </div>
+
+          <div class="previewNames" *ngIf="whatsappPreviews.length > 1">
+            <span>باقي المختارين</span>
+            <div class="previewNameChips">
+              <b *ngFor="let preview of whatsappPreviews.slice(1)">
+                {{ preview.member.fullName }}
+                <small *ngIf="!preview.url">رقم غير صالح</small>
+              </b>
+            </div>
           </div>
         </div>
-      </div>
+      </ng-container>
+
     </div>
   </div>
 </div>

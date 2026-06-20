@@ -87,6 +87,7 @@ export class IftekadComponent implements OnInit {
   whatsappOpen = false;
   whatsappTemplate = 'ازيك يا {name}، مستنيينك تيجي النهارده ❤️';
   whatsappPreviews: WhatsAppPreview[] = [];
+  whatsappSendIndex: number | null = null;
 
   ngOnInit(): void {
     this.auth.getUserData(true).subscribe({
@@ -660,12 +661,21 @@ export class IftekadComponent implements OnInit {
   closeWhatsAppPanel(): void {
     this.whatsappOpen = false;
     this.whatsappPreviews = [];
+    this.whatsappSendIndex = null;
+  }
+
+  private buildWaUrl(phone: string, message: string): string {
+    // whatsapp:// deep link — opens the desktop app directly (not the browser)
+    // and pre-fills the message in the chat input
+    const encoded = encodeURIComponent(message);
+    return `whatsapp://send?phone=${phone}&text=${encoded}`;
   }
 
   buildWhatsAppPreviews(): void {
     const selected = this.selectedMembers();
     if (!selected.length) {
       this.whatsappPreviews = [];
+      this.whatsappSendIndex = null;
       return;
     }
 
@@ -678,46 +688,72 @@ export class IftekadComponent implements OnInit {
           member,
           phone,
           message,
-          url: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : ''
+          url: phone ? this.buildWaUrl(phone, message) : ''
         };
       })
       .filter((item) => !!item.message);
+
+    this.whatsappSendIndex = null;
   }
 
-  openWhatsApp(preview: WhatsAppPreview): void {
-    if (!preview.url) {
-      this.message.add({ severity: 'warn', summary: 'رقم ناقص', detail: 'لا يوجد رقم واتساب صالح لهذا الشخص' });
-      return;
-    }
-    window.open(preview.url, '_blank');
-  }
-
-  openAllWhatsApp(): void {
-    const valid = this.whatsappPreviews.filter((preview) => !!preview.url);
+  startSequentialSend(): void {
+    const valid = this.whatsappPreviews.filter((p) => !!p.url);
     if (!valid.length) {
       this.message.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يوجد أرقام صالحة للإرسال' });
       return;
     }
+    this.whatsappSendIndex = 0;
+    this.openCurrentInApp();
+  }
 
-    for (const preview of valid) {
-      const link = document.createElement('a');
-      link.href = preview.url;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }
+  private openCurrentInApp(): void {
+    const preview = this.currentSendPreview;
+    if (!preview) return;
+    // whatsapp:// opens the desktop app directly with the chat + pre-filled message
+    window.location.href = preview.url;
+  }
 
-    if (valid.length > 1) {
-      this.message.add({
-        severity: 'info',
-        summary: 'تم',
-        detail: 'لو المتصفح منع فتح بعض الرسائل، اسمح بالنوافذ المنبثقة لهذه الصفحة.'
-      });
+  get currentSendPreview(): WhatsAppPreview | null {
+    const valid = this.whatsappPreviews.filter((p) => !!p.url);
+    if (this.whatsappSendIndex === null || this.whatsappSendIndex >= valid.length) return null;
+    return valid[this.whatsappSendIndex];
+  }
+
+  get sendProgress(): { current: number; total: number } {
+    const total = this.whatsappPreviews.filter((p) => !!p.url).length;
+    return { current: (this.whatsappSendIndex ?? 0) + 1, total };
+  }
+
+  goToNext(): void {
+    const valid = this.whatsappPreviews.filter((p) => !!p.url);
+    const next = (this.whatsappSendIndex ?? 0) + 1;
+    if (next >= valid.length) {
+      this.whatsappSendIndex = null;
+      this.message.add({ severity: 'success', summary: 'تم ✅', detail: 'تم فتح كل الشاتات' });
+    } else {
+      this.whatsappSendIndex = next;
+      this.openCurrentInApp();
     }
   }
+
+  skipCurrent(): void {
+    const valid = this.whatsappPreviews.filter((p) => !!p.url);
+    const next = (this.whatsappSendIndex ?? 0) + 1;
+    if (next >= valid.length) {
+      this.whatsappSendIndex = null;
+    } else {
+      this.whatsappSendIndex = next;
+      this.openCurrentInApp();
+    }
+  }
+
+  cancelSequentialSend(): void {
+    this.whatsappSendIndex = null;
+  }
+
+  // legacy — kept to avoid unused binding errors
+  sendCurrentAndNext(): void { this.goToNext(); }
+  skipCurrentAndNext(): void { this.skipCurrent(); }
 
   shownCardRows(member: IftekadMember): Array<{ label: string; value: string; isPhone?: boolean }> {
     return [

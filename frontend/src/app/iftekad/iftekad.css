@@ -1140,6 +1140,61 @@ button {
   color: #082816;
 }
 
+/* ── Sequential WhatsApp Send ─────────────────── */
+.sequentialCard {
+  background: #f4ece4;
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin: 4px 0 12px;
+}
+
+.sequentialName {
+  font-size: 17px;
+  font-weight: 800;
+  color: #2b2420;
+  margin-bottom: 10px;
+}
+
+.sequentialMessage {
+  margin: 0;
+  line-height: 1.7;
+  color: #2b2420;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sequentialActions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sequentialDots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e0d0c4;
+  transition: background 0.2s;
+}
+
+.dot--done {
+  background: #25d366;
+}
+
+.dot--current {
+  background: #7a2f1d;
+  transform: scale(1.25);
+}
+
 @media (max-width: 900px) {
   .pageHead,
   .profileColumns {
