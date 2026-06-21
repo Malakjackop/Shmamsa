@@ -53,6 +53,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { TagModule } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
 import { MultiSelectModule } from 'primeng/multiselect';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 
 @NgModule({
@@ -105,7 +106,8 @@ import { MultiSelectModule } from 'primeng/multiselect';
     TextareaModule,
     TagModule,
     TableModule,
-    MultiSelectModule
+    MultiSelectModule,
+    DragDropModule
   ],
   providers: [
     { provide: LOCALE_ID, useValue: 'ar-EG' },

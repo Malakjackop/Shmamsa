@@ -5,6 +5,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
 import { DEFAULT_FAMILY_ORDER, canonicalFamilyName, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { forkJoin } from 'rxjs';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
 
 type Member = {
   id: number;
@@ -40,6 +41,7 @@ export class TransferMembersComponent implements OnInit {
   me: any;
   members: Member[] = [];
   loading = false;
+  private memberCache = new Map<string, Member[]>();
 
   khors?: string;
   khorsYear?: number;
@@ -97,6 +99,10 @@ familyRequestTargets: { label: string; value: string }[] = [
   targetFamily = '';
   extraFamilies: Array<{ family: string; role: 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'MAKHDOM' }> = [];
   targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'KHADIM';
+
+  targetFamilyMembers: Member[] = [];
+  targetFamilyLoading = false;
+  private targetFamilyCache = new Map<string, Member[]>();
 
   ngOnInit() {
     this.auth.getUserData(true).subscribe({
@@ -224,19 +230,40 @@ familyRequestTargets: { label: string; value: string }[] = [
         }
 
         this.loadMembers();
+        this.prefetchServants();
+        this.loadTargetFamilyMembers();
       },
       error: () => {
         this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
         this.makhdomFamilies = this.sortFamiliesByPreferredOrder(this.makhdomFamilies);
         this.loadMembers();
+        this.loadTargetFamilyMembers();
       }
     });
   }
   private loadMembers() {
     this.loading = true;
 
-    let famParam: string | undefined = undefined;
+    const famParam = this.memberFamilyParamForCurrentMode();
+    const cacheKey = this.memberCacheKey(famParam, this.mode);
+    const cached = this.memberCache.get(cacheKey);
+    if (cached) {
+      this.members = cached;
+      this.loading = false;
+      return;
+    }
 
+    this.familySvc.members(famParam).subscribe({
+      next: (m) => this.applyLoadedMembers(famParam, this.mode, (m as any) || []),
+      error: (err) => {
+        this.loading = false;
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في تحميل الاعضاء' });
+      }
+    });
+  }
+
+  private memberFamilyParamForCurrentMode(): string | undefined {
+    let famParam: string | undefined = undefined;
     if (this.isAminKhedmaOrDev() || this.isKhadim() || this.isAminOsra()) {
       if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') {
         famParam = 'SERVANTS';
@@ -244,35 +271,53 @@ familyRequestTargets: { label: string; value: string }[] = [
         famParam = this.selectedFamilyView ? this.selectedFamilyView : undefined;
       }
     }
+    return famParam;
+  }
 
-    this.familySvc.members(famParam).subscribe({
-      next: (m) => {
-        let list = (m as any) || [];
-        if (this.mode === 'MAKHDOM' && this.isPapaAthanasiusView()) {
+  private memberCacheKey(famParam: string | undefined, mode: TransferMode): string {
+    return `${mode}:${famParam || 'ALL'}`;
+  }
+
+  private applyLoadedMembers(famParam: string | undefined, mode: TransferMode, rawList: any[]) {
+        let list = rawList || [];
+        if (mode === 'MAKHDOM' && this.isPapaAthanasiusView()) {
           list = list.filter((x: any) => !this.isTransferVisitor(x));
         }
 
         if (this.isAminKhedmaOrDev()) {
-  if (this.mode === 'MAKHDOM') {
+  if (mode === 'MAKHDOM') {
 
     if (!this.isChoirSelection()) {
       list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM');
     }
   }
-  if (this.mode === 'SERVANT') {
+  if (mode === 'SERVANT') {
     const ok = new Set(['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA']);
     list = list.filter((x: any) => ok.has(normalizeRole(x?.role)));
   }
         } else if (this.isKhadim()) {
           list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM');
         }
+        this.memberCache.set(this.memberCacheKey(famParam, mode), list);
         this.members = list;
         this.loading = false;
+  }
+
+  private prefetchServants() {
+    if (!this.isAminKhedmaOrDev()) return;
+    const key = this.memberCacheKey('SERVANTS', 'SERVANT');
+    if (this.memberCache.has(key)) return;
+    this.familySvc.members('SERVANTS').subscribe({
+      next: (members) => {
+        const previousMembers = this.members;
+        const previousLoading = this.loading;
+        this.applyLoadedMembers('SERVANTS', 'SERVANT', (members as any) || []);
+        if (this.mode !== 'SERVANT') {
+          this.members = previousMembers;
+          this.loading = previousLoading;
+        }
       },
-      error: (err) => {
-        this.loading = false;
-        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في تحميل الاعضاء' });
-      }
+      error: () => {}
     });
   }
 
@@ -426,6 +471,8 @@ removeFromChoir(m: Member) {
 
   onModeChange() {
     this.cancelSelecting();
+    this.targetFamilyMembers = [];
+    this.targetFamilyCache.clear();
 
     if (this.mode === 'MAKHDOM') {
       this.selectedFamilyView = this.selectedFamilyView || (this.servantFamilies[0] || '');
@@ -437,6 +484,7 @@ removeFromChoir(m: Member) {
     }
 
     this.loadMembers();
+    this.loadTargetFamilyMembers();
   }
 
   onFamilyViewChange() {
@@ -452,7 +500,7 @@ removeFromChoir(m: Member) {
   this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
 }
     this.selecting = true;
-    this.selectedIds.clear();
+    this.selectedIds = new Set(this.members.map((m) => m.id));
   }
 
   cancelSelecting() {
@@ -463,6 +511,52 @@ removeFromChoir(m: Member) {
   toggleMember(id: number, checked: boolean) {
     if (checked) this.selectedIds.add(id);
     else this.selectedIds.delete(id);
+  }
+
+  selectMemberForTransfer(member: Member) {
+    if (this.selectedIds.has(member.id)) return;
+    if (!this.selecting) {
+      this.selecting = true;
+      if (this.isMarmarkosView()) {
+        this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+      }
+    }
+    this.selectedIds.add(member.id);
+  }
+
+  isMemberSelected(member: Member): boolean {
+    return this.selectedIds.has(member.id);
+  }
+
+  selectedMembers(): Member[] {
+    return this.members.filter((member) => this.selectedIds.has(member.id));
+  }
+
+  extraDropListIds(): string[] {
+    return this.extraFamilies.map((_, index) => `transferExtraDrop${index}`);
+  }
+
+  connectedDropListIds(): string[] {
+    return ['transferSelectedDrop', ...this.extraDropListIds()];
+  }
+
+  onMemberDrop(event: CdkDragDrop<Member[]>) {
+    const member = event.item.data as Member | undefined;
+    if (!member?.id) return;
+    if (!this.selecting) {
+      this.selecting = true;
+      this.selectedIds.clear();
+      if (this.isMarmarkosView()) {
+        this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+      }
+    }
+    if (this.selectedIds.has(member.id)) return;
+    this.selectedIds.add(member.id);
+  }
+
+  onExtraFamilyDrop(event: CdkDragDrop<Member[]>, index: number) {
+    if (!this.extraFamilies[index]) return;
+    this.onMemberDrop(event);
   }
 
   doTransfer() {
@@ -598,6 +692,53 @@ private getServedFamilies(): string[] {
 
   getRoleLabel(role: string): string {
     return roleLabel(role);
+  }
+
+  targetFamilyOptions(): Array<{ label: string; value: string }> {
+    if (this.mode === 'SERVANT') {
+      return this.servantFamilies.map(f => ({ label: f, value: f }));
+    }
+    if (this.isMarmarkosView()) {
+      return this.marmarkosYearTargets;
+    }
+    const base = this.makhdomFamilies.map(f => ({ label: f, value: f }));
+    return [...base, ...this.familyRequestTargets];
+  }
+
+  showRoleSelector(): boolean {
+    return this.isAminKhedmaOrDev() && this.mode === 'SERVANT';
+  }
+
+  onTargetFamilyChange() {
+    this.loadTargetFamilyMembers();
+  }
+
+  private loadTargetFamilyMembers() {
+    const fam = this.targetFamily;
+    if (!fam || fam.startsWith('KHORS')) {
+      this.targetFamilyMembers = [];
+      return;
+    }
+    const cached = this.targetFamilyCache.get(fam);
+    if (cached) {
+      this.targetFamilyMembers = cached;
+      return;
+    }
+    this.targetFamilyLoading = true;
+    this.familySvc.members(fam).subscribe({
+      next: (m: any) => {
+        const list: Member[] = m || [];
+        this.targetFamilyCache.set(fam, list);
+        if (this.targetFamily === fam) {
+          this.targetFamilyMembers = list;
+        }
+        this.targetFamilyLoading = false;
+      },
+      error: () => {
+        this.targetFamilyMembers = [];
+        this.targetFamilyLoading = false;
+      }
+    });
   }
 }
 
