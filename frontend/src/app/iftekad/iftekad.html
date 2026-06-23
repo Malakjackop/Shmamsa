@@ -277,7 +277,7 @@
           <ng-container *ngFor="let p of whatsappPreviews; let i = index">
             <span *ngIf="p.url"
               class="dot"
-              [class.dot--done]="i < (whatsappSendIndex ?? 0)"
+              [class.dot--done]="i < whatsappSendIndex"
               [class.dot--current]="i === whatsappSendIndex">
             </span>
           </ng-container>

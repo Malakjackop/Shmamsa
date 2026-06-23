@@ -275,33 +275,11 @@ button {
   content: '';
   position: absolute;
   z-index: 0;
+  top: 0;
   right: 0;
   bottom: 0;
-  left: 0;
-  height: 32%;
+  width: 6px;
   background: var(--card-wave);
-  transform: none;
-}
-
-.iftekadCard::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  left: -4%;
-  bottom: calc(32% - 1px);
-  width: 108%;
-  height: 42px;
-  background: var(--card-wave);
-  opacity: 1;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 60' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0 31C22 19 46 16 70 23C93 30 116 37 140 34C164 31 182 18 204 16C229 13 247 24 269 28C289 31 304 25 320 18V60H0Z'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 60' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0 31C22 19 46 16 70 23C93 30 116 37 140 34C164 31 182 18 204 16C229 13 247 24 269 28C289 31 304 25 320 18V60H0Z'/%3E%3C/svg%3E");
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-position: center;
-  mask-position: center;
-  animation: iftekadWaveFloat 2300ms ease-in-out infinite;
 }
 
 .iftekadCard--green {
@@ -314,24 +292,6 @@ button {
 
 .iftekadCard--red {
   --card-wave: #e65f68;
-}
-
-@keyframes iftekadWaveFloat {
-  from {
-    transform: translateX(-4%) translateY(0) scaleX(1.02);
-  }
-  25% {
-    transform: translateX(-1%) translateY(4px) scaleX(1.04);
-  }
-  50% {
-    transform: translateX(4%) translateY(7px) scaleX(1);
-  }
-  75% {
-    transform: translateX(1%) translateY(3px) scaleX(1.03);
-  }
-  to {
-    transform: translateX(-4%) translateY(0) scaleX(1.02);
-  }
 }
 
 .cardContent {

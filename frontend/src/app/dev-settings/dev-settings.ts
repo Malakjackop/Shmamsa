@@ -14,7 +14,7 @@ import { SelectModule } from 'primeng/select';
 import { DatePickerModule } from 'primeng/datepicker';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { forkJoin, interval, Subscription } from 'rxjs';
+import { interval, Subscription } from 'rxjs';
 
 import { DevSettingsService, CustomField, VisibilityCondition, FamilyCatalog, SecretCodeResponse } from '../services/dev-settings.service';
 import { AuthService, FamilyOption } from '../services/auth.service';
@@ -292,6 +292,7 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   }
 
   loadFields(): void {
+    this.ensureFamilyOptionsLoaded();
     this.loading = true;
     this.svc.getAllFields().subscribe({
       next: (data) => {
@@ -313,7 +314,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   /* ── Dialog helpers ──────────────────────────────────── */
   openCreate(): void {
     this.dialogMode = 'create';
-    this.ensureFamilyOptionsLoaded();
     this.editingField = {
       fieldKey: '',
       labelAr: '',
@@ -338,7 +338,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   }
 
   openEdit(f: CustomField): void {
-    this.ensureFamilyOptionsLoaded();
     this.dialogMode = 'edit';
     this.selectedRequiredRules = this.parseRequiredRules(f.requiredRule);
     this.visibilityConditions = this.deserializeVisibilityConditions(f);
@@ -413,10 +412,16 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
 
     if (this.dialogMode === 'create') {
       this.svc.createField(payload).subscribe({
-        next: () => {
+        next: (newField) => {
           this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم إنشاء الحقل بنجاح' });
           this.dialogVisible = false;
-          this.loadFields();
+          const normalized = {
+            ...newField,
+            showIn: this.resolveEffectiveShowInValue(newField.showIn, newField),
+            profileEditable: this.resolveEffectiveProfileEditable(newField)
+          };
+          this.fields = this.sortFields([...this.fields, normalized]);
+          this.rebuildSections();
         },
         error: (err) => {
           const detail = err?.error?.message || 'فشل إنشاء الحقل';
@@ -425,10 +430,16 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
       });
     } else {
       this.svc.updateField(this.editingField.id!, payload).subscribe({
-        next: () => {
+        next: (updatedField) => {
           this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الحقل بنجاح' });
           this.dialogVisible = false;
-          this.loadFields();
+          const normalized = {
+            ...updatedField,
+            showIn: this.resolveEffectiveShowInValue(updatedField.showIn, updatedField),
+            profileEditable: this.resolveEffectiveProfileEditable(updatedField)
+          };
+          this.fields = this.sortFields(this.fields.map((f) => f.id === normalized.id ? normalized : f));
+          this.rebuildSections();
         },
         error: (err) => {
           const detail = err?.error?.message || 'فشل تعديل الحقل';
@@ -449,6 +460,10 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
         this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحديث الحالة' });
       }
     });
+  }
+
+  trackByIndex(index: number): number {
+    return index;
   }
 
   addOption(): void {
@@ -846,7 +861,8 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
         this.svc.deleteField(f.id!).subscribe({
           next: () => {
             this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم حذف الحقل' });
-            this.loadFields();
+            this.fields = this.sortFields(this.fields.filter((x) => x.id !== f.id));
+            this.rebuildSections();
           },
           error: (err) => {
             const detail = err?.error?.message || 'فشل حذف الحقل';
@@ -1559,17 +1575,12 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   }
 
   private loadFamilyOptionSources(): void {
-    forkJoin({
-      member: this.authService.getFamilyOptions('MEMBER'),
-      servant: this.authService.getFamilyOptions('SERVANT'),
-      khors: this.authService.getFamilyOptions('KHORS'),
-      attendKhors: this.authService.getFamilyOptions('KHORS_ATTEND')
-    }).subscribe({
-      next: ({ member, servant, khors, attendKhors }) => {
-        this.memberFamilyOptions = this.extractFamilyNames(member || []);
-        this.servantFamilyOptions = this.extractFamilyNames(servant || []);
-        this.khorsFamilyOptions = this.extractFamilyNames(khors || []);
-        this.attendKhorsFamilyOptions = this.extractFamilyNames(attendKhors || []);
+    this.authService.getAllFamilyOptions().subscribe({
+      next: (result) => {
+        this.memberFamilyOptions = this.extractFamilyNames(result.member || []);
+        this.servantFamilyOptions = this.extractFamilyNames(result.servant || []);
+        this.khorsFamilyOptions = this.extractFamilyNames(result.khors || []);
+        this.attendKhorsFamilyOptions = this.extractFamilyNames(result.attendKhors || []);
         this.refreshManagedFieldOptionsIfNeeded();
       },
       error: () => {

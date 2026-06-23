@@ -17,6 +17,7 @@ const SYSTEM_FIELD_DEFAULT_SHOW_IN: Record<string, string[]> = {
   deaconDegree: ['PROFILE', 'FAMILY_INFO'],
   deaconFamily: ['FAMILY_INFO', 'IFTEKAD'],
   khors: ['FAMILY_INFO', 'IFTEKAD'],
+  khorsYear: ['FAMILY_INFO', 'IFTEKAD'],
   status: ['PROFILE', 'FAMILY_INFO'],
   studyType: ['PROFILE', 'FAMILY_INFO'],
   schoolName: ['PROFILE', 'FAMILY_INFO'],

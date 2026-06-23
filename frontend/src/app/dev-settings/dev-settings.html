@@ -557,7 +557,7 @@
           <i class="pi pi-plus"></i>
         </button>
       </div>
-      <div class="option-row" *ngFor="let option of optionInputs; let i = index">
+      <div class="option-row" *ngFor="let option of optionInputs; let i = index; trackBy: trackByIndex">
         <input
           type="text"
           [(ngModel)]="optionInputs[i]"

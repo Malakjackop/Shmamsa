@@ -122,19 +122,19 @@
           <div class="notice-copy">
             <h3>{{ e.title }}</h3>
             <strong>{{ targetLabel(e) }}</strong>
-            <div class="notice-badges" *ngIf="showEventStatusBadge(e) || e.reminderBeforeMinutes">
+            <div class="notice-badges" *ngIf="showEventStatusBadge(e) || (e.reminderBeforeMinutes && isAtLeast('KHADIM'))">
               <span *ngIf="showEventStatusBadge(e)">{{ statusLabel(e) }}</span>
-              <span *ngIf="e.reminderBeforeMinutes">{{ reminderLabel(e) }}</span>
+              <span *ngIf="e.reminderBeforeMinutes && isAtLeast('KHADIM')">{{ reminderLabel(e) }}</span>
             </div>
             <p>
               <span *ngIf="e.eventAt">{{ formatDateTime(e.eventAt) }}</span>
               <span *ngIf="e.joinCount !== undefined && e.joinCount !== null">الحجز: {{ e.joinCount }}</span>
             </p>
-            <div class="event-warning" *ngIf="isCancelledEvent(e)">
+            <div class="event-warning" *ngIf="isCancelledEvent(e) && isAtLeast('KHADIM')">
               {{ e.cancelMessage || 'تم إلغاء هذا الموعد.' }}
               <small *ngIf="e.cancelNoticeUntil">سيظهر التنبيه حتى {{ formatDateTime(e.cancelNoticeUntil) }}</small>
             </div>
-            <div class="event-warning event-warning--reminder" *ngIf="!isCancelledEvent(e) && e.reminderActive">
+            <div class="event-warning event-warning--reminder" *ngIf="!isCancelledEvent(e) && e.reminderActive && isAtLeast('KHADIM')">
               <div>تذكير: هذا الموعد قريب.</div>
               <strong>{{ countdownLabel(e) }}</strong>
             </div>
@@ -156,8 +156,8 @@
             <button
               *ngIf="e.canDelete"
               type="button"
-              aria-label="مسح الموعد"
-              (click)="deleteEvent(e)"
+              aria-label="الغاء الموعد"
+              (click)="cancelEvent(e)"
             >
               <i class="pi pi-trash"></i>
             </button>
@@ -515,14 +515,12 @@
     </div>
   </p-dialog>
 
-  <!-- Unpublish / Cancel Dialog -->
-  <p-dialog [(visible)]="showUnpublishDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog" header="تأكيد إلغاء النشر">
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      <div class="event-warning">
-        هل تريد إلغاء نشر هذا الموعد؟ يمكن كتابة رسالة اختيارية تظهر للناس.
-      </div>
 
-      <label>رسالة الإلغاء (اختياري)</label>
+
+  <!-- Cancel Event Dialog -->
+  <p-dialog [(visible)]="showUnpublishDialog" [modal]="true" [focusTrap]="false" [draggable]="false" [style]="{width:'520px'}" styleClass="app-surface-dialog" header="إلغاء الموعد">
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <label>سبب الإلغاء (يظهر للمخدوم)</label>
       <textarea pTextarea [(ngModel)]="unpublishForm.message" rows="4" placeholder="مثال: تم إلغاء الميعاد لظروف خاصة"></textarea>
 
       <label>تظهر الرسالة لحد يوم</label>
@@ -561,7 +559,7 @@
 
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
         <button pButton type="button" label="رجوع" class="p-button-text" (click)="showUnpublishDialog=false"></button>
-        <button pButton type="button" [label]="isUnpublishingEvent(unpublishForm.event) ? 'جاري الإلغاء...' : 'تأكيد إلغاء النشر'" icon="pi pi-times" class="p-button-danger" [disabled]="isUnpublishingEvent(unpublishForm.event)" (click)="confirmUnpublishEvent()"></button>
+        <button pButton type="button" [label]="isUnpublishingEvent(unpublishForm.event) ? 'جاري الإلغاء...' : 'تأكيد إلغاء الموعد'" icon="pi pi-times" class="p-button-danger" [disabled]="isUnpublishingEvent(unpublishForm.event)" (click)="confirmUnpublishEvent()"></button>
       </div>
     </div>
   </p-dialog>

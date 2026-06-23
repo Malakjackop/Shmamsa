@@ -161,6 +161,7 @@ export class FamilyAttendanceComponent implements OnInit {
   selectedFamily = '';
   private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
   loading = false;
+  sortAttendance: 'default' | 'highest' | 'lowest' = 'default';
 
   exportMode = false;
   pendingExport: 'pdf' | '' = '';
@@ -203,32 +204,8 @@ export class FamilyAttendanceComponent implements OnInit {
   private scheduleTimes: Record<string, Partial<Record<AttendanceType, Record<string, string>>>> = {};
   private scheduleCreatedDates: Record<string, Partial<Record<AttendanceType, Record<string, string>>>> = {};
 
-  // schedule management within daily modal
-  showDailyScheduleSection = false;
-  scheduleSaving = false;
-  scheduleItems: any[] = [];
-  scheduleForm: { familyBase: string; type: AttendanceType; dayOfWeek: number; time: Date | null } = {
-    familyBase: '',
-    type: 'FRIDAY_LITURGY',
-    dayOfWeek: 5,
-    time: null
-  };
-  readonly scheduleTypeOptions: { value: AttendanceType; label: string }[] = [
-    { value: 'FRIDAY_LITURGY', label: 'قداس الجمعة' },
-    { value: 'TASBEEHA', label: 'تسبحة' },
-    { value: 'FAMILY_MEETING', label: 'اجتماع الأسرة' },
-    { value: 'MARMARKOS_KHORS', label: 'خورس مارمرقس' },
-    { value: 'ATHANASIUS_KHORS', label: 'خورس البابا اثناسيوس' },
-  ];
-  readonly scheduleDayOptions: { value: number; label: string }[] = [
-    { value: 0, label: 'الأحد' },
-    { value: 1, label: 'الاثنين' },
-    { value: 2, label: 'الثلاثاء' },
-    { value: 3, label: 'الأربعاء' },
-    { value: 4, label: 'الخميس' },
-    { value: 5, label: 'الجمعة' },
-    { value: 6, label: 'السبت' },
-  ];
+  // schedule days loaded from server context
+
 
   // edit attendance record date
   editingAttendanceId: number | null = null;
@@ -422,6 +399,7 @@ export class FamilyAttendanceComponent implements OnInit {
     this.familySvc.members(famParam).subscribe({
       next: (m) => {
         this.members = (m || []) as Member[];
+        this.applySort();
         this.refreshIftekadLastDates();
         this.loading = false;
       },
@@ -430,6 +408,26 @@ export class FamilyAttendanceComponent implements OnInit {
         this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في التحميل' });
       }
     });
+  }
+
+  onSortChange(): void {
+    this.applySort();
+  }
+
+  private applySort(): void {
+    if (this.sortAttendance === 'default') return;
+    const dir = this.sortAttendance === 'highest' ? -1 : 1;
+    this.members = [...this.members].sort((a, b) => {
+      return dir * (this.memberTotalAttendance(a) - this.memberTotalAttendance(b));
+    });
+  }
+
+  private memberTotalAttendance(m: Member): number {
+    return (
+      (m.fridayLiturgyPresent ?? m.fridayLiturgy ?? 0) +
+      (m.tasbeehaPresent ?? m.tasbeeha ?? 0) +
+      (m.familyMeetingPresent ?? m.familyMeeting ?? 0)
+    );
   }
 
   private refreshIftekadLastDates() {
@@ -1208,93 +1206,6 @@ reloadDetails(): void {
   }
 
   // ===== Schedule management within daily modal =====
-  openDailyScheduleSection(): void {
-    this.showDailyScheduleSection = !this.showDailyScheduleSection;
-    if (this.showDailyScheduleSection) {
-      const family = this.dailyFamilyParam() || '';
-      this.scheduleForm.familyBase = family;
-      this.scheduleForm.type = 'FRIDAY_LITURGY';
-      this.scheduleForm.dayOfWeek = 5;
-      this.scheduleForm.time = null;
-      this.loadScheduleItems();
-    }
-  }
-
-  private loadScheduleItems(): void {
-    const base = this.scheduleForm.familyBase;
-    if (!base) {
-      this.scheduleItems = [];
-      return;
-    }
-    this.attendanceSvc.getSchedules(base).subscribe({
-      next: (list: any[]) => {
-        this.scheduleItems = list || [];
-      },
-      error: () => {
-        this.scheduleItems = [];
-      }
-    });
-  }
-
-  addSchedule(): void {
-    const base = this.scheduleForm.familyBase;
-    if (!base) return;
-
-    this.scheduleSaving = true;
-    const timeStr = this.scheduleForm.time
-      ? `${String(this.scheduleForm.time.getHours()).padStart(2, '0')}:${String(this.scheduleForm.time.getMinutes()).padStart(2, '0')}`
-      : undefined;
-    this.attendanceSvc.createSchedule({
-      familyBase: base,
-      type: this.scheduleForm.type,
-      dayOfWeek: this.scheduleForm.dayOfWeek,
-      time: timeStr
-    }).subscribe({
-      next: () => {
-        this.scheduleSaving = false;
-        this.loadScheduleItems();
-        this.refreshDailyScheduleData();
-      },
-      error: () => {
-        this.scheduleSaving = false;
-      }
-    });
-  }
-
-  deleteSchedule(s: any): void {
-    if (!s.id) return;
-    this.attendanceSvc.deleteSchedule(s.id).subscribe({
-      next: () => {
-        this.loadScheduleItems();
-        this.refreshDailyScheduleData();
-      },
-      error: () => {}
-    });
-  }
-
-  private refreshDailyScheduleData(): void {
-    this.attendanceSvc.context().subscribe({
-      next: (ctx) => {
-        this.scheduleDays = ctx.scheduleDays || {};
-        this.scheduleTimes = ctx.scheduleTimes || {};
-        this.scheduleCreatedDates = ctx.scheduleCreatedDates || {};
-        this.dailyMinDate = this.computeDailyMinDate(this.dailyType);
-        this.buildDailyEvents();
-      },
-      error: () => {}
-    });
-  }
-
-  scheduleTypeLabel(t: string): string {
-    const opt = this.scheduleTypeOptions.find(o => o.value === t);
-    return opt ? opt.label : t;
-  }
-
-  scheduleDayLabel(day: number): string {
-    const opt = this.scheduleDayOptions.find(d => d.value === day);
-    return opt ? opt.label : String(day);
-  }
-
   // ===== Edit attendance record date =====
   startEditAttendanceDate(record: AttendanceRow): void {
     this.editingAttendanceId = record.id;

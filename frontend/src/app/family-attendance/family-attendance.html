@@ -15,6 +15,15 @@
       </select>
     </div>
 
+    <div class="filterGroup">
+      <label>ترتيب</label>
+      <select [(ngModel)]="sortAttendance" (change)="onSortChange()">
+        <option value="default">بدون ترتيب</option>
+        <option value="highest">الأعلى حضوراً</option>
+        <option value="lowest">الأقل حضوراً</option>
+      </select>
+    </div>
+
     <div class="actions">
       <button
         pButton
@@ -171,65 +180,6 @@
           </button>
         </div>
 
-        <div class="dailyField">
-          <label>&nbsp;</label>
-          <button
-            type="button"
-            class="dailyScheduleBtn"
-            (click)="openDailyScheduleSection()"
-          >
-            <i class="pi pi-clock"></i>
-            {{ showDailyScheduleSection ? 'إخفاء المواعيد' : 'إدارة المواعيد' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Schedule management section -->
-      <div class="dailyScheduleSection" *ngIf="showDailyScheduleSection">
-        <div class="dailyScheduleForm">
-          <div class="scheduleField">
-            <label>المناسبة</label>
-            <select [(ngModel)]="scheduleForm.type" [ngModelOptions]="{ standalone: true }">
-              <option *ngFor="let opt of scheduleTypeOptions" [value]="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="scheduleField">
-            <label>اليوم</label>
-            <select [(ngModel)]="scheduleForm.dayOfWeek" [ngModelOptions]="{ standalone: true }">
-              <option *ngFor="let opt of scheduleDayOptions" [value]="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="scheduleField">
-            <label>الوقت</label>
-            <p-datepicker [(ngModel)]="scheduleForm.time" [timeOnly]="true" placeholder="اختر الوقت" [ngModelOptions]="{ standalone: true }"></p-datepicker>
-          </div>
-          <div class="scheduleField">
-            <label>&nbsp;</label>
-          </div>
-        </div>
-
-        <div class="dailyScheduleList" *ngIf="scheduleItems.length; else noSchedules">
-          <div class="scheduleItem" *ngFor="let s of scheduleItems">
-            <span class="scheduleItemType">{{ scheduleTypeLabel(s.type) }}</span>
-            <span class="scheduleItemDay">{{ scheduleDayLabel(s.dayOfWeek) }}</span>
-            <span class="scheduleItemDate" *ngIf="s.createdAt">{{ formatRecordedAt(s.createdAt) }}</span>
-            <span class="scheduleItemTime" *ngIf="s.time">{{ s.time }}</span>
-            <span class="scheduleItemStatus" [class.active]="s.enabled">{{ s.enabled ? 'مفعل' : 'معطل' }}</span>
-            <button type="button" class="scheduleItemDelete" (click)="deleteSchedule(s)" title="حذف">
-              <i class="pi pi-trash"></i>
-            </button>
-          </div>
-        </div>
-        <ng-template #noSchedules>
-          <p class="hint">لا توجد مواعيد أسبوعية. أضف موعدًا جديدًا باستخدام الحقول أعلاه.</p>
-        </ng-template>
-
-        <div class="scheduleActions">
-          <button type="button" class="action-btn" (click)="addSchedule()" [disabled]="scheduleSaving">
-            <i class="pi pi-plus"></i>
-            {{ scheduleSaving ? 'جاري الحفظ...' : 'إضافة موعد' }}
-          </button>
-        </div>
       </div>
 
       <div *ngIf="dailyLoading" class="hint">جاري التحميل...</div>

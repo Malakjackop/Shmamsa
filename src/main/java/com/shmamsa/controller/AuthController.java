@@ -156,6 +156,16 @@ public class AuthController {
         return ResponseEntity.ok(familyCatalogService.listForAudience(audience));
     }
 
+    @GetMapping("/family-options-all")
+    public ResponseEntity<Map<String, List<FamilyOptionDto>>> familyOptionsAll() {
+        Map<String, List<FamilyOptionDto>> result = new LinkedHashMap<>();
+        result.put("member", familyCatalogService.listForAudience("MEMBER"));
+        result.put("servant", familyCatalogService.listForAudience("SERVANT"));
+        result.put("khors", familyCatalogService.listForAudience("KHORS"));
+        result.put("attendKhors", familyCatalogService.listForAudience("KHORS_ATTEND"));
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         String token = authService.login(request.getUsername(), request.getPassword());

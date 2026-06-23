@@ -333,6 +333,7 @@ public class EventController {
             boolean canDelete = canM || creator;
             boolean canPublish = (canM || creator) && st != EventStatus.PUBLISHED;
             boolean canUnpublish = (canM || creator) && st == EventStatus.PUBLISHED;
+            boolean isServant = isServantGlobal(role);
 
             out.add(EventView.builder()
                     .id(e.getId())
@@ -343,8 +344,8 @@ public class EventController {
                     .targetAudience(normalizeAudience(e.getTargetAudience()))
                     .status(hasCancellationNotice ? EventStatus.CANCELLED.name() : st.name())
                     .removeAt(e.getRemoveAt())
-                    .reminderBeforeMinutes(e.getReminderBeforeMinutes())
-                    .reminderActive(isReminderActive(e))
+                    .reminderBeforeMinutes(isServant ? e.getReminderBeforeMinutes() : null)
+                    .reminderActive(isServant && isReminderActive(e))
                     .imageUrl(e.getImageStoredName() == null || e.getImageStoredName().isBlank() ? null : "/api/events/" + e.getId() + "/image")
                     .cancelMessage(e.getCancelMessage())
                     .cancelNoticeUntil(e.getCancelNoticeUntil())
@@ -522,22 +523,32 @@ public class EventController {
         }
 
         String message = optionalText(req, "message");
-        LocalDateTime requestedNoticeUntil = parseOptionalDateTime(req == null ? null : req.get("noticeUntil"));
-        LocalDateTime noticeUntil = defaultCancelNoticeUntil(e, requestedNoticeUntil);
-        if (noticeUntil == null || noticeUntil.isBefore(LocalDateTime.now())) {
-            noticeUntil = LocalDateTime.now().plusDays(3);
+        boolean hasCancel = message != null || (req != null && req.containsKey("noticeUntil"));
+
+        if (hasCancel) {
+            LocalDateTime requestedNoticeUntil = parseOptionalDateTime(req == null ? null : req.get("noticeUntil"));
+            LocalDateTime noticeUntil = defaultCancelNoticeUntil(e, requestedNoticeUntil);
+            if (noticeUntil == null || noticeUntil.isBefore(LocalDateTime.now())) {
+                noticeUntil = LocalDateTime.now().plusDays(3);
+            }
+
+            // Do not save CANCELLED in the database. Some existing databases were created
+            // before this value existed, so their event status column/check constraint only
+            // accepts PENDING and PUBLISHED. We store the row as PENDING and use
+            // cancelledAt/cancelNoticeUntil as the real cancellation flag. The list API
+            // returns it to the frontend as virtual status CANCELLED.
+            e.setCancelMessage(message);
+            e.setCancelNoticeUntil(noticeUntil);
+            e.setCancelledAt(LocalDateTime.now());
+        } else {
+            // Simple unpublish without cancellation notice
+            e.setCancelMessage(null);
+            e.setCancelNoticeUntil(null);
+            e.setCancelledAt(null);
         }
 
-        // Do not save CANCELLED in the database. Some existing databases were created
-        // before this value existed, so their event status column/check constraint only
-        // accepts PENDING and PUBLISHED. We store the row as PENDING and use
-        // cancelledAt/cancelNoticeUntil as the real cancellation flag. The list API
-        // returns it to the frontend as virtual status CANCELLED.
         e.setStatus(EventStatus.PENDING);
         e.setPublishedAt(null);
-        e.setCancelMessage(message == null || message.isBlank() ? null : message);
-        e.setCancelNoticeUntil(noticeUntil);
-        e.setCancelledAt(LocalDateTime.now());
         eventRepo.save(e);
         return ResponseEntity.ok(Map.of("ok", true));
     }

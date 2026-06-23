@@ -44,7 +44,8 @@ const FALLBACK_SYSTEM_FIELD_KEYS = new Set([
   'isWorking',
   'workDetails',
   'guardiansPhone',
-  'guardianRelation'
+  'guardianRelation',
+  'khorsYear'
 ]);
 
 @Component({
@@ -196,6 +197,7 @@ export class RegisterComponent implements OnInit {
 
       guardiansPhone: ['', [this.optionalPhone11()]],
       guardianRelation: [''],
+      khorsYear: [''],
 
       password: ['', Validators.required],
       confirmPassword: ['', Validators.required],
@@ -372,32 +374,33 @@ export class RegisterComponent implements OnInit {
       field('deaconDegree', 'رتبة الشماس', 'SELECT', 9, { required: true }),
       field('deaconFamily', 'الأسرة', 'SELECT', 10, { visibilityRule: 'MEMBER_ONLY' }),
       field('khors', 'الخورس', 'SELECT', 11, { visibilityRule: 'MEMBER_ONLY' }),
-      field('servingWhere', 'بتخدم فين', 'SELECT', 12, { visibilityRule: 'SERVANT_ONLY' }),
-      field('attendKhors', 'خورس الحضور', 'SELECT', 13, { visibilityRule: 'SERVANT_ONLY' }),
-      field('status', 'الحالة', 'SELECT', 14),
-      field('graduatedFrom', 'الجامعة المتخرج منها', 'TEXT', 15, { visibilityRule: 'GRADUATE_ONLY' }),
-      field('graduateJob', 'الوظيفة الحالية', 'TEXT', 16, { visibilityRule: 'GRADUATE_ONLY' }),
-      field('studyType', 'الجهة الدراسية', 'SELECT', 17, { visibilityRule: 'STUDENT_ONLY' }),
-      field('schoolName', 'اسم المدرسة', 'TEXT', 18, { visibilityRule: 'STUDENT_SCHOOL' }),
-      field('schoolGrade', 'الصف الدراسي', 'SELECT', 19, { visibilityRule: 'STUDENT_SCHOOL' }),
-      field('otherGrade', 'صف دراسي آخر', 'TEXT', 20, {
+      field('khorsYear', 'سنة الخورس', 'TEXT', 12, { visibilityRule: 'MEMBER_ONLY' }),
+      field('servingWhere', 'بتخدم فين', 'SELECT', 13, { visibilityRule: 'SERVANT_ONLY' }),
+      field('attendKhors', 'خورس الحضور', 'SELECT', 14, { visibilityRule: 'SERVANT_ONLY' }),
+      field('status', 'الحالة', 'SELECT', 15),
+      field('graduatedFrom', 'الجامعة المتخرج منها', 'TEXT', 16, { visibilityRule: 'GRADUATE_ONLY' }),
+      field('graduateJob', 'الوظيفة الحالية', 'TEXT', 17, { visibilityRule: 'GRADUATE_ONLY' }),
+      field('studyType', 'الجهة الدراسية', 'SELECT', 18, { visibilityRule: 'STUDENT_ONLY' }),
+      field('schoolName', 'اسم المدرسة', 'TEXT', 19, { visibilityRule: 'STUDENT_SCHOOL' }),
+      field('schoolGrade', 'الصف الدراسي', 'SELECT', 20, { visibilityRule: 'STUDENT_SCHOOL' }),
+      field('otherGrade', 'صف دراسي آخر', 'TEXT', 21, {
         visibilityConditions: [
           { type: 'RULE', rule: 'STUDENT_SCHOOL' },
           { type: 'FIELD', fieldKey: 'schoolGrade', values: ['other'] }
         ]
       }),
-      field('universityName', 'اسم الجامعة', 'TEXT', 21, { visibilityRule: 'STUDENT_UNIVERSITY' }),
-      field('faculty', 'الكلية', 'TEXT', 22, { visibilityRule: 'STUDENT_UNIVERSITY' }),
-      field('universityGrade', 'الفرقة الدراسية', 'TEXT', 23, { visibilityRule: 'STUDENT_UNIVERSITY' }),
-      field('isWorking', 'هل تعمل؟', 'SELECT', 24, { visibilityRule: 'GRADUATE_ONLY' }),
-      field('workDetails', 'ما هي وظيفتك', 'TEXT', 25, {
+      field('universityName', 'اسم الجامعة', 'TEXT', 22, { visibilityRule: 'STUDENT_UNIVERSITY' }),
+      field('faculty', 'الكلية', 'TEXT', 23, { visibilityRule: 'STUDENT_UNIVERSITY' }),
+      field('universityGrade', 'الفرقة الدراسية', 'TEXT', 24, { visibilityRule: 'STUDENT_UNIVERSITY' }),
+      field('isWorking', 'هل تعمل؟', 'SELECT', 25, { visibilityRule: 'GRADUATE_ONLY' }),
+      field('workDetails', 'ما هي وظيفتك', 'TEXT', 26, {
         visibilityConditions: [
           { type: 'RULE', rule: 'GRADUATE_ONLY' },
           { type: 'FIELD', fieldKey: 'isWorking', values: ['true'] }
         ]
       }),
-      field('guardiansPhone', 'هاتف ولي الأمر', 'TEXT', 26),
-      field('guardianRelation', 'صلة القرابة', 'TEXT', 27)
+      field('guardiansPhone', 'هاتف ولي الأمر', 'TEXT', 27),
+      field('guardianRelation', 'صلة القرابة', 'TEXT', 28)
     ];
   }
 
@@ -477,7 +480,9 @@ export class RegisterComponent implements OnInit {
     }
 
     const controlName = this.getVisibilityDependencyControlName(dependsOn);
-    const currentValue = this.normalizeVisibilityDependencyValue(this.registerForm.get(controlName)?.value);
+    const rawValue = this.registerForm.get(controlName)?.value;
+    const displayValue = this.resolveVisibilityValue(dependsOn, rawValue);
+    const currentValue = this.normalizeVisibilityDependencyValue(displayValue);
     if (!currentValue) {
       return false;
     }
@@ -510,7 +515,9 @@ export class RegisterComponent implements OnInit {
       }
 
       const controlName = this.getVisibilityDependencyControlName(fieldKey);
-      const currentValue = this.normalizeVisibilityDependencyValue(this.registerForm.get(controlName)?.value);
+      const rawValue = this.registerForm.get(controlName)?.value;
+      const displayValue = this.resolveVisibilityValue(fieldKey, rawValue);
+      const currentValue = this.normalizeVisibilityDependencyValue(displayValue);
       if (!currentValue) {
         return false;
       }
@@ -545,6 +552,23 @@ export class RegisterComponent implements OnInit {
         .map(value => this.normalizeVisibilityDependencyValue(value))
         .filter(Boolean)
     ));
+  }
+
+  private resolveVisibilityValue(fieldKey: string, rawValue: unknown): unknown {
+    if (rawValue == null) return rawValue;
+    const allOptions: FamilyOption[] = [
+      ...this.memberFamilyOptions,
+      ...this.khorsOptionValues,
+      ...this.servantWhereOptions,
+      ...this.attendKhorsOptionValues
+    ];
+    const rawStr = String(rawValue).trim();
+    const found = allOptions.find(o =>
+      (o.id != null && String(o.id).trim() === rawStr) ||
+      (o.nameAr === rawStr)
+    );
+    if (found) return found.nameAr;
+    return rawValue;
   }
 
   private normalizeVisibilityDependencyValue(value: unknown): string {
@@ -1074,6 +1098,7 @@ private guardianNotSameAsPhone(): ValidatorFn {
 
       guardiansPhone: formValue.guardiansPhone,
       guardianRelation: formValue.guardianRelation,
+      khorsYear: formValue.khorsYear,
 
       secret: String(formValue.secret || '').trim(),
       customFields: {}

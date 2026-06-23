@@ -59,15 +59,15 @@ type ServiceCardView = {
   value: string;
 };
 
-type HeroSlide = {
-  imageUrl: string;
-  eventId: number;
-};
-
 type UnpublishForm = {
   event: EventView | null;
   message: string;
   noticeUntil: Date | null;
+};
+
+type HeroSlide = {
+  imageUrl: string;
+  eventId: number;
 };
 
 type ScopeSelectHandle = {
@@ -169,8 +169,8 @@ export class DashBoard implements OnInit, OnDestroy {
 
   showEventDialog = false;
   showJoinDialog = false;
-  showParticipantsDialog = false;
   showUnpublishDialog = false;
+  showParticipantsDialog = false;
 
   selectedJoinEvent: EventView | null = null;
   participantsGroups: ParticipantGroup[] = [];
@@ -469,16 +469,15 @@ export class DashBoard implements OnInit, OnDestroy {
       return;
     }
 
-    this.clearUnpublishNoticeDate(picker);
+    if (action === 'clearNotice') {
+      this.unpublishForm = { ...this.unpublishForm, noticeUntil: null };
+      this.closeDatePicker(picker);
+      return;
+    }
   }
 
   clearEventDate(field: 'eventAt' | 'removeAt', picker?: DatePickerHandle | null): void {
     this.eventForm = { ...this.eventForm, [field]: null };
-    this.closeDatePicker(picker);
-  }
-
-  clearUnpublishNoticeDate(picker?: DatePickerHandle | null): void {
-    this.unpublishForm = { ...this.unpublishForm, noticeUntil: null };
     this.closeDatePicker(picker);
   }
 
@@ -827,30 +826,9 @@ export class DashBoard implements OnInit, OnDestroy {
     return `سنه ${y}`;
   }
 
-  private servedKhorsLabel(): string {
-    const k = String(this.user?.khors || '').trim().toUpperCase();
-    const base = this.arKhorsName(k);
-    if (!base) return '';
-    if (k === 'ATHANASIUS') return base;
-    const year = this.arYearLabel(this.user?.khorsYear);
-    return year ? `${base} (${year})` : base;
-  }
-
-  private attendKhorsLabel(): string {
-    const k = String(this.user?.attendKhors || '').trim().toUpperCase();
-    return this.arKhorsName(k) || '';
-  }
-
   get currentFamilyLabel(): string {
-    const families = this.userFamilies();
-    const served = this.servedKhorsLabel();
-    const attend = this.attendKhorsLabel();
-
-    const labels: string[] = [];
-    labels.push(...families);
-    if (served) labels.push(served);
-    if (attend && !labels.some(x => x.includes(attend))) labels.push(attend);
-    return labels.join(' + ');
+    const fams = this.userFamilies();
+    return fams[0] || '';
   }
 
   get primaryFamilyLabel(): string {
@@ -1142,7 +1120,18 @@ export class DashBoard implements OnInit, OnDestroy {
 
   private visibleEvents(rows: EventView[]): EventView[] {
     const now = Date.now();
-    return (rows || []).filter((event) => !this.isExpiredEvent(event, now));
+    return (rows || [])
+      .filter((event) => !this.isExpiredEvent(event, now))
+      .map((event) => this.sanitizeEventForRole(event));
+  }
+
+  private sanitizeEventForRole(event: EventView): EventView {
+    if (this.isAtLeast('KHADIM')) return event;
+    return {
+      ...event,
+      reminderBeforeMinutes: undefined,
+      reminderActive: false
+    };
   }
 
   private pruneExpiredEvents(): void {
@@ -1328,7 +1317,7 @@ export class DashBoard implements OnInit, OnDestroy {
 
   private uploadEventImageInBackground(eventId: number, file: File): void {
     this.boardService.uploadEventImage(eventId, file).subscribe({
-      next: () => this.loadMonthBoards(),
+      next: () => this.rebuildHeroSlides(),
       error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'تم حفظ الموعد لكن فشل رفع الصورة.') });
       }
@@ -1394,7 +1383,29 @@ export class DashBoard implements OnInit, OnDestroy {
         this.selectedEventImageFile = null;
         this.selectedEventImageName = '';
         this.messageService.add({ severity: 'success', summary: 'تم', detail: imageFile ? 'تم حفظ الموعد، وجاري رفع الصورة.' : 'تم الحفظ.' });
-        this.loadMonthBoards();
+
+        const patch = {
+          title: payload.title,
+          description: payload.description,
+          eventAt: payload.eventAt,
+          removeAt: payload.removeAt,
+          reminderBeforeMinutes: this.reminderMinutesFromForm(),
+          targetFamily: payload.targetFamily,
+          targetAudience: payload.targetAudience,
+          imageUrl: this.eventForm?.imageUrl || null,
+        };
+
+        if (id) {
+          this.events = this.events.map((ev) =>
+            Number(ev.id) === id ? { ...ev, ...patch } : ev
+          );
+        } else if (savedId) {
+          this.events = this.sortEvents([
+            ...this.events,
+            { id: savedId, status: 'PENDING', joined: false, joinCount: 0, canPublish: true, canEdit: true, canDelete: true, ...patch } as EventView
+          ]);
+        }
+        this.rebuildHeroSlides();
 
         if (savedId && imageFile) {
           this.uploadEventImageInBackground(savedId, imageFile);
@@ -1421,7 +1432,6 @@ export class DashBoard implements OnInit, OnDestroy {
         this.publishingEventIds.delete(id);
         this.markEventPublishedInView(id);
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم نشر الموعد.' });
-        this.loadMonthBoards();
       },
       error: (err) => {
         this.publishingEventIds.delete(id);
@@ -1432,7 +1442,32 @@ export class DashBoard implements OnInit, OnDestroy {
 
   unpublishEvent(e: EventView): void {
     if (!e?.id) {
-      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن إخفاء الموعد حالياً.' });
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن إلغاء نشر الموعد حالياً.' });
+      return;
+    }
+    const id = Number(e.id);
+    if (this.unpublishingEventIds.has(id)) return;
+    this.unpublishingEventIds.add(id);
+
+    this.boardService.unpublishEvent(id, {}).subscribe({
+      next: () => {
+        this.unpublishingEventIds.delete(id);
+        this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء نشر الموعد.' });
+        this.events = this.events.map((ev) =>
+          Number(ev.id) === id ? { ...ev, status: 'PENDING', canPublish: true, canUnpublish: false } : ev
+        );
+        this.rebuildHeroSlides();
+      },
+      error: (err) => {
+        this.unpublishingEventIds.delete(id);
+        this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل إلغاء نشر الموعد.') });
+      }
+    });
+  }
+
+  cancelEvent(e: EventView): void {
+    if (!e?.id) {
+      this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'لا يمكن إلغاء الموعد حالياً.' });
       return;
     }
     const defaultUntil = e.eventAt ? new Date(e.eventAt) : new Date();
@@ -1466,7 +1501,11 @@ export class DashBoard implements OnInit, OnDestroy {
         this.unpublishingEventIds.delete(id);
         this.showUnpublishDialog = false;
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء نشر الموعد.' });
-        this.loadMonthBoards();
+        this.events = this.events.map((ev) =>
+          Number(ev.id) === id
+            ? { ...ev, status: 'CANCELLED', cancelMessage: this.unpublishForm.message || null, cancelNoticeUntil: this.unpublishForm.noticeUntil, cancelNoticeActive: true, canPublish: false, canUnpublish: false } : ev
+        );
+        this.rebuildHeroSlides();
       },
       error: (err) => {
         this.unpublishingEventIds.delete(id);
@@ -1494,7 +1533,8 @@ export class DashBoard implements OnInit, OnDestroy {
         this.boardService.deleteEvent(e.id!).subscribe({
           next: () => {
             this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم مسح الموعد.' });
-            this.loadMonthBoards();
+            this.events = this.events.filter((ev) => Number(ev.id) !== Number(e.id));
+            this.rebuildHeroSlides();
           },
           error: (err) => {
             this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل مسح الموعد.') });
@@ -1518,11 +1558,15 @@ export class DashBoard implements OnInit, OnDestroy {
       this.messageService.add({ severity: 'warn', summary: 'تنبيه', detail: 'الموعد غير متاح للانضمام الآن.' });
       return;
     }
+    const joinId = Number(this.selectedJoinEvent.id);
     this.boardService.joinEvent(this.selectedJoinEvent.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'success', summary: 'تم', detail: 'تم الانضمام.' });
         this.showJoinDialog = false;
-        this.loadMonthBoards();
+        this.events = this.events.map((ev) =>
+          Number(ev.id) === joinId ? { ...ev, joined: true, joinCount: (ev.joinCount || 0) + 1 } : ev
+        );
+        this.rebuildHeroSlides();
       },
       error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل الانضمام.') });
@@ -1538,7 +1582,11 @@ export class DashBoard implements OnInit, OnDestroy {
     this.boardService.unjoinEvent(e.id).subscribe({
       next: () => {
         this.messageService.add({ severity: 'info', summary: 'تم', detail: 'تم إلغاء الانضمام.' });
-        this.loadMonthBoards();
+        const evId = Number(e.id);
+        this.events = this.events.map((ev) =>
+          Number(ev.id) === evId ? { ...ev, joined: false, joinCount: Math.max(0, (ev.joinCount || 1) - 1) } : ev
+        );
+        this.rebuildHeroSlides();
       },
       error: (err) => {
         this.messageService.add({ severity: 'error', summary: 'خطأ', detail: this.errMsg(err, 'فشل إلغاء الانضمام.') });

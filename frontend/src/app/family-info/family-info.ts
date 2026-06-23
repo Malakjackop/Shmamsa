@@ -463,12 +463,9 @@ export class FamilyInfoComponent implements OnInit {
   }
 
   rolesForMember(member: Member): string[] {
-    const currentRole = normalizeRole(member?.role);
     return (this.allRoles || []).filter((role) => {
       const candidate = normalizeRole(role);
-      if (candidate === 'DEVELOPER') return false;
-      if (currentRole === 'KHADIM' && candidate === 'MAKHDOM') return false;
-      return true;
+      return candidate !== 'DEVELOPER';
     });
   }
 

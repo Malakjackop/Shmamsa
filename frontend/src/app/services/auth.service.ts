@@ -118,4 +118,13 @@ export class AuthService {
       catchError(() => of([]))
     );
   }
+
+  getAllFamilyOptions(): Observable<{ member: FamilyOption[]; servant: FamilyOption[]; khors: FamilyOption[]; attendKhors: FamilyOption[] }> {
+    if (!this.isBrowser) return of({ member: [], servant: [], khors: [], attendKhors: [] });
+    return this.http.get<{ member: FamilyOption[]; servant: FamilyOption[]; khors: FamilyOption[]; attendKhors: FamilyOption[] }>(
+      `${this.baseUrl}/family-options-all`, { withCredentials: true }
+    ).pipe(
+      catchError(() => of({ member: [], servant: [], khors: [], attendKhors: [] }))
+    );
+  }
 }

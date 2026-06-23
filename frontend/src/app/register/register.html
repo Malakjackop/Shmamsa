@@ -11,10 +11,10 @@
       <!-- ── Dynamic Ordering Wrapper ────────────────────────────────────── -->
       <div class="input-row flex-wrap-row" style="width: 100%;">
         <ng-container *ngFor="let f of orderedFields">
-          <ng-container *ngIf="isFieldVisible(f)" [ngSwitch]="f.fieldKey">
+          <ng-container *ngIf="isFieldVisible(f)">
 
             <!-- fullName -->
-            <ng-container *ngSwitchCase="'fullName'">
+            <ng-container *ngIf="f.fieldKey === 'fullName'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('fullName', 'الاسم بالكامل بالعربي') }}<span class="required-star" *ngIf="fieldRequired('fullName', true)"> *</span></label>
                 <input *ngIf="!isSelectField('fullName')" type="text" formControlName="fullName"
@@ -28,7 +28,7 @@
             </ng-container>
 
             <!-- username -->
-            <ng-container *ngSwitchCase="'username'">
+            <ng-container *ngIf="f.fieldKey === 'username'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('username', 'اسم المستخدم') }}<span class="required-star" *ngIf="fieldRequired('username', true)"> *</span></label>
                 <input *ngIf="!isSelectField('username')" type="text" formControlName="username"
@@ -42,7 +42,7 @@
             </ng-container>
 
             <!-- phoneNumber -->
-            <ng-container *ngSwitchCase="'phoneNumber'">
+            <ng-container *ngIf="f.fieldKey === 'phoneNumber'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('phoneNumber', 'رقم الهاتف') }}</label>
                 <input *ngIf="!isSelectField('phoneNumber')" type="text" formControlName="phoneNumber"
@@ -56,7 +56,7 @@
             </ng-container>
 
             <!-- address -->
-            <ng-container *ngSwitchCase="'address'">
+            <ng-container *ngIf="f.fieldKey === 'address'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('address', 'العنوان') }}</label>
                 <input *ngIf="!isSelectField('address')" type="text" formControlName="address"
@@ -70,7 +70,7 @@
             </ng-container>
 
             <!-- nationalId -->
-            <ng-container *ngSwitchCase="'nationalId'">
+            <ng-container *ngIf="f.fieldKey === 'nationalId'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('nationalId', 'الرقم القومي') }}<span class="required-star" *ngIf="fieldRequired('nationalId', true)"> *</span></label>
                 <input *ngIf="!isSelectField('nationalId')" type="text" formControlName="nationalId" name="national-id" autocomplete="off"
@@ -85,7 +85,7 @@
             </ng-container>
 
             <!-- email -->
-            <ng-container *ngSwitchCase="'email'">
+            <ng-container *ngIf="f.fieldKey === 'email'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('email', 'البريد الإلكتروني') }}<span class="required-star" *ngIf="fieldRequired('email', true)"> *</span></label>
                 <input *ngIf="!isSelectField('email')" type="email" formControlName="email"
@@ -99,7 +99,7 @@
             </ng-container>
 
             <!-- dateOfBirth -->
-            <ng-container *ngSwitchCase="'dateOfBirth'">
+            <ng-container *ngIf="f.fieldKey === 'dateOfBirth'">
               <div class="input-group small">
                 <label class="field-label">تاريخ الميلاد</label>
                 <input type="date" readonly formControlName="dateOfBirth" class="locked-derived" autocomplete="off" tabindex="-1" />
@@ -107,7 +107,7 @@
             </ng-container>
 
             <!-- gender -->
-            <ng-container *ngSwitchCase="'gender'">
+            <ng-container *ngIf="f.fieldKey === 'gender'">
               <div class="input-group small">
                 <label class="field-label">النوع</label>
                 <input type="text" formControlName="gender" class="locked-derived" autocomplete="off" tabindex="-1" />
@@ -115,7 +115,7 @@
             </ng-container>
 
             <!-- deaconDegree -->
-            <ng-container *ngSwitchCase="'deaconDegree'">
+            <ng-container *ngIf="f.fieldKey === 'deaconDegree'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('deaconDegree', 'ما هي رتبة الشماس؟') }}<span class="required-star" *ngIf="fieldRequired('deaconDegree', true)"> *</span></label>
                 <input *ngIf="!isSelectField('deaconDegree')" type="text" formControlName="deaconDegree"
@@ -131,7 +131,7 @@
             </ng-container>
 
             <!-- deaconFamily -->
-            <ng-container *ngSwitchCase="'deaconFamily'">
+            <ng-container *ngIf="f.fieldKey === 'deaconFamily'">
               <div class="input-group small" *ngIf="!isServant">
                 <label class="field-label">{{ fieldLabel('deaconFamily', 'الأسرة') }}<span class="required-star" *ngIf="fieldRequired('deaconFamily', true)"> *</span></label>
                 <select formControlName="deaconFamily" (change)="markTouchedFromList('deaconFamily')">
@@ -143,7 +143,7 @@
             </ng-container>
 
             <!-- khors -->
-            <ng-container *ngSwitchCase="'khors'">
+            <ng-container *ngIf="f.fieldKey === 'khors'">
               <div class="input-group small" *ngIf="!isServant">
                 <label class="field-label">{{ fieldLabel('khors', 'الخورس') }}<span class="required-star" *ngIf="fieldRequired('khors', true)"> *</span></label>
                 <select formControlName="khors" (change)="markTouchedFromList('khors')">
@@ -156,8 +156,22 @@
               </div>
             </ng-container>
 
+            <!-- khorsYear -->
+            <ng-container *ngIf="f.fieldKey === 'khorsYear'">
+              <div class="input-group small">
+                <label class="field-label">{{ fieldLabel('khorsYear', 'سنة الخورس') }}<span class="required-star" *ngIf="fieldRequired('khorsYear', true)"> *</span></label>
+                <input *ngIf="!isSelectField('khorsYear')" type="text" formControlName="khorsYear"
+                       (click)="markInteracted('khorsYear')" (blur)="markTouched('khorsYear')" />
+                <select *ngIf="isSelectField('khorsYear')" formControlName="khorsYear" (change)="markTouchedFromList('khorsYear')">
+                  <option value="" disabled>{{ fieldLabel('khorsYear', 'سنة الخورس') }}</option>
+                  <option *ngFor="let opt of fieldOptions('khorsYear')" [value]="opt">{{ opt }}</option>
+                </select>
+                <small class="error-text" *ngIf="shouldShowError('khorsYear')">{{ errorText('khorsYear','سنة الخورس') }}</small>
+              </div>
+            </ng-container>
+
             <!-- servingWhere -->
-            <ng-container *ngSwitchCase="'servingWhere'">
+            <ng-container *ngIf="f.fieldKey === 'servingWhere'">
               <div class="input-group small" *ngIf="isServant">
                 <label class="field-label">{{ fieldLabel('servingWhere', 'بتخدم فين؟') }}<span class="required-star" *ngIf="fieldRequired('servingWhere', true)"> *</span></label>
                 <select
@@ -173,7 +187,7 @@
             </ng-container>
 
             <!-- attendKhors -->
-            <ng-container *ngSwitchCase="'attendKhors'">
+            <ng-container *ngIf="f.fieldKey === 'attendKhors'">
               <div class="input-group small" *ngIf="isServant && servingWhereValue && !isKhorsServingWhere()">
                 <label class="field-label">{{ fieldLabel('attendKhors', 'بحضر في انهي خورس؟') }}<span class="required-star" *ngIf="fieldRequired('attendKhors', true)"> *</span></label>
                 <select formControlName="attendKhors" (change)="markTouchedFromList('attendKhors')">
@@ -193,7 +207,7 @@
             </ng-container>
 
             <!-- status -->
-            <ng-container *ngSwitchCase="'status'">
+            <ng-container *ngIf="f.fieldKey === 'status'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('status', 'اختر الحالة') }}<span class="required-star" *ngIf="fieldRequired('status', true)"> *</span></label>
                 <input *ngIf="!isSelectField('status')" type="text" formControlName="status"
@@ -207,7 +221,7 @@
             </ng-container>
 
             <!-- graduatedFrom -->
-            <ng-container *ngSwitchCase="'graduatedFrom'">
+            <ng-container *ngIf="f.fieldKey === 'graduatedFrom'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('graduatedFrom', 'تخرج من (مثال: اسم الجامعة)') }}</label>
                 <input *ngIf="!isSelectField('graduatedFrom')" type="text" formControlName="graduatedFrom"
@@ -221,7 +235,7 @@
             </ng-container>
 
             <!-- graduateJob -->
-            <ng-container *ngSwitchCase="'graduateJob'">
+            <ng-container *ngIf="f.fieldKey === 'graduateJob'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('graduateJob', 'الوظيفة الحالية') }}</label>
                 <input *ngIf="!isSelectField('graduateJob')" type="text" formControlName="graduateJob"
@@ -235,7 +249,7 @@
             </ng-container>
 
             <!-- studyType -->
-            <ng-container *ngSwitchCase="'studyType'">
+            <ng-container *ngIf="f.fieldKey === 'studyType'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('studyType', 'الدراسة في') }}<span class="required-star" *ngIf="fieldRequired('studyType', true)"> *</span></label>
                 <input *ngIf="!isSelectField('studyType')" type="text" formControlName="studyType"
@@ -249,7 +263,7 @@
             </ng-container>
 
             <!-- schoolName -->
-            <ng-container *ngSwitchCase="'schoolName'">
+            <ng-container *ngIf="f.fieldKey === 'schoolName'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('schoolName', 'اسم المدرسة') }}</label>
                 <input *ngIf="!isSelectField('schoolName')" type="text" formControlName="schoolName"
@@ -263,7 +277,7 @@
             </ng-container>
 
             <!-- schoolGrade -->
-            <ng-container *ngSwitchCase="'schoolGrade'">
+            <ng-container *ngIf="f.fieldKey === 'schoolGrade'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('schoolGrade', 'اختر الصف') }}<span class="required-star" *ngIf="fieldRequired('schoolGrade', true)"> *</span></label>
                 <input *ngIf="!isSelectField('schoolGrade')" type="text" formControlName="schoolGrade"
@@ -277,7 +291,7 @@
             </ng-container>
 
             <!-- otherGrade -->
-            <ng-container *ngSwitchCase="'otherGrade'">
+            <ng-container *ngIf="f.fieldKey === 'otherGrade'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('otherGrade', 'اكتب الصف الدراسي') }}</label>
                 <input *ngIf="!isSelectField('otherGrade')" type="text"
@@ -292,7 +306,7 @@
             </ng-container>
 
             <!-- universityName -->
-            <ng-container *ngSwitchCase="'universityName'">
+            <ng-container *ngIf="f.fieldKey === 'universityName'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('universityName', 'اسم الجامعة') }}<span class="required-star" *ngIf="fieldRequired('universityName', true)"> *</span></label>
                 <input *ngIf="!isSelectField('universityName')" type="text" formControlName="universityName"
@@ -306,7 +320,7 @@
             </ng-container>
 
             <!-- faculty -->
-            <ng-container *ngSwitchCase="'faculty'">
+            <ng-container *ngIf="f.fieldKey === 'faculty'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('faculty', 'الكلية') }}<span class="required-star" *ngIf="fieldRequired('faculty', true)"> *</span></label>
                 <input *ngIf="!isSelectField('faculty')" type="text" formControlName="faculty"
@@ -320,7 +334,7 @@
             </ng-container>
 
             <!-- universityGrade -->
-            <ng-container *ngSwitchCase="'universityGrade'">
+            <ng-container *ngIf="f.fieldKey === 'universityGrade'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('universityGrade', 'السنة/الفرقة') }}<span class="required-star" *ngIf="fieldRequired('universityGrade', true)"> *</span></label>
                 <input *ngIf="!isSelectField('universityGrade')" type="text" formControlName="universityGrade"
@@ -334,7 +348,7 @@
             </ng-container>
 
             <!-- isWorking -->
-            <ng-container *ngSwitchCase="'isWorking'">
+            <ng-container *ngIf="f.fieldKey === 'isWorking'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('isWorking', 'هل تعمل؟') }}<span class="required-star" *ngIf="fieldRequired('isWorking', true)"> *</span></label>
                 <select formControlName="isWorking" (change)="markTouchedFromList('isWorking')">
@@ -347,7 +361,7 @@
             </ng-container>
 
             <!-- workDetails -->
-            <ng-container *ngSwitchCase="'workDetails'">
+            <ng-container *ngIf="f.fieldKey === 'workDetails'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('workDetails', 'ما هي وظيفتك؟') }}</label>
                 <input type="text" formControlName="workDetails"
@@ -357,7 +371,7 @@
             </ng-container>
 
             <!-- guardiansPhone -->
-            <ng-container *ngSwitchCase="'guardiansPhone'">
+            <ng-container *ngIf="f.fieldKey === 'guardiansPhone'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('guardiansPhone', 'هاتف ولي الأمر') }}<span class="required-star" *ngIf="fieldRequired('guardiansPhone', true)"> *</span></label>
                 <input *ngIf="!isSelectField('guardiansPhone')" type="text" formControlName="guardiansPhone"
@@ -371,7 +385,7 @@
             </ng-container>
 
             <!-- guardianRelation -->
-            <ng-container *ngSwitchCase="'guardianRelation'">
+            <ng-container *ngIf="f.fieldKey === 'guardianRelation'">
               <div class="input-group small">
                 <label class="field-label">{{ fieldLabel('guardianRelation', 'مين صاحب رقم ولي الأمر؟') }}</label>
                 <input *ngIf="!isSelectField('guardianRelation')" type="text" formControlName="guardianRelation"
@@ -385,7 +399,7 @@
             </ng-container>
 
             <!-- ── Dynamic Custom Fields ────────────────────────────────────── -->
-            <ng-container *ngSwitchDefault>
+            <ng-container *ngIf="!f.isSystem">
               <div class="input-group small" *ngIf="!f.isSystem">
                 <label class="field-label">{{ f.labelAr }}<span class="required-star" *ngIf="customFieldRequired(f)"> *</span></label>
                 <input *ngIf="f.fieldType === 'TEXT'"
