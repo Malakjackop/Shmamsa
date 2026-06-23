@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, HostListener } from '@angular/core';
 import { FamilyService } from '../services/family.service';
 import { AuthService, FamilyOption } from '../services/auth.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
@@ -50,6 +50,20 @@ export class TransferMembersComponent implements OnInit {
   selecting = false;
   selectedIds = new Set<number>();
 
+  transferredMap = new Map<number, Set<string>>();
+
+  get hasPendingTransfers(): boolean {
+    return this.transferredMap.size > 0;
+  }
+
+  pendingMainMembers: Member[] = [];
+
+  get totalPending(): number {
+    let count = this.pendingMainMembers.length;
+    this.extraFamilies.forEach(ef => count += ef.members.length);
+    return count;
+  }
+
   private readonly preferredFamilyOrder = DEFAULT_FAMILY_ORDER;
 
   /** fallback only when family-options is unavailable */
@@ -91,18 +105,45 @@ marmarkosYearTargets: { label: string; value: string }[] = [
 ];
 
 familyRequestTargets: { label: string; value: string }[] = [
-  { label: 'طلب نقل لخورس مارمرقس', value: 'KHORS_REQUEST:MARMARKOS' }
+  { label: 'طلب نقل لخورس مارمرقس', value: 'KHORS_REQUEST:MARMARKOS' },
+  { label: 'طلب نقل لخورس البابا اثناسيوس', value: 'KHORS_REQUEST:ATHANASIUS' }
 ];
 
   mode: TransferMode = 'MAKHDOM';
   selectedFamilyView = '';
   targetFamily = '';
-  extraFamilies: Array<{ family: string; role: 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'MAKHDOM' }> = [];
-  targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'KHADIM';
+  servantSourceFamily = '';
+
+  get filteredMembers(): Member[] {
+    if (this.mode !== 'SERVANT' || !this.isAminKhedmaOrDev()) return this.members;
+    let list = this.members;
+    if (this.servantSourceFamily) {
+      list = list.filter(m => {
+        const fams = this.assignmentsOf(m).map(x => x.familyName);
+        return fams.includes(this.servantSourceFamily);
+      });
+    }
+    const ok = new Set(['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA']);
+    return list.filter(m => ok.has(normalizeRole(m.role)));
+  }
+  extraFamilies: Array<{ family: string; role: 'KHADIM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' | 'MAKHDOM'; members: number[] }> = [];
+  targetRole: 'KHADIM' | 'MAKHDOM' | 'AMIN_OSRA' | 'AMIN_KHEDMA' = 'MAKHDOM';
 
   targetFamilyMembers: Member[] = [];
+
+  get displayTargetMembers(): Member[] {
+    if (this.mode === 'SERVANT') {
+      const ok = new Set(['KHADIM', 'AMIN_OSRA', 'AMIN_KHEDMA']);
+      return this.targetFamilyMembers.filter(m => ok.has(normalizeRole(m.role)));
+    }
+    return this.targetFamilyMembers;
+  }
   targetFamilyLoading = false;
   private targetFamilyCache = new Map<string, Member[]>();
+
+  distributionOpen = false;
+  distributionFamilies: string[] = [];
+  distributionData: Array<{ servant: Member; assignments: Array<{ targetFamily: string; targetRole: string; pending?: boolean }> }> = [];
 
   ngOnInit() {
     this.auth.getUserData(true).subscribe({
@@ -151,21 +192,19 @@ familyRequestTargets: { label: string; value: string }[] = [
     if (this.isAminKhedmaOrDev()) {
       this.mode = 'MAKHDOM';
       this.selectedFamilyView = '';
-      this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
-      this.targetRole = 'KHADIM';
+      this.targetRole = 'MAKHDOM';
       return;
     }
 
     if (this.isKhadim()) {
   this.mode = 'MAKHDOM';
   this.selectedFamilyView = '';
-  this.targetFamily = this.makhdomFamilies[0] || '';
   return;
 }
 
     this.mode = 'MAKHDOM';
     this.selectedFamilyView = '';
-    this.targetFamily = this.makhdomFamilies.find(x => x !== mineBase) || (this.makhdomFamilies[0] || '');
+    this.targetRole = 'MAKHDOM';
   }
 
   private canonicalFamilyName(value: any): string {
@@ -232,6 +271,7 @@ familyRequestTargets: { label: string; value: string }[] = [
         this.loadMembers();
         this.prefetchServants();
         this.loadTargetFamilyMembers();
+        this.loadTransferredMap();
       },
       error: () => {
         this.servantFamilies = this.sortFamiliesByPreferredOrder(this.servantFamilies);
@@ -470,16 +510,15 @@ removeFromChoir(m: Member) {
 
 
   onModeChange() {
-    this.cancelSelecting();
+    this.pendingMainMembers = [];
+    this.extraFamilies = [];
     this.targetFamilyMembers = [];
     this.targetFamilyCache.clear();
 
     if (this.mode === 'MAKHDOM') {
       this.selectedFamilyView = this.selectedFamilyView || (this.servantFamilies[0] || '');
-      this.targetFamily = this.targetFamily || (this.makhdomFamilies[0] || '');
+      this.targetRole = 'MAKHDOM';
     } else {
-      this.targetFamily = this.servantFamilies[0] || '';
-      this.extraFamilies = [];
       this.targetRole = 'KHADIM';
     }
 
@@ -488,48 +527,79 @@ removeFromChoir(m: Member) {
   }
 
   onFamilyViewChange() {
-    this.cancelSelecting();
-    if (this.isMarmarkosView()) {
-  this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
-}
     this.loadMembers();
   }
 
-  startTransfer() {
-    if (this.isMarmarkosView()) {
-  this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
-}
-    this.selecting = true;
-    this.selectedIds = new Set(this.members.map((m) => m.id));
+  saveAll() {
+    const mainIds = this.pendingMainMembers.map(m => m.id);
+    const extraAssignments = this.extraFamilies
+      .filter(ef => ef.family && ef.members.length)
+      .map(ef => ({
+        family: ef.family,
+        role: ef.role || 'KHADIM'
+      }));
+
+    if (!mainIds.length && !extraAssignments.length) return;
+
+    mainIds.forEach(id => this.trackTransfer(id, this.targetFamily));
+    this.extraFamilies.forEach(ef => {
+      if (ef.family) ef.members.forEach(mId => this.trackTransfer(mId, ef.family));
+    });
+    this.saveTransferredMap();
+
+    this.message.add({ severity: 'success', summary: 'تم الحفظ', detail: `تم حفظ التوزيع مؤقتاً، اضغط "نقل" لتأكيد النقل` });
+    this.pendingMainMembers = [];
+    this.extraFamilies.forEach(ef => ef.members = []);
   }
 
-  cancelSelecting() {
-    this.selecting = false;
-    this.selectedIds.clear();
-  }
+  executeAll() {
+    if (this.totalPending === 0) return;
 
-  toggleMember(id: number, checked: boolean) {
-    if (checked) this.selectedIds.add(id);
-    else this.selectedIds.delete(id);
-  }
+    const count = this.totalPending;
+    const targetLabel = this.targetFamily || 'الأسرة الهدف';
+    const msg = `نقل ${count} خادم الي "${targetLabel}"؟`;
 
-  selectMemberForTransfer(member: Member) {
-    if (this.selectedIds.has(member.id)) return;
-    if (!this.selecting) {
-      this.selecting = true;
-      if (this.isMarmarkosView()) {
-        this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
+    this.confirm.confirm({
+      header: 'تأكيد النقل',
+      message: msg,
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'نقل',
+      rejectLabel: 'الغاء',
+      accept: () => {
+        const mainIds = this.pendingMainMembers.map(m => m.id);
+        const roleToSend = this.isAminKhedmaOrDev() ? this.targetRole : undefined;
+        const extraAssignments = this.extraFamilies
+          .filter(ef => ef.family && ef.members.length)
+          .map(ef => ({ family: ef.family, role: ef.role || 'KHADIM' }));
+
+        this.familySvc.transferMembers(
+          mainIds,
+          this.targetFamily,
+          roleToSend,
+          undefined,
+          extraAssignments.length ? extraAssignments : undefined,
+          ''
+        ).subscribe({
+          next: (res) => {
+            const updated = res?.updated ?? 0;
+            mainIds.forEach(id => this.trackTransfer(id, this.targetFamily));
+            this.extraFamilies.forEach(ef => {
+              if (ef.family) ef.members.forEach(mId => this.trackTransfer(mId, ef.family));
+            });
+            this.message.add({ severity: 'success', summary: 'تم النقل', detail: `تم نقل ${updated} خادم` });
+            this.pendingMainMembers = [];
+            this.extraFamilies.forEach(ef => ef.members = []);
+            this.loadMembers();
+            this.loadTargetFamilyMembers();
+            this.transferredMap.clear();
+            localStorage.removeItem('transfer_pending');
+          },
+          error: (err) => {
+            this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل النقل' });
+          }
+        });
       }
-    }
-    this.selectedIds.add(member.id);
-  }
-
-  isMemberSelected(member: Member): boolean {
-    return this.selectedIds.has(member.id);
-  }
-
-  selectedMembers(): Member[] {
-    return this.members.filter((member) => this.selectedIds.has(member.id));
+    });
   }
 
   extraDropListIds(): string[] {
@@ -543,71 +613,107 @@ removeFromChoir(m: Member) {
   onMemberDrop(event: CdkDragDrop<Member[]>) {
     const member = event.item.data as Member | undefined;
     if (!member?.id) return;
-    if (!this.selecting) {
-      this.selecting = true;
-      this.selectedIds.clear();
-      if (this.isMarmarkosView()) {
-        this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
-      }
+
+    const targetFam = String(this.targetFamily || '').trim();
+    if (!targetFam) {
+      this.message.add({ severity: 'warn', summary: 'اختار اسره', detail: 'برجاء اختيار الأسرة الهدف أولاً' });
+      return;
     }
-    if (this.selectedIds.has(member.id)) return;
-    this.selectedIds.add(member.id);
+
+    if (this.pendingMainMembers.find(m => m.id === member.id)) {
+      this.message.add({ severity: 'info', summary: 'موجود', detail: 'العضو موجود بالفعل في قائمة النقل' });
+      return;
+    }
+
+    this.pendingMainMembers.push(member);
+  }
+
+  removePendingMain(memberId: number) {
+    this.pendingMainMembers = this.pendingMainMembers.filter(m => m.id !== memberId);
   }
 
   onExtraFamilyDrop(event: CdkDragDrop<Member[]>, index: number) {
     if (!this.extraFamilies[index]) return;
-    this.onMemberDrop(event);
+    const member = event.item.data as Member | undefined;
+    if (!member?.id) return;
+
+    const targetFam = String(this.extraFamilies[index]?.family || '').trim();
+    if (!targetFam) {
+      this.message.add({ severity: 'warn', summary: 'اختار أسرة', detail: 'برجاء اختيار أسرة إضافية أولاً' });
+      return;
+    }
+
+    const panel = this.extraFamilies[index];
+    if (panel.members.includes(member.id)) {
+      this.message.add({ severity: 'info', summary: 'موجود', detail: 'العضو موجود بالفعل في هذه الأسرة' });
+      return;
+    }
+
+    this.extraFamilies.forEach((p, idx) => {
+      if (idx !== index) p.members = p.members.filter(id => id !== member.id);
+    });
+    panel.members.push(member.id);
   }
 
-  doTransfer() {
-    if (!this.targetFamily) {
-      this.message.add({ severity: 'warn', summary: 'اختار اسره', detail: 'برجاء اختيار الاسره.' });
-      return;
+  removeExtraFamilyMember(extraIdx: number, memberId: number) {
+    const panel = this.extraFamilies[extraIdx];
+    if (!panel) return;
+    panel.members = panel.members.filter(id => id !== memberId);
+  }
+
+  private trackTransfer(memberId: number, family: string) {
+    if (!this.transferredMap.has(memberId)) {
+      this.transferredMap.set(memberId, new Set());
     }
+    this.transferredMap.get(memberId)!.add(family);
+  }
 
-    if (this.isAminKhedmaOrDev() && this.mode === 'SERVANT' && !this.targetRole) {
-      this.message.add({ severity: 'warn', summary: 'اختار الدور', detail: 'برجاء اختيار الدور ' });
-      return;
-    }
-
-    if (!this.selectedIds.size) {
-      this.message.add({ severity: 'warn', summary: 'برجاء التحديد', detail: 'برجاء اختيار عضو واحد علي الاقل' });
-      return;
-    }
-
-    const ids = Array.from(this.selectedIds);
-    const roleLabel = this.getRoleLabel(this.targetRole);
-
-    const msg = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
-      ? `تريد نقل  ${ids.length} مستخدم الي  "${this.targetFamily}" بدور  "${roleLabel}"؟`
-      : `نقل ${ids.length} مستخدم الي  "${this.targetFamily}"؟`;
-
-    this.confirm.confirm({
-      header: 'تأكيد التحويل',
-      message: msg,
-      icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'نقل',
-      rejectLabel: 'الغاء',
-      accept: () => {
-        const roleToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT') ? this.targetRole : undefined;
-        const extraAssignmentsToSend = (this.isAminKhedmaOrDev() && this.mode === 'SERVANT')
-          ? this.extraFamilies
-              .map(x => ({ family: String(x?.family || '').trim(), role: String(x?.role || 'KHADIM').trim().toUpperCase() }))
-              .filter(x => !!x.family)
-          : undefined;
-        this.familySvc.transferMembers(ids, this.targetFamily, roleToSend, undefined, extraAssignmentsToSend, this.selectedFamilyView).subscribe({
-          next: (res) => {
-            const updated = res?.updated ?? 0;
-            this.message.add({ severity: 'success', summary: 'نجح', detail: `تم نقل: ${updated}` });
-            this.cancelSelecting();
-            this.loadMembers();
-          },
-          error: (err) => {
-            this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل النقل' });
-          }
-        });
-      }
+  private saveTransferredMap() {
+    const obj: Record<number, string[]> = {};
+    this.transferredMap.forEach((families, id) => {
+      obj[id] = Array.from(families);
     });
+    localStorage.setItem('transfer_pending', JSON.stringify(obj));
+  }
+
+  private loadTransferredMap() {
+    try {
+      const raw = localStorage.getItem('transfer_pending');
+      if (!raw) return;
+      const obj = JSON.parse(raw) as Record<number, string[]>;
+      this.transferredMap.clear();
+      for (const [id, families] of Object.entries(obj)) {
+        this.transferredMap.set(Number(id), new Set(families));
+      }
+    } catch {
+      localStorage.removeItem('transfer_pending');
+    }
+  }
+
+  transferredFamilies(memberId: number): string[] {
+    return Array.from(this.transferredMap.get(memberId) || []);
+  }
+
+  transferredCount(memberId: number): number {
+    return this.transferredMap.get(memberId)?.size ?? 0;
+  }
+
+  availableMainFamilies(): string[] {
+    return this.servantFamilies.filter(f => f !== this.selectedFamilyView);
+  }
+
+  availableTargetFamilies(): string[] {
+    const exclude = this.mode === 'MAKHDOM' ? this.selectedFamilyView : this.selectedFamilyView;
+    return this.makhdomFamilies.filter(f => f !== exclude);
+  }
+
+  extraFamilyOptions(extraIdx: number): string[] {
+    const used = new Set<string>();
+    if (this.targetFamily) used.add(this.targetFamily);
+    this.extraFamilies.forEach((ef, idx) => {
+      if (ef.family && idx !== extraIdx) used.add(ef.family);
+    });
+    return this.servantFamilies.filter(f => !used.has(f));
   }
 
   canAddExtraFamily(): boolean {
@@ -663,11 +769,20 @@ private getServedFamilies(): string[] {
 
   addExtraFamily() {
     if (!this.canAddExtraFamily()) return;
-    this.extraFamilies.push({ family: '', role: 'KHADIM' });
+    this.extraFamilies.push({ family: '', role: 'KHADIM', members: [] });
+  }
+
+  setMode(m: TransferMode) {
+    this.mode = m;
+    this.onModeChange();
   }
 
   removeExtraFamily(idx: number) {
     this.extraFamilies.splice(idx, 1);
+  }
+
+  getMemberById(id: number): Member | undefined {
+    return this.members.find(m => m.id === id);
   }
 
   private countExtras(m: Member): number {
@@ -706,11 +821,145 @@ private getServedFamilies(): string[] {
   }
 
   showRoleSelector(): boolean {
-    return this.isAminKhedmaOrDev() && this.mode === 'SERVANT';
+    return this.isAminKhedmaOrDev();
   }
 
   onTargetFamilyChange() {
     this.loadTargetFamilyMembers();
+  }
+
+  openDistribution() {
+    this.distributionOpen = true;
+    this.distributionFamilies = [...this.servantFamilies];
+    const buildData = (list: Member[]) => list.map(s => {
+      const existing = this.assignmentsOf(s)
+        .filter(x => !this.isChoirBucket(x.familyName))
+        .map(x => ({ targetFamily: x.familyName, targetRole: x.role, pending: false }));
+      const transferredFamilies = this.transferredMap.get(s.id);
+      const transfers = transferredFamilies
+        ? Array.from(transferredFamilies).map(fam => ({ targetFamily: fam, targetRole: 'KHADIM', pending: true }))
+        : [];
+      const combined = [...existing];
+      for (const t of transfers) {
+        if (!combined.some(c => c.targetFamily === t.targetFamily)) {
+          combined.push(t);
+        }
+      }
+      return { servant: s, assignments: combined };
+    });
+    const key = this.memberCacheKey('SERVANTS', 'SERVANT');
+    const cached = this.memberCache.get(key);
+    if (cached) {
+      this.distributionData = buildData(cached);
+      return;
+    }
+    this.familySvc.members('SERVANTS').subscribe({
+      next: (m: any) => {
+        this.distributionData = buildData(m || []);
+      },
+      error: () => { this.distributionData = []; }
+    });
+  }
+
+  closeDistribution() {
+    this.distributionOpen = false;
+    this.distributionData = [];
+    this.distributionFamilies = [];
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.distributionOpen) {
+      this.closeDistribution();
+    }
+  }
+
+  isDistPending(s: Member, fam: string): boolean {
+    for (const item of this.distributionData) {
+      if (item.servant.id === s.id) {
+        return item.assignments.some(a => a.targetFamily === fam && a.pending);
+      }
+    }
+    return false;
+  }
+
+  getDistServantsForFamily(fam: string): Member[] {
+    const seen = new Set<number>();
+    const result: Member[] = [];
+    for (const item of this.distributionData) {
+      for (const a of item.assignments) {
+        if (a.targetFamily === fam && !seen.has(item.servant.id)) {
+          seen.add(item.servant.id);
+          result.push(item.servant);
+        }
+      }
+    }
+    return result;
+  }
+
+  getDistServantRole(s: Member): string {
+    for (const item of this.distributionData) {
+      if (item.servant.id === s.id && item.assignments.length) {
+        return item.assignments[0].targetRole;
+      }
+    }
+    return s.role;
+  }
+
+  addDistAssignment(idx: number) {
+    if (this.distributionData[idx]) {
+      this.distributionData[idx].assignments.push({ targetFamily: '', targetRole: 'KHADIM', pending: true });
+    }
+  }
+
+  removeDistAssignment(idx: number, aidx: number) {
+    if (this.distributionData[idx]?.assignments.length > 1) {
+      this.distributionData[idx].assignments.splice(aidx, 1);
+    }
+  }
+
+  saveDistribution() {
+    const calls: ReturnType<typeof this.familySvc.transferMembers>[] = [];
+
+    for (const item of this.distributionData) {
+      const valid = item.assignments.filter(a => a.targetFamily && a.pending);
+      if (!valid.length) continue;
+
+      const memberIds = [item.servant.id];
+      const primary = valid[0];
+      const extras = valid.slice(1).map(a => ({
+        family: String(a.targetFamily).trim(),
+        role: String(a.targetRole).trim().toUpperCase()
+      }));
+
+      calls.push(
+        this.familySvc.transferMembers(
+          memberIds,
+          primary.targetFamily,
+          primary.targetRole,
+          undefined,
+          extras.length ? extras : undefined,
+          this.selectedFamilyView
+        )
+      );
+    }
+
+    if (!calls.length) {
+      this.message.add({ severity: 'warn', summary: 'لا يوجد تغييرات', detail: 'لم يتم تحديد أي أسر' });
+      return;
+    }
+
+    forkJoin(calls).subscribe({
+      next: () => {
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ التوزيعة' });
+        this.memberCache.delete(this.memberCacheKey('SERVANTS', 'SERVANT'));
+        this.closeDistribution();
+        this.loadMembers();
+      },
+      error: (err) => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل في الحفظ' });
+      }
+    });
   }
 
   private loadTargetFamilyMembers() {
