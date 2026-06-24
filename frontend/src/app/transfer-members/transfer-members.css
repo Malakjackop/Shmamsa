@@ -643,6 +643,29 @@ select:focus {
   transform: translateY(-50%);
 }
 
+.memberRemove--unassign {
+  background: #fff0ee;
+  color: #c0392b;
+}
+
+.memberRemove--unassign:hover {
+  background: #fde0dc;
+}
+
+.removalPendingBadge {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: #c0392b;
+  border-radius: 6px;
+  padding: 2px 7px;
+  pointer-events: none;
+}
+
 .dropPanel {
   display: flex;
   flex-direction: column;
@@ -1361,19 +1384,20 @@ select:focus {
 }
 
 .dist-families {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
   flex: 1;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  align-content: start;
 }
 
 .dist-fam-section {
   background: #f7f3ec;
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px;
 }
 
 .dist-fam-title {
@@ -1388,25 +1412,25 @@ select:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
+  padding: 4px 6px;
   border-radius: 6px;
   background: #fff;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .dist-fam-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #2b201b;
 }
 
 .dist-fam-role {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #8a6f64;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dist-pending-badge {
@@ -1564,7 +1588,178 @@ select:focus {
   white-space: nowrap;
   transform: translateY(-50%);
   direction: ltr;
+  cursor: pointer;
 }
 .transferBadge i {
   font-size: 12px;
+}
+
+/* Smaller نقل button in extrasInline */
+.extrasInline .transferBtn--execute {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+  flex: none;
+}
+
+/* Kirillos choir fixed panel */
+.kirillosChoirPanel {
+  min-width: 160px;
+  max-width: 200px;
+  flex-shrink: 0;
+}
+
+.kirillosChoirTitle {
+  color: #5d443b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  padding: 6px 8px;
+  background: #edf5e8;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid #c8e0bd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.kirillosChoirBody {
+  min-height: 80px;
+  border-radius: 0 0 8px 8px;
+  background: #f4faf1 !important;
+}
+
+.selectedItem--choir {
+  background: #edf5e8 !important;
+  border-color: #c8e0bd !important;
+  grid-template-columns: minmax(0,1fr) !important;
+}
+
+/* Year filter tabs for خورس مارمرقس */
+.yearFilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.yearBtn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #d6c8ba;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #f5f1ec;
+  color: #7a655d;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.yearBtn.active {
+  background: #6f3b30;
+  color: #fff;
+  border-color: #6f3b30;
+}
+
+.yearBtn:not(.active):hover {
+  background: #eadfd3;
+}
+
+/* Year filter for Marmarkos source */
+.yearFilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 0 4px;
+}
+
+.yearFilterBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #d4c4b8;
+  border-radius: 20px;
+  background: #f5f0eb;
+  color: #5a3d33;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.yearFilterBtn:hover {
+  background: #eadfd3;
+}
+
+.yearFilterBtn.active {
+  background: #6f3b30;
+  color: #fff;
+  border-color: #6f3b30;
+}
+
+/* Select all button */
+.sourceActions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.selectAllBtn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #d6c8ba;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #f5f1ec;
+  color: #6f3b30;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.selectAllBtn:hover {
+  background: #eadfd3;
+}
+
+.selectAllBtn--active {
+  background: #6f3b30 !important;
+  color: #fff !important;
+  border-color: #6f3b30 !important;
+}
+
+.selectAllBtn--active:hover {
+  background: #5a2f25 !important;
+}
+
+/* Remove/undo button for existing members in target panel */
+.existingRemoveBtn {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: #efe4da;
+  color: #6f3b30;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.existingRemoveBtn:hover {
+  background: #e0d0c5;
+}
+
+.selectedItem--existing {
+  grid-template-columns: 24px minmax(0, 1fr) !important;
+}
+
+/* Member freed from target family shows with dashed border */
+.memberItem--freed {
+  border: 1px dashed #b08070 !important;
+  background: #f9f0eb !important;
 }

@@ -21,12 +21,17 @@
             <button type="button" class="modeBtn" [class.active]="mode === 'MAKHDOM'" (click)="setMode('MAKHDOM')">مخدوم</button>
             <button type="button" class="modeBtn" [class.active]="mode === 'SERVANT'" (click)="setMode('SERVANT')">خادم</button>
           </div>
-          <div class="extrasInline" *ngIf="mode === 'SERVANT'">
-            <button type="button" class="addFamilyBtn" (click)="addExtraFamily()" [disabled]="!canAddExtraFamily()" title="إضافة أسرة">
-              <i class="pi pi-plus"></i> إضافة أسرة
-            </button>
-            <button type="button" class="distBtn" (click)="openDistribution()" title="توزيعة السنة">
-              <i class="pi pi-sitemap"></i> توزيعة السنة
+          <div class="extrasInline">
+            <ng-container *ngIf="mode === 'SERVANT'">
+              <button type="button" class="addFamilyBtn" (click)="addExtraFamily()" [disabled]="!canAddExtraFamily()" title="إضافة أسرة">
+                <i class="pi pi-plus"></i> إضافة أسرة
+              </button>
+              <button type="button" class="distBtn" (click)="openDistribution()" title="توزيعة السنة">
+                <i class="pi pi-sitemap"></i> توزيعة السنة
+              </button>
+            </ng-container>
+            <button type="button" class="transferBtn transferBtn--execute" (click)="executeAll()" [disabled]="totalPending === 0 && !hasPendingTransfers">
+              <i class="pi pi-send"></i> نقل
             </button>
           </div>
         </div>
@@ -51,6 +56,21 @@
             <div class="sourceTitle" *ngIf="!isAminKhedmaOrDev() && !isKhadim()">{{ selectedFamilyView || 'عرض الأعضاء' }}</div>
           </ng-template>
         </div>
+
+        <!-- Year filter for خورس مارمرقس source -->
+        <div class="yearFilter" *ngIf="isMarmarkosView()">
+          <button type="button" class="yearFilterBtn" [class.active]="selectedSourceYear === null" (click)="setSourceYear(null)">الكل</button>
+          <button type="button" class="yearFilterBtn" *ngFor="let yr of [1,2,3,4,5]" [class.active]="selectedSourceYear === yr" (click)="setSourceYear(yr)">سنة {{ yr }}</button>
+        </div>
+
+        <!-- Select all / deselect all button -->
+        <div class="sourceActions" *ngIf="(targetFamily || (isMarmarkosView() && targetMarmarkosYear)) && filteredSourceMembers.length">
+          <button type="button" class="selectAllBtn" [class.selectAllBtn--active]="allSelected" (click)="selectAll()">
+            <i class="pi" [class.pi-check-square]="!allSelected" [class.pi-times-circle]="allSelected"></i>
+            {{ allSelected ? 'مسح الكل' : 'اختر الكل' }}
+          </button>
+        </div>
+
         <div *ngIf="loading" class="hint memberLoadHint">جاري التحميل...</div>
           <div
             class="memberList"
@@ -60,18 +80,25 @@
             [cdkDropListData]="members"
             [cdkDropListConnectedTo]="connectedDropListIds()"
           >
-            <ng-container *ngIf="members.length; else noMembersTpl">
+            <ng-container *ngIf="filteredSourceMembers.length; else noMembersTpl">
               <div
                 class="memberItem"
-                *ngFor="let m of (mode === 'SERVANT' && isAminKhedmaOrDev() ? filteredMembers : members)"
+                [class.memberItem--freed]="removedFromTargetIds.has(m.id)"
+                *ngFor="let m of filteredSourceMembers"
                 cdkDrag
                 [cdkDragData]="m"
               >
                 <span class="dragHandle">⋮⋮</span>
                 <span class="memberName">{{ m.fullName }}</span>
                 <span class="memberMeta">{{ getRoleLabel(m.role) }} · {{ displayFamily(m) }}</span>
-                <span class="transferBadge" *ngIf="transferredCount(m.id) > 0">
-                  <i class="pi pi-check-circle"></i>
+                <span
+                  class="transferBadge"
+                  *ngIf="transferredCount(m.id) > 0"
+                  (click)="confirmRemoveFromFamily(m); $event.stopPropagation()"
+                  title="إزالة من الأسرة"
+                  aria-label="إزالة من الأسرة"
+                >
+                  <i class="pi pi-times"></i>
                   تم ({{ transferredCount(m.id) }})
                 </span>
                 <button
@@ -84,6 +111,20 @@
                 >
                   <i class="pi pi-trash"></i>
                 </button>
+                <!-- Remove servant from all families in SERVANT mode -->
+                <button
+                  type="button"
+                  class="memberRemove memberRemove--unassign"
+                  *ngIf="mode === 'SERVANT' && isAminKhedmaOrDev() && !pendingRemovals.has(m.id)"
+                  (click)="confirmRemoveFromFamily(m); $event.stopPropagation()"
+                  title="إزالة من الأسرة"
+                  aria-label="إزالة من الأسرة"
+                >
+                  <i class="pi pi-times"></i>
+                </button>
+                <span class="removalPendingBadge" *ngIf="mode === 'SERVANT' && pendingRemovals.has(m.id)">
+                  سيتشال
+                </span>
               </div>
             </ng-container>
             <ng-template #noMembersTpl>
@@ -93,19 +134,62 @@
       </div>
 
       <div class="targetPanels">
-        <div class="dropPanel">
-          <!-- Family + Role selectors side by side -->
+
+        <!-- Marmarkos year transfer panel — shown FIRST when source = خورس مارمرقس -->
+        <div class="dropPanel marmarkosYearPanel" *ngIf="isMarmarkosView()">
+          <div class="panelSelectors sideBySide">
+            <select class="select" [(ngModel)]="targetMarmarkosYear">
+              <option value="" disabled selected>اختيار السنة</option>
+              <option *ngFor="let opt of marmarkosTargetOptions" [value]="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <div
+            class="dropPanel__body"
+            id="transferMarmarkosMain"
+            cdkDropList
+            [cdkDropListData]="members"
+            [cdkDropListConnectedTo]="['transferMemberList']"
+            (cdkDropListDropped)="onMarmarkosMainDrop($event)"
+          >
+            <div class="selectedStack" *ngIf="pendingMarmarkosMembers.length">
+              <div class="selectedItem selectedItem--pending" *ngFor="let m of pendingMarmarkosMembers">
+                <button type="button" (click)="removePendingMarmarkos(m.id)" aria-label="حذف">
+                  <i class="pi pi-times"></i>
+                </button>
+                <span class="selectedName">{{ m.fullName }}</span>
+              </div>
+            </div>
+            <div class="emptyDrop" *ngIf="!pendingMarmarkosMembers.length">
+              {{ targetMarmarkosYear ? 'اسحب الأعضاء هنا' : 'اختار السنة أولاً' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Main drop panel (family target) — hidden in Marmarkos view -->
+        <div class="dropPanel" *ngIf="!isMarmarkosView()">
+          <!-- Family + Role selectors -->
           <div class="panelSelectors sideBySide">
             <select class="select" [(ngModel)]="targetFamily" (ngModelChange)="onTargetFamilyChange()">
               <option value="" disabled selected>اختيار الأسرة</option>
-              <option *ngFor="let f of (mode === 'SERVANT' && isAminKhedmaOrDev() ? availableMainFamilies() : availableTargetFamilies())" [value]="f">{{ f }}</option>
-              <option *ngFor="let t of familyRequestTargets" [value]="t.value">{{ t.label }}</option>
+              <option *ngFor="let opt of targetFamilySelectOptions" [value]="opt.value">{{ opt.label }}</option>
+              <ng-container *ngIf="mode === 'MAKHDOM' && !isMarmarkosView()">
+                <option value="KHORS:MARMARKOS">خورس مارمرقس</option>
+                <option value="KHORS_REQUEST:ATHANASIUS">طلب نقل لخورس البابا اثناسيوس</option>
+              </ng-container>
             </select>
             <select class="select roleSelect" *ngIf="showRoleSelector()" [(ngModel)]="targetRole">
               <option value="MAKHDOM">مخدوم</option>
               <option value="KHADIM">خادم</option>
               <option value="AMIN_OSRA">أمين أسرة</option>
               <option value="AMIN_KHEDMA">أمين خدمة</option>
+            </select>
+          </div>
+
+          <!-- Choir request selector (shown for كيرلس, انبا ابرام, اسطفانوس sources) -->
+          <div class="panelSelectors" *ngIf="showChoirRequest && targetFamily && !targetFamily.startsWith('KHORS')">
+            <select class="select" [(ngModel)]="targetChoir">
+              <option value="">بدون خورس</option>
+              <option value="KHORS_REQUEST:MARMARKOS">بعت طلب دخول خورس مارمرقس</option>
             </select>
           </div>
 
@@ -124,8 +208,11 @@
 
             <!-- Combined: existing members + pending transfers -->
             <div class="selectedStack" *ngIf="!targetFamilyLoading && targetFamily && (displayTargetMembers.length + pendingMainMembers.length) > 0">
-              <div class="existingTitle">{{ targetFamily }} ({{ displayTargetMembers.length + pendingMainMembers.length }})</div>
+              <div class="existingTitle">{{ targetFamilyLabel }} ({{ displayTargetMembers.length + pendingMainMembers.length }})</div>
               <div class="selectedItem selectedItem--existing" *ngFor="let m of displayTargetMembers">
+                <button type="button" class="existingRemoveBtn existingRemoveBtn--delete" (click)="removeExistingFromTarget(m)" title="إزالة من الأسرة" aria-label="إزالة من الأسرة">
+                  <i class="pi pi-times"></i>
+                </button>
                 <span class="selectedName">{{ m.fullName }}</span>
               </div>
               <div class="selectedItem selectedItem--pending" *ngFor="let m of pendingMainMembers">
@@ -137,20 +224,11 @@
             </div>
 
             <div class="emptyDrop" *ngIf="!targetFamilyLoading && (!targetFamily || (displayTargetMembers.length + pendingMainMembers.length === 0))">
-              {{ targetFamily ? 'اسحب الخدام هنا' : 'اختار أسرة أولاً' }}
+              {{ targetFamily ? 'اسحب الأعضاء هنا' : 'اختار أسرة أولاً' }}
             </div>
           </div>
-
-          <!-- Save + Execute buttons below main panel -->
-          <div class="panelActions" *ngIf="isAminKhedmaOrDev()">
-            <button type="button" class="transferBtn transferBtn--save" *ngIf="mode === 'SERVANT'" (click)="saveAll()" [disabled]="totalPending === 0">
-              <i class="pi pi-save"></i> حفظ
-            </button>
-            <button type="button" class="transferBtn transferBtn--execute" (click)="executeAll()" [disabled]="totalPending === 0">
-              <i class="pi pi-send"></i> نقل
-            </button>
-          </div>
         </div>
+
 
         <div class="extraPanelsWrap">
           <div class="dropPanel extraDropPanel" *ngFor="let extra of extraFamilies; let i = index">

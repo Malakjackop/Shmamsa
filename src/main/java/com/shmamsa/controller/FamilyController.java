@@ -1159,6 +1159,75 @@ public class  FamilyController {
         return ResponseEntity.ok(Map.of("updated", updated));
     }
 
+    @PostMapping("/remove-assignment")
+    public ResponseEntity<?> removeAssignment(@RequestBody Map<String, Object> body, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String myRole = normRole(me.getRole());
+        if (!List.of("AMIN_KHEDMA", "DEVELOPER").contains(myRole)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        Object memberIdObj = body.get("memberId");
+        String family = body.get("family") == null ? null : body.get("family").toString().trim();
+
+        if (memberIdObj == null || family == null || family.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "memberId and family are required");
+        }
+
+        Long memberId = Long.valueOf(memberIdObj.toString());
+        User u = userRepo.findById(memberId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
+
+        if ("DEVELOPER".equalsIgnoreCase(u.getRole())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        boolean removeAll = "ALL".equalsIgnoreCase(family);
+        String targetBase = removeAll ? null : familyCatalogService.baseNameForName(family);
+        if (!removeAll && (targetBase == null || targetBase.isBlank())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Unknown family");
+        }
+
+        List<UserFamilyAssignmentView> current = userFamilyRoleService.getAssignments(u);
+        List<UserFamilyAssignmentView> filtered = new ArrayList<>();
+        boolean removed = false;
+
+        if (removeAll) {
+            // Remove all family assignments — servant stays as role but unassigned
+            removed = !current.isEmpty();
+        } else {
+            int order = 1;
+            for (UserFamilyAssignmentView a : current) {
+                String aBase = familyCatalogService.baseNameForName(a.getFamilyName());
+                if (!removed && targetBase.equalsIgnoreCase(aBase)) {
+                    removed = true;
+                    continue;
+                }
+                filtered.add(UserFamilyAssignmentView.builder()
+                        .familyId(a.getFamilyId())
+                        .familyName(a.getFamilyName())
+                        .roleCode(a.getRoleCode())
+                        .role(a.getRole())
+                        .assignmentOrder(order++)
+                        .build());
+            }
+        }
+
+        if (!removed) {
+            return ResponseEntity.ok(Map.of("updated", 0, "note", "Assignment not found"));
+        }
+
+        userFamilyRoleService.replaceAssignments(u, filtered);
+        userRepo.saveAndFlush(u);
+        attendanceBackfillService.backfillForUser(u);
+
+        return ResponseEntity.ok(Map.of("updated", 1));
+    }
+
     @GetMapping("/members/{id}/attendance")
     public ResponseEntity<?> memberAttendance(@PathVariable Long id,
                                               @RequestParam(required = false) AttendanceType type,

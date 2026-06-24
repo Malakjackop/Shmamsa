@@ -160,6 +160,16 @@ export class FamilyService {
     );
   }
 
+  /** Remove a servant's assignment from a specific family without transferring elsewhere. */
+  removeServantFromFamily(memberId: number, family: string): Observable<FamilyMutationResponse> {
+    if (!this.isBrowser) return of(null);
+    return this.http.post<Record<string, unknown>>(
+      `${this.baseUrl}/remove-assignment`,
+      { memberId, family },
+      { withCredentials: true }
+    );
+  }
+
   /** Remove a member from a choir (Marmarkos / Athanasius). */
   removeFromKhors(memberId: number, khorsLabel: string): Observable<FamilyMutationResponse> {
     if (!this.isBrowser) return of(null);
