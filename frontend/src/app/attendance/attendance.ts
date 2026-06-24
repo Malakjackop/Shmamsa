@@ -2487,9 +2487,6 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     this.loadScheduleItemsForFamily();
     this.initCalendarRules();
     this.refreshRuntimeState();
-    if (!this.selectedDate && this.attendanceDatePicker) {
-      this.attendanceDatePicker.overlayVisible = true;
-    }
   }
 
   onSearchChange(v: string) {
@@ -2681,6 +2678,10 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   remove(id: number) {
     this.selected = this.selected.filter((x) => x.id !== id);
+  }
+
+  clearAllSelected() {
+    this.selected = [];
   }
 
   onCodeResult(resultString: string) {

@@ -194,7 +194,7 @@
                 type="button"
                 class="scan-btn"
                 (click)="toggleScan()"
-                [disabled]="isSelfCheckinMode() || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()"
+                [disabled]="isSelfCheckinMode() || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled() || !selectedType || !selectedDate"
               >
                 <i class="pi pi-qrcode"></i>
                 تشغيل السكان
@@ -224,6 +224,10 @@
 
         <div class="summary-bar" *ngIf="selected.length">
           <span class="summary-count">{{ selected.length }} اسم تم اختيارهم</span>
+          <button type="button" class="mini-btn danger" (click)="clearAllSelected()" title="إزالة الكل">
+            <i class="pi pi-trash"></i>
+            إزالة الكل
+          </button>
           <button type="button" class="submit-btn" (click)="submit()" [disabled]="!selectedDate || !!blockedMessage || !typeOptions.length || selectedTypeOptionDisabled()">
             <i class="pi pi-check-square"></i>
             تسجيل الحضور

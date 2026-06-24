@@ -276,6 +276,11 @@ textarea {
   color: #5e2b20 ;
 }
 
+.mini-btn.danger {
+  background: #fff0f0;
+  color: #a73232;
+}
+
 .mini-btn.danger:hover {
   background: #ffe0e0;
   color: #a73232;
@@ -401,17 +406,21 @@ textarea {
 
 :host ::ng-deep .family-multiselect .p-multiselect-label {
   color: #111 !important;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 400;
   text-align: right;
-  line-height: 44px;
-  padding-block: 0;
+  line-height: 1.5;
+  padding-block: 0.5rem;
   padding-inline: 0.8rem 2.4rem;
   width: auto;
   max-width: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 
 :host ::ng-deep .family-multiselect .p-multiselect-label-empty {
@@ -423,7 +432,9 @@ textarea {
 }
 
 :host ::ng-deep .family-multiselect .p-multiselect-token {
-  display: none;
+  font-size: 0.78rem;
+  max-width: none;
+  white-space: nowrap;
 }
 
 .family-multiselect-panel {
@@ -487,7 +498,7 @@ textarea {
   align-items: center !important;
   justify-content: flex-start !important;
   padding: 0.65rem 0.75rem !important;
-  font-size: 0.9rem !important;
+  font-size: 0.78rem !important;
   gap: 8px !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -510,13 +521,13 @@ textarea {
 ::ng-deep .family-multiselect-panel .p-multiselect-option-label,
 ::ng-deep .family-multiselect-panel .p-multiselect-option > span,
 ::ng-deep .family-multiselect-panel li[role="option"] > span {
-  flex: 0 1 auto !important;
+  flex: 1 1 auto !important;
   margin: 0 !important;
   margin-inline: 0 !important;
   padding: 0 !important;
   text-align: right !important;
   width: auto !important;
-  max-width: calc(100% - 28px) !important;
+  white-space: nowrap !important;
 }
 
 ::ng-deep .family-multiselect-panel .p-multiselect-item:hover,
