@@ -201,7 +201,7 @@
               <div class="input-group small" *ngIf="isServant && servingWhereValue === firstKhorsName && firstKhorsName">
                 <label class="field-label">{{ fieldLabel('attendKhors', 'بحضر في انهي خورس؟') }}</label>
                 <select formControlName="attendKhors" [disabled]="true">
-                  <option [value]="secondKhorsName">{{ secondKhorsName }}</option>
+                  <option [value]="secondKhorsCode">{{ secondKhorsName }}</option>
                 </select>
               </div>
             </ng-container>

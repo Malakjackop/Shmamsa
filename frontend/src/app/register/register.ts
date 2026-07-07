@@ -140,6 +140,24 @@ export class RegisterComponent implements OnInit {
     return [...this.attendKhorsFamilyOptions, { nameAr: 'بدون خورس' }];
   }
 
+  private resolveKhorsCode(value: unknown, options: FamilyOption[]): string {
+    let nameAr = '';
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      nameAr = String(options.find(x => x.id === value)?.nameAr || '').trim();
+    } else {
+      const raw = String(value ?? '').trim();
+      if (!raw) return '';
+      const asNumber = Number(raw);
+      if (Number.isFinite(asNumber)) {
+        nameAr = String(options.find(x => x.id === asNumber)?.nameAr || '').trim();
+      } else {
+        nameAr = raw;
+      }
+    }
+    if (!nameAr) return '';
+    return this.khorsCodeFromName(nameAr);
+  }
+
   isKhorsServingWhere(): boolean {
     return this.khorsFamilyOptions.some(k => k.nameAr === this.servingWhereValue);
   }
@@ -151,6 +169,19 @@ export class RegisterComponent implements OnInit {
   get secondKhorsName(): string {
     return this.khorsFamilyOptions.length > 1 ? this.khorsFamilyOptions[1].nameAr : '';
   }
+
+  get secondKhorsCode(): string {
+    return this.khorsFamilyOptions.length > 1 ? this.khorsCodeFromName(this.khorsFamilyOptions[1].nameAr) : '';
+  }
+
+  private khorsCodeFromName(nameAr: string): string {
+    const upper = (nameAr || '').trim().toUpperCase();
+    if (upper.includes('MARMARKOS') || upper.includes('مارمر') || upper.includes('مرقس')) return 'MARMARKOS';
+    if (upper.includes('ATHANASIUS') || upper.includes('اثناس')) return 'ATHANASIUS';
+    if (upper === 'NONE' || upper === 'بدون خورس') return 'NONE';
+    return nameAr;
+  }
+
   private buildForm() {
     const minAge = this.isServant ? 16 : 6;
 
@@ -772,7 +803,7 @@ onServingWhereChange() {
 
     if (kh === this.firstKhorsName) {
       attendCtrl?.clearValidators();
-      attendCtrl?.setValue(this.secondKhorsName, { emitEvent: false });
+      attendCtrl?.setValue(this.secondKhorsCode, { emitEvent: false });
       attendCtrl?.disable({ emitEvent: false });
     } else {
       attendCtrl?.clearValidators();
@@ -1058,7 +1089,7 @@ private guardianNotSameAsPhone(): ValidatorFn {
         ? String(formValue.otherGrade || '').trim()
         : formValue.schoolGrade;
 
-    let khorsToSend = String(formValue.khors || '').trim();
+    let khorsToSend = this.resolveKhorsCode(formValue.khors, this.khorsOptionValues);
     if (!this.isServant) {
       if (!khorsToSend) khorsToSend = 'NONE';
     }
@@ -1123,7 +1154,7 @@ private guardianNotSameAsPhone(): ValidatorFn {
     return;
   }
 
-  payload.attendKhors = String(formValue.attendKhors || '').trim();
+  payload.attendKhors = this.resolveKhorsCode(formValue.attendKhors, this.attendKhorsOptionValues);
 
   this.http.post('/api/auth/register-servant', payload, { withCredentials: true })
     .subscribe({

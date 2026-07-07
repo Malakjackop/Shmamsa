@@ -5,15 +5,11 @@
   <div class="pageHead">
     <div>
       <h1>الأنتقالات</h1>
-      <div class="pageSub" *ngIf="selectedFamilyView">{{ selectedFamilyView }}</div>
+      <div class="pageSub">{{ mode === 'SERVANT' ? 'خدام' : 'أسرة' }}</div>
     </div>
   </div>
 
   <section class="transferShell">
-    <div class="pendingBanner" *ngIf="hasPendingTransfers">
-      <i class="pi pi-info-circle"></i>
-      يوجد نقلات معلقة — لم يتم تأكيدها بعد. اضغط <strong>"نقل"</strong> لتأكيد النقل أو افتح <strong>"توزيعة السنة"</strong> لمراجعتها.
-    </div>
     <div class="filtersBar">
       <div class="familyView" *ngIf="isAminKhedmaOrDev()">
         <div class="modeRow">
@@ -30,11 +26,16 @@
                 <i class="pi pi-sitemap"></i> توزيعة السنة
               </button>
             </ng-container>
-            <button type="button" class="transferBtn transferBtn--execute" (click)="executeAll()" [disabled]="totalPending === 0 && !hasPendingTransfers">
-              <i class="pi pi-send"></i> نقل
-            </button>
           </div>
         </div>
+      </div>
+      <div class="actionBtns">
+        <button type="button" class="transferBtn transferBtn--save" *ngIf="mode === 'SERVANT'" (click)="saveAll()" [disabled]="totalPending === 0">
+          <i class="pi pi-save"></i> حفظ
+        </button>
+        <button type="button" class="transferBtn transferBtn--execute" (click)="executeAll()" [disabled]="totalPending === 0 && !hasPendingTransfers">
+          <i class="pi pi-send"></i> نقل
+        </button>
       </div>
     </div>
 
@@ -48,7 +49,7 @@
             </select>
           </ng-container>
           <ng-template #makhdomSource>
-            <div *ngIf="mode === 'MAKHDOM' && (isAminKhedmaOrDev() || isKhadim() || isAminOsra()) && (isAminKhedmaOrDev() || (viewFamilies?.length || 0) > 1)" class="sourceFamSelect">
+            <div *ngIf="mode === 'MAKHDOM' && (isAminKhedmaOrDev() || isKhadim())" class="sourceFamSelect">
               <select class="select" [(ngModel)]="selectedFamilyView" (change)="onFamilyViewChange()">
                 <option *ngFor="let f of viewFamilies" [value]="f">{{ f }}</option>
               </select>
@@ -91,16 +92,6 @@
                 <span class="dragHandle">⋮⋮</span>
                 <span class="memberName">{{ m.fullName }}</span>
                 <span class="memberMeta">{{ getRoleLabel(m.role) }} · {{ displayFamily(m) }}</span>
-                <span
-                  class="transferBadge"
-                  *ngIf="transferredCount(m.id) > 0"
-                  (click)="confirmRemoveFromFamily(m); $event.stopPropagation()"
-                  title="إزالة من الأسرة"
-                  aria-label="إزالة من الأسرة"
-                >
-                  <i class="pi pi-times"></i>
-                  تم ({{ transferredCount(m.id) }})
-                </span>
                 <button
                   type="button"
                   class="memberRemove"
@@ -111,20 +102,7 @@
                 >
                   <i class="pi pi-trash"></i>
                 </button>
-                <!-- Remove servant from all families in SERVANT mode -->
-                <button
-                  type="button"
-                  class="memberRemove memberRemove--unassign"
-                  *ngIf="mode === 'SERVANT' && isAminKhedmaOrDev() && !pendingRemovals.has(m.id)"
-                  (click)="confirmRemoveFromFamily(m); $event.stopPropagation()"
-                  title="إزالة من الأسرة"
-                  aria-label="إزالة من الأسرة"
-                >
-                  <i class="pi pi-times"></i>
-                </button>
-                <span class="removalPendingBadge" *ngIf="mode === 'SERVANT' && pendingRemovals.has(m.id)">
-                  سيتشال
-                </span>
+                                
               </div>
             </ng-container>
             <ng-template #noMembersTpl>
@@ -153,9 +131,6 @@
           >
             <div class="selectedStack" *ngIf="pendingMarmarkosMembers.length">
               <div class="selectedItem selectedItem--pending" *ngFor="let m of pendingMarmarkosMembers">
-                <button type="button" (click)="removePendingMarmarkos(m.id)" aria-label="حذف">
-                  <i class="pi pi-times"></i>
-                </button>
                 <span class="selectedName">{{ m.fullName }}</span>
               </div>
             </div>
@@ -169,7 +144,7 @@
         <div class="dropPanel" *ngIf="!isMarmarkosView()">
           <!-- Family + Role selectors -->
           <div class="panelSelectors sideBySide">
-            <select class="select" [(ngModel)]="targetFamily" (ngModelChange)="onTargetFamilyChange()">
+            <select class="select" *ngIf="!isAminOsra() || isAminKhedmaOrDev()" [(ngModel)]="targetFamily" (ngModelChange)="onTargetFamilyChange()">
               <option value="" disabled selected>اختيار الأسرة</option>
               <option *ngFor="let opt of targetFamilySelectOptions" [value]="opt.value">{{ opt.label }}</option>
               <ng-container *ngIf="mode === 'MAKHDOM' && !isMarmarkosView()">
@@ -177,6 +152,7 @@
                 <option value="KHORS_REQUEST:ATHANASIUS">طلب نقل لخورس البابا اثناسيوس</option>
               </ng-container>
             </select>
+            <div class="autoTargetLabel" *ngIf="isAminOsra() && !isAminKhedmaOrDev() && targetFamily">{{ targetFamily }}</div>
             <select class="select roleSelect" *ngIf="showRoleSelector()" [(ngModel)]="targetRole">
               <option value="MAKHDOM">مخدوم</option>
               <option value="KHADIM">خادم</option>
@@ -210,16 +186,14 @@
             <div class="selectedStack" *ngIf="!targetFamilyLoading && targetFamily && (displayTargetMembers.length + pendingMainMembers.length) > 0">
               <div class="existingTitle">{{ targetFamilyLabel }} ({{ displayTargetMembers.length + pendingMainMembers.length }})</div>
               <div class="selectedItem selectedItem--existing" *ngFor="let m of displayTargetMembers">
-                <button type="button" class="existingRemoveBtn existingRemoveBtn--delete" (click)="removeExistingFromTarget(m)" title="إزالة من الأسرة" aria-label="إزالة من الأسرة">
-                  <i class="pi pi-times"></i>
-                </button>
+                <button class="pi pi-times selectedItemRemove" (click)="removeExistingFromTarget(m)"></button>
                 <span class="selectedName">{{ m.fullName }}</span>
+                <span class="selectedRole">{{ getRoleLabel(targetExistingRole(m)) }}</span>
               </div>
               <div class="selectedItem selectedItem--pending" *ngFor="let m of pendingMainMembers">
-                <button type="button" (click)="removePendingMain(m.id)" aria-label="حذف">
-                  <i class="pi pi-times"></i>
-                </button>
+                <button class="pi pi-times selectedItemRemove" (click)="removePendingMain(m.id)"></button>
                 <span class="selectedName">{{ m.fullName }}</span>
+                <span class="selectedRole">{{ getRoleLabel(targetRole) }}</span>
               </div>
             </div>
 
@@ -258,9 +232,6 @@
             <div class="selectedStack" *ngIf="extra.members.length; else emptyExtraDrop">
               <ng-container *ngFor="let mId of extra.members">
                 <div class="selectedItem" *ngIf="getMemberById(mId) as m">
-                  <button type="button" (click)="removeExtraFamilyMember(i, mId)" aria-label="حذف">
-                    <i class="pi pi-times"></i>
-                  </button>
                   <span class="selectedName">{{ m.fullName }}</span>
                   <span class="selectedTarget">
                     <i class="pi pi-arrow-left"></i>
@@ -296,8 +267,9 @@
             <span class="dist-fam-name">{{ s.fullName }}</span>
             <span class="dist-fam-role">
               <span class="dist-pending-badge" *ngIf="isDistPending(s, fam)">نقل</span>
-              {{ getRoleLabel(getDistServantRole(s)) }}
+              {{ getRoleLabel(getDistServantRole(s, fam)) }}
             </span>
+            <button class="dist-remove-btn" (click)="removeDistServant(s, fam)" title="إزالة من الأسرة">✕</button>
           </div>
           <div class="dist-fam-empty" *ngIf="!getDistServantsForFamily(fam).length">
             لا يوجد خدام

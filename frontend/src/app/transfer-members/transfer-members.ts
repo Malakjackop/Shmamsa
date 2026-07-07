@@ -61,6 +61,7 @@ export class TransferMembersComponent implements OnInit {
   targetKhorsYear: number | '' = '';
 
   transferredMap = new Map<number, Set<string>>();
+  transferRoles = new Map<string, string>();
   pendingRemovals = new Map<number, Set<string>>();
 
   get hasPendingTransfers(): boolean {
@@ -197,7 +198,8 @@ familyRequestTargets: { label: string; value: string }[] = [
     let list = [...base, ...this.removedAsSourceMembers].filter(m => {
       if (seen.has(m.id)) return false;
       seen.add(m.id);
-      // hide members already transferred (they appear in the target panel)
+      // in SERVANT mode, keep transferred members visible (can assign to multiple families)
+      if (this.mode === 'SERVANT') return true;
       return !transferredIds.has(m.id);
     });
     if (this.isMarmarkosView() && this.selectedSourceYear !== null) {
@@ -361,6 +363,8 @@ familyRequestTargets: { label: string; value: string }[] = [
           this.targetFamily = this.marmarkosYearTargets[0]?.value || '';
         }
 
+        this.autoSelectTargetForAminOsra();
+
         this.loadMembers();
         this.prefetchServants();
         this.loadTargetFamilyMembers();
@@ -413,15 +417,11 @@ familyRequestTargets: { label: string; value: string }[] = [
 
   private applyLoadedMembers(famParam: string | undefined, mode: TransferMode, rawList: any[]) {
         let list = rawList || [];
-        if (mode === 'MAKHDOM' && this.isPapaAthanasiusView()) {
-          list = list.filter((x: any) => !this.isTransferVisitor(x));
-        }
-
         if (this.isAminKhedmaOrDev()) {
   if (mode === 'MAKHDOM') {
 
     if (!this.isChoirSelection()) {
-      list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM');
+      list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM' || this.isTransferVisitor(x));
     }
   }
   if (mode === 'SERVANT') {
@@ -430,6 +430,8 @@ familyRequestTargets: { label: string; value: string }[] = [
   }
         } else if (this.isKhadim()) {
           list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM');
+        } else if (this.isAminOsra()) {
+          list = list.filter((x: any) => normalizeRole(x?.role) === 'MAKHDOM' || this.isTransferVisitor(x));
         }
         this.memberCache.set(this.memberCacheKey(famParam, mode), list);
         this.members = list;
@@ -481,6 +483,16 @@ private familyRoleFor(m: Member, fam: string): string {
     }
   }
   return '';
+}
+
+targetExistingRole(m: Member): string {
+  const selected = this.canonicalFamilyName(this.targetFamily);
+  for (const a of this.assignmentsOf(m)) {
+    if (this.canonicalFamilyName(a.familyName) === selected) {
+      return a.role;
+    }
+  }
+  return m.role;
 }
 
 private familyWithRole(m: Member, fam: string): string {
@@ -597,8 +609,6 @@ isChoirSelection(): boolean {
     }
     if (this.pendingMarmarkosMembers.find(m => m.id === member.id)) return;
     this.pendingMarmarkosMembers.push(member);
-    this.trackTransfer(member.id, this.targetMarmarkosYear);
-    this.saveTransferredMap();
   }
 
   removePendingMarmarkos(memberId: number) {
@@ -634,8 +644,20 @@ isChoirSelection(): boolean {
       this.targetRole = 'KHADIM';
     }
 
+    this.autoSelectTargetForAminOsra();
     this.loadMembers();
     this.loadTargetFamilyMembers();
+  }
+
+  private autoSelectTargetForAminOsra(): void {
+    if (!this.isAminOsra() && !this.isAminKhedmaOrDev()) return;
+    if (this.mode === 'SERVANT') return;
+    const fam = (this.selectedFamilyView || '').trim();
+    if (!fam) return;
+    const idx = this.makhdomFamilies.indexOf(fam);
+    if (idx >= 0 && idx < this.makhdomFamilies.length - 1) {
+      this.targetFamily = this.makhdomFamilies[idx + 1];
+    }
   }
 
   onFamilyViewChange() {
@@ -643,7 +665,9 @@ isChoirSelection(): boolean {
     this.pendingMarmarkosMembers = [];
     this.targetMarmarkosYear = '';
     this.selectedSourceYear = null;
+    this.autoSelectTargetForAminOsra();
     this.loadMembers();
+    this.loadTargetFamilyMembers();
   }
 
   saveAll() {
@@ -657,9 +681,16 @@ isChoirSelection(): boolean {
 
     if (!mainIds.length && !extraAssignments.length) return;
 
-    mainIds.forEach(id => this.trackTransfer(id, this.targetFamily));
+    const mainRole = this.targetRole || 'KHADIM';
+    mainIds.forEach(id => {
+      this.trackTransfer(id, this.targetFamily);
+      this.transferRoles.set(`${id}:${this.targetFamily}`, mainRole);
+    });
     this.extraFamilies.forEach(ef => {
-      if (ef.family) ef.members.forEach(mId => this.trackTransfer(mId, ef.family));
+      if (ef.family) ef.members.forEach(mId => {
+        this.trackTransfer(mId, ef.family);
+        this.transferRoles.set(`${mId}:${ef.family}`, ef.role || 'KHADIM');
+      });
     });
     this.saveTransferredMap();
 
@@ -684,7 +715,9 @@ isChoirSelection(): boolean {
       accept: () => {
         if (this.totalPending === 0 && this.pendingRemovals.size === 0) {
           this.transferredMap.clear();
-          localStorage.removeItem('transfer_pending');
+          this.transferRoles.clear();
+          localStorage.removeItem(this.storageKey('transfer_pending'));
+          localStorage.removeItem(this.storageKey('transfer_roles'));
           this.removedFromTargetIds.clear();
           this.message.add({ severity: 'info', summary: 'تم', detail: 'تم مسح النقلات المعلقة' });
           return;
@@ -695,7 +728,7 @@ isChoirSelection(): boolean {
         // Main panel transfer
         const mainIds = this.pendingMainMembers.map(m => m.id);
         if (mainIds.length) {
-          const roleToSend = this.isAminKhedmaOrDev() ? this.targetRole : undefined;
+          const roleToSend = this.targetRole;
           const extraAssignments = this.extraFamilies
             .filter(ef => ef.family && ef.members.length)
             .map(ef => ({ family: ef.family, role: ef.role || 'KHADIM' }));
@@ -740,13 +773,15 @@ isChoirSelection(): boolean {
             this.extraFamilies.forEach(ef => ef.members = []);
             this.removedFromTargetIds.clear();
             this.pendingRemovals.clear();
-            localStorage.removeItem('transfer_removals');
+            localStorage.removeItem(this.storageKey('transfer_removals'));
             this.memberCache.clear();
             this.targetFamilyCache.clear();
             this.loadMembers();
             this.loadTargetFamilyMembers();
             this.transferredMap.clear();
-            localStorage.removeItem('transfer_pending');
+            this.transferRoles.clear();
+            localStorage.removeItem(this.storageKey('transfer_pending'));
+            localStorage.removeItem(this.storageKey('transfer_roles'));
           },
           error: (err) => {
             this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل النقل' });
@@ -797,9 +832,6 @@ isChoirSelection(): boolean {
     }
 
     this.pendingMainMembers.push(member);
-    this.trackTransfer(member.id, targetFam);
-    if (this.showKirillosChoirPanel) this.trackTransfer(member.id, 'KHORS:MARMARKOS:YEAR:1');
-    this.saveTransferredMap();
   }
 
   removePendingMain(memberId: number) {
@@ -844,17 +876,24 @@ isChoirSelection(): boolean {
     this.transferredMap.get(memberId)!.add(family);
   }
 
+  private storageKey(base: string): string {
+    return `${base}_${this.me?.id || 'anonymous'}`;
+  }
+
   private saveTransferredMap() {
     const obj: Record<number, string[]> = {};
     this.transferredMap.forEach((families, id) => {
       obj[id] = Array.from(families);
     });
-    localStorage.setItem('transfer_pending', JSON.stringify(obj));
+    localStorage.setItem(this.storageKey('transfer_pending'), JSON.stringify(obj));
+    const roleObj: Record<string, string> = {};
+    this.transferRoles.forEach((role, key) => { roleObj[key] = role; });
+    localStorage.setItem(this.storageKey('transfer_roles'), JSON.stringify(roleObj));
   }
 
   private loadTransferredMap() {
     try {
-      const raw = localStorage.getItem('transfer_pending');
+      const raw = localStorage.getItem(this.storageKey('transfer_pending'));
       if (!raw) return;
       const obj = JSON.parse(raw) as Record<number, string[]>;
       this.transferredMap.clear();
@@ -862,10 +901,22 @@ isChoirSelection(): boolean {
         this.transferredMap.set(Number(id), new Set(families));
       }
     } catch {
-      localStorage.removeItem('transfer_pending');
+      localStorage.removeItem(this.storageKey('transfer_pending'));
     }
     try {
-      const raw = localStorage.getItem('transfer_removals');
+      const raw = localStorage.getItem(this.storageKey('transfer_roles'));
+      if (raw) {
+        const roleObj = JSON.parse(raw) as Record<string, string>;
+        this.transferRoles.clear();
+        for (const [key, role] of Object.entries(roleObj)) {
+          this.transferRoles.set(key, role);
+        }
+      }
+    } catch {
+      localStorage.removeItem(this.storageKey('transfer_roles'));
+    }
+    try {
+      const raw = localStorage.getItem(this.storageKey('transfer_removals'));
       if (!raw) return;
       const obj = JSON.parse(raw) as Record<number, string[]>;
       this.pendingRemovals.clear();
@@ -873,14 +924,14 @@ isChoirSelection(): boolean {
         this.pendingRemovals.set(Number(id), new Set(families));
       }
     } catch {
-      localStorage.removeItem('transfer_removals');
+      localStorage.removeItem(this.storageKey('transfer_removals'));
     }
   }
 
   private savePendingRemovals() {
     const obj: Record<number, string[]> = {};
     this.pendingRemovals.forEach((fams, id) => { obj[id] = Array.from(fams); });
-    localStorage.setItem('transfer_removals', JSON.stringify(obj));
+    localStorage.setItem(this.storageKey('transfer_removals'), JSON.stringify(obj));
   }
 
   transferredFamilies(memberId: number): string[] {
@@ -1015,7 +1066,7 @@ private getServedFamilies(): string[] {
   }
 
   showRoleSelector(): boolean {
-    return this.isAminKhedmaOrDev();
+    return this.mode === 'SERVANT';
   }
 
   onTargetFamilyChange() {
@@ -1110,8 +1161,6 @@ private getServedFamilies(): string[] {
     if (this.allSelected) {
       this.pendingMainMembers = [];
       this.pendingMarmarkosMembers = [];
-      this.transferredMap.clear();
-      localStorage.removeItem('transfer_pending');
       return;
     }
 
@@ -1125,9 +1174,7 @@ private getServedFamilies(): string[] {
       for (const m of list) {
         if (this.pendingMarmarkosMembers.find(x => x.id === m.id)) continue;
         this.pendingMarmarkosMembers.push(m);
-        this.trackTransfer(m.id, this.targetMarmarkosYear);
       }
-      this.saveTransferredMap();
       return;
     }
 
@@ -1144,8 +1191,6 @@ private getServedFamilies(): string[] {
       const alreadyInFamily = this.displayTargetMembers.some(x => x.id === m.id);
       if (alreadyInFamily) continue;
       this.pendingMainMembers.push(m);
-      this.trackTransfer(m.id, targetFam);
-      if (this.showKirillosChoirPanel) this.trackTransfer(m.id, 'KHORS:MARMARKOS:YEAR:1');
       added++;
     }
     if (added) this.saveTransferredMap();
@@ -1166,7 +1211,11 @@ private getServedFamilies(): string[] {
         .map(x => ({ targetFamily: x.familyName, targetRole: x.role, pending: false }));
 
       const transfers = transferredFamilies
-        ? Array.from(transferredFamilies).map(fam => ({ targetFamily: fam, targetRole: 'KHADIM', pending: true }))
+        ? Array.from(transferredFamilies).map(fam => ({
+            targetFamily: fam,
+            targetRole: this.transferRoles.get(`${s.id}:${fam}`) || 'KHADIM',
+            pending: true
+          }))
         : [];
 
       const combined = [...existing];
@@ -1205,9 +1254,10 @@ private getServedFamilies(): string[] {
   }
 
   isDistPending(s: Member, fam: string): boolean {
+    const cfam = this.canonicalFamilyName(fam);
     for (const item of this.distributionData) {
       if (item.servant.id === s.id) {
-        return item.assignments.some(a => a.targetFamily === fam && a.pending);
+        return item.assignments.some(a => this.canonicalFamilyName(a.targetFamily) === cfam && a.pending);
       }
     }
     return false;
@@ -1216,9 +1266,10 @@ private getServedFamilies(): string[] {
   getDistServantsForFamily(fam: string): Member[] {
     const seen = new Set<number>();
     const result: Member[] = [];
+    const cfam = this.canonicalFamilyName(fam);
     for (const item of this.distributionData) {
       for (const a of item.assignments) {
-        if (a.targetFamily === fam && !seen.has(item.servant.id)) {
+        if (this.canonicalFamilyName(a.targetFamily) === cfam && !seen.has(item.servant.id)) {
           seen.add(item.servant.id);
           result.push(item.servant);
         }
@@ -1227,13 +1278,28 @@ private getServedFamilies(): string[] {
     return result;
   }
 
-  getDistServantRole(s: Member): string {
+  getDistServantRole(s: Member, family: string): string {
+    const cfam = this.canonicalFamilyName(family);
     for (const item of this.distributionData) {
-      if (item.servant.id === s.id && item.assignments.length) {
-        return item.assignments[0].targetRole;
+      if (item.servant.id === s.id) {
+        const match = item.assignments.find(a => this.canonicalFamilyName(a.targetFamily) === cfam);
+        if (match) return match.targetRole;
+        if (item.assignments.length) return item.assignments[0].targetRole;
       }
     }
     return s.role;
+  }
+
+  removeDistServant(s: Member, family: string) {
+    const transferredFamilies = this.transferredMap.get(s.id);
+    if (transferredFamilies) {
+      transferredFamilies.delete(family);
+      if (transferredFamilies.size === 0) this.transferredMap.delete(s.id);
+    }
+    this.transferRoles.delete(`${s.id}:${family}`);
+    this.saveTransferredMap();
+    // Rebuild distribution data
+    this.openDistribution();
   }
 
   addDistAssignment(idx: number) {
@@ -1295,6 +1361,10 @@ private getServedFamilies(): string[] {
   private loadTargetFamilyMembers() {
     const fam = this.targetFamily;
     if (!fam || fam.startsWith('KHORS')) {
+      this.targetFamilyMembers = [];
+      return;
+    }
+    if (this.isAminOsra() && !this.isAminKhedmaOrDev()) {
       this.targetFamilyMembers = [];
       return;
     }

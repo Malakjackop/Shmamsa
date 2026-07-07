@@ -221,7 +221,7 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   private readonly sectionDefinitions: Array<Omit<FieldSection, 'fields'>> = [
     {
       id: 'personal',
-      title: 'بيانات شخصية ',
+      title: 'بيانات شخصية',
       fieldKeys: [
         'username',
         'fullName',
