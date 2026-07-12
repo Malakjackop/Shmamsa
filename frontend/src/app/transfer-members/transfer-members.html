@@ -148,11 +148,13 @@
               <option value="" disabled selected>اختيار الأسرة</option>
               <option *ngFor="let opt of targetFamilySelectOptions" [value]="opt.value">{{ opt.label }}</option>
               <ng-container *ngIf="mode === 'MAKHDOM' && !isMarmarkosView()">
-                <option value="KHORS:MARMARKOS">خورس مارمرقس</option>
-                <option value="KHORS_REQUEST:ATHANASIUS">طلب نقل لخورس البابا اثناسيوس</option>
+                <option value="KHORS_REQUEST:MARMARKOS">طلب نقل لخورس مارمرقس</option>
               </ng-container>
             </select>
-            <div class="autoTargetLabel" *ngIf="isAminOsra() && !isAminKhedmaOrDev() && targetFamily">{{ targetFamily }}</div>
+            <select class="select" *ngIf="isAminOsra() && !isAminKhedmaOrDev()" [(ngModel)]="aminOsraTarget">
+              <option value="FAMILY">{{ autoTargetFamily || 'الأسرة التالية' }}</option>
+              <option value="KHORS_REQUEST:MARMARKOS">طلب نقل لخورس مارمرقس</option>
+            </select>
             <select class="select roleSelect" *ngIf="showRoleSelector()" [(ngModel)]="targetRole">
               <option value="MAKHDOM">مخدوم</option>
               <option value="KHADIM">خادم</option>
@@ -164,7 +166,6 @@
           <!-- Choir request selector (shown for كيرلس, انبا ابرام, اسطفانوس sources) -->
           <div class="panelSelectors" *ngIf="showChoirRequest && targetFamily && !targetFamily.startsWith('KHORS')">
             <select class="select" [(ngModel)]="targetChoir">
-              <option value="">بدون خورس</option>
               <option value="KHORS_REQUEST:MARMARKOS">بعت طلب دخول خورس مارمرقس</option>
             </select>
           </div>

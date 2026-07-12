@@ -45,8 +45,7 @@
   margin-bottom: 22px;
 }
 
-.familyView,
-.inlinePicker {
+.familyView {
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -83,12 +82,6 @@
   padding: 6px 10px;
   min-height: auto;
   height: auto;
-}
-
-.lbl {
-  color: #6b5147;
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .select,
@@ -139,31 +132,6 @@ select:focus {
 
 .transferBtn:hover {
   transform: translateY(-1px);
-}
-
-.transferBtn--primary {
-  background: #5e2b20;
-}
-
-.transferBtn--dark {
-  background: #692e21;
-  box-shadow: 0 10px 20px rgba(116, 44, 26, 0.16);
-}
-
-.transferControls {
-  display: contents;
-}
-
-.selHint {
-  min-height: 34px;
-  padding: 7px 12px;
-  border-radius: 8px;
-  background: #f7f1ea;
-  color: #6f3b30;
-  font-size: 13px;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
 }
 
 .hint {
@@ -322,36 +290,11 @@ select:focus {
   gap: 6px;
   flex-wrap: nowrap;
 }
-.targetFamLabel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 800;
-  color: #6f3b30;
-  padding: 6px 10px;
-  background: #f5f1ec;
-  border-radius: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.targetFamLabel i {
-  font-size: 12px;
-  flex-shrink: 0;
-}
 .sideBySide .select {
   flex: 1 1 auto;
   min-width: 120px;
 }
 
-.panelActions {
-  display: flex;
-  gap: 6px;
-  margin-top: 6px;
-}
 .transferBtn--save {
   flex: 1;
   padding: 8px 12px;
@@ -597,27 +540,6 @@ select:focus {
   direction: rtl;
 }
 
-.selectedBadge {
-  position: absolute;
-  top: 50%;
-  left: 10px;
-  min-height: 28px;
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: #6f3b30;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 800;
-  transform: translateY(-50%);
-}
-
-.selectedBadge .pi {
-  font-size: 11px;
-}
-
 .memberRemove {
   position: absolute;
   top: 50%;
@@ -757,11 +679,6 @@ select:focus {
   text-align: center;
 }
 
-.tableWrap,
-.tbl {
-  display: none;
-}
-
 .addFamilyBtn {
   min-height: 44px;
   padding: 8px 16px;
@@ -786,55 +703,6 @@ select:focus {
 .addFamilyBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.extrasWrap {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 2px 0 10px;
-  scroll-snap-type: x proximity;
-}
-
-.extrasWrap::-webkit-scrollbar {
-  height: 8px;
-}
-
-.extrasWrap::-webkit-scrollbar-track {
-  background: #f5f1ec;
-  border-radius: 999px;
-}
-
-.extrasWrap::-webkit-scrollbar-thumb {
-  background: #d6c8ba;
-  border-radius: 999px;
-}
-
-.extrasWrap--empty {
-  min-height: 44px;
-  align-items: center;
-}
-
-.extraRow {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(160px, 0.7fr) 36px;
-  gap: 6px;
-  align-items: center;
-  min-width: min(460px, 92vw);
-  scroll-snap-align: start;
-}
-
-.extrasEmpty {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #f7f1ea;
-  color: #7a655d;
-  font-size: 13px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .miniBtn {
@@ -898,63 +766,12 @@ select:focus {
   padding: 12px 0;
 }
 
-.existingSection {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
 .existingTitle {
   color: #5d443b;
   font-size: 12px;
   font-weight: 800;
   text-align: right;
   padding: 2px 0 4px;
-}
-
-.existingMember {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: #ece6de;
-  min-height: 36px;
-}
-
-.existingName {
-  font-size: 13px;
-  font-weight: 800;
-  color: #3a2e28;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.existingRole {
-  font-size: 11px;
-  font-weight: 700;
-  color: #7a655d;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.dropDivider {
-  text-align: center;
-  color: #9b8d82;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 10px 0 6px;
-  border-top: 1px dashed #d6c8ba;
-  margin-top: 4px;
-}
-
-.transferBtn--confirm {
-  background: #6f3b30;
-  box-shadow: 0 10px 20px rgba(111, 59, 48, 0.2);
 }
 
 .cdk-drag-preview {
@@ -1462,108 +1279,6 @@ select:focus {
   font-weight: 700;
 }
 
-.dist-pool {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  position: relative;
-}
-
-.dist-pool-title {
-  color: #5d443b;
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 10px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.dist-pool-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.dist-pool-item {
-  padding: 10px 12px;
-  background: #f7f3ec;
-  border-radius: 8px;
-}
-
-.dist-pool-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dist-pool-name {
-  font-size: 13px;
-  font-weight: 800;
-  color: #2b201b;
-  min-width: 80px;
-}
-
-.dist-pool-current {
-  font-size: 11px;
-  color: #8a6f64;
-  font-weight: 600;
-  flex: 1;
-}
-
-.dist-add-assign {
-  width: 100%;
-  min-height: 34px;
-  border: 1px dashed #d6c8ba;
-  border-radius: 8px;
-  background: transparent;
-  color: #7a5f52;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background 0.16s ease, color 0.16s ease;
-}
-
-.dist-add-assign:hover {
-  background: #ede5dc;
-  color: #4a2a20;
-}
-
-.dist-assignments {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.dist-assign-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.dist-remove-assign {
-  flex-shrink: 0;
-}
-
-.dist-select {
-  min-height: 34px !important;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
-  min-width: 100px;
-  flex: 1;
-}
-
 .distBtn {
   min-height: 44px;
   padding: 8px 16px;
@@ -1592,71 +1307,6 @@ select:focus {
   padding: 6px 14px;
   font-size: 13px;
   flex: none;
-}
-
-/* Kirillos choir fixed panel */
-.kirillosChoirPanel {
-  min-width: 160px;
-  max-width: 200px;
-  flex-shrink: 0;
-}
-
-.kirillosChoirTitle {
-  color: #5d443b;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: center;
-  padding: 6px 8px;
-  background: #edf5e8;
-  border-radius: 8px 8px 0 0;
-  border-bottom: 1px solid #c8e0bd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
-.kirillosChoirBody {
-  min-height: 80px;
-  border-radius: 0 0 8px 8px;
-  background: #f4faf1 !important;
-}
-
-.selectedItem--choir {
-  background: #edf5e8 !important;
-  border-color: #c8e0bd !important;
-  grid-template-columns: minmax(0,1fr) !important;
-}
-
-/* Year filter tabs for خورس مارمرقس */
-.yearFilter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 8px;
-}
-
-.yearBtn {
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  border: 1px solid #d6c8ba;
-  border-radius: 6px;
-  cursor: pointer;
-  background: #f5f1ec;
-  color: #7a655d;
-  transition: background 0.15s, color 0.15s;
-  font-family: inherit;
-}
-
-.yearBtn.active {
-  background: #6f3b30;
-  color: #fff;
-  border-color: #6f3b30;
-}
-
-.yearBtn:not(.active):hover {
-  background: #eadfd3;
 }
 
 /* Year filter for Marmarkos source */
