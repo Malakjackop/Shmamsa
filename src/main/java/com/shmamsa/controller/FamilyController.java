@@ -882,16 +882,23 @@ public class  FamilyController {
         // ✅ Optional role change (DEV/AMIN_KHEDMA only)
         String normalizedTargetRole = null;
         if (targetRole != null && !targetRole.isBlank()) {
-            if (isAminOsra || scopedAminOsra) throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            normalizedTargetRole = targetRole.trim().toUpperCase(Locale.ROOT);
+            String rawTargetRole = targetRole.trim().toUpperCase(Locale.ROOT);
 
-            List<String> allowed = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
-            if (!allowed.contains(normalizedTargetRole)) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid targetRole");
+            if (isAminOsra || scopedAminOsra) {
+                // AMIN_OSRA can only pass through the member's existing role (no actual change)
+                if (!"MAKHDOM".equals(rawTargetRole)) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+                }
+            } else {
+                List<String> allowed = List.of("MAKHDOM", "KHADIM", "AMIN_OSRA", "AMIN_KHEDMA");
+                if (!allowed.contains(rawTargetRole)) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid targetRole");
+                }
+                if (!RoleUtil.canAssign(myRole, rawTargetRole)) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+                }
             }
-            if (!RoleUtil.canAssign(myRole, normalizedTargetRole)) {
-                throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
-            }
+            normalizedTargetRole = rawTargetRole;
         }
 
         // If this is khors operation, ignore family logic completely

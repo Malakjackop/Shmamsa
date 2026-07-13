@@ -42,22 +42,22 @@ export function canonicalFamilyName(value: unknown, options: CanonicalFamilyOpti
   if (normalized.includes('اسكلابيوس')) return 'اسرة القديس اسكلابيوس';
   if (normalized.includes('كيرلس')) {
     if (options.keepSubFamilies) {
-      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(normalized)) return 'اسرة القديس البابا كيرلس أ';
-      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(normalized)) return 'اسرة القديس البابا كيرلس ب';
+      if (/[(\[]\s*ا\s*[)\]]|\sا$/i.test(normalized)) return 'اسرة القديس البابا كيرلس أ';
+      if (/[(\[]\s*ب\s*[)\]]|\sب$/i.test(normalized)) return 'اسرة القديس البابا كيرلس ب';
     }
     return 'اسرة القديس البابا كيرلس';
   }
   if (normalized.includes('ابرام')) {
     if (options.keepSubFamilies) {
-      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(normalized)) return 'اسرة القديس الانبا ابرام أ';
-      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(normalized)) return 'اسرة القديس الانبا ابرام ب';
+      if (/[(\[]\s*ا\s*[)\]]|\sا$/i.test(normalized)) return 'اسرة القديس الانبا ابرام أ';
+      if (/[(\[]\s*ب\s*[)\]]|\sب$/i.test(normalized)) return 'اسرة القديس الانبا ابرام ب';
     }
     return 'اسرة القديس الانبا ابرام';
   }
   if (normalized.includes('اسطفانوس') || normalized.includes('استفانوس')) {
     if (options.keepSubFamilies) {
-      if (/\bا\b|[(\[]\s*ا\s*[)\]]/i.test(normalized)) return 'اسرة القديس اسطفانوس أ';
-      if (/\bب\b|[(\[]\s*ب\s*[)\]]/i.test(normalized)) return 'اسرة القديس اسطفانوس ب';
+      if (/[(\[]\s*ا\s*[)\]]|\sا$/i.test(normalized)) return 'اسرة القديس اسطفانوس أ';
+      if (/[(\[]\s*ب\s*[)\]]|\sب$/i.test(normalized)) return 'اسرة القديس اسطفانوس ب';
     }
     return 'اسرة القديس اسطفانوس';
   }
@@ -79,8 +79,12 @@ export function sortFamiliesByPreferredOrder(
   );
 
   return [...deduped].sort((a, b) => {
-    const aOrder = orderMap.get(normalizeFamilyName(canonicalFamilyName(a, options)));
-    const bOrder = orderMap.get(normalizeFamilyName(canonicalFamilyName(b, options)));
+    const aNorm = normalizeFamilyName(canonicalFamilyName(a, options));
+    const bNorm = normalizeFamilyName(canonicalFamilyName(b, options));
+    const aBase = aNorm.replace(/\s[اب]$/, '');
+    const bBase = bNorm.replace(/\s[اب]$/, '');
+    const aOrder = orderMap.get(aBase);
+    const bOrder = orderMap.get(bBase);
 
     if (aOrder != null && bOrder != null) {
       if (aOrder !== bOrder) return aOrder - bOrder;

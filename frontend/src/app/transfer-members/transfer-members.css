@@ -410,6 +410,37 @@ select:focus {
   border: 1px solid #ede6dd;
 }
 
+.sourceBranchTabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.branchTab {
+  flex: 1;
+  padding: 8px 16px;
+  border: 1px solid #d4c4b8;
+  border-radius: 20px;
+  background: #f5f0eb;
+  color: #5a3d33;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.branchTab:hover {
+  background: #eadfd3;
+}
+
+.branchTab.active {
+  background: #6f3b30;
+  color: #fff;
+  border-color: #6f3b30;
+}
+
 .sourceTitle {
   color: #5d443b;
   font-size: 14px;

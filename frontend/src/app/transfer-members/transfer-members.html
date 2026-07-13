@@ -54,7 +54,12 @@
                 <option *ngFor="let f of viewFamilies" [value]="f">{{ f }}</option>
               </select>
             </div>
-            <div class="sourceTitle" *ngIf="!isAminKhedmaOrDev() && !isKhadim()">{{ selectedFamilyView || 'عرض الأعضاء' }}</div>
+            <ng-container *ngIf="!isAminKhedmaOrDev() && !isKhadim()">
+              <div class="sourceBranchTabs" *ngIf="showBranchTabs">
+                <button *ngFor="let b of sourceBranches" class="branchTab" [class.active]="b === selectedFamilyView" type="button" (click)="selectSourceBranch(b)">{{ branchLabel(b) }}</button>
+              </div>
+              <div class="sourceTitle" *ngIf="!showBranchTabs">{{ selectedFamilyView || 'عرض الأعضاء' }}</div>
+            </ng-container>
           </ng-template>
         </div>
 
@@ -144,29 +149,18 @@
         <div class="dropPanel" *ngIf="!isMarmarkosView()">
           <!-- Family + Role selectors -->
           <div class="panelSelectors sideBySide">
-            <select class="select" *ngIf="!isAminOsra() || isAminKhedmaOrDev()" [(ngModel)]="targetFamily" (ngModelChange)="onTargetFamilyChange()">
+            <select class="select" [(ngModel)]="targetFamily" (ngModelChange)="onTargetFamilyChange()">
               <option value="" disabled selected>اختيار الأسرة</option>
               <option *ngFor="let opt of targetFamilySelectOptions" [value]="opt.value">{{ opt.label }}</option>
-              <ng-container *ngIf="mode === 'MAKHDOM' && !isMarmarkosView()">
+              <ng-container *ngIf="mode === 'MAKHDOM' && !isMarmarkosView() && !showBranchTabs">
                 <option value="KHORS_REQUEST:MARMARKOS">طلب نقل لخورس مارمرقس</option>
               </ng-container>
-            </select>
-            <select class="select" *ngIf="isAminOsra() && !isAminKhedmaOrDev()" [(ngModel)]="aminOsraTarget">
-              <option value="FAMILY">{{ autoTargetFamily || 'الأسرة التالية' }}</option>
-              <option value="KHORS_REQUEST:MARMARKOS">طلب نقل لخورس مارمرقس</option>
             </select>
             <select class="select roleSelect" *ngIf="showRoleSelector()" [(ngModel)]="targetRole">
               <option value="MAKHDOM">مخدوم</option>
               <option value="KHADIM">خادم</option>
               <option value="AMIN_OSRA">أمين أسرة</option>
               <option value="AMIN_KHEDMA">أمين خدمة</option>
-            </select>
-          </div>
-
-          <!-- Choir request selector (shown for كيرلس, انبا ابرام, اسطفانوس sources) -->
-          <div class="panelSelectors" *ngIf="showChoirRequest && targetFamily && !targetFamily.startsWith('KHORS')">
-            <select class="select" [(ngModel)]="targetChoir">
-              <option value="KHORS_REQUEST:MARMARKOS">بعت طلب دخول خورس مارمرقس</option>
             </select>
           </div>
 
