@@ -107,15 +107,6 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(200, 168, 137, 0.2);
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-
 .transferBtn {
   min-width: 64px;
   min-height: 44px;
@@ -597,24 +588,6 @@ select:focus {
   scroll-snap-align: start;
 }
 
-.panelTargetName {
-  font-size: 13px;
-  font-weight: 700;
-  color: #6f3b30;
-  padding: 6px 12px;
-  background: #f5f1ec;
-  border-radius: 8px;
-  text-align: center;
-  direction: rtl;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.panelTargetName i {
-  font-size: 12px;
-  margin-left: 4px;
-}
-
 .dropPanel__body {
   flex: 1;
   padding: 12px;
@@ -653,10 +626,6 @@ select:focus {
   box-shadow: 0 1px 0 rgba(111, 59, 48, 0.07);
   grid-template-columns: 28px 1fr auto;
   border: 1px solid rgba(111, 59, 48, 0.12);
-}
-
-.selectedItem--existing {
-  grid-template-columns: 28px 1fr auto;
 }
 
 .selectedRole {
@@ -768,23 +737,6 @@ select:focus {
 .roleSelect {
   flex-shrink: 0;
   min-width: 100px;
-}
-
-.autoTargetLabel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 800;
-  color: #6f3b30;
-  padding: 10px 14px;
-  background: #f4f0ea;
-  border-radius: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  min-height: 44px;
 }
 
 .targetLoading {
@@ -906,11 +858,6 @@ select:focus {
   .dropPanel {
     min-width: 240px;
   }
-
-  .existingMember {
-    padding: 6px 8px;
-    min-height: 32px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -945,31 +892,10 @@ select:focus {
     font-size: 13px;
   }
 
-  .lbl {
-    font-size: 12px;
-  }
-
   .transferBtn {
     min-height: 40px;
     font-size: 13px;
     padding: 6px 12px;
-  }
-
-  .transferBtn--primary,
-  .transferBtn--confirm,
-  .transferBtn--dark {
-    box-shadow: none;
-  }
-
-  .actions {
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-
-  .selHint {
-    font-size: 12px;
-    min-height: 30px;
-    padding: 5px 10px;
   }
 
   .hint {
@@ -1010,12 +936,6 @@ select:focus {
     padding-left: 88px;
   }
 
-  .selectedBadge {
-    min-height: 24px;
-    padding: 3px 7px;
-    font-size: 11px;
-    left: 6px;
-  }
 
   .selectedItem button {
     width: 22px;
@@ -1100,33 +1020,10 @@ select:focus {
     font-size: 13px;
   }
 
-  .extrasWrap {
-    padding: 2px 0 6px;
-  }
-
-  .extraRow {
-    min-width: min(340px, 90vw);
-    grid-template-columns: 1fr 1fr 32px;
-    gap: 4px;
-  }
-
   .miniBtn {
     width: 32px;
     height: 32px;
     font-size: 14px;
-  }
-
-  .existingMember {
-    padding: 5px 6px;
-    min-height: 28px;
-  }
-
-  .existingName {
-    font-size: 12px;
-  }
-
-  .existingRole {
-    font-size: 10px;
   }
 
   .targetLoading {
@@ -1405,10 +1302,6 @@ select:focus {
 
 .selectAllBtn--active:hover {
   background: #5a2f25 !important;
-}
-
-.selectedItem--existing {
-  grid-template-columns: minmax(0, 1fr) !important;
 }
 
 /* Member freed from target family shows with dashed border */

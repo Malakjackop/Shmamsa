@@ -19,7 +19,7 @@
           </div>
           <div class="extrasInline">
             <ng-container *ngIf="mode === 'SERVANT'">
-              <button type="button" class="addFamilyBtn" (click)="addExtraFamily()" [disabled]="!canAddExtraFamily()" title="إضافة أسرة">
+              <button type="button" class="addFamilyBtn" (click)="addExtraFamily()" title="إضافة أسرة">
                 <i class="pi pi-plus"></i> إضافة أسرة
               </button>
               <button type="button" class="distBtn" (click)="openDistribution()" title="توزيعة السنة">
@@ -177,14 +177,8 @@
               <i class="pi pi-spin pi-spinner"></i> جاري التحميل...
             </div>
 
-            <!-- Combined: existing members + pending transfers -->
-            <div class="selectedStack" *ngIf="!targetFamilyLoading && targetFamily && (displayTargetMembers.length + pendingMainMembers.length) > 0">
-              <div class="existingTitle">{{ targetFamilyLabel }} ({{ displayTargetMembers.length + pendingMainMembers.length }})</div>
-              <div class="selectedItem selectedItem--existing" *ngFor="let m of displayTargetMembers">
-                <button class="pi pi-times selectedItemRemove" (click)="removeExistingFromTarget(m)"></button>
-                <span class="selectedName">{{ m.fullName }}</span>
-                <span class="selectedRole">{{ getRoleLabel(targetExistingRole(m)) }}</span>
-              </div>
+            <div class="selectedStack" *ngIf="!targetFamilyLoading && targetFamily && pendingMainMembers.length > 0">
+              <div class="existingTitle">{{ targetFamilyLabel }} ({{ pendingMainMembers.length }})</div>
               <div class="selectedItem selectedItem--pending" *ngFor="let m of pendingMainMembers">
                 <button class="pi pi-times selectedItemRemove" (click)="removePendingMain(m.id)"></button>
                 <span class="selectedName">{{ m.fullName }}</span>
@@ -192,7 +186,7 @@
               </div>
             </div>
 
-            <div class="emptyDrop" *ngIf="!targetFamilyLoading && (!targetFamily || (displayTargetMembers.length + pendingMainMembers.length === 0))">
+            <div class="emptyDrop" *ngIf="!targetFamilyLoading && (!targetFamily || pendingMainMembers.length === 0)">
               {{ targetFamily ? 'اسحب الأعضاء هنا' : 'اختار أسرة أولاً' }}
             </div>
           </div>
