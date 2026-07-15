@@ -83,6 +83,8 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
     long countPresentByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
 
+    long countByUser_IdAndTypeAndCustomTitleAndArchivedFalse(Long userId, AttendanceType type, String customTitle);
+
     // أرشفة سجل الحضور (بدل الحذف) وربطه بالأرشيف
     @Modifying
     @Transactional

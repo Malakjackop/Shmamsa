@@ -1,4 +1,5 @@
 ﻿<p-toast position="top-left"></p-toast>
+<p-confirmDialog [draggable]="false" styleClass="app-surface-dialog" [style]="{ width: 'auto' }"></p-confirmDialog>
 
 <div class="page" dir="rtl">
   <div class="page-header">
@@ -1288,15 +1289,15 @@
       <div class="schedule-item" *ngFor="let s of scheduleItems; trackBy: trackScheduleItem">
         <div class="schedule-item__info">
           <span class="schedule-item__family" *ngIf="selectedScheduleFamilies.length > 1">{{ s.familyBase }}</span>
-          <span class="schedule-item__type">{{ scheduleTypeLabel(s.type) }}</span>
+          <span class="schedule-item__type">{{ scheduleTypeLabel(s.type, s.familyBase, s.dayOfWeek) }}</span>
           <span class="schedule-item__day">{{ scheduleDayLabel(s.dayOfWeek) }}</span>
           <span class="schedule-item__time">{{ scheduleTimeLabel(s.time) }}</span>
         </div>
         <div class="schedule-item__actions" *ngIf="s.id">
-          <button type="button" class="mini-btn" (click)="editSchedule(s)" aria-label="تعديل" title="تعديل">
+          <button type="button" class="mini-btn" (click)="editSchedule(s)" aria-label="تعديل">
             <i class="pi pi-pencil"></i>
           </button>
-          <button type="button" class="mini-btn danger" (click)="deleteSchedule(s)" aria-label="حذف" title="حذف">
+          <button type="button" class="mini-btn danger" (click)="deleteSchedule(s)" aria-label="حذف">
             <i class="pi pi-trash"></i>
           </button>
         </div>
@@ -1309,9 +1310,6 @@
       <button type="button" class="action-btn" (click)="addSchedule()" [disabled]="!scheduleForm.type || scheduleSaving">
         <i class="pi pi-plus"></i>
         {{ scheduleSaving ? 'جارٍ الحفظ...' : 'إضافة ميعاد' }}
-      </button>
-      <button type="button" class="mini-btn" (click)="closeScheduleDialog()">
-        إغلاق
       </button>
     </div>
   </ng-template>
@@ -1332,7 +1330,7 @@
   <div class="dialog-body" *ngIf="editScheduleItem">
     <div class="form-group">
       <label>نوع المناسبة</label>
-      <div class="readonly-box">{{ scheduleTypeLabel(editScheduleItem.type) }}</div>
+      <div class="readonly-box">{{ scheduleTypeLabel(editScheduleItem.type, editScheduleItem.familyBase, editScheduleItem.dayOfWeek) }}</div>
     </div>
     <div class="form-group">
       <label>اليوم</label>
@@ -1396,7 +1394,7 @@
   header="قواعد الحضور"
   [(visible)]="ruleGroupsDialogVisible"
   [modal]="true"
-  [style]="{ width: '560px', maxWidth: '95vw' }"
+  [style]="{ width: '600px', maxWidth: '95vw' }"
   styleClass="app-surface-dialog"
   [baseZIndex]="10020"
   [draggable]="false"
@@ -1404,58 +1402,62 @@
   dir="rtl"
 >
   <div class="dialog-body">
-    <p class="hint" style="margin-bottom:16px">
-      حدد مجموعات من الأنواع التي تعتبر بدائل عن بعضها. مثلاً: إذا حضن القداس يكتفي به ولا يحتاج للتسبحة.
-    </p>
 
-    <div *ngIf="!editableRuleGroups.length" class="hint" style="text-align:center;padding:24px 0">
-      لا توجد مجموعات بعد. أضف مجموعة جديدة.
+    <!-- Family picker -->
+    <div class="absence-mode-family-picker" *ngIf="absenceModeFamilyOptions().length">
+      <label>الأسرة</label>
+      <select [(ngModel)]="selectedConfigFamily" (ngModelChange)="onConfigFamilyChange()">
+        <option *ngFor="let fam of absenceModeFamilyOptions()" [value]="fam">{{ fam }}</option>
+      </select>
     </div>
 
-    <div *ngFor="let group of editableRuleGroups; let i = index" class="rule-group-card">
-      <div class="rule-group-card__head">
-        <input type="text" [(ngModel)]="group.name" placeholder="اسم المجموعة (مثلاً: قداس + تسبحة)" class="rule-group-card__name" />
-        <button type="button" class="mini-btn danger" (click)="removeRuleGroup(i)" aria-label="حذف المجموعة">
-          <i class="pi pi-trash"></i>
-        </button>
-      </div>
+    <!-- Absence mode per type -->
+    <div class="absence-mode-section" *ngIf="selectedConfigFamily">
+      <h3 class="absence-mode-section__title">نوع احتساب الغياب</h3>
 
-      <div class="rule-group-card__types">
-        <label class="rule-group-card__label">الأنواع في هذه المجموعة:</label>
-        <div class="rule-group-card__chips">
-          <button
-            *ngFor="let opt of availableTypesForRuleGroup()"
-            type="button"
-            class="rule-group-chip"
-            [class.rule-group-chip--selected]="group.types.includes(opt.value)"
-            (click)="toggleRuleGroupType(group, opt.value)"
-          >
-            {{ opt.label }}
-          </button>
+      <div class="absence-mode-picker">
+        <label>اختر المناسبة</label>
+        <select [(ngModel)]="selectedAbsenceModeType" (ngModelChange)="onAbsenceModeTypeChange()" class="absence-mode-type-select">
+          <option *ngFor="let opt of absenceModeTypeOptions()" [value]="opt.value">{{ opt.label }}</option>
+        </select>
+
+        <div class="absence-mode-value-picker" *ngIf="selectedAbsenceModeType">
+          <!-- Days selection first -->
+          <div class="absence-mode-days" *ngIf="absenceModeTypeDays(selectedAbsenceModeType).length">
+            <label>اختر الأيام المطبّق عليها:</label>
+            <div class="absence-mode-day-list">
+              <button
+                *ngFor="let d of absenceModeTypeDays(selectedAbsenceModeType)"
+                type="button"
+                class="absence-mode-chip"
+                [class.absence-mode-chip--active]="isAbsenceModeDaySelected(selectedAbsenceModeType, d)"
+                (click)="toggleAbsenceModeDay(selectedAbsenceModeType, d)"
+              >
+                {{ absenceModeDayLabel(d) }}
+              </button>
+            </div>
+          </div>
+          <!-- Then mode selection -->
+          <label style="margin-top:10px;display:block">نوع الاحتساب</label>
+          <div class="absence-mode-chips">
+            <button
+              *ngFor="let mode of absenceModeOptions"
+              type="button"
+              class="absence-mode-chip"
+              [class.absence-mode-chip--active]="isAbsenceModeSelected(selectedAbsenceModeType, mode.value)"
+              (click)="setAbsenceMode(selectedAbsenceModeType, mode.value)"
+            >
+              {{ mode.label }}
+            </button>
+          </div>
         </div>
       </div>
-
-      <div class="rule-group-card__options">
-        <label class="rule-group-card__toggle">
-          <input type="checkbox" [(ngModel)]="group.allRequired" />
-          كل الأنواع مطلوبة (غير بديلة)
-        </label>
-        <label class="rule-group-card__toggle">
-          <input type="checkbox" [(ngModel)]="group.bonusAllowed" [disabled]="group.allRequired" />
-          الحضور الإضافي يُحتسب كإضافي (Bonus)
-        </label>
-      </div>
     </div>
 
-    <button type="button" class="action-btn secondary" style="margin-top:12px;width:100%" (click)="addRuleGroup()">
-      <i class="pi pi-plus"></i>
-      إضافة مجموعة
-    </button>
   </div>
 
   <ng-template pTemplate="footer">
     <div class="dialog-footer">
-      <button type="button" class="mini-btn" (click)="cancelRuleGroups()">إلغاء</button>
       <button type="button" class="action-btn" (click)="saveRuleGroups()" [disabled]="configSaving">
         <i class="pi pi-check"></i>
         {{ configSaving ? 'جارٍ الحفظ...' : 'حفظ' }}

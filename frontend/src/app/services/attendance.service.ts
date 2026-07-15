@@ -72,6 +72,8 @@ export type AttendanceConfig = {
   familyAbsenceAllowedDays?: Record<string, number[]>;
   familyAbsenceOpenDays?: Record<string, number[]>;
   attendanceRuleGroups?: AttendanceRuleGroup[];
+  typeAbsenceModes?: Record<string, string[]>;
+  typeAbsenceModeDays?: Record<string, number[]>;
 };
 
 export type AttendanceAccessGrant = {
@@ -393,6 +395,8 @@ export class AttendanceService {
     FAMILY_MEETING_TOTAL?: number;
     FAMILY_MEETING_BY_FAMILY?: Record<string, number>;
     FAMILY_MEETING_TOTAL_BY_FAMILY?: Record<string, number>;
+    BONUS_STATS?: Record<string, number>;
+    ALTERNATIVE_STATS?: Record<string, { PRESENT: number; TOTAL: number }>;
   }> {
     if (!this.isBrowser) {
       return of({
@@ -418,6 +422,8 @@ export class AttendanceService {
       FAMILY_MEETING_TOTAL?: number;
       FAMILY_MEETING_BY_FAMILY?: Record<string, number>;
       FAMILY_MEETING_TOTAL_BY_FAMILY?: Record<string, number>;
+      BONUS_STATS?: Record<string, number>;
+      ALTERNATIVE_STATS?: Record<string, { PRESENT: number; TOTAL: number }>;
     }>(
       `${this.baseUrl}/my-stats-v2`,
       { withCredentials: true }

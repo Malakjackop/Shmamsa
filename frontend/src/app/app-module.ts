@@ -32,7 +32,7 @@ import { IftekadComponent } from './iftekad/iftekad';
 
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
-import { MessageService } from 'primeng/api';
+import { MessageService, ConfirmationService } from 'primeng/api';
 import { RoleLabelPipe } from './pipes/role-label.pipe';
 
 // ✅ PrimeNG Component Modules
@@ -112,6 +112,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
   providers: [
     { provide: LOCALE_ID, useValue: 'ar-EG' },
     MessageService,
+    ConfirmationService,
     provideHttpClient(withFetch()),
     providePrimeNG({
       theme: {

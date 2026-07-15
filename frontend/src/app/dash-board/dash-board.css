@@ -245,6 +245,15 @@
   text-align: center;
 }
 
+.service-card--bonus {
+  background: #fff8e1;
+  border-color: #f9a825;
+}
+
+.service-card--bonus .service-card__value {
+  color: #e65100;
+}
+
 .notice-section {
   margin-top: 44px;
 }

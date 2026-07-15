@@ -7,7 +7,7 @@ import { IftekadService, type IftekadVisitRecord } from '../services/iftekad.ser
 import { normalizeAssignmentRole, normalizeRole, roleLabel } from '../shared/role-utils';
 import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
-import { FamilyMemberDetails, FamilyMemberSummary } from '../services/family.service';
+import { FamilyMemberDetails } from '../services/family.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
 import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
 
@@ -764,6 +764,14 @@ reloadDetails(): void {
       if (item.customTitle) return d.customTitle === item.customTitle;
       return true;
     });
+  }
+
+  detailsSectionSummary(item: DetailsDisplayItem): string {
+    const records = this.filteredDetailsForItem(item);
+    const present = records.filter(r => (r.status || 'PRESENT') !== 'ABSENT').length;
+    const absent = records.filter(r => r.status === 'ABSENT').length;
+    if (absent === 0) return `${present}`;
+    return `${absent}/${present + absent}`;
   }
 
   trackByMember(_: number, m: Member): number {

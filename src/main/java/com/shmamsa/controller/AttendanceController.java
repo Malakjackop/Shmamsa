@@ -499,6 +499,15 @@ public class AttendanceController {
         User me = userRepo.findByUsername(auth.getName())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
 
+        var config = attendanceConfigService.getAttendanceConfig();
+        var absenceModes = config.getTypeAbsenceModes() == null ? Map.<String, List<String>>of() : config.getTypeAbsenceModes();
+
+        // Check if a type has a specific absence mode
+        java.util.function.BiPredicate<String, String> hasMode = (typeKey, mode) -> {
+            List<String> modes = absenceModes.get(typeKey);
+            return modes != null && modes.contains(mode);
+        };
+
         long fPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.FRIDAY_LITURGY);
         long mkPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.MARMARKOS_KHORS);
         long akPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.ATHANASIUS_KHORS);
@@ -519,25 +528,88 @@ public class AttendanceController {
             fb = fb == null ? "" : fb.trim();
             if (fb.isBlank()) continue;
             familyMeetingTotalByFamily.put(fb, familyMeetingTotalByFamily.getOrDefault(fb, 0L) + 1L);
-            // count only PRESENT (or null treated as present for legacy)
             if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
             familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
         }
 
-        return ResponseEntity.ok(Map.ofEntries(
-                Map.entry("FRIDAY_LITURGY", fPresent),
-                Map.entry("MARMARKOS_KHORS", mkPresent),
-                Map.entry("ATHANASIUS_KHORS", akPresent),
-                Map.entry("TASBEEHA", tPresent),
-                Map.entry("FAMILY_MEETING", mPresent),
-                Map.entry("FRIDAY_LITURGY_TOTAL", fTotal),
-                Map.entry("MARMARKOS_KHORS_TOTAL", mkTotal),
-                Map.entry("ATHANASIUS_KHORS_TOTAL", akTotal),
-                Map.entry("TASBEEHA_TOTAL", tTotal),
-                Map.entry("FAMILY_MEETING_TOTAL", mTotal),
-                Map.entry("FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily),
-                Map.entry("FAMILY_MEETING_TOTAL_BY_FAMILY", familyMeetingTotalByFamily)
-        ));
+        // ====== ALTERNATIVE mode: if type has ALTERNATIVE mode, compute week-based stats ======
+        java.util.function.Function<AttendanceType, Map<String, Long>> computeAlternativeStats = (type) -> {
+            Map<String, Long> result = new LinkedHashMap<>();
+            if (!hasMode.test(type.name(), "ALTERNATIVE")) {
+                return result;
+            }
+            List<AttendanceRecord> records = attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), type);
+            // Group by ISO week (Monday start)
+            Map<String, List<AttendanceRecord>> byWeek = new LinkedHashMap<>();
+            for (AttendanceRecord r : records) {
+                if (r.getDate() == null) continue;
+                LocalDate weekStart = r.getDate().with(java.time.DayOfWeek.MONDAY);
+                String weekKey = weekStart.toString();
+                byWeek.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(r);
+            }
+            long presentWeeks = 0;
+            long totalWeeks = byWeek.size();
+            for (List<AttendanceRecord> weekRecords : byWeek.values()) {
+                boolean hasPresent = weekRecords.stream().anyMatch(r -> r.getStatus() == null || r.getStatus() == AttendanceStatus.PRESENT);
+                if (hasPresent) presentWeeks++;
+            }
+            result.put("PRESENT", presentWeeks);
+            result.put("TOTAL", totalWeeks);
+            return result;
+        };
+
+        // ====== BONUS_ONLY mode: count bonus records ======
+        Map<String, Long> bonusStats = new LinkedHashMap<>();
+        List<AttendanceType> allTypes = List.of(
+                AttendanceType.FRIDAY_LITURGY, AttendanceType.TASBEEHA, AttendanceType.FAMILY_MEETING,
+                AttendanceType.MARMARKOS_KHORS, AttendanceType.ATHANASIUS_KHORS
+        );
+        for (AttendanceType type : allTypes) {
+            if (hasMode.test(type.name(), "BONUS_ONLY")) {
+                long bonusCount = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), type);
+                String label = config.getTypeLabels() == null ? type.name() : config.getTypeLabels().getOrDefault(type.name(), type.name());
+                bonusStats.put(label, bonusCount);
+            }
+        }
+        // Also count custom events with BONUS_ONLY mode
+        if (config.getCustomEvents() != null) {
+            for (var ev : config.getCustomEvents()) {
+                if (ev.getId() == null) continue;
+                String customKey = "CUSTOM_GROUP:" + (ev.getTitle() == null ? "" : ev.getTitle().trim().toLowerCase(Locale.ROOT))
+                        + "|" + (ev.getFamilyBase() == null ? "__all__" : canonicalFamilyName(ev.getFamilyBase()));
+                if (hasMode.test(customKey, "BONUS_ONLY")) {
+                    // Count present records for this custom event
+                    long cnt = attendanceRepo.countByUser_IdAndTypeAndCustomTitleAndArchivedFalse(me.getId(), AttendanceType.CUSTOM_EVENT, ev.getTitle());
+                    bonusStats.merge(ev.getTitle() == null ? "مناسبة مخصصة" : ev.getTitle(), cnt, Long::sum);
+                }
+            }
+        }
+
+        // ====== ALTERNATIVE-adjusted stats ======
+        Map<String, Map<String, Long>> alternativeStats = new LinkedHashMap<>();
+        for (AttendanceType type : allTypes) {
+            Map<String, Long> alt = computeAlternativeStats.apply(type);
+            if (!alt.isEmpty()) {
+                alternativeStats.put(type.name(), alt);
+            }
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("FRIDAY_LITURGY", fPresent);
+        response.put("MARMARKOS_KHORS", mkPresent);
+        response.put("ATHANASIUS_KHORS", akPresent);
+        response.put("TASBEEHA", tPresent);
+        response.put("FAMILY_MEETING", mPresent);
+        response.put("FRIDAY_LITURGY_TOTAL", fTotal);
+        response.put("MARMARKOS_KHORS_TOTAL", mkTotal);
+        response.put("ATHANASIUS_KHORS_TOTAL", akTotal);
+        response.put("TASBEEHA_TOTAL", tTotal);
+        response.put("FAMILY_MEETING_TOTAL", mTotal);
+        response.put("FAMILY_MEETING_BY_FAMILY", familyMeetingByFamily);
+        response.put("FAMILY_MEETING_TOTAL_BY_FAMILY", familyMeetingTotalByFamily);
+        response.put("BONUS_STATS", bonusStats);
+        response.put("ALTERNATIVE_STATS", alternativeStats);
+        return ResponseEntity.ok(response);
     }
 
 

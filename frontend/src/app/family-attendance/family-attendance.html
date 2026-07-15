@@ -336,7 +336,7 @@
                [class.open]="isExpanded(item)">
             <button type="button" class="detailsSectionHead" (click)="toggleDetailsSection(item)">
               <span>{{ item.label }}</span>
-              <span class="detailsSectionCount">{{ filteredDetailsForItem(item).length }}</span>
+              <span class="detailsSectionCount">{{ detailsSectionSummary(item) }}</span>
               <i class="pi pi-chevron-down detailsSectionArrow"></i>
             </button>
             <div class="detailsSectionBody" *ngIf="isExpanded(item)">

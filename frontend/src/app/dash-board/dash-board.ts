@@ -835,6 +835,8 @@ export class DashBoard implements OnInit, OnDestroy {
     return this.userFamilies()[0] || 'الأسرة';
   }
 
+  private bonusStats: Record<string, number> = {};
+
   get serviceCards(): ServiceCardView[] {
     const cards: ServiceCardView[] = [];
 
@@ -871,6 +873,16 @@ export class DashBoard implements OnInit, OnDestroy {
         label: khors.label,
         value: this.absenceLabel(khors.count, khors.total)
       });
+    }
+
+    // Bonus items
+    for (const [bonusLabel, bonusCount] of Object.entries(this.bonusStats)) {
+      if (bonusCount > 0) {
+        cards.push({
+          label: bonusLabel,
+          value: `+${bonusCount}`
+        });
+      }
     }
 
     return cards;
@@ -976,6 +988,7 @@ export class DashBoard implements OnInit, OnDestroy {
 
         this.familyMeetingByFamily = data?.FAMILY_MEETING_BY_FAMILY || {};
         this.familyMeetingTotalByFamily = data?.FAMILY_MEETING_TOTAL_BY_FAMILY || {};
+        this.bonusStats = data?.BONUS_STATS || {};
         this.rebuildFamilyMeetingCards();
       },
       error: () => {}

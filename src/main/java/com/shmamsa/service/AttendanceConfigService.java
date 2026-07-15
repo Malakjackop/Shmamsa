@@ -1,7 +1,10 @@
 package com.shmamsa.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AppSetting;
 import com.shmamsa.model.AttendanceType;
@@ -87,6 +90,12 @@ public class AttendanceConfigService {
 
         @Builder.Default
         private List<AttendanceRuleGroup> attendanceRuleGroups = new ArrayList<>();
+
+        @Builder.Default
+        private Map<String, List<String>> typeAbsenceModes = new LinkedHashMap<>();
+
+        @Builder.Default
+        private Map<String, List<Integer>> typeAbsenceModeDays = new LinkedHashMap<>();
     }
 
     public AttendanceConfigPayload getAttendanceConfig() {
@@ -261,10 +270,54 @@ public class AttendanceConfigService {
 
     private AttendanceConfigPayload fromSetting(AppSetting setting) {
         try {
-            AttendanceConfigPayload parsed = objectMapper.readValue(setting.getSettingValue(), AttendanceConfigPayload.class);
+            JsonNode root = objectMapper.readTree(setting.getSettingValue());
+            migrateAbsenceModes((ObjectNode) root);
+            AttendanceConfigPayload parsed = objectMapper.treeToValue(root, AttendanceConfigPayload.class);
             return normalize(parsed);
         } catch (Exception ex) {
             return defaultConfig();
+        }
+    }
+
+    /**
+     * Migrate old typeAbsenceModes format (Map&lt;String, String&gt;) to new format (Map&lt;String, List&lt;String&gt;&gt;).
+     * Also ensure typeAbsenceModeDays exists.
+     */
+    private void migrateAbsenceModes(ObjectNode root) {
+        JsonNode modes = root.get("typeAbsenceModes");
+        if (modes != null && modes.isObject()) {
+            ObjectNode modesObj = (ObjectNode) modes;
+            // Check if any value is a text (old format) instead of array
+            boolean needsMigration = false;
+            Iterator<String> it = modesObj.fieldNames();
+            while (it.hasNext()) {
+                JsonNode val = modesObj.get(it.next());
+                if (val != null && val.isTextual()) {
+                    needsMigration = true;
+                    break;
+                }
+            }
+            if (needsMigration) {
+                ObjectNode newModes = objectMapper.createObjectNode();
+                Iterator<String> it2 = modesObj.fieldNames();
+                while (it2.hasNext()) {
+                    String key = it2.next();
+                    JsonNode val = modesObj.get(key);
+                    if (val != null && val.isTextual()) {
+                        ArrayNode arr = objectMapper.createArrayNode();
+                        arr.add(val.asText());
+                        newModes.set(key, arr);
+                    } else {
+                        newModes.set(key, val);
+                    }
+                }
+                root.set("typeAbsenceModes", newModes);
+            }
+        } else if (modes == null) {
+            root.putObject("typeAbsenceModes");
+        }
+        if (!root.has("typeAbsenceModeDays")) {
+            root.putObject("typeAbsenceModeDays");
         }
     }
 
@@ -300,6 +353,10 @@ public class AttendanceConfigService {
                 ? new ArrayList<>()
                 : cfg.getAttendanceRuleGroups();
 
+        Map<String, List<String>> typeAbsenceModes = normalizeAbsenceModes(cfg.getTypeAbsenceModes());
+
+        Map<String, List<Integer>> typeAbsenceModeDays = normalizeAbsenceModeDays(cfg.getTypeAbsenceModeDays());
+
         return AttendanceConfigPayload.builder()
                 .servantEntryOpenDays(openDays)
                 .servantSelectableEventDays(computeSelectableEventDays(typeDays, familyTypeDays, customEvents))
@@ -311,6 +368,8 @@ public class AttendanceConfigService {
                 .familyAbsenceOpenDays(familyAbsenceOpenDays)
                 .customEvents(customEvents)
                 .attendanceRuleGroups(ruleGroups)
+                .typeAbsenceModes(typeAbsenceModes)
+                .typeAbsenceModeDays(typeAbsenceModeDays)
                 .build();
     }
 
@@ -405,6 +464,43 @@ public class AttendanceConfigService {
         return out;
     }
 
+    private static Map<String, List<String>> normalizeAbsenceModes(Map<String, List<String>> raw) {
+        Map<String, List<String>> out = new LinkedHashMap<>();
+        if (raw == null) return out;
+        Set<String> valid = Set.of("PRIMARY", "ALTERNATIVE", "ALTERNATIVE_BONUS", "BONUS_ONLY");
+        raw.forEach((k, v) -> {
+            String key = k == null ? null : k.trim().toUpperCase(Locale.ROOT);
+            if (key == null || key.isBlank()) return;
+            if (v == null || v.isEmpty()) return;
+            List<String> normalizedValues = new ArrayList<>();
+            for (String mode : v) {
+                if (mode == null) continue;
+                String val = mode.trim().toUpperCase(Locale.ROOT);
+                if (valid.contains(val)) {
+                    normalizedValues.add(val);
+                }
+            }
+            if (!normalizedValues.isEmpty()) {
+                out.put(key, normalizedValues);
+            }
+        });
+        return out;
+    }
+
+    private static Map<String, List<Integer>> normalizeAbsenceModeDays(Map<String, List<Integer>> raw) {
+        Map<String, List<Integer>> out = new LinkedHashMap<>();
+        if (raw == null) return out;
+        raw.forEach((k, v) -> {
+            String key = k == null ? null : k.trim().toUpperCase(Locale.ROOT);
+            if (key == null || key.isBlank()) return;
+            List<Integer> days = normalizeDays(v, List.of());
+            if (!days.isEmpty()) {
+                out.put(key, days);
+            }
+        });
+        return out;
+    }
+
     private static CustomEventConfig normalizeCustomEvent(CustomEventConfig raw, boolean generateIdWhenMissing) {
         if (raw == null) return null;
         String familyBase = clean(raw.getFamilyBase());
@@ -469,6 +565,8 @@ public class AttendanceConfigService {
                 .familyAbsenceAllowedDays(new LinkedHashMap<>())
                 .familyAbsenceOpenDays(new LinkedHashMap<>())
                 .customEvents(new ArrayList<>())
+                .typeAbsenceModes(new LinkedHashMap<>())
+                .typeAbsenceModeDays(new LinkedHashMap<>())
                 .build();
     }
 

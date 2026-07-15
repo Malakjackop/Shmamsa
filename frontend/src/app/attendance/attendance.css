@@ -2990,6 +2990,29 @@ textarea {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #d7c2b5 transparent;
+}
+
+.custom-editor-chips::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-editor-chips::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.custom-editor-chips::-webkit-scrollbar-thumb {
+  background: #d7c2b5;
+  border-radius: 999px;
+}
+
+.custom-editor-chips::-webkit-scrollbar-thumb:hover {
+  background: #c7ac9c;
 }
 
 .custom-editor-chip {
@@ -3572,4 +3595,129 @@ textarea {
   gap: 0.5rem;
   color: #5e2b20 !important;
   font-weight: 900 !important;
+}
+
+/* ── Absence Mode Dialog ── */
+
+.absence-mode-family-picker {
+  margin-bottom: 16px;
+}
+
+.absence-mode-family-picker label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #7d6f69;
+  margin-bottom: 6px;
+}
+
+.absence-mode-family-picker select {
+  width: 100%;
+  border: 1px solid #e4dad3;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #2f2723;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.absence-mode-section__title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #2f2723;
+  margin: 0 0 12px 0;
+}
+
+.absence-mode-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.absence-mode-picker label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #7d6f69;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.absence-mode-type-select {
+  width: 100%;
+  border: 1px solid #e4dad3;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #2f2723;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.absence-mode-value-picker {
+  margin-top: 4px;
+}
+
+.absence-mode-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.absence-mode-chip {
+  border: 1px solid #e4dad3;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: #fff;
+  color: #5e2b20;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.absence-mode-chip:hover {
+  background: #efe1da;
+  border-color: #8d5144;
+}
+
+.absence-mode-chip--active {
+  background: #8d5144;
+  color: #fff;
+  border-color: #8d5144;
+}
+
+.absence-mode-chip--active:hover {
+  background: #7a4538;
+  color: #fff;
+  border-color: #7a4538;
+}
+
+.absence-mode-days {
+  margin-top: 12px;
+}
+
+.absence-mode-days label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #7d6f69;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.absence-mode-day-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.absence-mode-advanced {
+  border-top: 1px solid #efe4de;
+  padding-top: 12px;
+}
+
+.absence-mode-advanced summary {
+  user-select: none;
 }
