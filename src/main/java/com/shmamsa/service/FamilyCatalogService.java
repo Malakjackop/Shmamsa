@@ -98,6 +98,21 @@ public class FamilyCatalogService {
         return out;
     }
 
+    public List<String> branchNamesForBase(String familyName) {
+        String x = String.valueOf(familyName == null ? "" : familyName).trim();
+        if (x.isBlank()) return List.of();
+        FamilyCatalog selected = findByName(x);
+        if (selected == null || !Boolean.TRUE.equals(selected.getActive())) return List.of();
+
+        String baseName = String.valueOf(selected.getBaseName() == null ? selected.getNameAr() : selected.getBaseName()).trim();
+        return familyCatalogRepository.findByActiveTrueAndBaseName(baseName).stream()
+                .filter(item -> item.getBranch() != null && !item.getBranch().isBlank())
+                .map(FamilyCatalog::getNameAr)
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .toList();
+    }
+
     public boolean isValidServantFamily(String name) {
         String x = String.valueOf(name == null ? "" : name).trim();
         FamilyCatalog item = findByName(x);

@@ -101,6 +101,12 @@ export class FamilyService {
     this.isBrowser = isPlatformBrowser(platformId);
   }
 
+  branches(family: string): Observable<string[]> {
+    if (!this.isBrowser) return of([]);
+    let params = new HttpParams().set('family', family);
+    return this.http.get<string[]>(`${this.baseUrl}/families/branches`, { params, withCredentials: true });
+  }
+
   families(context?: string): Observable<string[]> {
     if (!this.isBrowser) return of([]);
     let params = new HttpParams();

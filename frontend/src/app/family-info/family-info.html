@@ -31,6 +31,14 @@
       </ng-template>
     </div>
 
+    <div class="filterGroup filterGroup--branch" *ngIf="canSelectFamily() && branches.length > 0">
+      <label>الفرع</label>
+      <select [(ngModel)]="selectedBranch" (change)="onBranchChange()">
+        <option value="ALL">الكل</option>
+        <option *ngFor="let branch of branches" [value]="branch">{{ branchLabel(branch) }}</option>
+      </select>
+    </div>
+
     <div class="filterGroup birthdayFilter">
       <label>تاريخ الميلاد</label>
       <button
@@ -119,6 +127,21 @@
         <option *ngFor="let grade of gradeOptions" [value]="grade">{{ grade }}</option>
       </select>
     </div>
+
+    <div class="filterGroup" *ngIf="deaconDegreeOptions.length > 0">
+      <label>رتبة الشماسة</label>
+      <select [(ngModel)]="selectedDeaconDegree" (change)="onDeaconDegreeChange()">
+        <option value="">كل الرتب</option>
+        <option *ngFor="let degree of deaconDegreeOptions" [value]="degree">{{ degree }}</option>
+      </select>
+    </div>
+
+    <div class="filterGroup filterGroup--download" *ngIf="showFilteredExport && filteredMembers.length">
+      <label>&nbsp;</label>
+      <button type="button" class="notifBtn" (click)="downloadFilteredPdf()" title="تحميل PDF">
+        <i class="pi pi-download"></i>
+      </button>
+    </div>
   </div>
 
   <div *ngIf="loading" class="emptyState">
@@ -138,7 +161,7 @@
       [class.memberCard--green]="member.uiAttendanceVisual.colorState === 'green'"
       [class.memberCard--yellow]="member.uiAttendanceVisual.colorState === 'yellow'"
       [class.memberCard--red]="member.uiAttendanceVisual.colorState === 'red'"
-      [class.memberCard--selected]="exportMode && member.selected"
+
       [style.--card-fill-ratio]="member.uiAttendanceVisual.fillRatio"
       [style.--card-surface-opacity]="member.uiAttendanceVisual.surfaceOpacity"
       [style.--card-fill-delay]="(i * 90) + 'ms'"

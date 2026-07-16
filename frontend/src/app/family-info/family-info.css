@@ -62,11 +62,16 @@
 }
 
 .filtersBar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 14px;
   align-items: end;
   margin-bottom: 14px;
+}
+
+.filtersBar .filterGroup {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .filterGroup {
@@ -92,6 +97,24 @@
   color: #1f1f1f;
   font-size: 14px;
   outline: none;
+}
+
+.filterGroup--branch {
+  flex: 0 0 auto;
+  min-width: 0;
+  gap: 3px;
+}
+
+.filterGroup--branch label {
+  font-size: 11px;
+}
+
+.filterGroup--branch select {
+  width: auto;
+  min-width: 50px;
+  min-height: 46px;
+  padding: 2px 6px;
+  font-size: 12px;
 }
 
 .singleSelectValue {
@@ -277,10 +300,10 @@
 }
 
 .detailsIconBtn {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border: 1px solid #e4ddd2;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   color: #5f574d;
   display: inline-flex;
@@ -293,9 +316,9 @@
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 
 .detailAdminField {
@@ -311,32 +334,33 @@
 }
 
 .detailAdminField select {
-  min-width: 240px;
+  min-width: 180px;
 }
 
 .profileGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .profileGrid > div {
   border: 1px solid #ede6dc;
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
   background: #fffdfb;
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
 .title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
 }
 
 .sub {
-  margin-top: 4px;
+  margin-top: 2px;
   color: #6c6459;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .phoneInline {
@@ -356,6 +380,16 @@
   cursor: pointer;
 }
 
+.filterGroup--download {
+  flex: 0 0 auto;
+  min-width: 0;
+  gap: 3px;
+}
+
+.filterGroup--download label {
+  font-size: 11px;
+}
+
 .emptyState,
 .hint {
   padding: 16px;
@@ -367,8 +401,8 @@
 
 .memberGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
 }
 
 .memberCard {
@@ -379,19 +413,23 @@
   --card-fill-delay: 0ms;
   position: relative;
   width: 100%;
-  max-width: 252px;
-  min-height: 258px;
-  height: 258px;
+  min-height: 150px;
+  height: 150px;
   justify-self: center;
   border: none;
-  border-radius: 18px;
+  border-radius: 14px;
   background: #ffffff;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: none;
-  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
   animation: cardReveal 720ms cubic-bezier(0.2, 0.8, 0.24, 1) both;
   animation-delay: var(--card-fill-delay);
+}
+
+.memberCard:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
 .memberCard::before {
@@ -473,17 +511,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 3px;
   height: 100%;
-  padding: 26px 18px;
+  padding: 10px 8px;
   text-align: center;
 }
 
 .memberCard__name {
   margin: 0;
-  min-height: 72px;
+  min-height: 32px;
   text-align: center;
-  font-size: 26px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.2;
   display: -webkit-box;
@@ -496,9 +534,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   direction: ltr;
-  min-height: 24px;
+  min-height: 18px;
 }
 
 .memberCard__copy {
@@ -515,7 +553,7 @@
 }
 
 .memberCard__copy .pi {
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .memberCard__phoneRow--empty {
@@ -527,28 +565,25 @@
 .memberCard__birthDate,
 .memberCard__attendanceLine {
   color: #2b2b2b;
-  line-height: 1.35;
+  line-height: 1.3;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .memberCard__phoneValue {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
 }
 
 .memberCard__grade {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
 }
 
 .memberCard__birthDate {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
 }
 
 .memberCard__attendanceLine {
-  margin-top: 2px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
 }
 
 .modal {
@@ -558,22 +593,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 40px 16px;
   z-index: 40;
 }
 
 .modalCard {
   width: min(900px, 100%);
-  max-height: 90vh;
-  overflow: auto;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
   padding: 16px;
   border-radius: 18px;
   background: #fff;
 }
 
 .modalCard.profileModal {
-  width: min(840px, 100%);
-  padding: 18px;
+  width: min(560px, 100%);
+  padding: 14px;
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.16);
 }
 
@@ -586,7 +621,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .modalActions {
@@ -698,7 +733,13 @@
   }
 
   .filtersBar {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+  }
+
+  .filtersBar .filterGroup {
+    flex: 1 1 auto;
+    max-width: 50%;
+    min-width: 0;
   }
 
   .birthdayPanel {
@@ -711,18 +752,18 @@
   }
 
   .memberCard {
-    min-height: 250px;
-    height: 250px;
+    min-height: 120px;
+    height: 120px;
   }
 
   .memberCard__content {
-    padding: 22px 16px;
-    gap: 9px;
+    padding: 8px 6px;
+    gap: 2px;
   }
 
   .memberCard__name {
-    min-height: 62px;
-    font-size: 24px;
+    min-height: 26px;
+    font-size: 14px;
   }
 }
 
@@ -736,31 +777,28 @@
   }
 
   .memberGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
   }
 
   .memberCard {
-    max-width: 320px;
-    margin: 0 auto;
-    min-height: 244px;
-    height: 244px;
-    border-radius: 16px;
+    min-height: 110px;
+    height: 110px;
+    border-radius: 10px;
+  }
+
+  .memberCard__content {
+    padding: 8px 6px;
+    gap: 2px;
   }
 
   .memberCard__name {
-    min-height: 54px;
-    font-size: 22px;
+    min-height: 26px;
+    font-size: 14px;
   }
 
   .memberCard__copy {
-    width: 16px;
-    height: 16px;
-  }
-
-  .memberCard__phoneValue,
-  .memberCard__grade,
-  .memberCard__birthDate,
-  .memberCard__attendanceLine {
-    font-size: 12px;
+    width: 14px;
+    height: 14px;
   }
 }

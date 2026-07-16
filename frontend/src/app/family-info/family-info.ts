@@ -1,11 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { ConfirmationService, MessageService } from 'primeng/api';
-import { of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+
 import { AdminService } from '../services/admin.service';
 import { AuthService, AuthUser } from '../services/auth.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
-import { FamilyMemberDetails, FamilyMemberSummary, FamilyService } from '../services/family.service';
+import { FamilyMemberSummary, FamilyService } from '../services/family.service';
 import { KhorsJoinRequestView, KhorsRequestsService } from '../services/khors-requests.service';
 import { FamilyJoinRequestService, FamilyJoinRequestView } from '../services/family-join-request.service';
 import {
@@ -57,6 +56,7 @@ type Member = {
   guardiansPhone?: string;
   schoolGrade?: string;
   dateOfBirth?: string;
+  deaconDegree?: string;
   khors?: string;
   khorsYear?: number | string | null;
   servingScope?: string;
@@ -73,7 +73,6 @@ type Member = {
   marmarkosKhorsTotal?: number;
   athanasiusKhorsPresent?: number;
   athanasiusKhorsTotal?: number;
-  selected?: boolean;
   uiDisplayPhone: string;
   uiPhoneCaption: string;
   uiGradeLabel: string;
@@ -169,12 +168,14 @@ export class FamilyInfoComponent implements OnInit {
   selectedFamily = '';
   loading = false;
 
-  selectAll = false;
-  exportMode = false;
-  pendingExport: 'pdf' | null = null;
+
+  branches: string[] = [];
+  selectedBranch = 'ALL';
 
   selectedSchoolGrade = '';
   gradeOptions: string[] = [];
+  selectedDeaconDegree = '';
+  deaconDegreeOptions: string[] = [];
   birthdayPanelOpen = false;
   birthdayFilterMode: 'DAY' | 'MONTH' = 'DAY';
   selectedBirthdayMonth: number | null = null;
@@ -265,10 +266,6 @@ export class FamilyInfoComponent implements OnInit {
     return this.birthdayFilterMode === 'MONTH' ? 'اختر الشهر' : 'اختر اليوم';
   }
 
-  selectedMembersCount(): number {
-    return this.getSelectedMembers().length;
-  }
-
   hasEnabledBirthdayDayOptions(): boolean {
     return this.birthdayDayOptions.some((option) => !option.disabled);
   }
@@ -312,10 +309,29 @@ export class FamilyInfoComponent implements OnInit {
     this.applyFilters();
   }
 
+  onDeaconDegreeChange() {
+    this.applyFilters();
+  }
+
   onFamilyChange() {
     this.resetInteractiveStateForNewFamily();
+    this.loadBranches();
     this.loadMembers();
     this.loadFamilyPendingRequestsCount();
+  }
+
+  onBranchChange() {
+    this.selectedSchoolGrade = '';
+    this.selectedDeaconDegree = '';
+    this.selectedBirthdayMonth = null;
+    this.selectedBirthdayDay = null;
+    this.closeProfile();
+    this.loadMembers();
+  }
+
+  branchLabel(branchName: string): string {
+    const s = branchName.trim();
+    return s.length > 0 ? s.charAt(s.length - 1) : '';
   }
 
   openProfile(member: Member) {
@@ -383,23 +399,6 @@ export class FamilyInfoComponent implements OnInit {
     } catch {
       this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل نسخ الرقم' });
     }
-  }
-
-  toggleSelectAll() {
-    this.members.forEach((member) => (member.selected = this.selectAll));
-  }
-
-  onMemberSelectionChange() {
-    const anySelected = this.members.some((member) => !!member.selected);
-    if (!anySelected) {
-      this.selectAll = false;
-      return;
-    }
-    this.selectAll = this.members.every((member) => !!member.selected);
-  }
-
-  private getSelectedMembers(): Member[] {
-    return (this.members || []).filter((member) => !!member.selected);
   }
 
   profileEntries(): Array<{ label: string; value: string }> {
@@ -517,17 +516,14 @@ export class FamilyInfoComponent implements OnInit {
     });
   }
 
-  async exportPdf() {
-    if (!this.exportMode) {
-      this.exportMode = true;
-      this.pendingExport = 'pdf';
-      this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
-      return;
-    }
+  get showFilteredExport(): boolean {
+    return !!(this.selectedSchoolGrade || this.selectedDeaconDegree);
+  }
 
-    if (this.pendingExport && this.pendingExport !== 'pdf') {
-      this.pendingExport = 'pdf';
-      this.message.add({ severity: 'info', summary: 'حدد الاعضاء', detail: 'اختر عضو ثم اضغط تحميل' });
+  async downloadFilteredPdf() {
+    const list = this.filteredMembers;
+    if (!list.length) {
+      this.message.add({ severity: 'warn', summary: '', detail: 'لا يوجد أعضاء للتصدير' });
       return;
     }
 
@@ -535,16 +531,7 @@ export class FamilyInfoComponent implements OnInit {
       const jsPDF = (await import('jspdf')).default;
       const autoTable = (await import('jspdf-autotable')).default;
 
-      const selected = this.getSelectedMembers();
-      if (!selected.length) {
-        this.message.add({ severity: 'warn', summary: 'حدد الاعضاء', detail: 'برجاء اختيار عضو واحد علي الاقل' });
-        return;
-      }
-
-    const famParam = this.canSelectFamily() ? this.selectedFamily : undefined;
-      const detailsArr = await this.fetchDetailsForMembers(selected, famParam);
-
-      const doc = new jsPDF({ orientation: 'landscape' });
+      const doc = new jsPDF({ orientation: 'portrait' });
       await ensureDejaVuFont(doc);
       const pdfText = createPdfText(doc, jsPDF);
       const pageRight = doc.internal.pageSize.getWidth() - 14;
@@ -552,84 +539,56 @@ export class FamilyInfoComponent implements OnInit {
       doc.setFontSize(14);
       doc.text(pdfText('بيانات الأعضاء'), pageRight, 14, { align: 'right' });
       doc.setFontSize(10);
-      if (this.selectedFamily) {
-        doc.text(pdfText(`الأسرة: ${this.selectedFamily}`), pageRight, 22, { align: 'right' });
+      let subtitle = this.selectedFamily || '';
+      if (this.selectedSchoolGrade) subtitle += ` - ${this.selectedSchoolGrade}`;
+      if (this.selectedDeaconDegree) subtitle += ` - ${this.selectedDeaconDegree}`;
+      if (subtitle) {
+        doc.text(pdfText(subtitle), pageRight, 22, { align: 'right' });
       }
 
-      let y = 28;
-      selected.forEach((member, idx) => {
-        const detail = ((detailsArr[idx] || null) as ProfileView | null) || {};
+      const calcAge = (dob?: string): string => {
+        if (!dob) return '';
+        const match = dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return '';
+        const birth = new Date(+match[1], +match[2] - 1, +match[3]);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const mDiff = today.getMonth() - birth.getMonth();
+        if (mDiff < 0 || (mDiff === 0 && today.getDate() < birth.getDate())) age--;
+        return String(age);
+      };
 
-        doc.setFontSize(12);
-        doc.text(pdfText(`${member.fullName} (${this.roleAr(member.role)})`), pageRight, y, { align: 'right' });
-        y += 4;
+      const rows: string[][] = list.map((m) => [
+        pdfText(m.fullName),
+        pdfText(calcAge(m.dateOfBirth)),
+        pdfText(m.schoolGrade || ''),
+        pdfText(m.deaconDegree || ''),
+        pdfText(m.phoneNumber || ''),
+        pdfText(m.guardiansPhone || '')
+      ]);
 
-        const show = (value: unknown) => {
-          const text = String(value ?? '').trim();
-          return text ? text : '-';
-        };
-
-        const rows: [string, string][] = [
-          ['رقم الهاتف', String(detail.phoneNumber ?? member.phoneNumber ?? '')],
-          ['هاتف ولي الأمر', String(detail.guardiansPhone ?? member.guardiansPhone ?? '')],
-          ['العنوان', String(detail.address ?? member.address ?? '')],
-          ['الصف الدراسي', String(detail.schoolGrade ?? member.schoolGrade ?? '')],
-          ['اسم المستخدم', String(detail.username ?? '')],
-          ['البريد الإلكتروني', String(detail.email ?? '')],
-          ['الرقم القومي', String(detail.nationalId ?? '')],
-          ['الرتبة', String(detail.deaconDegree ?? '')],
-          ['صلة القرابة', this.guardianRelationAr(detail.guardianRelation)],
-          ['تاريخ الميلاد', this.formatDateValue(detail.dateOfBirth)],
-          ['النوع', this.genderAr(detail.gender)],
-          ['الحالة', this.statusAr(detail.status)],
-          ['نوع الدراسة', this.studyTypeAr(detail.studyType)],
-          ['اسم المدرسة', String(detail.schoolName ?? '')],
-          ['اسم الجامعة', String(detail.universityName ?? '')],
-          ['الكلية', String(detail.faculty ?? '')],
-          ['السنة الجامعية', String(detail.universityGrade ?? '')],
-          ['الوظيفة', String(detail.graduateJob ?? '')],
-          ['هل يعمل', this.yesNoAr(detail.isWorking)],
-          ['تفاصيل العمل', String(detail.workDetails ?? '')]
-        ];
-
-        const kv: [string, string][] = rows.map(([k, v]) => [pdfText(show(v)), pdfText(k)]);
-
-        autoTable(doc, {
-          startY: y,
-          head: [[pdfText('القيمة'), pdfText('البيان')]],
-          body: kv,
-          theme: 'grid',
-          styles: { font: 'DejaVu', fontSize: 9, cellPadding: 2, overflow: 'linebreak', halign: 'right' },
-          columnStyles: {
-            0: { cellWidth: 220 },
-            1: { cellWidth: 45 }
-          },
-          margin: { left: 14, right: 14 }
-        });
-
-        y = (doc as any).lastAutoTable.finalY + 10;
-        if (y > 180 && idx < selected.length - 1) {
-          doc.addPage();
-          y = 20;
-        }
+      autoTable(doc, {
+        startY: 28,
+        head: [[pdfText('الاسم'), pdfText('السن'), pdfText('السنة الدراسية'), pdfText('رتبة الشماسة'), pdfText('التليفون'), pdfText('تليفون ولي الأمر')]],
+        body: rows,
+        theme: 'grid',
+        styles: { font: 'DejaVu', fontSize: 9, cellPadding: 3, overflow: 'linebreak', halign: 'right' },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 40 },
+          5: { cellWidth: 40 }
+        },
+        margin: { left: 10, right: 10 }
       });
 
-      doc.save(`family_${this.selectedFamily || 'my'}_members_info.pdf`);
-      this.exitExportMode();
+      doc.save(`filtered_members.pdf`);
+      this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تحميل PDF' });
     } catch {
       this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تصدير PDF' });
     }
-  }
-
-  cancelExport() {
-    this.exitExportMode();
-  }
-
-  private exitExportMode() {
-    this.exportMode = false;
-    this.pendingExport = null;
-    this.selectAll = false;
-    this.members.forEach((member) => (member.selected = false));
   }
 
   canDecideKhorsRequests(): boolean {
@@ -792,6 +751,7 @@ export class FamilyInfoComponent implements OnInit {
           this.families = sortFamiliesByPreferredOrder(families || [], this.preferredFamilyOrder);
           if (this.families.length) {
             this.selectedFamily = this.families[0];
+            this.loadBranches();
             this.loadMembers();
             this.loadFamilyPendingRequestsCount();
           }
@@ -799,12 +759,14 @@ export class FamilyInfoComponent implements OnInit {
         error: () => {
           this.families = [];
           this.selectedFamily = '';
+          this.loadBranches();
           this.loadMembers();
           this.familyRequestsPendingCount = 0;
         }
       });
     } else {
       this.selectedFamily = this.assignmentsOf(this.me)[0]?.familyName || '';
+      this.loadBranches();
       this.loadMembers();
       this.loadFamilyPendingRequestsCount();
     }
@@ -812,7 +774,9 @@ export class FamilyInfoComponent implements OnInit {
 
   private loadMembers() {
     this.loading = true;
-    const famParam = this.selectedFamily || undefined;
+    const famParam = this.selectedBranch !== 'ALL' && this.selectedBranch
+      ? this.selectedBranch
+      : (this.selectedFamily || undefined);
 
     this.familySvc.members(famParam).subscribe({
       next: (rows) => {
@@ -830,6 +794,26 @@ export class FamilyInfoComponent implements OnInit {
     });
   }
 
+  private loadBranches() {
+    if (!this.selectedFamily) {
+      this.branches = [];
+      this.selectedBranch = 'ALL';
+      return;
+    }
+    this.familySvc.branches(this.selectedFamily).subscribe({
+      next: (list) => {
+        this.branches = list || [];
+        if (this.selectedBranch !== 'ALL' && !this.branches.includes(this.selectedBranch)) {
+          this.selectedBranch = 'ALL';
+        }
+      },
+      error: () => {
+        this.branches = [];
+        this.selectedBranch = 'ALL';
+      }
+    });
+  }
+
   private prepareMember(summary: FamilyMemberSummary): Member {
     const base = summary as Member;
     const displayPhone = String(base.phoneNumber || base.guardiansPhone || '').trim();
@@ -842,7 +826,6 @@ export class FamilyInfoComponent implements OnInit {
       fullName: String(base.fullName || '').trim(),
       role: String(base.role || '').trim(),
       deaconFamily: String(base.deaconFamily || '').trim(),
-      selected: !!base.selected,
       uiDisplayPhone: displayPhone,
       uiPhoneCaption: base.phoneNumber ? 'الهاتف' : base.guardiansPhone ? 'هاتف ولي الأمر' : 'لا يوجد رقم',
       uiGradeLabel: String(base.schoolGrade || '').trim() || 'غير مسجلة',
@@ -975,6 +958,19 @@ export class FamilyInfoComponent implements OnInit {
       this.selectedSchoolGrade = '';
     }
 
+    const deaconDegrees = Array.from(
+      new Set(
+        this.members
+          .map((member) => String(member.deaconDegree || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ar'));
+
+    this.deaconDegreeOptions = deaconDegrees;
+    if (this.selectedDeaconDegree && !deaconDegrees.includes(this.selectedDeaconDegree)) {
+      this.selectedDeaconDegree = '';
+    }
+
     this.rebuildBirthdayMonthOptions();
     this.rebuildBirthdayDayOptions();
   }
@@ -1040,6 +1036,10 @@ export class FamilyInfoComponent implements OnInit {
       result = result.filter((member) => String(member.schoolGrade || '').trim() === this.selectedSchoolGrade);
     }
 
+    if (this.selectedDeaconDegree) {
+      result = result.filter((member) => String(member.deaconDegree || '').trim() === this.selectedDeaconDegree);
+    }
+
     if (this.birthdayFilterMode === 'MONTH' && this.selectedBirthdayMonth != null) {
       result = result.filter((member) => member.uiBirthdayMonth === this.selectedBirthdayMonth);
     }
@@ -1056,7 +1056,6 @@ export class FamilyInfoComponent implements OnInit {
     }
 
     this.filteredMembers = result;
-    this.selectAll = this.members.length > 0 && this.members.every((member) => !!member.selected);
 
     if (this.profileFor && !result.some((member) => member.id === this.profileFor?.id)) {
       this.closeProfile();
@@ -1065,10 +1064,11 @@ export class FamilyInfoComponent implements OnInit {
 
   private resetInteractiveStateForNewFamily() {
     this.selectedSchoolGrade = '';
+    this.selectedDeaconDegree = '';
     this.selectedBirthdayMonth = null;
     this.selectedBirthdayDay = null;
     this.birthdayPanelOpen = false;
-    this.selectAll = false;
+    this.selectedBranch = 'ALL';
     this.closeProfile();
   }
 
@@ -1211,85 +1211,6 @@ export class FamilyInfoComponent implements OnInit {
       isSystem: true,
       showIn: ''
     }).includes('FAMILY_INFO');
-  }
-
-  private fetchDetailsForMembers(list: Member[], famParam?: string): Promise<FamilyMemberDetails[]> {
-    if (!list?.length) return Promise.resolve([]);
-
-    return Promise.all(
-      list.map(
-        (member) =>
-          new Promise<FamilyMemberDetails>((resolve) => {
-            this.familySvc
-              .memberDetails(member.id, famParam)
-              .pipe(catchError(() => of({})))
-              .subscribe({
-                next: (details) => resolve((details || {}) as FamilyMemberDetails),
-                error: () => resolve({})
-              });
-          })
-      )
-    );
-  }
-
-  private roleAr(role?: string): string {
-    const normalized = normalizeRole(role);
-    if (normalized === 'DEVELOPER') return 'مطوّر';
-    if (normalized === 'AMIN_KHEDMA') return 'أمين خدمة';
-    if (normalized === 'AMIN_OSRA') return 'أمين أسرة';
-    if (normalized === 'KHADIM') return 'خادم';
-    return role || '';
-  }
-
-  private genderAr(value?: string): string {
-    const normalized = (value || '').toUpperCase();
-    if (normalized === 'MALE') return 'ذكر';
-    if (normalized === 'FEMALE') return 'أنثى';
-    return value || '';
-  }
-
-  private studyTypeAr(value?: string): string {
-    const normalized = (value || '').toUpperCase();
-    if (normalized === 'SCHOOL') return 'مدرسي';
-    if (normalized === 'UNIVERSITY') return 'جامعي';
-    if (normalized === 'GRADUATE') return 'خريج';
-    return value || '';
-  }
-
-  private statusAr(value?: string): string {
-    const normalized = (value || '').toUpperCase();
-    if (normalized === 'ACTIVE') return 'نشط';
-    if (normalized === 'INACTIVE') return 'غير نشط';
-    if (normalized === 'SUSPENDED') return 'موقوف';
-    if (normalized === 'STUDENT') return 'طالب';
-    return value || '';
-  }
-
-  private guardianRelationAr(value?: string): string {
-    const normalized = (value || '').toUpperCase();
-    if (normalized === 'MOTHER' || normalized === 'MOM') return 'الأم';
-    if (normalized === 'FATHER' || normalized === 'DAD') return 'الأب';
-    if (normalized === 'BROTHER') return 'الأخ';
-    if (normalized === 'SISTER') return 'الأخت';
-    return value || '';
-  }
-
-  private isKhorsFamilySelected(): boolean {
-    return !!this.selectedKhorsCode();
-  }
-
-  private getSelectedKhorsCode(): 'MARMARKOS' | 'ATHANASIUS' | '' {
-    const familyRaw = String(this.selectedFamily || '').trim();
-    const family = familyRaw.toUpperCase();
-    if (!family) return '';
-
-    if (family === 'MARMARKOS' || family.includes('مارمر') || family.includes('MARMARKOS')) return 'MARMARKOS';
-    if (family === 'ATHANASIUS' || family.includes('اثناس') || family.includes('ATHANASIUS')) return 'ATHANASIUS';
-    if (family.includes('KHORS')) {
-      if (family.includes('MARMARKOS')) return 'MARMARKOS';
-      if (family.includes('ATHANASIUS')) return 'ATHANASIUS';
-    }
-    return '';
   }
 
   private filterRequestsBySelectedKhors(list: KhorsJoinRequestView[]): KhorsJoinRequestView[] {

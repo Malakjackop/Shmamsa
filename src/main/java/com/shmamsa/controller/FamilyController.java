@@ -328,6 +328,14 @@ public class  FamilyController {
         return null;
     }
 
+    @GetMapping("/families/branches")
+    public ResponseEntity<?> familyBranches(@RequestParam String family, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        String base = looseBaseNameForName(family);
+        if (base == null || base.isBlank()) return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(familyCatalogService.branchNamesForBase(base));
+    }
+
     @GetMapping("/families")
     public ResponseEntity<?> families(
             @RequestParam(required = false) String context,
@@ -505,7 +513,22 @@ public class  FamilyController {
                 members = new ArrayList<>(map.values());
             } else {
                 List<Long> ids = relatedFamilyIds(base);
-                boolean useAssignmentRoles = attendanceContext
+
+                // إذا تم اختيار فرع محدد (مش base)، فلتر الـ IDs لفرع واحد فقط
+                if (hasFamilySelection && family != null) {
+                    FamilyCatalog exactFam = familyCatalogService.findByName(family);
+                    if (exactFam != null && exactFam.getBranch() != null && !exactFam.getBranch().isBlank() && exactFam.getId() != null) {
+                        Long specificId = exactFam.getId();
+                        ids = ids.stream().filter(id -> specificId.equals(id)).toList();
+                    }
+                }
+
+                boolean specificBranchRequested = hasFamilySelection && family != null
+                        && familyCatalogService.findByName(family) != null
+                        && familyCatalogService.findByName(family).getBranch() != null
+                        && !familyCatalogService.findByName(family).getBranch().isBlank();
+                boolean useAssignmentRoles = !specificBranchRequested
+                        && attendanceContext
                         && (isAminKhedmaOrDev || isKhadim || effIsAminOsra || hasAnyAttendanceGrant);
                 members = ids.isEmpty()
                         ? List.of()
@@ -592,6 +615,7 @@ public class  FamilyController {
             row.put("khorsYear", u.getKhorsYear());
             row.put("servingScope", u.getServingScope());
             row.put("schoolGrade", u.getSchoolGrade());
+            row.put("deaconDegree", u.getDeaconDegree());
             if (includeSensitive) {
                 row.put("phoneNumber", u.getPhoneNumber());
                 row.put("guardiansPhone", u.getGuardiansPhone());
