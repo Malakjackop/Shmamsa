@@ -71,6 +71,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/khors-requests/**")
                         .hasAnyRole("KHADIM","AMIN_KHEDMA","DEVELOPER")
 
+                        .requestMatchers(HttpMethod.GET, "/api/khors/standing").authenticated()
+
                         .requestMatchers("/api/khors/**")
                         .hasAnyRole("AMIN_KHEDMA","DEVELOPER")
 

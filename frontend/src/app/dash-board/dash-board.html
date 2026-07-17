@@ -108,6 +108,54 @@
       </div>
     </div>
 
+    <!-- Choir Standing card -->
+    <article class="notice-card notice-card--choir" *ngIf="choirStanding" (click)="openChoirStandingModal()">
+      <div class="notice-card__top">
+        <div class="notice-copy">
+          <h3>واقفة الخورس</h3>
+          <strong>{{ choirStandingKhors }}</strong>
+          <p *ngIf="mySeatIndex >= 0">
+            مكانك: صف {{ choirSeatRow(mySeatIndex) }} — عمود {{ choirSeatCol(mySeatIndex) }}
+          </p>
+          <p *ngIf="mySeatIndex < 0">مكانك غير محدد في الواقفة</p>
+        </div>
+        <span class="notice-badge notice-badge--choir">واقفة</span>
+      </div>
+    </article>
+
+    <!-- Choir Standing modal -->
+    <div class="choir-modal-overlay" *ngIf="showChoirStandingModal" (click)="closeChoirStandingModal()">
+      <div class="choir-modal" (click)="$event.stopPropagation()">
+        <div class="choir-modal__head">
+          <button type="button" class="choir-modal__close" (click)="closeChoirStandingModal()">✕</button>
+          <span class="choir-modal__title">واقفة {{ choirStandingKhors }}</span>
+          <button type="button" class="choir-modal__download" (click)="downloadChoirStanding()" title="تحميل الواقفة">
+            <i class="pi pi-download"></i>
+          </button>
+        </div>
+        <div class="choir-modal__body">
+          <div class="choir-modal__side-bar">
+            <span class="choir-edge-label choir-edge-label--front" *ngIf="choirStanding!.frontAtTop !== false">قدام (المذبح)</span>
+            <span class="choir-edge-label choir-edge-label--crowd" *ngIf="choirStanding!.frontAtTop === false">الشعب</span>
+            <span class="choir-edge-label choir-edge-label--crowd" *ngIf="choirStanding!.frontAtTop !== false">الشعب</span>
+            <span class="choir-edge-label choir-edge-label--front" *ngIf="choirStanding!.frontAtTop === false">قدام (المذبح)</span>
+          </div>
+          <div class="choir-modal__grid" [style.--choir-cols]="choirStanding!.cols">
+            <ng-container *ngFor="let seat of choirStanding!.seats; let i = index">
+              <div class="choir-modal__row-break" *ngIf="i > 0 && i % choirStanding!.cols === 0"></div>
+              <div
+                class="choir-modal__seat"
+                [class.choir-modal__seat--me]="i === mySeatIndex"
+                [class.choir-modal__seat--empty]="!seat.memberId"
+              >
+                <div class="choir-modal__seat-name">{{ seat.memberName || '—' }}</div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="notice-list" *ngIf="events.length > 0; else noEvents">
       <article
         class="notice-card"

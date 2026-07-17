@@ -1,10 +1,14 @@
 package com.shmamsa.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shmamsa.exception.ApiException;
+import com.shmamsa.model.ChoirStanding;
 import com.shmamsa.model.User;
+import com.shmamsa.repository.ChoirStandingRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.FamilyAccessService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,6 +24,8 @@ public class KhorsController {
 
     private final UserRepository userRepo;
     private final FamilyAccessService familyAccessService;
+    private final ChoirStandingRepository choirStandingRepo;
+    private final ObjectMapper objectMapper;
 
     private static String normRole(String raw) {
         if (raw == null) return "";
@@ -117,5 +123,78 @@ public class KhorsController {
         if (changed) userRepo.save(target);
 
         return ResponseEntity.ok(Map.of("removed", changed));
+    }
+
+    // ===== Choir Standing =====
+
+    /** GET /api/khors/standing?khors= — any authenticated user */
+    @GetMapping("/standing")
+    public ResponseEntity<?> getStanding(@RequestParam String khors, Authentication auth) {
+        me(auth);
+        String code = normKhors(khors);
+        if (code == null || code.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "khors required");
+
+        Optional<ChoirStanding> opt = choirStandingRepo.findByKhors(code);
+        if (opt.isEmpty()) return ResponseEntity.ok(null);
+
+        ChoirStanding s = opt.get();
+        return ResponseEntity.ok(toStandingView(s));
+    }
+
+    /** PUT /api/khors/standing — AMIN_KHEDMA / DEVELOPER only (covered by security config) */
+    @PutMapping("/standing")
+    public ResponseEntity<?> saveStanding(@RequestBody Map<String, Object> body, Authentication auth) {
+        User actor = me(auth);
+        ensureCanManage(actor);
+
+        String khors = normKhors((String) body.get("khors"));
+        if (khors == null || khors.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "khors required");
+
+        ChoirStanding s = choirStandingRepo.findByKhors(khors).orElse(new ChoirStanding());
+        s.setKhors(khors);
+        s.setRows(toInt(body.get("rows"), 4));
+        s.setCols(toInt(body.get("cols"), 6));
+        s.setDirection(body.get("direction") != null ? body.get("direction").toString() : "right");
+        s.setPublished(Boolean.TRUE.equals(body.get("published")));
+        s.setFrontAtTop(!Boolean.FALSE.equals(body.get("frontAtTop")));
+        s.setFrontOffset(toInt(body.get("frontOffset"), 0));
+        s.setCrowdOffset(toInt(body.get("crowdOffset"), 0));
+
+        try {
+            Object seats = body.get("seats");
+            s.setSeatsJson(seats != null ? objectMapper.writeValueAsString(seats) : "[]");
+        } catch (Exception e) {
+            s.setSeatsJson("[]");
+        }
+
+        choirStandingRepo.save(s);
+        return ResponseEntity.ok(toStandingView(s));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toStandingView(ChoirStanding s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("khors", s.getKhors());
+        m.put("rows", s.getRows());
+        m.put("cols", s.getCols());
+        m.put("direction", s.getDirection());
+        m.put("published", s.isPublished());
+        m.put("frontAtTop", s.isFrontAtTop());
+        m.put("frontOffset", s.getFrontOffset());
+        m.put("crowdOffset", s.getCrowdOffset());
+        m.put("updatedAt", s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : null);
+        try {
+            m.put("seats", objectMapper.readValue(
+                s.getSeatsJson() != null ? s.getSeatsJson() : "[]", List.class));
+        } catch (Exception e) {
+            m.put("seats", List.of());
+        }
+        return m;
+    }
+
+    private static int toInt(Object v, int def) {
+        if (v == null) return def;
+        if (v instanceof Number) return ((Number) v).intValue();
+        try { return Integer.parseInt(v.toString()); } catch (Exception e) { return def; }
     }
 }

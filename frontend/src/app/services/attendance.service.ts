@@ -544,4 +544,19 @@ export class AttendanceService {
       { params, withCredentials: true }
     );
   }
+
+  // ===== Absence Notes =====
+
+  getAbsenceNotes(familyBase: string, date: string): Observable<any[]> {
+    if (!this.isBrowser) return of([]);
+    return this.http.get<any[]>(`${this.baseUrl}/absence-notes`, {
+      params: { familyBase, date },
+      withCredentials: true
+    });
+  }
+
+  saveAbsenceNote(body: { memberId: number; date: string; attendanceType: string; note: string; familyBase: string }): Observable<any> {
+    if (!this.isBrowser) return of(null);
+    return this.http.post<any>(`${this.baseUrl}/absence-notes`, body, { withCredentials: true });
+  }
 }

@@ -9,6 +9,7 @@ import { createPdfText, ensureDejaVuFont } from '../shared/pdf-utils';
 import { DEFAULT_FAMILY_ORDER, sortFamiliesByPreferredOrder } from '../shared/family-utils';
 import { FamilyMemberDetails } from '../services/family.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
+import { KhorsRequestsService, type ChoirStandingPayload } from '../services/khors-requests.service';
 import { buildVisibleCustomFieldEntries, customFieldHasTarget, effectiveShowInTargets } from '../shared/custom-field-display';
 
 type Member = {
@@ -155,6 +156,7 @@ export class FamilyAttendanceComponent implements OnInit {
   private message = inject(MessageService);
   private iftekadSvc = inject(IftekadService);
   private attendanceSvc = inject(AttendanceService);
+  private khorsSvc = inject(KhorsRequestsService);
 
   me: AuthUser | null = null;
   members: Member[] = [];
@@ -257,6 +259,27 @@ export class FamilyAttendanceComponent implements OnInit {
   showDeleteConfirm = false;
   visitToDelete: IftekadVisitView | null = null;
   deleteSaving = false;
+
+  // ===== Absence Notes =====
+  showAbsenceNoteModal = false;
+  absenceNoteTarget: { id: number; fullName: string } | null = null;
+  absenceNoteText = '';
+  private absenceNoteDate = '';
+  private absenceNoteType = '';
+  private absenceNotesStore: Record<string, string> = {};
+
+  // ===== Choir Standing =====
+  showChoirStanding = false;
+  choirRows = 4;
+  choirCols = 6;
+  choirDirection: 'right' | 'left' = 'right';
+  choirSeats: Array<{ memberId: number | null; memberName: string | null; score: number }> = [];
+  choirSelectedSeatIdx: number | null = null;
+  choirPublished = false;
+  choirTopPercent = 20;
+  choirFrontAtTop = true;
+  choirFrontOffset = 0;
+  choirCrowdOffset = 0;
 
   isChoirSelected(): boolean {
     const x = String(this.selectedFamily || '').trim();
@@ -1448,6 +1471,7 @@ reloadDetails(): void {
         }
 
         this.loadDailyCancellations(isoDate);
+        this.loadAbsenceNotesFromApi(isoDate);
         this.dailyLoading = false;
       },
       error: (err) => {
@@ -1905,6 +1929,242 @@ reloadDetails(): void {
         this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'خطأ في الحذف' });
       }
     });
+  }
+
+  // ===== Absence Notes =====
+  private absenceNoteKey(memberId: number, date: string, type: string): string {
+    return `${memberId}_${date}_${type}`;
+  }
+
+  private loadAbsenceNotesFromApi(date: string): void {
+    const familyBase = this.selectedFamilyName;
+    if (!familyBase || !date) return;
+    this.attendanceSvc.getAbsenceNotes(familyBase, date).subscribe({
+      next: (notes) => {
+        this.absenceNotesStore = {};
+        for (const n of (notes || [])) {
+          const key = this.absenceNoteKey(n.memberId, n.date, n.attendanceType);
+          this.absenceNotesStore[key] = n.note || '';
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  getAbsenceNote(memberId: number): string {
+    const date = this.toIsoDateOnly(this.dailyDate);
+    const type = this.dailyType || '';
+    return this.absenceNotesStore[this.absenceNoteKey(memberId, date, type)] || '';
+  }
+
+  getAbsenceNoteForRecord(record: AttendanceRow): string {
+    if (!this.detailsFor) return '';
+    return this.absenceNotesStore[this.absenceNoteKey(this.detailsFor.id, record.date, record.type)] || '';
+  }
+
+  openAbsenceNote(person: { id: number; fullName: string }): void {
+    this.absenceNoteTarget = person;
+    this.absenceNoteDate = this.toIsoDateOnly(this.dailyDate);
+    this.absenceNoteType = this.dailyType || '';
+    this.absenceNoteText = this.absenceNotesStore[this.absenceNoteKey(person.id, this.absenceNoteDate, this.absenceNoteType)] || '';
+    this.showAbsenceNoteModal = true;
+  }
+
+  closeAbsenceNoteModal(): void {
+    this.showAbsenceNoteModal = false;
+    this.absenceNoteTarget = null;
+    this.absenceNoteText = '';
+  }
+
+  saveAbsenceNote(): void {
+    if (!this.absenceNoteTarget) return;
+    const key = this.absenceNoteKey(this.absenceNoteTarget.id, this.absenceNoteDate, this.absenceNoteType);
+    this.attendanceSvc.saveAbsenceNote({
+      memberId: this.absenceNoteTarget.id,
+      date: this.absenceNoteDate,
+      attendanceType: this.absenceNoteType,
+      note: this.absenceNoteText.trim(),
+      familyBase: this.selectedFamilyName
+    }).subscribe({
+      next: () => {
+        if (this.absenceNoteText.trim()) {
+          this.absenceNotesStore[key] = this.absenceNoteText.trim();
+        } else {
+          delete this.absenceNotesStore[key];
+        }
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حفظ العذر' });
+        this.closeAbsenceNoteModal();
+      },
+      error: () => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل في حفظ العذر' });
+      }
+    });
+  }
+
+  // ===== Choir Standing =====
+  private get choirAttendanceType(): 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' {
+    return this.isMarmarkosChoir ? 'MARMARKOS_KHORS' : 'ATHANASIUS_KHORS';
+  }
+
+  openChoirStanding(): void {
+    this.showChoirStanding = true;
+    this.choirSelectedSeatIdx = null;
+    this.loadChoirStandingData();
+  }
+
+  closeChoirStanding(): void {
+    this.showChoirStanding = false;
+    this.choirSelectedSeatIdx = null;
+  }
+
+  private loadChoirStandingData(): void {
+    const khors = this.selectedFamilyName;
+    if (!khors) return;
+    this.khorsSvc.getChoirStanding(khors).subscribe({
+      next: (saved) => {
+        if (saved) {
+          this.choirRows = saved.rows || 4;
+          this.choirCols = saved.cols || 6;
+          this.choirDirection = (saved.direction as any) || 'right';
+          this.choirSeats = saved.seats || [];
+          this.choirPublished = saved.published || false;
+          this.choirFrontAtTop = saved.frontAtTop !== false;
+          this.choirFrontOffset = (saved as any).frontOffset || 0;
+          this.choirCrowdOffset = (saved as any).crowdOffset || 0;
+        } else {
+          this.choirSeats = [];
+          this.choirPublished = false;
+          this.choirFrontAtTop = true;
+          this.choirFrontOffset = 0;
+          this.choirCrowdOffset = 0;
+        }
+      },
+      error: () => {
+        this.choirSeats = [];
+        this.choirPublished = false;
+      }
+    });
+  }
+
+  moveLabelOffset(label: 'front' | 'crowd', delta: number): void {
+    if (label === 'front') {
+      this.choirFrontOffset = Math.max(0, Math.min(80, this.choirFrontOffset + delta));
+    } else {
+      this.choirCrowdOffset = Math.max(0, Math.min(80, this.choirCrowdOffset + delta));
+    }
+  }
+
+  swapChoirLabels(): void {
+    this.choirFrontAtTop = !this.choirFrontAtTop;
+  }
+
+  buildChoirStanding(): void {
+    const type = this.choirAttendanceType;
+    const withScore = [...this.members].map(m => {
+      const present = type === 'MARMARKOS_KHORS' ? (m.marmarkosKhorsPresent ?? 0) : (m.athanasiusKhorsPresent ?? 0);
+      const tot = type === 'MARMARKOS_KHORS' ? (m.marmarkosKhorsTotal ?? 0) : (m.athanasiusKhorsTotal ?? 0);
+      return { memberId: m.id, memberName: m.fullName, score: tot > 0 ? present / tot : 0, present, tot, khorsYear: m.khorsYear ?? null };
+    });
+
+    // sort by attendance desc to determine top-percent split
+    const byAttendance = [...withScore].sort((a, b) => b.score - a.score || b.present - a.present);
+
+    const pct = Math.max(0, Math.min(100, this.choirTopPercent));
+    const topCount = Math.round(byAttendance.length * pct / 100);
+    const topGroup = byAttendance.slice(0, topCount);
+    const restGroup = byAttendance.slice(topCount);
+
+    // within each group sort by khorsYear DESCENDING (larger year = higher seniority = placed first)
+    // nulls go to the end
+    const bySeniority = (a: typeof topGroup[0], b: typeof topGroup[0]) => {
+      const aYear = a.khorsYear ?? -1;
+      const bYear = b.khorsYear ?? -1;
+      return bYear - aYear; // descending: bigger year first
+    };
+    topGroup.sort(bySeniority);
+    restGroup.sort(bySeniority);
+
+    const sorted = [...topGroup, ...restGroup];
+
+    const total = this.choirRows * this.choirCols;
+    const seats: typeof this.choirSeats = new Array(total).fill(null).map(() => ({ memberId: null, memberName: null, score: 0 }));
+
+    let memberIdx = 0;
+    for (let row = 0; row < this.choirRows; row++) {
+      if (this.choirDirection === 'right') {
+        for (let col = 0; col < this.choirCols; col++) {
+          if (memberIdx < sorted.length) {
+            seats[row * this.choirCols + col] = sorted[memberIdx++];
+          }
+        }
+      } else {
+        for (let col = this.choirCols - 1; col >= 0; col--) {
+          if (memberIdx < sorted.length) {
+            seats[row * this.choirCols + col] = sorted[memberIdx++];
+          }
+        }
+      }
+    }
+
+    this.choirSeats = seats;
+    this.choirPublished = false;
+    this.choirSelectedSeatIdx = null;
+  }
+
+  selectChoirSeat(idx: number): void {
+    if (this.choirSelectedSeatIdx === null) {
+      this.choirSelectedSeatIdx = idx;
+    } else if (this.choirSelectedSeatIdx === idx) {
+      this.choirSelectedSeatIdx = null;
+    } else {
+      const tmp = { ...this.choirSeats[this.choirSelectedSeatIdx] };
+      this.choirSeats[this.choirSelectedSeatIdx] = { ...this.choirSeats[idx] };
+      this.choirSeats[idx] = tmp;
+      this.choirSelectedSeatIdx = null;
+    }
+  }
+
+  choirSeatRow(idx: number): number {
+    return Math.floor(idx / this.choirCols) + 1;
+  }
+
+  private choirStandingPayload(published: boolean): ChoirStandingPayload {
+    return {
+      khors: this.selectedFamilyName,
+      rows: this.choirRows,
+      cols: this.choirCols,
+      direction: this.choirDirection,
+      seats: this.choirSeats,
+      published,
+      frontAtTop: this.choirFrontAtTop,
+      frontOffset: this.choirFrontOffset,
+      crowdOffset: this.choirCrowdOffset
+    };
+  }
+
+  private callSaveChoirStanding(published: boolean, successMsg: string): void {
+    const payload = this.choirStandingPayload(published);
+    this.khorsSvc.saveChoirStanding(payload).subscribe({
+      next: () => {
+        this.choirPublished = published;
+        this.message.add({ severity: 'success', summary: 'تم', detail: successMsg });
+      },
+      error: () => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل في الحفظ' });
+      }
+    });
+  }
+
+  saveChoirStanding(): void {
+    this.callSaveChoirStanding(this.choirPublished, 'تم حفظ الواقفة');
+  }
+
+  publishChoirStanding(): void {
+    this.callSaveChoirStanding(true, 'الواقفة منشورة للأعضاء');
+  }
+
+  unpublishChoirStanding(): void {
+    this.callSaveChoirStanding(false, 'تم إلغاء نشر الواقفة');
   }
 
   formatRecordedAt(dateStr?: string): string {

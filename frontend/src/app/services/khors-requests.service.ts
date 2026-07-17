@@ -1,7 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { HttpParams } from '@angular/common/http';
+
+export type ChoirStandingPayload = {
+  khors: string;
+  rows: number;
+  cols: number;
+  direction: string;
+  seats: Array<{ memberId: number | null; memberName: string | null; score: number }>;
+  published: boolean;
+  frontAtTop: boolean;
+  frontOffset: number;
+  crowdOffset: number;
+};
 
 export type KhorsJoinRequestView = {
   requestId: number;
@@ -37,6 +49,23 @@ export class KhorsRequestsService {
     return this.http.post(
       `${this.baseUrl}/${requestId}/decision`,
       { approved },
+      { withCredentials: true }
+    );
+  }
+
+  // ===== Choir Standing =====
+
+  getChoirStanding(khors: string): Observable<ChoirStandingPayload | null> {
+    return this.http.get<ChoirStandingPayload | null>(
+      `/api/khors/standing`,
+      { params: { khors }, withCredentials: true }
+    );
+  }
+
+  saveChoirStanding(data: ChoirStandingPayload): Observable<ChoirStandingPayload> {
+    return this.http.put<ChoirStandingPayload>(
+      `/api/khors/standing`,
+      data,
       { withCredentials: true }
     );
   }

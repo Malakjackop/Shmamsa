@@ -147,6 +147,168 @@ textarea {
   }
 }
 
+/* ===== dashboardDatePanel — global so it works in any component (appendTo="body") ===== */
+.dashboardDatePanel,
+.dashboardDatePanel.p-datepicker,
+.dashboardDatePanel.p-datepicker-panel {
+  width: min(420px, calc(100vw - 28px)) !important;
+  max-width: calc(100vw - 28px) !important;
+  border: 1px solid #e7dad3 !important;
+  border-radius: 16px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  overflow: hidden !important;
+  box-shadow: 0 18px 45px rgba(39, 18, 13, 0.22) !important;
+  direction: rtl;
+  z-index: 12000 !important;
+}
+
+.dashboardDatePanel .p-datepicker,
+.dashboardDatePanel .p-datepicker-panel,
+.dashboardDatePanel .p-datepicker-group,
+.dashboardDatePanel .p-datepicker-calendar-container,
+.dashboardDatePanel .p-datepicker-calendar,
+.dashboardDatePanel table,
+.dashboardDatePanel tbody,
+.dashboardDatePanel tr,
+.dashboardDatePanel td,
+.dashboardDatePanel th {
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+.dashboardDatePanel .p-datepicker-header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+}
+
+.dashboardDatePanel .p-datepicker-prev-button { grid-column: 3; justify-self: end; }
+.dashboardDatePanel .p-datepicker-next-button { grid-column: 1; justify-self: start; }
+
+.dashboardDatePanel .p-datepicker-title,
+.dashboardDatePanel .p-datepicker-select-month,
+.dashboardDatePanel .p-datepicker-select-year,
+.dashboardDatePanel .p-datepicker-decade {
+  color: #5e2b20 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+}
+
+.dashboardDatePanel .p-datepicker-title {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.dashboardDatePanel .p-datepicker-title button,
+.dashboardDatePanel .p-datepicker-select-month,
+.dashboardDatePanel .p-datepicker-select-year {
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.dashboardDatePanel .p-datepicker-title button:hover,
+.dashboardDatePanel .p-datepicker-select-month:hover,
+.dashboardDatePanel .p-datepicker-select-year:hover {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+}
+
+.dashboardDatePanel .p-datepicker-prev-button,
+.dashboardDatePanel .p-datepicker-next-button,
+.dashboardDatePanel .p-datepicker-prev,
+.dashboardDatePanel .p-datepicker-next {
+  width: 36px !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+  box-shadow: none !important;
+}
+
+.dashboardDatePanel .p-datepicker-prev-button:hover,
+.dashboardDatePanel .p-datepicker-next-button:hover {
+  background: #efe1da !important;
+  color: #6d3326 !important;
+}
+
+.dashboardDatePanel .p-datepicker-prev-button svg,
+.dashboardDatePanel .p-datepicker-next-button svg {
+  transform: scaleX(-1) !important;
+}
+
+.dashboardDatePanel .p-datepicker-weekday,
+.dashboardDatePanel th,
+.dashboardDatePanel thead th {
+  color: #8d5144 !important;
+  font-weight: 900 !important;
+  opacity: 1 !important;
+}
+
+.dashboardDatePanel .p-datepicker-day,
+.dashboardDatePanel .p-datepicker-date,
+.dashboardDatePanel td > span,
+.dashboardDatePanel td > button {
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #5e2b20 !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.dashboardDatePanel .p-datepicker-day:not(.p-disabled):not(.p-datepicker-day-selected):hover,
+.dashboardDatePanel .p-datepicker-date:not(.p-disabled):not(.p-highlight):hover,
+.dashboardDatePanel td > span:not(.p-disabled):not(.p-highlight):hover {
+  background: #fbf1eb !important;
+  color: #6d3326 !important;
+  box-shadow: none !important;
+}
+
+.dashboardDatePanel .p-datepicker-day-selected,
+.dashboardDatePanel .p-datepicker-date.p-highlight,
+.dashboardDatePanel td > span.p-highlight {
+  background: #8d5144 !important;
+  color: #ffffff !important;
+  border-color: #8d5144 !important;
+}
+
+.dashboardDatePanel td.p-datepicker-today > span:not(.p-datepicker-day-selected):not(.p-highlight),
+.dashboardDatePanel td.p-datepicker-today > button:not(.p-datepicker-day-selected):not(.p-highlight) {
+  border: 1px solid #d9c2b8 !important;
+  background: #fbf1eb !important;
+  color: #8d5144 !important;
+}
+
+.dashboardDatePanel .p-disabled,
+.dashboardDatePanel .p-datepicker-other-month span,
+.dashboardDatePanel td.p-disabled > span,
+.dashboardDatePanel td.p-disabled > button {
+  color: #b08f84 !important;
+  opacity: 0.72 !important;
+}
+
+.dashboardDatePanel .p-datepicker-buttonbar,
+.dashboardDatePanel .p-datepicker-button-bar {
+  padding: 12px 14px !important;
+  border-top: 1px solid #eadfd9 !important;
+  background: #fffaf6 !important;
+}
+
 .modal.legacy-modal {
   z-index: 1200;
   padding: 32px 16px;

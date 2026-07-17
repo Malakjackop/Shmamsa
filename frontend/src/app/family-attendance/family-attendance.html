@@ -2,7 +2,7 @@
 
 <div class="page">
   <div class="pageHead">
-    <h1>حضور الأسره 
+    <h1>حضور الأسره
     </h1>
     <button *ngIf="exportMode" pButton type="button" class="p-button-secondary" label="إلغاء" (click)="cancelExport()"></button>
   </div>
@@ -33,6 +33,15 @@
         (click)="openDailyAttendance()"
         class="todayAttendanceBtn"
         *ngIf="canEditDailyAttendance()"
+      ></button>
+      <button
+        pButton
+        type="button"
+        icon="pi pi-th-large"
+        label="واقفة الخورس"
+        (click)="openChoirStanding()"
+        class="choirStandingBtn"
+        *ngIf="isChoirSelected() && isAminKhedmaOrDev()"
       ></button>
     </div>
   </div>
@@ -136,9 +145,9 @@
             [ngModelOptions]="{ standalone: true }"
             [showIcon]="true"
             [showOnFocus]="true"
-            styleClass="attendance-date-input"
-            inputStyleClass="attendance-date-input__field"
-            panelStyleClass="attendanceGrantDatePanel"
+            styleClass="dashboard-date-input"
+            inputStyleClass="dashboard-date-input__field"
+            panelStyleClass="dashboardDatePanel"
             [readonlyInput]="true"
             [showButtonBar]="true"
             [minDate]="dailyMinDate"
@@ -237,6 +246,18 @@
               <div class="attBoxBody" *ngIf="dailyAbsent?.length; else noAbsent">
                 <div class="attRow" *ngFor="let a of dailyAbsent">
                   <span class="attName">{{ a.fullName }}</span>
+                  <span class="absenceNoteIndicator" *ngIf="getAbsenceNote(a.id)" title="{{ getAbsenceNote(a.id) }}">
+                    <i class="pi pi-bookmark-fill"></i>
+                  </span>
+                  <button
+                    *ngIf="canEditDailyAttendance()"
+                    type="button"
+                    class="noteBtn"
+                    title="تسجيل عذر الغياب"
+                    (click)="openAbsenceNote(a)"
+                  >
+                    <i class="pi pi-pencil"></i>
+                  </button>
                 </div>
               </div>
               <ng-template #noAbsent>
@@ -299,6 +320,127 @@
           </div>
         </div>
       </div>
+
+      <!-- Absence note modal -->
+      <div class="confirmOverlay" *ngIf="showAbsenceNoteModal && absenceNoteTarget">
+        <div class="confirmBox confirmBox--note">
+          <div class="confirmTitle">عذر الغياب — {{ absenceNoteTarget.fullName }}</div>
+          <div class="confirmText" style="font-size:13px; color:#6c6459;">
+            {{ displayDateOnly(dailyDate) }} — {{ dailyType ? dailyTypeLabel(dailyType) : '' }}
+          </div>
+          <textarea
+            class="noteTextarea"
+            [(ngModel)]="absenceNoteText"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="اكتب عذر الغياب هنا..."
+            rows="3"
+          ></textarea>
+          <div class="confirmActions">
+            <button type="button" class="miniDanger" (click)="saveAbsenceNote()">حفظ</button>
+            <button type="button" class="cancelBtn2" (click)="closeAbsenceNoteModal()">إلغاء</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Choir Standing Modal -->
+  <div class="modal legacy-modal" *ngIf="showChoirStanding">
+    <div class="modalCard choirStandingCard">
+      <div class="modalHead">
+        <div>
+          <div class="title">واقفة الخورس</div>
+          <div class="sub">{{ selectedFamilyName }}</div>
+        </div>
+        <div class="legacy-modal__head-actions">
+          <button type="button" class="legacy-modal__close" (click)="closeChoirStanding()" aria-label="إغلاق">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div class="choirConfig">
+        <div class="choirConfigField">
+          <label>عدد الصفوف</label>
+          <div class="choirSpinner">
+            <button type="button" class="choirSpinBtn" (click)="choirRows = choirRows > 1 ? choirRows - 1 : 1">▼</button>
+            <span class="choirSpinVal">{{ choirRows }}</span>
+            <button type="button" class="choirSpinBtn" (click)="choirRows = choirRows < 30 ? choirRows + 1 : 30">▲</button>
+          </div>
+        </div>
+        <div class="choirConfigField">
+          <label>عدد الأعمدة</label>
+          <div class="choirSpinner">
+            <button type="button" class="choirSpinBtn" (click)="choirCols = choirCols > 1 ? choirCols - 1 : 1">▼</button>
+            <span class="choirSpinVal">{{ choirCols }}</span>
+            <button type="button" class="choirSpinBtn" (click)="choirCols = choirCols < 20 ? choirCols + 1 : 20">▲</button>
+          </div>
+        </div>
+        <div class="choirConfigField">
+          <label>البداية من</label>
+          <select [(ngModel)]="choirDirection" [ngModelOptions]="{ standalone: true }" class="choirSelect">
+            <option value="right">اليمين</option>
+            <option value="left">الشمال</option>
+          </select>
+        </div>
+        <div class="choirConfigField">
+          <label>نسبة الأقدمية %</label>
+          <div class="choirSpinner">
+            <button type="button" class="choirSpinBtn" (click)="choirTopPercent = choirTopPercent > 0 ? choirTopPercent - 5 : 0">▼</button>
+            <span class="choirSpinVal">{{ choirTopPercent }}%</span>
+            <button type="button" class="choirSpinBtn" (click)="choirTopPercent = choirTopPercent < 100 ? choirTopPercent + 5 : 100">▲</button>
+          </div>
+        </div>
+        <button pButton type="button" icon="pi pi-sort-amount-down-alt" label="ترتيب تلقائي" (click)="buildChoirStanding()" class="p-button-secondary choirBuildBtn"></button>
+      </div>
+
+      <div class="choirHint" *ngIf="!choirSeats.length">
+        اضغط "ترتيب تلقائي" لبناء الواقفة حسب الالتزام، أو عدّل الأرقام واضغط مجدداً.
+      </div>
+
+      <!-- Grid -->
+      <ng-container *ngIf="choirSeats.length">
+        <!-- Side labels bar: المذبح يمين / الشعب شمال (أو العكس بعد swap) -->
+        <div class="choirSideBar">
+          <span class="choirEdgeLabel choirEdgeLabel--front" *ngIf="choirFrontAtTop">المذبح</span>
+          <span class="choirEdgeLabel choirEdgeLabel--crowd" *ngIf="!choirFrontAtTop">الشعب</span>
+          <button type="button" class="labelSwapBtn" (click)="swapChoirLabels()" title="تبديل الجهتين">⇄</button>
+          <span class="choirEdgeLabel choirEdgeLabel--crowd" *ngIf="choirFrontAtTop">الشعب</span>
+          <span class="choirEdgeLabel choirEdgeLabel--front" *ngIf="!choirFrontAtTop">المذبح</span>
+        </div>
+
+        <div class="choirGrid" [style.--choir-cols]="choirCols">
+          <ng-container *ngFor="let seat of choirSeats; let i = index">
+            <div class="choirRowBreak" *ngIf="i > 0 && i % choirCols === 0"></div>
+            <div
+              class="choirSeat"
+              [class.choirSeat--selected]="choirSelectedSeatIdx === i"
+              [class.choirSeat--empty]="!seat.memberId"
+              [class.choirSeat--first]="choirSeatRow(i) === 1"
+              (click)="selectChoirSeat(i)"
+              [title]="seat.memberName || 'فارغ'"
+            >
+              <div class="seatScore" *ngIf="seat.memberId">{{ (seat.score * 100).toFixed(0) }}%</div>
+              <div class="seatName">{{ seat.memberName || '—' }}</div>
+            </div>
+          </ng-container>
+        </div>
+
+        <div class="choirSelectionHint" *ngIf="choirSelectedSeatIdx !== null">
+          اختار مقعد آخر لتبديل المكانين
+        </div>
+      </ng-container>
+
+      <!-- Actions -->
+      <div class="choirActions" *ngIf="choirSeats.length">
+        <button pButton type="button" icon="pi pi-save" label="حفظ" (click)="saveChoirStanding()" class="p-button-secondary"></button>
+        <button *ngIf="!choirPublished" pButton type="button" icon="pi pi-send" label="نشر للأعضاء" (click)="publishChoirStanding()" class="choirPublishBtn"></button>
+        <button *ngIf="choirPublished" pButton type="button" icon="pi pi-eye-slash" label="إلغاء النشر" (click)="unpublishChoirStanding()" class="choirUnpublishBtn"></button>
+        <span *ngIf="choirPublished" class="choirPublishedStatus">
+          <i class="pi pi-check-circle"></i> منشور
+        </span>
+      </div>
     </div>
   </div>
 
@@ -344,7 +486,7 @@
                 <div class="detailRow" *ngFor="let d of filteredDetailsForItem(item)">
                   <ng-container *ngIf="editingAttendanceId === d.id; else viewBlock2">
                     <div class="dEditForm">
-                      <p-datepicker [(ngModel)]="editingAttendanceDate" dateFormat="yy-mm-dd" [ngModelOptions]="{ standalone: true }"></p-datepicker>
+                      <p-datepicker [(ngModel)]="editingAttendanceDate" dateFormat="yy-mm-dd" [ngModelOptions]="{ standalone: true }" appendTo="body" panelStyleClass="dashboardDatePanel"></p-datepicker>
                       <div class="dEditActions">
                         <button type="button" class="miniDanger miniDanger--sm" (click)="saveEditAttendanceDate()" [disabled]="editingAttendanceSaving">
                           <i class="pi pi-check"></i>
@@ -359,6 +501,9 @@
                     <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock">
                       <div class="dTitle">غياب</div>
                       <div class="dSub">يوم الغياب: {{ d.date }}</div>
+                      <div class="dSub dSub--note" *ngIf="getAbsenceNoteForRecord(d)">
+                        <i class="pi pi-bookmark-fill"></i> العذر: {{ getAbsenceNoteForRecord(d) }}
+                      </div>
                     </ng-container>
                     <ng-template #presentBlock>
                       <div class="dTitle">حضور</div>
@@ -383,7 +528,7 @@
           <div class="detailRow" *ngFor="let d of details">
             <ng-container *ngIf="editingAttendanceId === d.id; else viewBlock">
               <div class="dEditForm">
-                <p-datepicker [(ngModel)]="editingAttendanceDate" dateFormat="yy-mm-dd" [ngModelOptions]="{ standalone: true }"></p-datepicker>
+                <p-datepicker [(ngModel)]="editingAttendanceDate" dateFormat="yy-mm-dd" [ngModelOptions]="{ standalone: true }" appendTo="body" panelStyleClass="dashboardDatePanel"></p-datepicker>
                 <div class="dEditActions">
                   <button type="button" class="miniDanger miniDanger--sm" (click)="saveEditAttendanceDate()" [disabled]="editingAttendanceSaving">
                     <i class="pi pi-check"></i>
@@ -398,6 +543,9 @@
               <ng-container *ngIf="(d.status || 'PRESENT') === 'ABSENT'; else presentBlock2">
                 <div class="dTitle">{{ attendanceRowLabel(d) }} • غياب</div>
                 <div class="dSub">يوم الغياب: {{ d.date }}</div>
+                <div class="dSub dSub--note" *ngIf="getAbsenceNoteForRecord(d)">
+                  <i class="pi pi-bookmark-fill"></i> العذر: {{ getAbsenceNoteForRecord(d) }}
+                </div>
               </ng-container>
               <ng-template #presentBlock2>
                 <div class="dTitle">{{ attendanceRowLabel(d) }} • حضور</div>

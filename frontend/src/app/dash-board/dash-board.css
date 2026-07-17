@@ -658,6 +658,171 @@
   color: #2f8f54;
 }
 
+/* ===== Choir Standing Card ===== */
+.notice-card--choir {
+  border-inline-start-color: #7b5e3a;
+  cursor: pointer;
+}
+
+.notice-card--choir:hover {
+  background: #fdf6ee;
+}
+
+.notice-badge--choir {
+  border-radius: 999px;
+  background: #f7f1e8;
+  color: #7b5e3a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 12px;
+  white-space: nowrap;
+}
+
+/* ===== Choir Standing Modal ===== */
+.choir-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.choir-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+
+.choir-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #eadfd9;
+  flex-shrink: 0;
+  direction: rtl;
+}
+
+.choir-modal__title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #3b2a1a;
+  flex: 1;
+  text-align: center;
+}
+
+.choir-modal__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #9b7b5e;
+  padding: 4px 6px;
+  line-height: 1;
+}
+
+.choir-modal__close:hover {
+  color: #5e2b20;
+}
+
+.choir-modal__download {
+  background: none;
+  border: 1.5px solid #d4c4b8;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #9b7b5e;
+  padding: 5px 10px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.choir-modal__download:hover {
+  background: #faf6f1;
+  color: #5e2b20;
+  border-color: #b09070;
+}
+
+.choir-modal__body {
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  flex: 1;
+}
+
+.choir-modal__side-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.choir-edge-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.choir-edge-label--front {
+  background: #fdecd3;
+  color: #7b5e3a;
+}
+
+.choir-edge-label--crowd {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.choir-modal__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  direction: ltr;
+}
+
+.choir-modal__row-break {
+  width: 100%;
+}
+
+.choir-modal__seat {
+  flex: 0 0 calc((100% - (var(--choir-cols, 6) - 1) * 5px) / var(--choir-cols, 6));
+  min-width: 0;
+  border: 1px solid #d9c9b4;
+  border-radius: 6px;
+  padding: 6px 4px;
+  text-align: center;
+  background: #faf6f1;
+  font-size: 0.72rem;
+}
+
+.choir-modal__seat--me {
+  background: #fff3cd;
+  border-color: #c8962a;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(200, 150, 42, 0.35);
+}
+
+.choir-modal__seat--empty {
+  background: #f0f0f0;
+  border-color: #ddd;
+  color: #aaa;
+}
+
+.choir-modal__seat-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .event-warning {
   margin-top: 10px;
   padding: 10px 12px;

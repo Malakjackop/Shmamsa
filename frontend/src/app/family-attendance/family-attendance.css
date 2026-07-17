@@ -236,9 +236,9 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 16px;
+  padding: 80px 16px 32px;
   overflow-y: auto;
   z-index: 40;
 }
@@ -339,7 +339,6 @@
   border: 1px solid #d9c8bf;
   border-radius: 14px;
   background: #fffdfb;
-  overflow: hidden;
 }
 
 .detailsSection.open {
@@ -397,8 +396,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 54vh;
-  overflow: auto;
   padding-right: 4px;
 }
 
@@ -1229,4 +1226,597 @@
   .memberCard__attendanceLines { gap: 1px; }
   .memberCard__checkbox { top: 2px; right: 2px; }
   .memberCard__checkbox input { width: 12px; height: 12px; }
+}
+
+/* Note: attName flex-grows so buttons stay at the end */
+.attRow .attName { flex: 1; }
+
+/* ===== Choir Number Input (styled arrows) ===== */
+
+/* ===== Choir Label Bars ===== */
+.choirSideBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.choirEdgeLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.choirEdgeLabel--front {
+  background: #fdf3f0;
+  color: #5e2b20;
+  border: 1px solid #e8c4b8;
+}
+
+.choirEdgeLabel--crowd {
+  background: #f0f6fb;
+  color: #1e4d6b;
+  border: 1px solid #b8d4e8;
+}
+
+.labelMoveBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  color: inherit;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.labelMoveBtn:hover { opacity: 1; }
+
+.labelSwapBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  color: inherit;
+  opacity: 0.6;
+  margin-right: 2px;
+}
+
+.labelSwapBtn:hover { opacity: 1; }
+
+/* ===== Choir Unpublish Button ===== */
+.choirUnpublishBtn {
+  background: #8b6914 !important;
+  border-color: #8b6914 !important;
+  color: #fff !important;
+}
+
+.choirUnpublishBtn:hover {
+  background: #a07a18 !important;
+  border-color: #a07a18 !important;
+}
+
+/* ===== Choir Standing Button ===== */
+.choirStandingBtn {
+  border-radius: 10px;
+  background: #1e4d6b !important;
+  border-color: #1e4d6b !important;
+  color: #fff !important;
+}
+
+.choirStandingBtn:hover {
+  background: #265f84 !important;
+  border-color: #265f84 !important;
+}
+
+/* ===== Absence Note ===== */
+.noteBtn {
+  background: none;
+  border: 1px solid #e4ddd2;
+  border-radius: 8px;
+  padding: 3px 7px;
+  cursor: pointer;
+  color: #7a6652;
+  font-size: 13px;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.noteBtn:hover {
+  background: #f5f0e8;
+  color: #5e2b20;
+}
+
+.absenceNoteIndicator {
+  color: #e8a020;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+}
+
+.noteTextarea {
+  width: 100%;
+  border: 1px solid #e4ddd2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  margin: 8px 0;
+  direction: rtl;
+}
+
+.noteTextarea:focus {
+  border-color: #5e2b20;
+}
+
+.confirmBox--note {
+  min-width: 320px;
+  max-width: 440px;
+}
+
+.dSub--note {
+  color: #c07a10;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dSub--note .pi {
+  font-size: 12px;
+}
+
+/* ===== Choir Standing Modal ===== */
+.choirStandingCard {
+  max-width: 900px;
+  width: 95vw;
+}
+
+.choirConfig {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0ece5;
+  margin-bottom: 14px;
+}
+
+.choirConfigField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.choirConfigField label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6c6459;
+}
+
+/* Custom spinner widget */
+.choirSpinner {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid #d4c4b8;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+  height: 38px;
+}
+
+.choirSpinBtn {
+  background: #faf6f1;
+  border: none;
+  border-inline-start: 1.5px solid #d4c4b8;
+  color: #9b7b5e;
+  font-size: 10px;
+  width: 26px;
+  height: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s;
+}
+
+.choirSpinBtn:first-child {
+  border-inline-start: none;
+  border-inline-end: 1.5px solid #d4c4b8;
+}
+
+.choirSpinBtn:hover {
+  background: #f0e8df;
+  color: #5e2b20;
+}
+
+.choirSpinVal {
+  min-width: 32px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.choirSelect {
+  height: 38px;
+  padding: 6px 12px 6px 32px;
+  border-radius: 10px;
+  border: 1.5px solid #d4c4b8;
+  background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239b7b5e' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 10px center;
+  color: #1f1f1f;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  min-width: 110px;
+  width: auto;
+  transition: border-color 0.15s;
+  direction: rtl;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.choirSelect:focus {
+  border-color: #5e2b20;
+}
+
+/* override the global .modal.legacy-modal select rule in styles.css */
+.modal.legacy-modal .choirSelect,
+:host .choirSelect {
+  padding: 6px 12px 6px 32px !important;
+  min-width: 110px !important;
+  height: 38px !important;
+  border-radius: 10px !important;
+  border: 1.5px solid #d4c4b8 !important;
+  background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239b7b5e' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 10px center !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.choirBuildBtn {
+  height: 38px;
+}
+
+.choirPercentRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0 4px;
+  border-top: 1px solid #f0ece5;
+  margin-bottom: 6px;
+}
+
+.choirPercentLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6c6459;
+  white-space: nowrap;
+}
+
+.choirPercentHint {
+  font-size: 11px;
+  color: #9a8a7a;
+}
+
+.choirHint {
+  text-align: center;
+  color: #9a8a7a;
+  font-size: 14px;
+  padding: 20px;
+  background: #fbf8f2;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.choirDirectionLabel {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.choirFrontLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5e2b20;
+  letter-spacing: 0.5px;
+}
+
+.choirGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-start;
+  direction: rtl;
+  margin-bottom: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.choirRowBreak {
+  width: 100%;
+  height: 0;
+}
+
+.choirSeat {
+  width: calc((100% - var(--choir-cols, 6) * 6px) / var(--choir-cols, 6));
+  min-width: 70px;
+  max-width: 120px;
+  border: 1.5px solid #e4ddd2;
+  border-radius: 10px;
+  padding: 6px 4px;
+  text-align: center;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  box-sizing: border-box;
+}
+
+.choirSeat:hover {
+  border-color: #1e4d6b;
+  background: #f0f6fb;
+  transform: translateY(-1px);
+}
+
+.choirSeat--selected {
+  border-color: #5e2b20 !important;
+  background: #fdf3f0 !important;
+  box-shadow: 0 0 0 2px rgba(94, 43, 32, 0.2);
+}
+
+.choirSeat--empty {
+  border-style: dashed;
+  background: #fbf8f2;
+  color: #bbb;
+}
+
+.choirSeat--first {
+  border-color: #1e4d6b;
+  background: #f0f6fb;
+}
+
+.seatScore {
+  font-size: 10px;
+  color: #4a8a3c;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.seatName {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1f1f1f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.choirSeat--empty .seatName {
+  color: #ccc;
+}
+
+.choirSelectionHint {
+  text-align: center;
+  font-size: 13px;
+  color: #5e2b20;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.choirActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #f0ece5;
+  flex-wrap: wrap;
+}
+
+.choirPublishBtn {
+  background: #2d7a3a !important;
+  border-color: #2d7a3a !important;
+  color: #fff !important;
+}
+
+.choirPublishBtn:hover {
+  background: #378f45 !important;
+  border-color: #378f45 !important;
+}
+
+.choirPublishedBadge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #2d7a3a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.choirPublishedStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #2d7a3a;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+/* ===== Daily attendance datepicker input (mirrors dashboard-date-input) ===== */
+:host ::ng-deep .dashboard-date-input,
+:host ::ng-deep .dashboard-date-input .p-datepicker,
+:host ::ng-deep .dashboard-date-input .p-inputwrapper {
+  --dashboard-date-control-height: 44px;
+  width: 100%;
+  position: relative !important;
+}
+
+:host ::ng-deep .dashboard-date-input .p-datepicker,
+:host ::ng-deep .dashboard-date-input .p-inputwrapper {
+  display: flex;
+  align-items: stretch;
+}
+
+:host ::ng-deep .dashboard-date-input .p-inputtext,
+:host ::ng-deep .dashboard-date-input__field {
+  flex: 1 1 auto;
+  width: auto !important;
+  height: var(--dashboard-date-control-height) !important;
+  min-height: var(--dashboard-date-control-height);
+  border: 1px solid #e3d6cf !important;
+  border-radius: 10px !important;
+  background: #fffaf6 !important;
+  color: #5e2b20 !important;
+  direction: ltr;
+  text-align: right;
+  font-size: 1rem;
+  font-weight: 700;
+  padding-inline: 14px !important;
+  padding-inline-end: 44px !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+:host ::ng-deep .dashboard-date-input .p-inputtext:focus,
+:host ::ng-deep .dashboard-date-input__field:focus {
+  border-color: #8d5144 !important;
+  box-shadow: 0 0 0 3px rgba(141, 81, 68, 0.14) !important;
+}
+
+:host ::ng-deep .dashboard-date-input .p-datepicker-dropdown,
+:host ::ng-deep .dashboard-date-input .p-button {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #8d5144 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: absolute !important;
+  inset-inline-end: 6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 1 !important;
+  cursor: pointer;
+}
+
+:host ::ng-deep .dashboard-date-input .p-datepicker-dropdown:hover,
+:host ::ng-deep .dashboard-date-input .p-button:hover {
+  background: rgba(141, 81, 68, 0.1) !important;
+}
+
+/* ===== Daily attendance datepicker panel (old class — kept for safety) ===== */
+.attendanceGrantDatePanel.p-datepicker,
+.attendanceGrantDatePanel {
+  background: #ffffff !important;
+  border: 1px solid #e3d6cf !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 32px rgba(52, 28, 20, 0.12) !important;
+  color: #2f2723 !important;
+  direction: rtl;
+  font-family: inherit;
+}
+
+.attendanceGrantDatePanel .p-datepicker-header,
+.attendanceGrantDatePanel .p-datepicker-calendar-header {
+  background: #ffffff !important;
+  color: #5e2b20 !important;
+  border-bottom: 1px solid #f0e8e0 !important;
+  padding: 10px 14px !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-title,
+.attendanceGrantDatePanel .p-datepicker-decade,
+.attendanceGrantDatePanel .p-datepicker-year,
+.attendanceGrantDatePanel .p-datepicker-month {
+  color: #5e2b20 !important;
+  font-weight: 700 !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-prev,
+.attendanceGrantDatePanel .p-datepicker-next,
+.attendanceGrantDatePanel .p-datepicker-prev-button,
+.attendanceGrantDatePanel .p-datepicker-next-button {
+  color: #8d5144 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-prev:hover,
+.attendanceGrantDatePanel .p-datepicker-next:hover,
+.attendanceGrantDatePanel .p-datepicker-prev-button:hover,
+.attendanceGrantDatePanel .p-datepicker-next-button:hover {
+  background: #f7ede8 !important;
+  border-radius: 8px !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-calendar th,
+.attendanceGrantDatePanel table th {
+  color: #9b7b5e !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-calendar td,
+.attendanceGrantDatePanel table td {
+  padding: 2px !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-calendar td span,
+.attendanceGrantDatePanel table td span,
+.attendanceGrantDatePanel .p-datepicker-day {
+  color: #2f2723 !important;
+  background: transparent !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-calendar td span:hover,
+.attendanceGrantDatePanel table td span:hover,
+.attendanceGrantDatePanel .p-datepicker-day:hover {
+  background: #f7ede8 !important;
+  color: #5e2b20 !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-calendar td.p-datepicker-today span,
+.attendanceGrantDatePanel table td.p-datepicker-today span,
+.attendanceGrantDatePanel .p-datepicker-day-selected {
+  background: #5e2b20 !important;
+  color: #ffffff !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-calendar td.p-datepicker-other-month span,
+.attendanceGrantDatePanel table td.p-datepicker-other-month span {
+  color: #ccc !important;
+}
+
+.attendanceGrantDatePanel .p-datepicker-buttonbar,
+.attendanceGrantDatePanel .p-datepicker-footer {
+  background: #ffffff !important;
+  border-top: 1px solid #f0e8e0 !important;
+  padding: 8px 14px !important;
+}
+
+@media (max-width: 540px) {
+  .attendanceGrantDatePanel {
+    width: calc(100vw - 28px) !important;
+    max-width: calc(100vw - 28px) !important;
+  }
 }

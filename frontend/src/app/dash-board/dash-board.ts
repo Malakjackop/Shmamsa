@@ -13,6 +13,7 @@ import {
   BoardParticipantGroup as ParticipantGroup,
   BoardService
 } from '../services/board.service';
+import { KhorsRequestsService, type ChoirStandingPayload } from '../services/khors-requests.service';
 
 type FamilyAssignmentView = {
   familyName?: string;
@@ -96,6 +97,7 @@ export class DashBoard implements OnInit, OnDestroy {
   private messageService = inject(MessageService);
   private confirmationService = inject(ConfirmationService);
   private http = inject(HttpClient);
+  private khorsSvc = inject(KhorsRequestsService);
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
@@ -837,6 +839,13 @@ export class DashBoard implements OnInit, OnDestroy {
 
   private bonusStats: Record<string, number> = {};
 
+  // ===== Choir Standing =====
+  choirStanding: ChoirStandingPayload | null = null;
+  choirStandingKhors: string | null = null;
+  mySeatIndex = -1;
+  showChoirStandingModal = false;
+  private myFullNameForChoir = '';
+
   get serviceCards(): ServiceCardView[] {
     const cards: ServiceCardView[] = [];
 
@@ -950,9 +959,144 @@ export class DashBoard implements OnInit, OnDestroy {
         this.syncFormsWithScope();
         this.rebuildFamilyMeetingCards();
         this.loadMonthBoards();
+        this.myFullNameForChoir = String((data as any).fullName || '').trim();
+        const servedK = String((data as any).khors || '').trim().toUpperCase();
+        const attendK = String((data as any).attendKhors || '').trim().toUpperCase();
+        if (servedK === 'MARMARKOS' || attendK === 'MARMARKOS') this.choirStandingKhors = 'خورس مارمرقس';
+        else if (servedK === 'ATHANASIUS' || attendK === 'ATHANASIUS') this.choirStandingKhors = 'خورس البابا اثناسيوس';
+        if (this.choirStandingKhors) this.loadMyChoirStanding();
       },
       error: () => this.router.navigate(['/login'])
     });
+  }
+
+  private loadMyChoirStanding(): void {
+    if (!this.choirStandingKhors) return;
+    this.khorsSvc.getChoirStanding(this.choirStandingKhors).subscribe({
+      next: (data) => {
+        if (!data || !data.published) return;
+        this.choirStanding = data;
+        this.mySeatIndex = data.seats.findIndex(
+          s => s.memberName && s.memberName.trim() === this.myFullNameForChoir.trim()
+        );
+      },
+      error: () => {}
+    });
+  }
+
+  openChoirStandingModal(): void {
+    this.showChoirStandingModal = true;
+  }
+
+  closeChoirStandingModal(): void {
+    this.showChoirStandingModal = false;
+  }
+
+  choirSeatRow(idx: number): number {
+    return this.choirStanding ? Math.floor(idx / this.choirStanding.cols) + 1 : 0;
+  }
+
+  choirSeatCol(idx: number): number {
+    return this.choirStanding ? (idx % this.choirStanding.cols) + 1 : 0;
+  }
+
+  downloadChoirStanding(): void {
+    const standing = this.choirStanding;
+    if (!standing) return;
+
+    const cols = standing.cols;
+    const seats = standing.seats;
+    const rows = Math.ceil(seats.length / cols);
+
+    const cellW = 130;
+    const cellH = 52;
+    const pad = 20;
+    const headerH = 60;
+    const labelBarH = 36;
+    const footerH = 32;
+
+    const canvasW = cols * cellW + pad * 2;
+    const canvasH = headerH + labelBarH + rows * cellH + pad + footerH;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#fffaf6';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // header
+    ctx.fillStyle = '#5e2b20';
+    ctx.fillRect(0, 0, canvasW, headerH);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`واقفة ${this.choirStandingKhors ?? ''}`, canvasW / 2, headerH / 2);
+
+    // label bar
+    const frontLabel = standing.frontAtTop !== false ? 'قدام (المذبح)' : 'الشعب';
+    const crowdLabel = standing.frontAtTop !== false ? 'الشعب' : 'قدام (المذبح)';
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#7b5e3a';
+    ctx.fillText(frontLabel, canvasW - pad, headerH + labelBarH / 2);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillText(crowdLabel, pad, headerH + labelBarH / 2);
+
+    // seats
+    for (let i = 0; i < seats.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = pad + col * cellW;
+      const y = headerH + labelBarH + row * cellH;
+      const seat = seats[i];
+      const isMe = i === this.mySeatIndex;
+      const isEmpty = !seat.memberId;
+
+      const radius = 8;
+      const sx = x + 3; const sy = y + 3;
+      const sw = cellW - 6; const sh = cellH - 6;
+
+      ctx.beginPath();
+      ctx.moveTo(sx + radius, sy);
+      ctx.lineTo(sx + sw - radius, sy);
+      ctx.quadraticCurveTo(sx + sw, sy, sx + sw, sy + radius);
+      ctx.lineTo(sx + sw, sy + sh - radius);
+      ctx.quadraticCurveTo(sx + sw, sy + sh, sx + sw - radius, sy + sh);
+      ctx.lineTo(sx + radius, sy + sh);
+      ctx.quadraticCurveTo(sx, sy + sh, sx, sy + sh - radius);
+      ctx.lineTo(sx, sy + radius);
+      ctx.quadraticCurveTo(sx, sy, sx + radius, sy);
+      ctx.closePath();
+
+      ctx.fillStyle = isMe ? '#fff3cd' : isEmpty ? '#f0f0f0' : '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = isMe ? '#c8962a' : '#d9c9b4';
+      ctx.lineWidth = isMe ? 2 : 1;
+      ctx.stroke();
+
+      ctx.fillStyle = isEmpty ? '#aaaaaa' : isMe ? '#7a5500' : '#2f2723';
+      ctx.font = isMe ? 'bold 11px "Segoe UI", Arial, sans-serif' : '11px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const name = seat.memberName || '—';
+      ctx.fillText(name.length > 14 ? name.slice(0, 13) + '…' : name, sx + sw / 2, sy + sh / 2);
+    }
+
+    // footer
+    ctx.fillStyle = '#b0a090';
+    ctx.font = '11px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Shmamsa', canvasW / 2, canvasH - footerH / 2);
+
+    const link = document.createElement('a');
+    link.download = `واقفة-${this.choirStandingKhors ?? 'الخورس'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   }
 
   private loadMyQrToken(): void {
