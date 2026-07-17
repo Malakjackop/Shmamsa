@@ -5,6 +5,7 @@ import com.shmamsa.model.CustomRegistrationField;
 import com.shmamsa.model.VisibilityConditionConfig;
 import com.shmamsa.repository.CustomFieldValueRepository;
 import com.shmamsa.repository.CustomRegistrationFieldRepository;
+import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.ServantSecretService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

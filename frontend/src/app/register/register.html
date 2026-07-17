@@ -84,19 +84,7 @@
               </div>
             </ng-container>
 
-            <!-- email -->
-            <ng-container *ngIf="f.fieldKey === 'email'">
-              <div class="input-group small">
-                <label class="field-label">{{ fieldLabel('email', 'البريد الإلكتروني') }}<span class="required-star" *ngIf="fieldRequired('email', true)"> *</span></label>
-                <input *ngIf="!isSelectField('email')" type="email" formControlName="email"
-                       (click)="markInteracted('email')" (blur)="markTouched('email')" />
-                <select *ngIf="isSelectField('email')" formControlName="email" [required]="fieldRequired('email', true)" (change)="markTouchedFromList('email')">
-                  <option value="" disabled>{{ fieldLabel('email', 'البريد الإلكتروني') }}</option>
-                  <option *ngFor="let opt of fieldOptions('email')" [value]="opt">{{ opt }}</option>
-                </select>
-                <small class="error-text" *ngIf="shouldShowError('email')">{{ errorText('email','البريد الإلكتروني') }}</small>
-              </div>
-            </ng-container>
+
 
             <!-- dateOfBirth -->
             <ng-container *ngIf="f.fieldKey === 'dateOfBirth'">
@@ -167,6 +155,18 @@
                   <option *ngFor="let opt of fieldOptions('khorsYear')" [value]="opt">{{ opt }}</option>
                 </select>
                 <small class="error-text" *ngIf="shouldShowError('khorsYear')">{{ errorText('khorsYear','سنة الخورس') }}</small>
+              </div>
+            </ng-container>
+
+            <!-- yearsInFamily -->
+            <ng-container *ngIf="f.fieldKey === 'yearsInFamily'">
+              <div class="input-group small">
+                <label class="field-label">{{ fieldLabel('yearsInFamily', 'عدد السنوات في الأسرة') }}<span class="required-star" *ngIf="fieldRequired('yearsInFamily')"> *</span></label>
+                <select formControlName="yearsInFamily" (change)="markTouchedFromList('yearsInFamily')">
+                  <option value="" disabled>{{ fieldLabel('yearsInFamily', 'عدد السنوات في الأسرة') }}</option>
+                  <option *ngFor="let opt of fieldOptions('yearsInFamily', ['اول سنه ليا','سنتين','٣ سنين','٤ سنين','اكتر من ٤ سنين'])" [value]="opt">{{ opt }}</option>
+                </select>
+                <small class="error-text" *ngIf="shouldShowError('yearsInFamily')">{{ errorText('yearsInFamily','عدد السنوات في الأسرة') }}</small>
               </div>
             </ng-container>
 

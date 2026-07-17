@@ -3,7 +3,6 @@ package com.shmamsa.dto;
 import com.shmamsa.validation.customAnnotation.DifferentParentPhones;
 import com.shmamsa.validation.customAnnotation.DifferentParentPhonesValidator.HasParentPhones;
 import com.shmamsa.validation.customAnnotation.ValidNationalId;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import jakarta.validation.constraints.Pattern;
@@ -20,9 +19,6 @@ public class RegisterServantRequest implements HasParentPhones {
     @NotBlank(message = "Username is required")
     private String username;
 
-    @Email(message = "Email should be valid")
-    @NotBlank(message = "Email is required")
-    private String email;
 
     @NotBlank(message = "Password is required")
     private String password;
@@ -56,6 +52,8 @@ public class RegisterServantRequest implements HasParentPhones {
     private String khors;
     private String attendKhors;
 
+
+    private String yearsInFamily;
 
     @Pattern(regexp = "^$|^\\d{11}$", message = "رقم الهاتف يجب أن يكون 11 رقم")
     private String phoneNumber;

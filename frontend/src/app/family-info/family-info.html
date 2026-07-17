@@ -5,7 +5,6 @@
   <div class="pageHead">
     <div>
       <h1>بيانات الأسرة</h1>
-      <div class="pageSub" *ngIf="selectedFamily">{{ selectedFamily }}</div>
     </div>
 
     <button
@@ -29,6 +28,11 @@
       <ng-template #singleFamilyView>
         <div class="singleSelectValue">{{ selectedFamily || families[0] }}</div>
       </ng-template>
+    </div>
+
+    <div class="filterGroup" *ngIf="isAminOsra() && selectedFamily">
+      <label>الأسرة</label>
+      <div class="singleSelectValue">{{ selectedFamily }}</div>
     </div>
 
     <div class="filterGroup filterGroup--branch" *ngIf="canSelectFamily() && branches.length > 0">
@@ -168,6 +172,7 @@
       (click)="openProfile(member)"
     >
       <span class="memberCard__fill" *ngIf="member.uiAttendanceVisual.colorState !== 'white'"></span>
+      <span class="memberCard__notesDot" *ngIf="member.hasNotes && canViewNotes()" title="يوجد ملاحظة"></span>
 
       <div class="memberCard__content">
         <h2 class="memberCard__name">{{ member.fullName }}</h2>
@@ -273,6 +278,74 @@
         <ng-template #noProfileEntries>
           <div class="hint">لا توجد بيانات إضافية متاحة.</div>
         </ng-template>
+      </div>
+
+      <div class="notesSection" *ngIf="!profileLoading && canViewNotes()">
+        <div class="notesSection__head">
+          <label>ملاحظات ({{ notesList.length }})</label>
+          <button type="button" class="ghostBtn" (click)="startAddNote()" *ngIf="!addingNote">
+            <i class="pi pi-plus"></i>
+            إضافة
+          </button>
+        </div>
+
+        <div *ngIf="notesLoading" class="hint" style="font-size:12px;">جاري التحميل...</div>
+
+        <div *ngIf="!notesLoading && notesList.length === 0 && !addingNote" class="notesSection__empty">
+          لا توجد ملاحظات
+        </div>
+
+        <div class="notesList" *ngIf="!notesLoading">
+          <div class="notesList__item" *ngFor="let note of notesList">
+            <ng-container *ngIf="editingNoteId !== note.id; else editMode">
+              <div class="notesList__text">{{ note.text }}</div>
+              <div class="notesList__meta">
+                <span class="notesList__author">{{ note.createdBy }}</span>
+                <span class="notesList__date">{{ note.createdAt | date:'short' }}</span>
+              </div>
+              <div class="notesList__actions">
+                <button type="button" class="notesList__actionBtn" (click)="startEditNote(note)" title="تعديل">
+                  <i class="pi pi-pencil"></i>
+                </button>
+                <button type="button" class="notesList__actionBtn notesList__actionBtn--danger" (click)="confirmDeleteNote(note)" title="حذف">
+                  <i class="pi pi-trash"></i>
+                </button>
+              </div>
+            </ng-container>
+
+            <ng-template #editMode>
+              <div class="notesSection__editor">
+                <textarea
+                  [(ngModel)]="editNoteText"
+                  [ngModelOptions]="{ standalone: true }"
+                  placeholder="عدل الملاحظة..."
+                  rows="3"
+                ></textarea>
+                <div class="notesSection__actions">
+                  <button type="button" class="ghostBtn" (click)="cancelEditNote()">إلغاء</button>
+                  <button type="button" class="saveNotesBtn" (click)="submitEditNote(note)" [disabled]="savingNote">
+                    {{ savingNote ? 'جاري...' : 'حفظ' }}
+                  </button>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+
+        <div *ngIf="addingNote" class="notesSection__editor" style="margin-top:8px;">
+          <textarea
+            [(ngModel)]="addNoteText"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="اكتب ملاحظة جديدة..."
+            rows="3"
+          ></textarea>
+          <div class="notesSection__actions">
+            <button type="button" class="ghostBtn" (click)="cancelAddNote()">إلغاء</button>
+            <button type="button" class="saveNotesBtn" (click)="submitAddNote()" [disabled]="savingNote || !addNoteText.trim()">
+              {{ savingNote ? 'جاري...' : 'إضافة' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

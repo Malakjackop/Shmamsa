@@ -65,7 +65,9 @@ ngOnDestroy(): void {
 
   isAminKhedmaOrDev(): boolean {
     const r = normalizeRole(this.user?.role);
-    return ['AMIN_KHEDMA', 'DEVELOPER'].includes(r);
+    if (!['AMIN_KHEDMA', 'DEVELOPER'].includes(r)) return false;
+    if (this.hasAnyAminOsraScope()) return false;
+    return true;
   }
 
   isDeveloper(): boolean {

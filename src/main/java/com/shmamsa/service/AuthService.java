@@ -118,21 +118,11 @@ public class AuthService {
                     throw new ApiException(HttpStatus.CONFLICT, "USERNAME_TAKEN", "Username already in use");
                 });
 
-        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
-
-        userRepository.findByEmail(email).ifPresent(u -> {
-            throw new ApiException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_TAKEN",
-                    "Email already in use",
-                    java.util.Map.of("email", "الإيميل مسجل بالفعل")
-            );
-        });
 
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
-        user.setEmail(email);
+        user.setEmail("");
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(request.getNationalId());
         FamilyCatalog memberFamily = familyCatalogService.resolveMemberFamily(request.getDeaconFamilyId(), request.getDeaconFamily());
@@ -161,6 +151,8 @@ public class AuthService {
 
         user.setGraduatedFrom(request.getGraduatedFrom());
         user.setGraduateJob(request.getGraduateJob());
+
+        user.setYearsInFamily(request.getYearsInFamily());
 
         LocalDate dob = NationalIdUtils.extractBirthDate(request.getNationalId());
         if (dob != null) user.setDateOfBirth(dob);
@@ -236,21 +228,11 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SCOPE", "Invalid serving scope");
         }
 
-        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
-
-        userRepository.findByEmail(email).ifPresent(u -> {
-            throw new ApiException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_TAKEN",
-                    "Email already in use",
-                    java.util.Map.of("email", "الإيميل مسجل بالفعل")
-            );
-        });
 
         User user = new User();
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
-        user.setEmail(email);
+        user.setEmail("");
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNationalId(nid);
         FamilyCatalog primaryFamily = null;
@@ -333,6 +315,8 @@ public class AuthService {
         user.setGraduateJob(request.getGraduateJob());
         user.setIsWorking(request.getIsWorking());
         user.setWorkDetails(request.getWorkDetails());
+
+        user.setYearsInFamily(request.getYearsInFamily());
 
         userRepository.save(user);
         List<UserFamilyAssignmentView> assignments = new ArrayList<>();

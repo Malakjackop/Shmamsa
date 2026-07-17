@@ -30,7 +30,8 @@ const SYSTEM_FIELD_DEFAULT_SHOW_IN: Record<string, string[]> = {
   isWorking: ['FAMILY_INFO'],
   workDetails: ['PROFILE', 'FAMILY_INFO'],
   guardiansPhone: ['PROFILE', 'FAMILY_INFO'],
-  guardianRelation: ['PROFILE', 'FAMILY_INFO']
+  guardianRelation: ['PROFILE', 'FAMILY_INFO'],
+  yearsInFamily: ['PROFILE', 'FAMILY_INFO']
 };
 
 const SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE = new Set([
@@ -46,7 +47,8 @@ const SYSTEM_FIELD_DEFAULT_PROFILE_EDITABLE = new Set([
   'universityGrade',
   'graduatedFrom',
   'graduateJob',
-  'workDetails'
+  'workDetails',
+  'yearsInFamily'
 ]);
 
 export function parseShowInTargets(showIn?: string | null): string[] {

@@ -58,7 +58,7 @@
         </div>
 
         <!-- الإعدادات dropdown -->
-        <div class="nav-dropdown" [class.open]="activeDropdown === 'settings'" *ngIf="isServantOrAbove()">
+        <div class="nav-dropdown" [class.open]="activeDropdown === 'settings'" *ngIf="isAminKhedmaOrDev() || isDeveloper()">
           <button class="top-nav-link dropdown-btn" (click)="toggleDropdown('settings'); $event.stopPropagation()">
             <i class="pi pi-cog"></i>
             <span>الإعدادات</span>
@@ -69,7 +69,6 @@
             <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'fields'}" routerLinkActive="active">حقول التسجيل</a>
             <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'families'}" routerLinkActive="active">الأسر</a>
             <a *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'secret'}" routerLinkActive="active">كود سري</a>
-            <a *ngIf="isDeveloper()" routerLink="/role-settings" routerLinkActive="active">الصلاحيات</a>
           </div>
         </div>
       </nav>
@@ -147,7 +146,7 @@
           <span>حضوري</span>
         </li>
 
-        <ng-container *ngIf="isServantOrAbove()">
+        <ng-container *ngIf="isAminKhedmaOrDev() || isDeveloper()">
           <li class="menu-group-header">الإعدادات</li>
           <li *ngIf="isAminKhedmaOrDev()" routerLink="/start-new-year" routerLinkActive="active" (click)="closeMobileMenu()">
             <i class="pi pi-calendar"></i>
@@ -164,10 +163,6 @@
           <li *ngIf="isDeveloper()" routerLink="/dev-settings" [queryParams]="{tab: 'secret'}" routerLinkActive="active" (click)="closeMobileMenu()">
             <i class="pi pi-key"></i>
             <span>كود سري</span>
-          </li>
-          <li *ngIf="isDeveloper()" routerLink="/role-settings" routerLinkActive="active" (click)="closeMobileMenu()">
-            <i class="pi pi-lock"></i>
-            <span>الصلاحيات</span>
           </li>
         </ng-container>
       </ul>

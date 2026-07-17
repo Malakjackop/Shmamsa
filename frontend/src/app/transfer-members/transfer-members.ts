@@ -261,6 +261,16 @@ familyRequestTargets: { label: string; value: string }[] = [
     if (this.mode === 'SERVANT' && this.isAminKhedmaOrDev()) {
       return this.availableMainFamilies().map(f => ({ label: f, value: f }));
     }
+    if (this.isAminOsra() && this.mode === 'MAKHDOM') {
+      const fam = (this.selectedFamilyView || '').trim();
+      if (!fam) return [];
+      const idx = this.makhdomFamilies.indexOf(fam);
+      if (idx >= 0 && idx < this.makhdomFamilies.length - 1) {
+        const next = this.makhdomFamilies[idx + 1];
+        return [{ label: next, value: next }];
+      }
+      return [];
+    }
     return this.availableTargetFamilies().map(f => ({ label: f, value: f }));
   }
   targetFamilyLoading = false;
@@ -783,7 +793,7 @@ isChoirSelection(): boolean {
                 extraAssignments.push({ family: fam, role: 'MAKHDOM' });
               }
               calls.push(this.familySvc.transferMembers(data.ids,
-                isKhorsReq ? '' : fam, data.role, undefined,
+                fam, data.role, undefined,
                 extraAssignments.length ? extraAssignments : undefined, transferContextFamily));
             }
           } else {
@@ -799,7 +809,7 @@ isChoirSelection(): boolean {
               extraAssignments.push({ family: String(this.familyApiParam(this.targetChoir)), role: 'MAKHDOM' });
             }
             calls.push(this.familySvc.transferMembers(mainIds,
-              isKhorsReq ? '' : targetFam, roleToSend, undefined,
+              targetFam, roleToSend, undefined,
               extraAssignments.length ? extraAssignments : undefined, transferContextFamily));
           }
         }

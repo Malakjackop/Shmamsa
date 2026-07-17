@@ -23,7 +23,6 @@ const FALLBACK_SYSTEM_FIELD_KEYS = new Set([
   'phoneNumber',
   'address',
   'nationalId',
-  'email',
   'dateOfBirth',
   'gender',
   'deaconDegree',
@@ -45,7 +44,8 @@ const FALLBACK_SYSTEM_FIELD_KEYS = new Set([
   'workDetails',
   'guardiansPhone',
   'guardianRelation',
-  'khorsYear'
+  'khorsYear',
+  'yearsInFamily'
 ]);
 
 @Component({
@@ -190,7 +190,6 @@ export class RegisterComponent implements OnInit {
       username: ['', Validators.required],
       phoneNumber: ['', [this.optionalPhone11()]],
       address: ['', [Validators.required, this.arabicTextOnly(true)]],
-      email: ['', [Validators.required, Validators.email]],
 
       nationalId: ['', [Validators.required, this.nationalIdValidator(minAge)]],
       dateOfBirth: this.fb.control({ value: '', disabled: true }),
@@ -229,6 +228,7 @@ export class RegisterComponent implements OnInit {
       guardiansPhone: ['', [this.optionalPhone11()]],
       guardianRelation: [''],
       khorsYear: [''],
+      yearsInFamily: this.fb.control('', { updateOn: 'change' }),
 
       password: ['', Validators.required],
       confirmPassword: ['', Validators.required],
@@ -399,8 +399,7 @@ export class RegisterComponent implements OnInit {
       field('phoneNumber', 'رقم الهاتف', 'TEXT', 3),
       field('address', 'العنوان', 'TEXT', 4),
       field('nationalId', 'الرقم القومي', 'TEXT', 5),
-      field('email', 'البريد الإلكتروني', 'TEXT', 6, { required: true }),
-      field('dateOfBirth', 'تاريخ الميلاد', 'DATE', 7),
+        field('dateOfBirth', 'تاريخ الميلاد', 'DATE', 7),
       field('gender', 'النوع', 'TEXT', 8),
       field('deaconDegree', 'رتبة الشماس', 'SELECT', 9, { required: true }),
       field('deaconFamily', 'الأسرة', 'SELECT', 10, { visibilityRule: 'MEMBER_ONLY' }),
@@ -430,6 +429,7 @@ export class RegisterComponent implements OnInit {
           { type: 'FIELD', fieldKey: 'isWorking', values: ['true'] }
         ]
       }),
+      field('yearsInFamily', 'عدد السنوات في الأسرة', 'SELECT', 26.5, { options: 'اول سنه ليا,سنتين,٣ سنين,٤ سنين,اكتر من ٤ سنين' }),
       field('guardiansPhone', 'هاتف ولي الأمر', 'TEXT', 27),
       field('guardianRelation', 'صلة القرابة', 'TEXT', 28)
     ];
@@ -961,7 +961,6 @@ onServingWhereChange() {
     const e: any = c.errors;
     if (e['required']) return (label || 'هذا الحقل ') + ' يلزم';
     if (e['configRequired']) return (label || 'هذا الحقل ') + ' يلزم';
-    if (e['email']) return 'الايميل غير صحيح';
     if (e['arabicOnly']) return 'هذا الحقل لازم يتكتب بالعربي';
     if (e['nationalIdFormat']) return 'الرقم القومي لازم يكون 14 رقم ';
     if (e['nationalIdMinAge']) return 'السن لازم يكون   ' + e['nationalIdMinAge']?.minAge + ' سنين او اكثر';
@@ -1097,7 +1096,6 @@ private guardianNotSameAsPhone(): ValidatorFn {
     const payload: any = {
       fullName: formValue.fullName,
       username: formValue.username,
-      email: formValue.email,
       password: formValue.password,
       confirmPassword: formValue.confirmPassword,
 
@@ -1130,6 +1128,7 @@ private guardianNotSameAsPhone(): ValidatorFn {
       guardiansPhone: formValue.guardiansPhone,
       guardianRelation: formValue.guardianRelation,
       khorsYear: formValue.khorsYear,
+      yearsInFamily: formValue.yearsInFamily,
 
       secret: String(formValue.secret || '').trim(),
       customFields: {}

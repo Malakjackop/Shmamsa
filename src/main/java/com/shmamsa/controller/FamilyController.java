@@ -13,6 +13,8 @@ import com.shmamsa.model.UserFamilyAssignmentView;
 import com.shmamsa.repository.AttendanceRepository;
 import com.shmamsa.repository.CustomFieldValueRepository;
 import com.shmamsa.repository.CustomRegistrationFieldRepository;
+import com.shmamsa.model.MemberNote;
+import com.shmamsa.repository.MemberNoteRepository;
 import com.shmamsa.repository.UserRepository;
 import com.shmamsa.security.RoleUtil;
 import com.shmamsa.service.AttendanceBackfillService;
@@ -21,6 +23,7 @@ import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.FamilyCatalogService;
 import com.shmamsa.service.KhorsJoinRequestService;
 import com.shmamsa.service.UserFamilyRoleService;
+import com.shmamsa.service.YearsInFamilyScheduler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +47,8 @@ public class  FamilyController {
     private final UserFamilyRoleService userFamilyRoleService;
     private final CustomRegistrationFieldRepository customFieldRepo;
     private final CustomFieldValueRepository customFieldValueRepo;
+    private final MemberNoteRepository memberNoteRepo;
+    private final YearsInFamilyScheduler yearsInFamilyScheduler;
 
     private String baseFamilyOf(User u) {
         return familyAccessService.baseFamily(u);
@@ -616,6 +621,8 @@ public class  FamilyController {
             row.put("servingScope", u.getServingScope());
             row.put("schoolGrade", u.getSchoolGrade());
             row.put("deaconDegree", u.getDeaconDegree());
+            row.put("yearsInFamily", u.getYearsInFamily());
+            row.put("hasNotes", memberNoteRepo.countByUserId(u.getId()) > 0);
             if (includeSensitive) {
                 row.put("phoneNumber", u.getPhoneNumber());
                 row.put("guardiansPhone", u.getGuardiansPhone());
@@ -699,6 +706,7 @@ public class  FamilyController {
         dto.put("workDetails", u.getWorkDetails());
         dto.put("khors", u.getKhors());
         dto.put("khorsYear", u.getKhorsYear());
+        dto.put("yearsInFamily", u.getYearsInFamily());
         if (includeSensitive) {
             dto.put("nationalId", u.getNationalId());
             dto.put("address", u.getAddress());
@@ -707,11 +715,118 @@ public class  FamilyController {
             dto.put("dateOfBirth", u.getDateOfBirth());
             dto.put("gender", u.getGender());
         }
+        if (canViewNotes(me)) {
+            dto.put("notes", memberNoteRepo.findByUserIdOrderByCreatedAtDesc(u.getId()));
+        }
         appendCustomFieldValues(dto, u, "FAMILY_INFO");
         return ResponseEntity.ok(dto);
     }
 
+    @GetMapping("/members/{id}/notes")
+    public ResponseEntity<?> getNotes(@PathVariable Long id, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        if (!canViewNotes(me)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        userRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
+
+        return ResponseEntity.ok(memberNoteRepo.findByUserIdOrderByCreatedAtDesc(id));
+    }
+
+    @PostMapping("/members/{id}/notes")
+    public ResponseEntity<?> addNote(@PathVariable Long id,
+                                     @RequestBody Map<String, String> body,
+                                     Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        if (!canViewNotes(me)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        userRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Member not found"));
+
+        String text = body.get("text");
+        if (text == null || text.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Note text is required");
+        }
+
+        MemberNote note = MemberNote.builder()
+                .userId(id)
+                .text(text.trim())
+                .createdBy(me.getFullName())
+                .createdAt(java.time.LocalDateTime.now())
+                .build();
+
+        memberNoteRepo.save(note);
+        return ResponseEntity.ok(note);
+    }
+
+    @PutMapping("/members/{id}/notes/{noteId}")
+    public ResponseEntity<?> updateNote(@PathVariable Long id,
+                                        @PathVariable Long noteId,
+                                        @RequestBody Map<String, String> body,
+                                        Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        if (!canViewNotes(me)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        MemberNote note = memberNoteRepo.findById(noteId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Note not found"));
+
+        if (!note.getUserId().equals(id)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Note does not belong to this member");
+        }
+
+        String text = body.get("text");
+        if (text == null || text.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Note text is required");
+        }
+
+        note.setText(text.trim());
+        note.setUpdatedAt(java.time.LocalDateTime.now());
+        memberNoteRepo.save(note);
+
+        return ResponseEntity.ok(note);
+    }
+
+    @DeleteMapping("/members/{id}/notes/{noteId}")
+    public ResponseEntity<?> deleteNote(@PathVariable Long id,
+                                        @PathVariable Long noteId,
+                                        Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        if (!canViewNotes(me)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        MemberNote note = memberNoteRepo.findById(noteId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Note not found"));
+
+        if (!note.getUserId().equals(id)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Note does not belong to this member");
+        }
+
+        memberNoteRepo.delete(note);
+        return ResponseEntity.ok(Map.of("deleted", true));
+    }
 
     @DeleteMapping("/members/{id}")
     public ResponseEntity<?> deleteMember(@PathVariable Long id, Authentication auth) {
@@ -814,6 +929,32 @@ public class  FamilyController {
         }
 
         return false;
+    }
+
+    @PostMapping("/trigger-years-increment")
+    public ResponseEntity<?> triggerYearsIncrement(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        String role = me.getRole();
+        if (!"DEVELOPER".equals(role) && !"AMIN_KHEDMA".equals(role)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+        yearsInFamilyScheduler.incrementYearsInFamily();
+        return ResponseEntity.ok(Map.of("message", "Years in family incremented successfully"));
+    }
+
+    @PostMapping("/reset-years-in-family")
+    public ResponseEntity<?> resetYearsInFamily(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        User me = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        String role = me.getRole();
+        if (!"DEVELOPER".equals(role) && !"AMIN_KHEDMA".equals(role)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+        yearsInFamilyScheduler.resetYearsInFamily();
+        return ResponseEntity.ok(Map.of("message", "Years in family reset successfully"));
     }
 
     @PostMapping("/transfer-members")
@@ -1178,6 +1319,8 @@ public class  FamilyController {
             }
 
             userFamilyRoleService.replaceAssignments(u, newAssignments);
+            u.setYearsInFamily("اول سنه ليا");
+            u.setFamilyTransferDate(java.time.LocalDate.now());
             userRepo.save(u);
             attendanceBackfillService.backfillForUser(u);
             updated++;
@@ -1390,6 +1533,14 @@ public class  FamilyController {
         }
 
         return sharesChoirScope(actor, member);
+    }
+
+    private boolean canViewNotes(User actor) {
+        if (actor == null) return false;
+        String role = normRole(actor.getRole());
+        if ("DEVELOPER".equals(role) || "AMIN_KHEDMA".equals(role)) return true;
+        if ("AMIN_OSRA".equals(role) || "KHADIM".equals(role)) return true;
+        return hasScopedRole(actor, "AMIN_OSRA") || hasScopedRole(actor, "KHADIM");
     }
 
     private boolean canViewSensitiveMemberDetails(User actor, User member) {

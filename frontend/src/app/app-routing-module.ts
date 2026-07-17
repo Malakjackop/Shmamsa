@@ -8,7 +8,6 @@ import { ForgotPasswordComponent } from './forgot-password/forgot-password';
 import { ResourcesComponent } from './resources/resources';
 import { AttendanceHistoryComponent } from './attendance-history/attendance-history';
 import { DevSettingsComponent } from './dev-settings/dev-settings';
-import { RoleSettingsComponent } from './role-settings/role-settings';
 
 import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
@@ -88,12 +87,6 @@ const routes: Routes = [
       {
         path: 'dev-settings',
         component: DevSettingsComponent,
-        canActivate: [RoleGuard],
-        data: { roles: ['DEVELOPER'] }
-      },
-      {
-        path: 'role-settings',
-        component: RoleSettingsComponent,
         canActivate: [RoleGuard],
         data: { roles: ['DEVELOPER'] }
       },

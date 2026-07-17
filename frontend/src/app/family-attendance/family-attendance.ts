@@ -110,6 +110,7 @@ type ProfileView = {
   khors?: string;
   khorsYear?: number | string | null;
   deaconDegree?: string;
+  yearsInFamily?: string;
   nationalId?: string;
   phoneNumber?: string;
   address?: string;

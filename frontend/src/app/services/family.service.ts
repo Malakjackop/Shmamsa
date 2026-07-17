@@ -4,6 +4,15 @@ import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 
+export type NoteItem = {
+  id: number;
+  userId: number;
+  text: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type FamilyMemberSummary = {
   id: number;
   fullName?: string;
@@ -154,6 +163,26 @@ export class FamilyService {
   deleteMember(id: number): Observable<FamilyMutationResponse> {
     if (!this.isBrowser) return of(null);
     return this.http.delete<Record<string, unknown>>(`${this.baseUrl}/members/${id}`, { withCredentials: true });
+  }
+
+  getNotes(id: number): Observable<NoteItem[]> {
+    if (!this.isBrowser) return of([]);
+    return this.http.get<NoteItem[]>(`${this.baseUrl}/members/${id}/notes`, { withCredentials: true });
+  }
+
+  addNote(id: number, text: string): Observable<NoteItem> {
+    if (!this.isBrowser) return of({ id: 0, userId: id, text, createdBy: '', createdAt: '' });
+    return this.http.post<NoteItem>(`${this.baseUrl}/members/${id}/notes`, { text }, { withCredentials: true });
+  }
+
+  updateNote(id: number, noteId: number, text: string): Observable<NoteItem> {
+    if (!this.isBrowser) return of({ id: noteId, userId: id, text, createdBy: '', createdAt: '' });
+    return this.http.put<NoteItem>(`${this.baseUrl}/members/${id}/notes/${noteId}`, { text }, { withCredentials: true });
+  }
+
+  deleteNote(id: number, noteId: number): Observable<{ deleted: boolean }> {
+    if (!this.isBrowser) return of({ deleted: true });
+    return this.http.delete<{ deleted: boolean }>(`${this.baseUrl}/members/${id}/notes/${noteId}`, { withCredentials: true });
   }
 
 

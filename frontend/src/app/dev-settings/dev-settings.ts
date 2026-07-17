@@ -75,7 +75,7 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   loading = true;
 
   /* ── Tab state ────────────────────────────────────────── */
-  activeTab: 'fields' | 'families' | 'secret' | 'permissions' = 'fields';
+  activeTab: 'fields' | 'families' | 'secret' = 'fields';
 
   /* ── Families state ───────────────────────────────────── */
   families: FamilyCatalog[] = [];
@@ -122,49 +122,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
   attendKhorsFamilyOptions: string[] = [];
   private familyOptionsLoaded = false;
 
-  /* ── Role Settings state ────────────────────────────── */
-  roles: Array<{
-    id?: number;
-    name: string;
-    displayNameAr: string;
-    sortOrder: number;
-    active: boolean;
-    permissions: string;
-  }> = [];
-  allPermissions: string[] = [];
-  roleLoading = false;
-  roleDialogVisible = false;
-  roleDialogMode: 'create' | 'edit' = 'create';
-  editingRole: Partial<{
-    id?: number;
-    name: string;
-    displayNameAr: string;
-    sortOrder: number;
-    active: boolean;
-    permissions: string;
-  }> = {};
-  selectedPermissions: string[] = [];
-
-  permissionLabels: Record<string, string> = {
-    VIEW_ATTENDANCE: 'عرض الحضور',
-    TAKE_ATTENDANCE: 'تسجيل الحضور',
-    VIEW_FAMILY_INFO: 'عرض بيانات الأسر',
-    MANAGE_FAMILY_INFO: 'تعديل بيانات الأسر',
-    MANAGE_EVENTS: 'إدارة المناسبات',
-    MANAGE_ANNOUNCEMENTS: 'إدارة الإعلانات',
-    MANAGE_IFTEKAD: 'إدارة الافتقاد',
-    TRANSFER_MEMBERS: 'نقل الأعضاء',
-    MANAGE_ROLES: 'إدارة الصلاحيات',
-    START_NEW_YEAR: 'بدء سنة جديدة',
-    MANAGE_KHORS: 'إدارة الخورس',
-    VIEW_GRADES: 'عرض الدرجات',
-    MANAGE_REGISTRATION_FIELDS: 'إدارة حقول التسجيل',
-    MANAGE_FAMILIES: 'إدارة الأسر',
-    MANAGE_SECRET_CODE: 'إدارة الكود السري',
-    MANAGE_RESOURCES: 'إدارة الملفات',
-    VIEW_ATTENDANCE_HISTORY: 'عرض تاريخ الحضور',
-    MANAGE_ATTENDANCE_ACCESS: 'إدارة صلاحيات الحضور'
-  };
 
   categoryOptions: string[] = [];
   selectedCategory: string = '';
@@ -243,7 +200,8 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
         'deaconFamily',
         'khors',
         'servingWhere',
-        'attendKhors'
+        'attendKhors',
+        'yearsInFamily'
       ]
     },
     {
@@ -281,9 +239,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
       } else if (tab === 'secret') {
         this.activeTab = 'secret';
         this.loadSecretCode();
-      } else if (tab === 'permissions') {
-        this.activeTab = 'permissions';
-        this.loadRoles();
       } else {
         this.activeTab = 'fields';
       }
@@ -1214,174 +1169,6 @@ export class DevSettingsComponent implements OnInit, OnDestroy {
     }
   }
 
-  /* ── Role Settings methods ──────────────────────────── */
-  loadRoles(): void {
-    this.roleLoading = true;
-    this.svc.getAllRoles().subscribe({
-      next: (data) => {
-        this.roles = data || [];
-        this.roleLoading = false;
-      },
-      error: () => {
-        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحميل الأدوار' });
-        this.roleLoading = false;
-      }
-    });
-    this.svc.getAllPermissions().subscribe({
-      next: (data) => {
-        this.allPermissions = data || [];
-      }
-    });
-  }
-
-  openCreateRole(): void {
-    this.roleDialogMode = 'create';
-    this.editingRole = {
-      name: '',
-      displayNameAr: '',
-      active: true,
-      permissions: ''
-    };
-    this.selectedPermissions = [];
-    this.roleDialogVisible = true;
-  }
-
-  openEditRole(r: typeof this.roles[0]): void {
-    this.roleDialogMode = 'edit';
-    this.editingRole = { ...r };
-    this.selectedPermissions = (r.permissions || '')
-      .split(',')
-      .map(p => p.trim())
-      .filter(Boolean);
-    this.roleDialogVisible = true;
-  }
-
-  saveRole(): void {
-    if (!this.editingRole.name?.trim()) {
-      this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اسم الدور مطلوب' });
-      return;
-    }
-    if (!this.editingRole.displayNameAr?.trim()) {
-      this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'الاسم بالعربي مطلوب' });
-      return;
-    }
-
-    if (this.roleDialogMode === 'create') {
-      const nameRegex = /^[A-Z][A-Z0-9_]*$/;
-      if (!nameRegex.test(this.editingRole.name.trim())) {
-        this.msg.add({ severity: 'warn', summary: 'تنبيه', detail: 'اسم الدور يجب أن يكون حروف إنجليزية كبيرة وأرقام و _ فقط' });
-        return;
-      }
-      this.svc.createRole({
-        name: this.editingRole.name.trim(),
-        displayNameAr: this.editingRole.displayNameAr.trim(),
-        permissions: this.selectedPermissions.join(',')
-      }).subscribe({
-        next: () => {
-          this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم إنشاء الدور بنجاح' });
-          this.roleDialogVisible = false;
-          this.loadRoles();
-        },
-        error: (err) => {
-          const detail = err?.error?.message || 'فشل إنشاء الدور';
-          this.msg.add({ severity: 'error', summary: 'خطأ', detail });
-        }
-      });
-    } else {
-      this.svc.updateRole(this.editingRole.id!, {
-        displayNameAr: this.editingRole.displayNameAr?.trim(),
-        active: this.editingRole.active,
-        permissions: this.selectedPermissions.join(',')
-      }).subscribe({
-        next: () => {
-          this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الدور بنجاح' });
-          this.roleDialogVisible = false;
-          this.loadRoles();
-        },
-        error: (err) => {
-          const detail = err?.error?.message || 'فشل تعديل الدور';
-          this.msg.add({ severity: 'error', summary: 'خطأ', detail });
-        }
-      });
-    }
-  }
-
-  toggleRoleActive(r: typeof this.roles[0]): void {
-    this.svc.updateRole(r.id!, { active: !r.active, displayNameAr: r.displayNameAr, permissions: r.permissions }).subscribe({
-      next: () => {
-        r.active = !r.active;
-        const status = r.active ? 'مفعل' : 'معطل';
-        this.msg.add({ severity: 'info', summary: 'تم', detail: `الدور ${status}` });
-      },
-      error: () => {
-        this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تحديث الحالة' });
-      }
-    });
-  }
-
-  deleteRole(r: typeof this.roles[0]): void {
-    this.confirm.confirm({
-      message: `هل أنت متأكد من حذف الدور "${r.displayNameAr}"؟`,
-      header: 'تأكيد الحذف',
-      icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'حذف',
-      rejectLabel: 'إلغاء',
-      accept: () => {
-        this.svc.deleteRole(r.id!).subscribe({
-          next: () => {
-            this.msg.add({ severity: 'success', summary: 'تم', detail: 'تم حذف الدور' });
-            this.loadRoles();
-          },
-          error: (err) => {
-            const detail = err?.error?.message || 'فشل حذف الدور';
-            this.msg.add({ severity: 'error', summary: 'خطأ', detail });
-          }
-        });
-      }
-    });
-  }
-
-  moveRoleUp(index: number): void {
-    if (index <= 0) return;
-    const ids = this.roles.map(r => r.id!);
-    const tmp = ids[index];
-    ids[index] = ids[index - 1];
-    ids[index - 1] = tmp;
-    this.svc.reorderRoles(ids).subscribe({
-      next: () => this.loadRoles(),
-      error: () => this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ الترتيب' })
-    });
-  }
-
-  moveRoleDown(index: number): void {
-    if (index >= this.roles.length - 1) return;
-    const ids = this.roles.map(r => r.id!);
-    const tmp = ids[index];
-    ids[index] = ids[index + 1];
-    ids[index + 1] = tmp;
-    this.svc.reorderRoles(ids).subscribe({
-      next: () => this.loadRoles(),
-      error: () => this.msg.add({ severity: 'error', summary: 'خطأ', detail: 'فشل حفظ الترتيب' })
-    });
-  }
-
-  hasPermission(perm: string): boolean {
-    return this.selectedPermissions.includes(perm);
-  }
-
-  togglePermission(perm: string, checked: boolean): void {
-    if (checked) {
-      if (!this.selectedPermissions.includes(perm)) {
-        this.selectedPermissions = [...this.selectedPermissions, perm];
-      }
-    } else {
-      this.selectedPermissions = this.selectedPermissions.filter(p => p !== perm);
-    }
-  }
-
-  permissionLabel(perm: string): string {
-    return this.permissionLabels[perm] || perm;
-  }
 
   /* ── Secret Code ─────────────────────────────────────── */
   ngOnDestroy(): void {

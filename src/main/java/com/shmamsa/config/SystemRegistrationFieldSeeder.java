@@ -40,6 +40,7 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
         if (fieldRepository.countByIsSystemTrue() > 0) {
             backfillMissingSystemSelectOptions();
             backfillWorkDetailsVisibility();
+            backfillYearsInFamily();
             return;
         }
 
@@ -59,6 +60,7 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
         createSystemField("khors", "الخورس", "SELECT", false, order++);
         createSystemField("servingWhere", "بتخدم فين", "SELECT", false, order++);
         createSystemField("attendKhors", "خورس الحضور", "SELECT", false, order++);
+        createSystemField("yearsInFamily", "عدد السنوات في الأسرة", "SELECT", false, order++);
         
         createSystemField("status", "الحالة (طالب/خريج)", "SELECT", false, order++);
         
@@ -148,11 +150,33 @@ public class SystemRegistrationFieldSeeder implements CommandLineRunner {
         }
     }
 
+    private void backfillYearsInFamily() {
+        if (fieldRepository.findByFieldKey("yearsInFamily").isPresent()) {
+            return;
+        }
+        int maxOrder = fieldRepository.findMaxDisplayOrder();
+        CustomRegistrationField field = CustomRegistrationField.builder()
+                .fieldKey("yearsInFamily")
+                .labelAr("عدد السنوات في الأسرة")
+                .fieldType("SELECT")
+                .options("اول سنه ليا,سنتين,٣ سنين,٤ سنين,اكتر من ٤ سنين")
+                .required(false)
+                .isSystem(true)
+                .displayOrder(maxOrder + 1)
+                .visibilityRule("ALWAYS")
+                .showIn("NONE")
+                .profileEditable(false)
+                .enabled(true)
+                .build();
+        fieldRepository.save(field);
+    }
+
     private static Map<String, String> buildDefaultSelectOptions() {
         Map<String, String> defaults = new LinkedHashMap<>();
         defaults.put("deaconDegree", "مش مرشوم,ابصالتس,اغنسطس,ايبودياكون");
         defaults.put("khors", "MARMARKOS,ATHANASIUS,NONE");
         defaults.put("attendKhors", "MARMARKOS,ATHANASIUS,NONE");
+        defaults.put("yearsInFamily", "اول سنه ليا,سنتين,٣ سنين,٤ سنين,اكتر من ٤ سنين");
         defaults.put("status", "student,graduate");
         defaults.put("studyType", "school,university");
         defaults.put("schoolGrade", "أولى ابتدائي,تانية ابتدائي,تالتة ابتدائي,رابعة ابتدائي,خامسة ابتدائي,سادسة ابتدائي,أولى إعدادي,تانية إعدادي,تالتة إعدادي,أولى ثانوي,تانية ثانوي,تالتة ثانوي,other");

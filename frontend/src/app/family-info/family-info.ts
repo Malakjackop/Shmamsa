@@ -4,7 +4,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { AdminService } from '../services/admin.service';
 import { AuthService, AuthUser } from '../services/auth.service';
 import { DevSettingsService, CustomField } from '../services/dev-settings.service';
-import { FamilyMemberSummary, FamilyService } from '../services/family.service';
+import { FamilyMemberSummary, FamilyService, NoteItem } from '../services/family.service';
 import { KhorsJoinRequestView, KhorsRequestsService } from '../services/khors-requests.service';
 import { FamilyJoinRequestService, FamilyJoinRequestView } from '../services/family-join-request.service';
 import {
@@ -57,6 +57,7 @@ type Member = {
   schoolGrade?: string;
   dateOfBirth?: string;
   deaconDegree?: string;
+  hasNotes?: boolean;
   khors?: string;
   khorsYear?: number | string | null;
   servingScope?: string;
@@ -86,6 +87,7 @@ type Member = {
 type ProfileView = {
   username?: string;
   email?: string;
+  notes?: NoteItem[];
   customFields?: Record<string, string>;
   familyAssignments?: FamilyAssignmentLike[];
   role?: string | number;
@@ -93,6 +95,7 @@ type ProfileView = {
   khors?: string;
   khorsYear?: number | string | null;
   deaconDegree?: string;
+  yearsInFamily?: string;
   nationalId?: string;
   phoneNumber?: string;
   address?: string;
@@ -190,6 +193,14 @@ export class FamilyInfoComponent implements OnInit {
   familyInfoFieldsLoaded = false;
   private profileCache = new Map<number, ProfileView | null>();
 
+  notesList: NoteItem[] = [];
+  notesLoading = false;
+  addNoteText = '';
+  addingNote = false;
+  editingNoteId: number | null = null;
+  editNoteText = '';
+  savingNote = false;
+
   allRoles: string[] = [];
 
   familyRequestsPendingCount = 0;
@@ -223,6 +234,14 @@ export class FamilyInfoComponent implements OnInit {
 
   canSelectFamily(): boolean {
     return this.isAminKhedmaOrDev() || this.isKhadim();
+  }
+
+  isAminOsra(): boolean {
+    return this.hasRole('AMIN_OSRA');
+  }
+
+  canViewNotes(): boolean {
+    return this.isAminKhedmaOrDev() || this.isKhadim() || this.hasRole('AMIN_OSRA');
   }
 
   canDeleteAccounts(): boolean {
@@ -358,6 +377,7 @@ export class FamilyInfoComponent implements OnInit {
         if (this.profileFor?.id === member.id) {
           this.profile = profile;
           this.profileLoading = false;
+          if (this.canViewNotes()) this.loadNotes();
         }
       },
       error: () => {
@@ -374,6 +394,12 @@ export class FamilyInfoComponent implements OnInit {
     this.profileFor = null;
     this.profile = null;
     this.profileLoading = false;
+    this.notesList = [];
+    this.notesLoading = false;
+    this.addingNote = false;
+    this.addNoteText = '';
+    this.editingNoteId = null;
+    this.editNoteText = '';
   }
 
   async copyPhone(value: unknown) {
@@ -419,6 +445,7 @@ export class FamilyInfoComponent implements OnInit {
         fieldKeys: ['deaconFamily']
       },
       { label: 'الخورس', value: this.memberKhorsLabel(p.khors, p.khorsYear), fieldKeys: ['khors'] },
+      { label: 'عدد السنوات في الأسرة', value: String(p.yearsInFamily ?? '').trim(), fieldKeys: ['yearsInFamily'] },
       { label: 'الرتبة', value: String(p.deaconDegree ?? '').trim(), fieldKeys: ['deaconDegree'] },
       { label: 'الرقم القومي', value: String(p.nationalId ?? '').trim(), fieldKeys: ['nationalId'] },
       { label: 'الهاتف', value: String(p.phoneNumber ?? '').trim(), fieldKeys: ['phoneNumber'] },
@@ -514,6 +541,112 @@ export class FamilyInfoComponent implements OnInit {
         });
       }
     });
+  }
+
+  loadNotes() {
+    if (!this.profileFor) return;
+    this.notesLoading = true;
+    this.familySvc.getNotes(this.profileFor.id).subscribe({
+      next: (list) => {
+        this.notesList = list || [];
+        this.notesLoading = false;
+      },
+      error: () => {
+        this.notesList = [];
+        this.notesLoading = false;
+      }
+    });
+  }
+
+  startAddNote() {
+    this.addNoteText = '';
+    this.addingNote = true;
+  }
+
+  cancelAddNote() {
+    this.addingNote = false;
+    this.addNoteText = '';
+  }
+
+  submitAddNote() {
+    if (!this.profileFor || !this.addNoteText.trim()) return;
+    const text = this.addNoteText.trim();
+    this.savingNote = true;
+    this.familySvc.addNote(this.profileFor.id, text).subscribe({
+      next: (note) => {
+        this.notesList = [note, ...this.notesList];
+        this.addingNote = false;
+        this.addNoteText = '';
+        this.savingNote = false;
+        this.updateHasNotes(true);
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إضافة الملاحظة' });
+      },
+      error: (err) => {
+        this.savingNote = false;
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل إضافة الملاحظة' });
+      }
+    });
+  }
+
+  startEditNote(note: NoteItem) {
+    this.editingNoteId = note.id;
+    this.editNoteText = note.text;
+  }
+
+  cancelEditNote() {
+    this.editingNoteId = null;
+    this.editNoteText = '';
+  }
+
+  submitEditNote(note: NoteItem) {
+    if (!this.profileFor || !this.editNoteText.trim()) return;
+    const text = this.editNoteText.trim();
+    this.savingNote = true;
+    this.familySvc.updateNote(this.profileFor.id, note.id, text).subscribe({
+      next: (updated) => {
+        this.notesList = this.notesList.map((n) => (n.id === note.id ? updated : n));
+        this.editingNoteId = null;
+        this.editNoteText = '';
+        this.savingNote = false;
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل الملاحظة' });
+      },
+      error: (err) => {
+        this.savingNote = false;
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل تعديل الملاحظة' });
+      }
+    });
+  }
+
+  confirmDeleteNote(note: NoteItem) {
+    if (!this.profileFor) return;
+    this.confirm.confirm({
+      header: 'حذف الملاحظة',
+      message: 'هل تريد حذف هذه الملاحظة؟',
+      acceptLabel: 'حذف',
+      rejectLabel: 'إلغاء',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.familySvc.deleteNote(this.profileFor!.id, note.id).subscribe({
+          next: () => {
+            this.notesList = this.notesList.filter((n) => n.id !== note.id);
+            this.updateHasNotes(this.notesList.length > 0);
+            this.message.add({ severity: 'success', summary: 'تم', detail: 'تم حذف الملاحظة' });
+          },
+          error: (err) => {
+            this.message.add({ severity: 'error', summary: 'خطأ', detail: err?.error?.error || 'فشل حذف الملاحظة' });
+          }
+        });
+      }
+    });
+  }
+
+  private updateHasNotes(has: boolean) {
+    const member = this.members.find((m) => m.id === this.profileFor?.id);
+    if (member) {
+      member.hasNotes = has;
+      const idx = this.members.indexOf(member);
+      if (idx >= 0) this.members[idx] = { ...member };
+    }
   }
 
   get showFilteredExport(): boolean {

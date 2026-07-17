@@ -147,9 +147,14 @@ public class User {
     @Column(length = 30)
     private String attendKhors;
 
-    @NotBlank(message = "Email is required")
-    @Column(nullable = false, unique = true, length = 120)
+    @Column(length = 120, nullable = true)
     private String email;
+
+    @Column(length = 20)
+    private String yearsInFamily;
+
+    @Column(name = "family_transfer_date")
+    private LocalDate familyTransferDate;
 
     private String role = "MAKHDOM";
 

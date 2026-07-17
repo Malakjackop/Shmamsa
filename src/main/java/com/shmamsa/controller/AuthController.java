@@ -441,7 +441,6 @@ public class AuthController {
         values.put("phoneNumber", safe(request.getPhoneNumber()));
         values.put("address", safe(request.getAddress()));
         values.put("nationalId", safe(request.getNationalId()));
-        values.put("email", safe(request.getEmail()));
         values.put("dateOfBirth", deriveDateOfBirth(request.getDateOfBirth(), request.getNationalId()));
         values.put("gender", deriveGender(request.getGender(), request.getNationalId()));
         values.put("deaconDegree", safe(request.getDeaconDegree()));
@@ -463,6 +462,7 @@ public class AuthController {
         values.put("workDetails", safe(request.getWorkDetails()));
         values.put("guardiansPhone", safe(request.getGuardiansPhone()));
         values.put("guardianRelation", safe(request.getGuardianRelation()));
+        values.put("yearsInFamily", safe(request.getYearsInFamily()));
         if (request.getCustomFields() != null) request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
         return values;
     }
@@ -474,7 +474,6 @@ public class AuthController {
         values.put("phoneNumber", safe(request.getPhoneNumber()));
         values.put("address", safe(request.getAddress()));
         values.put("nationalId", safe(request.getNationalId()));
-        values.put("email", safe(request.getEmail()));
         values.put("dateOfBirth", deriveDateOfBirth(request.getDateOfBirth(), request.getNationalId()));
         values.put("gender", deriveGender(request.getGender(), request.getNationalId()));
         values.put("deaconDegree", safe(request.getDeaconDegree()));
@@ -496,6 +495,7 @@ public class AuthController {
         values.put("workDetails", safe(request.getWorkDetails()));
         values.put("guardiansPhone", safe(request.getGuardiansPhone()));
         values.put("guardianRelation", safe(request.getGuardianRelation()));
+        values.put("yearsInFamily", safe(request.getYearsInFamily()));
         if (request.getCustomFields() != null) request.getCustomFields().forEach((key, value) -> values.put(key, safe(value)));
         return values;
     }
