@@ -211,6 +211,7 @@
 }
 
 .service-card {
+  position: relative;
   flex: 0 0 min(250px, calc((100% - 84px) / 4));
   min-width: 0;
   min-height: 148px;
@@ -243,6 +244,16 @@
   font-weight: 800;
   line-height: 1.4;
   text-align: center;
+}
+
+.service-card__bonus {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #ffd54f;
+  line-height: 1;
 }
 
 .service-card--bonus {

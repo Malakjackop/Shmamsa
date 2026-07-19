@@ -29,11 +29,12 @@ public class AttendanceScheduleService {
     private final AttendanceRepository attendanceRepo;
     private final FamilyAccessService familyAccessService;
     private final UserRepository userRepo;
+    private final TimeProvider timeProvider;
 
     @Scheduled(cron = "0 0 * * * *")
     @Transactional
     public void autoGenerateToday() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         int dayOfWeek = today.getDayOfWeek().getValue() % 7;
         generateForDay(today, dayOfWeek);
     }
@@ -67,7 +68,7 @@ public class AttendanceScheduleService {
                 AttendanceRecord r = new AttendanceRecord();
                 r.setUser(user);
                 r.setDate(date);
-                r.setTime(LocalTime.now());
+                r.setTime(timeProvider.localTime());
                 r.setType(type);
                 r.setStatus(AttendanceStatus.ABSENT);
                 r.setFamilyBase(familyBase);

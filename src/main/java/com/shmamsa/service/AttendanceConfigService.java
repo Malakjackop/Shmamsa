@@ -24,6 +24,7 @@ public class AttendanceConfigService {
 
     private final AppSettingRepository appSettingRepository;
     private final ObjectMapper objectMapper;
+    private final TimeProvider timeProvider;
 
     @Getter
     @Setter
@@ -218,7 +219,7 @@ public class AttendanceConfigService {
     }
 
     public boolean isTodayOpenForServant() {
-        int dow = LocalDate.now().getDayOfWeek().getValue() % 7;
+        int dow = timeProvider.localDate().getDayOfWeek().getValue() % 7;
         return new HashSet<>(getAttendanceConfig().getServantEntryOpenDays()).contains(dow);
     }
 
@@ -485,6 +486,28 @@ public class AttendanceConfigService {
             }
         });
         return out;
+    }
+
+    public List<String> getEffectiveModes(String typeKey, int dayOfWeek) {
+        Map<String, List<String>> modes = getAttendanceConfig().getTypeAbsenceModes();
+        if (modes == null || modes.isEmpty()) {
+            return List.of("PRIMARY");
+        }
+        String upperKey = typeKey.toUpperCase(Locale.ROOT);
+        String perDayKey = upperKey + ":" + dayOfWeek;
+        List<String> perDayModes = modes.get(perDayKey);
+        if (perDayModes != null && !perDayModes.isEmpty()) {
+            return perDayModes;
+        }
+        List<String> typeModes = modes.get(upperKey);
+        if (typeModes != null && !typeModes.isEmpty()) {
+            return typeModes;
+        }
+        return List.of("PRIMARY");
+    }
+
+    public boolean isPrimaryDay(String typeKey, int dayOfWeek) {
+        return getEffectiveModes(typeKey, dayOfWeek).contains("PRIMARY");
     }
 
     private static Map<String, List<Integer>> normalizeAbsenceModeDays(Map<String, List<Integer>> raw) {

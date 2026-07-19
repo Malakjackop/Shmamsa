@@ -68,9 +68,10 @@
     <h2>حضورك</h2>
 
     <div class="services-grid">
-      <article class="service-card" *ngFor="let service of serviceCards" [class.service-card--bonus]="service.value.startsWith('+')">
+      <article class="service-card" *ngFor="let service of serviceCards">
         <span class="service-card__title">{{ service.label }}</span>
         <strong class="service-card__value">{{ service.value }}</strong>
+        <span class="service-card__bonus" *ngIf="service.bonus">+{{ service.bonus }}</span>
       </article>
     </div>
   </section>

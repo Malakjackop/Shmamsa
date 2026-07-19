@@ -21,6 +21,7 @@ import com.shmamsa.repository.UserRepository;
 import com.shmamsa.service.AttendanceAccessGrantService;
 import com.shmamsa.service.AttendanceConfigService;
 import com.shmamsa.service.AttendanceScheduleService;
+import com.shmamsa.service.TimeProvider;
 import com.shmamsa.service.FamilyAccessService;
 import com.shmamsa.service.QrTokenService;
 import com.shmamsa.service.UserFamilyRoleService;
@@ -69,6 +70,7 @@ public class AttendanceController {
     private final AttendanceCancellationRepository attendanceCancellationRepo;
     private final AttendanceScheduleRepository attendanceScheduleRepo;
     private final AttendanceScheduleService attendanceScheduleService;
+    private final TimeProvider timeProvider;
 
     private static final String TITLE_META_SEPARATOR = "::max::";
     private static final List<String> PREFERRED_FAMILY_ORDER = List.of(
@@ -240,7 +242,7 @@ public class AttendanceController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> users = (List<Map<String, Object>>) usersObj;
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         LocalDate selectedDate = today;
         if (dateObj != null && !dateObj.toString().isBlank()) {
             try {
@@ -264,7 +266,7 @@ public class AttendanceController {
             }
         }
 
-        LocalTime now = LocalTime.now();
+        LocalTime now = timeProvider.localTime();
 
 
         int createdPresent = 0;
@@ -343,7 +345,13 @@ public class AttendanceController {
             createdPresent++;
         }
 
-        // 2) Auto-create ABSENT for scope users not present
+        // 2) Auto-create ABSENT for scope users not present (only on PRIMARY days)
+        boolean shouldAutoAbsent = true;
+        if (type != AttendanceType.CUSTOM_EVENT) {
+            int jsDay = toJavascriptDayOfWeek(selectedDate);
+            shouldAutoAbsent = attendanceConfigService.isPrimaryDay(type.name(), jsDay);
+        }
+        if (shouldAutoAbsent) {
         for (User target : scope) {
             if (target == null || target.getId() == null) continue;
             if ("DEVELOPER".equalsIgnoreCase(target.getRole())) continue;
@@ -371,6 +379,7 @@ public class AttendanceController {
             r.setTakenBy(servant);
             attendanceRepo.save(r);
             createdAbsent++;
+        }
         }
 
         return ResponseEntity.ok(Map.of(
@@ -422,7 +431,7 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
         }
 
-        if (selectedDate.isAfter(LocalDate.now())) {
+        if (selectedDate.isAfter(timeProvider.localDate())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot scan attendance in the future");
         }
 
@@ -501,11 +510,18 @@ public class AttendanceController {
 
         var config = attendanceConfigService.getAttendanceConfig();
         var absenceModes = config.getTypeAbsenceModes() == null ? Map.<String, List<String>>of() : config.getTypeAbsenceModes();
+        var absenceModeDays = config.getTypeAbsenceModeDays() == null ? Map.<String, List<Integer>>of() : config.getTypeAbsenceModeDays();
 
-        // Check if a type has a specific absence mode
         java.util.function.BiPredicate<String, String> hasMode = (typeKey, mode) -> {
             List<String> modes = absenceModes.get(typeKey);
-            return modes != null && modes.contains(mode);
+            if (modes != null && modes.contains(mode)) return true;
+            if (absenceModeDays.containsKey(typeKey)) {
+                for (int day : absenceModeDays.get(typeKey)) {
+                    List<String> dayModes = absenceModes.get(typeKey + ":" + day);
+                    if (dayModes != null && dayModes.contains(mode)) return true;
+                }
+            }
+            return false;
         };
 
         long fPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.FRIDAY_LITURGY);
@@ -532,14 +548,31 @@ public class AttendanceController {
             familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
         }
 
-        // ====== ALTERNATIVE mode: if type has ALTERNATIVE mode, compute week-based stats ======
+        // ====== Per-day absence mode classification ======
+        java.util.function.BiFunction<String, Integer, List<String>> getDayModes = (typeKey, day) -> {
+            String upperKey = typeKey.toUpperCase(Locale.ROOT);
+            String perDayKey = upperKey + ":" + day;
+            List<String> dayModes = absenceModes.get(perDayKey);
+            if (dayModes != null && !dayModes.isEmpty()) return dayModes;
+            List<String> typeModes = absenceModes.get(upperKey);
+            if (typeModes != null && !typeModes.isEmpty()) return typeModes;
+            return List.of("PRIMARY");
+        };
+
         java.util.function.Function<AttendanceType, Map<String, Long>> computeAlternativeStats = (type) -> {
             Map<String, Long> result = new LinkedHashMap<>();
-            if (!hasMode.test(type.name(), "ALTERNATIVE")) {
+            List<Integer> configuredDays = absenceModeDays.getOrDefault(type.name(), List.of());
+            boolean hasPerDayAlternative = !configuredDays.isEmpty() && configuredDays.stream()
+                    .anyMatch(day -> {
+                        List<String> modes = getDayModes.apply(type.name(), day);
+                        return modes.contains("ALTERNATIVE") || modes.contains("ALTERNATIVE_BONUS");
+                    });
+            boolean legacyAlternative = hasMode.test(type.name(), "ALTERNATIVE");
+            if (!hasPerDayAlternative && !legacyAlternative) {
                 return result;
             }
+
             List<AttendanceRecord> records = attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), type);
-            // Group by ISO week (Monday start)
             Map<String, List<AttendanceRecord>> byWeek = new LinkedHashMap<>();
             for (AttendanceRecord r : records) {
                 if (r.getDate() == null) continue;
@@ -547,10 +580,23 @@ public class AttendanceController {
                 String weekKey = weekStart.toString();
                 byWeek.computeIfAbsent(weekKey, k -> new ArrayList<>()).add(r);
             }
+
+            java.util.function.Predicate<AttendanceRecord> qualifiesForWeek = r -> {
+                if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) return false;
+                if (r.getDate() == null) return false;
+                if (hasPerDayAlternative) {
+                    int jsDay = toJavascriptDayOfWeek(r.getDate());
+                    List<String> modes = getDayModes.apply(type.name(), jsDay);
+                    if (modes.contains("BONUS_ONLY") && !modes.contains("ALTERNATIVE")) return false;
+                    return modes.contains("PRIMARY") || modes.contains("ALTERNATIVE") || modes.contains("ALTERNATIVE_BONUS");
+                }
+                return true;
+            };
+
             long presentWeeks = 0;
             long totalWeeks = byWeek.size();
             for (List<AttendanceRecord> weekRecords : byWeek.values()) {
-                boolean hasPresent = weekRecords.stream().anyMatch(r -> r.getStatus() == null || r.getStatus() == AttendanceStatus.PRESENT);
+                boolean hasPresent = weekRecords.stream().anyMatch(qualifiesForWeek);
                 if (hasPresent) presentWeeks++;
             }
             result.put("PRESENT", presentWeeks);
@@ -565,8 +611,41 @@ public class AttendanceController {
                 AttendanceType.MARMARKOS_KHORS, AttendanceType.ATHANASIUS_KHORS
         );
         for (AttendanceType type : allTypes) {
-            if (hasMode.test(type.name(), "BONUS_ONLY")) {
-                long bonusCount = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), type);
+            List<Integer> configuredDays = absenceModeDays.getOrDefault(type.name(), List.of());
+            boolean hasPerDayBonus = false;
+            if (!configuredDays.isEmpty()) {
+                for (int day : configuredDays) {
+                    List<String> modes = getDayModes.apply(type.name(), day);
+                    if (modes.contains("BONUS_ONLY")) {
+                        hasPerDayBonus = true;
+                        break;
+                    }
+                }
+            }
+            if (hasMode.test(type.name(), "BONUS_ONLY") || hasPerDayBonus) {
+                long bonusCount = 0;
+                if (configuredDays.isEmpty() || !hasPerDayBonus) {
+                    bonusCount = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), type);
+                } else {
+                    List<AttendanceRecord> records = attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), type);
+                    Set<Integer> bonusDays = new HashSet<>();
+                    for (int day : configuredDays) {
+                        List<String> modes = getDayModes.apply(type.name(), day);
+                        if (modes.contains("BONUS_ONLY")) {
+                            bonusDays.add(day);
+                        }
+                    }
+                    if (!bonusDays.isEmpty()) {
+                        for (AttendanceRecord r : records) {
+                            if (r.getDate() == null) continue;
+                            if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
+                            int jsDay = toJavascriptDayOfWeek(r.getDate());
+                            if (bonusDays.contains(jsDay)) {
+                                bonusCount++;
+                            }
+                        }
+                    }
+                }
                 String label = config.getTypeLabels() == null ? type.name() : config.getTypeLabels().getOrDefault(type.name(), type.name());
                 bonusStats.put(label, bonusCount);
             }
@@ -578,7 +657,6 @@ public class AttendanceController {
                 String customKey = "CUSTOM_GROUP:" + (ev.getTitle() == null ? "" : ev.getTitle().trim().toLowerCase(Locale.ROOT))
                         + "|" + (ev.getFamilyBase() == null ? "__all__" : canonicalFamilyName(ev.getFamilyBase()));
                 if (hasMode.test(customKey, "BONUS_ONLY")) {
-                    // Count present records for this custom event
                     long cnt = attendanceRepo.countByUser_IdAndTypeAndCustomTitleAndArchivedFalse(me.getId(), AttendanceType.CUSTOM_EVENT, ev.getTitle());
                     bonusStats.merge(ev.getTitle() == null ? "مناسبة مخصصة" : ev.getTitle(), cnt, Long::sum);
                 }
@@ -634,6 +712,18 @@ public class AttendanceController {
             row.put("status", r.getStatus() == null ? null : r.getStatus().name());
             row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
             row.put("familyBase", familyAccessService.baseNameForId(r.getFamilyId(), r.getFamilyBase()));
+            String modeLabel = null;
+            if (r.getType() != null && r.getDate() != null && r.getType() != AttendanceType.CUSTOM_EVENT && r.getStatus() != AttendanceStatus.ABSENT) {
+                List<String> modes = attendanceConfigService.getEffectiveModes(r.getType().name(), toJavascriptDayOfWeek(r.getDate()));
+                if (modes.contains("ALTERNATIVE") && modes.contains("BONUS_ONLY")) {
+                    modeLabel = "بديل وبونص";
+                } else if (modes.contains("ALTERNATIVE")) {
+                    modeLabel = "بديل";
+                } else if (modes.contains("BONUS_ONLY")) {
+                    modeLabel = "بونص";
+                }
+            }
+            row.put("absenceMode", modeLabel);
             out.add(row);
         }
         return ResponseEntity.ok(out);
@@ -727,7 +817,41 @@ public class AttendanceController {
         out.put("selfAllowedTypes", selfTypes.stream().map(Enum::name).toList());
         out.put("takeAllowedTypes", takeTypes.stream().map(Enum::name).toList());
         out.put("canUseCustomEvent", canUseCustomEvent(me));
+        out.put("serverTime", timeProvider.localDateTime().toString());
+        out.put("serverDate", timeProvider.localDate().toString());
+        out.put("timeOffsetMinutes", timeProvider.getTimeOffsetMinutes());
         return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/server-time")
+    public ResponseEntity<?> getServerTime(Authentication auth) {
+        requireAttendanceActor(auth);
+        return ResponseEntity.ok(Map.of(
+                "serverTime", timeProvider.localDateTime().toString(),
+                "serverDate", timeProvider.localDate().toString(),
+                "timeOffsetMinutes", timeProvider.getTimeOffsetMinutes()
+        ));
+    }
+
+    @PutMapping("/time-offset")
+    public ResponseEntity<?> setTimeOffset(@RequestBody Map<String, Object> body, Authentication auth) {
+        User me = requireAuthenticatedUser(auth);
+        String role = normRole(me.getRole());
+        boolean canManage = "DEVELOPER".equals(role) || "DEV".equals(role) || hasAminKhedmaPrivilege(me);
+        if (!canManage) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "ليس لديك صلاحية تعديل إعدادات الوقت");
+        }
+        Object minutesObj = body.get("timeOffsetMinutes");
+        long minutes = 0;
+        if (minutesObj instanceof Number n) {
+            minutes = n.longValue();
+        }
+        timeProvider.setTimeOffsetMinutes(minutes);
+        return ResponseEntity.ok(Map.of(
+                "timeOffsetMinutes", timeProvider.getTimeOffsetMinutes(),
+                "serverTime", timeProvider.localDateTime().toString(),
+                "serverDate", timeProvider.localDate().toString()
+        ));
     }
 
     @GetMapping("/cancelled-dates")
@@ -809,7 +933,7 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.FORBIDDEN, "TYPE_NOT_ALLOWED", "This type is not allowed for you now");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         LocalDate selectedDate = today;
         Object dateObj = body.get("date");
         if (dateObj != null && !String.valueOf(dateObj).isBlank()) {
@@ -833,7 +957,7 @@ public class AttendanceController {
             existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(me.getId(), selectedDate, type);
         }
 
-        LocalTime now = LocalTime.now();
+        LocalTime now = timeProvider.localTime();
         if (existing != null) {
             existing.setStatus(AttendanceStatus.PRESENT);
             existing.setTime(now);
@@ -870,7 +994,7 @@ public class AttendanceController {
         User servant = requireAttendanceActor(auth);
         enforceTakeAttendanceGrantIfNeeded(servant, type);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         LocalDate selectedDate = today;
         if (date != null && !date.isBlank()) {
             try {
@@ -984,7 +1108,7 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         if (selectedDate.isAfter(today)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot edit attendance in the future");
         }
@@ -1007,7 +1131,7 @@ public class AttendanceController {
             existing = attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(userId, selectedDate, type);
         }
 
-        LocalTime now = LocalTime.now();
+        LocalTime now = timeProvider.localTime();
         if (existing != null) {
             existing.setStatus(AttendanceStatus.ABSENT);
             existing.setTime(now);
@@ -1293,7 +1417,7 @@ public class AttendanceController {
     @PostMapping("/schedules/generate")
     public ResponseEntity<?> generateToday(Authentication auth) {
         requireAttendanceActor(auth);
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         int dayOfWeek = today.getDayOfWeek().getValue() % 7;
         int created = attendanceScheduleService.generateForDay(today, dayOfWeek);
         return ResponseEntity.ok(Map.of("ok", true, "created", created));
@@ -1353,7 +1477,7 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid date");
         }
 
-        if (newDate.isAfter(LocalDate.now())) {
+        if (newDate.isAfter(timeProvider.localDate())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot set attendance in the future");
         }
 
@@ -1416,7 +1540,7 @@ public class AttendanceController {
             return;
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.localDate();
         LocalDate monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
         String roleNorm = normRole(servant.getRole());
@@ -1961,7 +2085,7 @@ public class AttendanceController {
             sheet.setFirstTermDataJson(null);
             sheet.setSecondTermDataJson(null);
             sheet.setStatus("DRAFT");
-            sheet.setUpdatedAt(LocalDateTime.now());
+            sheet.setUpdatedAt(timeProvider.localDateTime());
             sheet.setPublishedAt(null);
             sheet.setFirstPublishedAt(null);
             sheet.setSecondPublishedAt(null);

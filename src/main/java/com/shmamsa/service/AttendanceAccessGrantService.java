@@ -25,6 +25,7 @@ public class AttendanceAccessGrantService {
     private final UserRepository userRepository;
     private final FamilyAccessService familyAccessService;
     private final UserFamilyRoleService userFamilyRoleService;
+    private final TimeProvider timeProvider;
 
     @Getter
     @Setter
@@ -51,7 +52,7 @@ public class AttendanceAccessGrantService {
 
     public List<AttendanceAccessGrant> activeGrantsForUser(Long userId) {
         if (userId == null) return List.of();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = timeProvider.localDateTime();
         return grantsForUser(userId).stream()
                 .filter(g -> g.getStartsAt() != null && g.getEndsAt() != null)
                 .filter(g -> !now.isBefore(g.getStartsAt()) && !now.isAfter(g.getEndsAt()))
@@ -71,7 +72,7 @@ public class AttendanceAccessGrantService {
      */
     public List<AttendanceAccessGrant> displayGrantsForUser(Long userId) {
         if (userId == null) return List.of();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = timeProvider.localDateTime();
         LocalDateTime earliestEndedAt = now.minusHours(GRANT_VISIBILITY_HOURS);
         return grantsForUser(userId).stream()
                 .filter(g -> g.getStartsAt() != null && g.getEndsAt() != null)
@@ -226,7 +227,7 @@ public class AttendanceAccessGrantService {
         out.put("enabled", Boolean.TRUE.equals(grant.getEnabled()));
         out.put("createdAt", grant.getCreatedAt());
         out.put("updatedAt", grant.getUpdatedAt());
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = timeProvider.localDateTime();
         boolean active = grant.getStartsAt() != null && grant.getEndsAt() != null
                 && !now.isBefore(grant.getStartsAt()) && !now.isAfter(grant.getEndsAt());
         boolean upcoming = grant.getStartsAt() != null && now.isBefore(grant.getStartsAt());

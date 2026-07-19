@@ -103,6 +103,36 @@
               <i class="pi pi-cog"></i>
               قواعد الحضور
             </button>
+
+            <div class="side-card time-control-section" *ngIf="isDeveloper()">
+              <div class="side-title" style="font-size:15px">
+                <i class="pi pi-calendar-clock"></i>
+                وقت السيرفر
+              </div>
+              <div class="time-control-info">
+                <span class="time-control-label">التاريخ:</span>
+                <span class="time-control-value">{{ serverDateString || 'غير متاح' }}</span>
+              </div>
+              <div class="time-control-info" *ngIf="serverTimeOffsetMinutes !== 0">
+                <span class="time-control-label">التعديل:</span>
+                <span class="time-control-value time-control-offset">{{ formatOffset(serverTimeOffsetMinutes) }}</span>
+              </div>
+              <hr class="side-divider" />
+              <div class="time-control-input-row">
+                <input type="number" class="time-control-input" [(ngModel)]="timeOffsetInput" placeholder="0" dir="ltr" />
+                <select class="time-control-select" [(ngModel)]="timeOffsetUnit">
+                  <option value="minutes">دقائق</option>
+                  <option value="hours">ساعات</option>
+                  <option value="days">أيام</option>
+                  <option value="months">شهور</option>
+                </select>
+                <button type="button" class="action-btn time-control-btn" (click)="applyTimeOffset()">تطبيق</button>
+              </div>
+              <button type="button" class="action-btn secondary time-control-reset" (click)="resetTimeOffset()" *ngIf="serverTimeOffsetMinutes !== 0">
+                <i class="pi pi-refresh"></i>
+                إلغاء التعديل
+              </button>
+            </div>
         </div>
       </aside>
 
@@ -164,6 +194,7 @@
                 inputStyleClass="attendance-date-input__field"
                 panelStyleClass="attendanceGrantDatePanel"
                 [disabledDays]="disabledDays"
+                [disabledDates]="cancelledDisabledDates"
                 [minDate]="minDate"
                 [maxDate]="maxDate"
                 [firstDayOfWeek]="firstDayOfWeek"
@@ -1422,33 +1453,24 @@
         </select>
 
         <div class="absence-mode-value-picker" *ngIf="selectedAbsenceModeType">
-          <!-- Days selection first -->
           <div class="absence-mode-days" *ngIf="absenceModeTypeDays(selectedAbsenceModeType).length">
-            <label>اختر الأيام المطبّق عليها:</label>
-            <div class="absence-mode-day-list">
-              <button
-                *ngFor="let d of absenceModeTypeDays(selectedAbsenceModeType)"
-                type="button"
-                class="absence-mode-chip"
-                [class.absence-mode-chip--active]="isAbsenceModeDaySelected(selectedAbsenceModeType, d)"
-                (click)="toggleAbsenceModeDay(selectedAbsenceModeType, d)"
-              >
-                {{ absenceModeDayLabel(d) }}
-              </button>
+            <label>اختيار نوع الاحتساب لكل يوم:</label>
+            <div class="absence-mode-day-rows">
+              <div *ngFor="let d of absenceModeTypeDays(selectedAbsenceModeType)" class="absence-mode-day-row">
+                <span class="absence-mode-day-row__label">{{ absenceModeDayLabel(d) }}</span>
+                <div class="absence-mode-day-row__modes">
+                  <button
+                    *ngFor="let mode of absenceModeOptions"
+                    type="button"
+                    class="absence-mode-chip"
+                    [class.absence-mode-chip--active]="isDayAbsenceModeSelected(selectedAbsenceModeType, d, mode.value)"
+                    (click)="setDayAbsenceMode(selectedAbsenceModeType, d, mode.value)"
+                  >
+                    {{ mode.label }}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          <!-- Then mode selection -->
-          <label style="margin-top:10px;display:block">نوع الاحتساب</label>
-          <div class="absence-mode-chips">
-            <button
-              *ngFor="let mode of absenceModeOptions"
-              type="button"
-              class="absence-mode-chip"
-              [class.absence-mode-chip--active]="isAbsenceModeSelected(selectedAbsenceModeType, mode.value)"
-              (click)="setAbsenceMode(selectedAbsenceModeType, mode.value)"
-            >
-              {{ mode.label }}
-            </button>
           </div>
         </div>
       </div>

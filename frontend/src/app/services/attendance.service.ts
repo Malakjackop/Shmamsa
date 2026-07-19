@@ -114,6 +114,9 @@ export type AttendanceContext = {
   selfAllowedTypes: AttendanceType[];
   takeAllowedTypes: AttendanceType[];
   canUseCustomEvent: boolean;
+  serverTime?: string;
+  serverDate?: string;
+  timeOffsetMinutes?: number;
 };
 
 export type AttendanceConfigResponse = {
@@ -542,6 +545,19 @@ export class AttendanceService {
     return this.http.get<{ dates: string[] }>(
       `${this.baseUrl}/cancelled-dates`,
       { params, withCredentials: true }
+    );
+  }
+
+  getServerTime(): Observable<{ serverTime: string; serverDate: string; timeOffsetMinutes: number }> {
+    if (!this.isBrowser) return of({ serverTime: new Date().toISOString(), serverDate: new Date().toISOString().slice(0, 10), timeOffsetMinutes: 0 });
+    return this.http.get<{ serverTime: string; serverDate: string; timeOffsetMinutes: number }>(
+      `${this.baseUrl}/server-time`, { withCredentials: true }
+    );
+  }
+
+  setTimeOffset(minutes: number): Observable<{ serverTime: string; serverDate: string; timeOffsetMinutes: number }> {
+    return this.http.put<{ serverTime: string; serverDate: string; timeOffsetMinutes: number }>(
+      `${this.baseUrl}/time-offset`, { timeOffsetMinutes: minutes }, { withCredentials: true }
     );
   }
 

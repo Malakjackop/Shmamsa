@@ -58,6 +58,7 @@ type EventForm = {
 type ServiceCardView = {
   label: string;
   value: string;
+  bonus?: number;
 };
 
 type UnpublishForm = {
@@ -884,13 +885,11 @@ export class DashBoard implements OnInit, OnDestroy {
       });
     }
 
-    // Bonus items
-    for (const [bonusLabel, bonusCount] of Object.entries(this.bonusStats)) {
-      if (bonusCount > 0) {
-        cards.push({
-          label: bonusLabel,
-          value: `+${bonusCount}`
-        });
+    // Merge bonus into matching cards (same label)
+    for (const card of cards) {
+      const bonusCount = this.bonusStats[card.label];
+      if (bonusCount && bonusCount > 0) {
+        card.bonus = bonusCount;
       }
     }
 

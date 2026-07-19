@@ -422,6 +422,13 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       next: (ctx) => {
         this.attendanceContext = { ...ctx, config: this.mergeConfig(ctx?.config) };
         this.configEditor = this.mergeConfig(ctx?.config);
+        if (ctx.serverTime) {
+          this.serverTimeString = ctx.serverTime;
+          this.serverDateString = ctx.serverDate || ctx.serverTime.slice(0, 10);
+          this.serverTimeOffsetMinutes = ctx.timeOffsetMinutes || 0;
+          this.timeOffsetInput = this.serverTimeOffsetMinutes;
+          this._contextLoadClientTime = Date.now();
+        }
         this.loadFamilies();
         this.refreshRuntimeState();
         if (this.canManageAccessGrants()) this.loadAccessGrants();
@@ -502,11 +509,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   canManageAccessGrants(): boolean {
-    return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm()) || this.hasAnyAminPrivilegeScope();
+    return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
   }
 
   canManageAttendanceConfig(): boolean {
-    return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm()) || this.hasAnyAminPrivilegeScope();
+    return ['AMIN_OSRA', 'AMIN_KHEDMA', 'DEVELOPER'].includes(this.roleNorm());
   }
 
   canFilterGrantFamilies(): boolean {
@@ -526,11 +533,11 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private hasAminKhedmaPrivilege(): boolean {
-    return this.roleNorm() === 'AMIN_KHEDMA' || this.hasScopedAssignmentRole('AMIN_KHEDMA');
+    return this.roleNorm() === 'AMIN_KHEDMA';
   }
 
   isAminKhedmaOrDeveloper(): boolean {
-    return this.isDeveloper() || this.hasAminKhedmaPrivilege();
+    return this.isDeveloper() || this.roleNorm() === 'AMIN_KHEDMA';
   }
 
   private isScopedAminOsraAttendanceManager(): boolean {
@@ -602,7 +609,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         TASBEEHA: 'تسبحة',
         FAMILY_MEETING: 'اجتماع الأسرة',
         MARMARKOS_KHORS: 'خورس مارمرقس',
-        ATHANASIUS_KHORS: 'خورس البابا أثناسيوس',
+        ATHANASIUS_KHORS: 'خورس البابا اثناسيوس',
         CUSTOM_EVENT: 'مناسبة مخصصة'
       },
       typeAbsenceModes: {},
@@ -657,7 +664,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   private choirFamilies(): string[] {
     const families: string[] = [];
     if (this.canAccessMarmarkosKhors()) families.push('خورس مارمرقس');
-    if (this.canAccessAthanasiusKhors()) families.push('خورس البابا أثناسيوس');
+    if (this.canAccessAthanasiusKhors()) families.push('خورس البابا اثناسيوس');
     return families;
   }
 
@@ -1498,6 +1505,23 @@ export class AttendanceComponent implements OnInit, OnDestroy {
         this.editableAbsenceModeDays[key] = [...savedDays[key]];
       }
     }
+    // For per-day absence modes (key format: typeValue:dayNumber), extract the days
+    for (const key of Object.keys(this.editableAbsenceModes)) {
+      const colonIdx = key.lastIndexOf(':');
+      if (colonIdx > 0) {
+        const dayStr = key.slice(colonIdx + 1);
+        const day = parseInt(dayStr, 10);
+        if (!isNaN(day) && day >= 0 && day <= 6) {
+          const typeKey = key.slice(0, colonIdx);
+          if (!this.editableAbsenceModeDays[typeKey]) {
+            this.editableAbsenceModeDays[typeKey] = [];
+          }
+          if (!this.editableAbsenceModeDays[typeKey].includes(day)) {
+            this.editableAbsenceModeDays[typeKey].push(day);
+          }
+        }
+      }
+    }
     this.editableRuleGroups = this.configEditor.attendanceRuleGroups
       ? this.configEditor.attendanceRuleGroups.map(g => ({ ...g, types: [...g.types] }))
       : [];
@@ -1592,14 +1616,46 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return `CUSTOM_GROUP:${title}|${family}`;
   }
 
+  private absenceModeKey(typeValue: string, day: number | null): string {
+    return day != null ? `${typeValue}:${day}` : typeValue;
+  }
+
   absenceModeForType(typeValue: string): string[] {
     return this.editableAbsenceModes[typeValue] || ['PRIMARY'];
+  }
+
+  absenceModeForDay(typeValue: string, day: number): string[] {
+    const key = this.absenceModeKey(typeValue, day);
+    return this.editableAbsenceModes[key] || ['PRIMARY'];
   }
 
   isAbsenceModeSelected(typeValue: string, mode: string): boolean {
     const modes = this.editableAbsenceModes[typeValue];
     if (!modes && mode === 'PRIMARY') return true;
     return modes?.includes(mode) ?? false;
+  }
+
+  isDayAbsenceModeSelected(typeValue: string, day: number, mode: string): boolean {
+    const key = this.absenceModeKey(typeValue, day);
+    const modes = this.editableAbsenceModes[key];
+    if (!modes && mode === 'PRIMARY') return true;
+    return modes?.includes(mode) ?? false;
+  }
+
+  setDayAbsenceMode(typeValue: string, day: number, mode: string): void {
+    const key = this.absenceModeKey(typeValue, day);
+    const current = this.editableAbsenceModes[key] || [];
+    if (current.includes(mode)) {
+      const filtered = current.filter(m => m !== mode);
+      if (filtered.length === 0) delete this.editableAbsenceModes[key];
+      else this.editableAbsenceModes[key] = filtered;
+    } else if (mode === 'PRIMARY') {
+      this.editableAbsenceModes[key] = ['PRIMARY'];
+    } else {
+      const withoutPrimary = current.filter(m => m !== 'PRIMARY');
+      withoutPrimary.push(mode);
+      this.editableAbsenceModes[key] = withoutPrimary;
+    }
   }
 
   isAbsenceModeDaySelected(typeValue: string, day: number): boolean {
@@ -1609,10 +1665,12 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   toggleAbsenceModeDay(typeValue: string, day: number): void {
     const current = this.editableAbsenceModeDays[typeValue];
     if (current?.includes(day)) {
-      if (current.length <= 1) return; // must keep at least one day
-      delete this.editableAbsenceModeDays[typeValue];
+      if (current.length <= 1) return;
+      const idx = current.indexOf(day);
+      current.splice(idx, 1);
+      this.editableAbsenceModeDays[typeValue] = [...current];
     } else {
-      this.editableAbsenceModeDays[typeValue] = [day];
+      this.editableAbsenceModeDays[typeValue] = [...(current || []), day];
     }
   }
 
@@ -1635,24 +1693,37 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   setAbsenceMode(typeValue: string, mode: string): void {
-    const current = this.editableAbsenceModes[typeValue] || [];
-    if (current.includes(mode)) {
-      // Remove mode
-      const filtered = current.filter(m => m !== mode);
-      if (filtered.length === 0) {
-        // Nothing left -> back to PRIMARY
-        delete this.editableAbsenceModes[typeValue];
-      } else {
-        this.editableAbsenceModes[typeValue] = filtered;
+    const days = this.editableAbsenceModeDays[typeValue] || [];
+    if (days.length > 0) {
+      for (const day of days) {
+        const key = this.absenceModeKey(typeValue, day);
+        const current = this.editableAbsenceModes[key] || [];
+        if (current.includes(mode)) {
+          const filtered = current.filter(m => m !== mode);
+          if (filtered.length === 0) delete this.editableAbsenceModes[key];
+          else this.editableAbsenceModes[key] = filtered;
+        } else if (mode === 'PRIMARY') {
+          this.editableAbsenceModes[key] = ['PRIMARY'];
+        } else {
+          const withoutPrimary = current.filter(m => m !== 'PRIMARY');
+          withoutPrimary.push(mode);
+          this.editableAbsenceModes[key] = withoutPrimary;
+        }
       }
       return;
     }
+    // Fallback: no specific day selected
+    const current = this.editableAbsenceModes[typeValue] || [];
+    if (current.includes(mode)) {
+      const filtered = current.filter(m => m !== mode);
+      if (filtered.length === 0) delete this.editableAbsenceModes[typeValue];
+      else this.editableAbsenceModes[typeValue] = filtered;
+      return;
+    }
     if (mode === 'PRIMARY') {
-      // PRIMARY alone
       this.editableAbsenceModes[typeValue] = ['PRIMARY'];
       return;
     }
-    // Adding ALTERNATIVE or BONUS
     const withoutPrimary = current.filter(m => m !== 'PRIMARY');
     withoutPrimary.push(mode);
     this.editableAbsenceModes[typeValue] = withoutPrimary;
@@ -2138,7 +2209,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private refreshRuntimeState(): void {
-    const now = new Date();
+    const now = this.now();
     const grant = this.pickCountdownGrant(now);
     const activeGrants = this.activeScopeGrants(now);
     this.countdownGrant = grant;
@@ -2330,7 +2401,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
     let family = this.selectedFamily;
     if (this.selectedType === 'MARMARKOS_KHORS') family = 'خورس مارمرقس';
-    if (this.selectedType === 'ATHANASIUS_KHORS') family = 'خورس البابا أثناسيوس';
+    if (this.selectedType === 'ATHANASIUS_KHORS') family = 'خورس البابا اثناسيوس';
 
     const scheduleDays = this.attendanceContext?.scheduleDays?.[family]?.[selectedType];
     if (scheduleDays && scheduleDays.length > 0) return scheduleDays;
@@ -2397,7 +2468,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const today = new Date();
+    const today = this.startOfToday();
     today.setHours(0, 0, 0, 0);
     const start = new Date(today);
     start.setFullYear(start.getFullYear() - 1);
@@ -2418,7 +2489,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
           return dt;
         });
 
-        const now = new Date();
+        const now = this.now();
         const todayDow = today.getDay();
 
         const cursor = new Date(start);
@@ -2461,7 +2532,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     }
 
     const current = this.selectedDate ? new Date(this.selectedDate) : null;
-    const today = new Date();
+    const today = this.startOfToday();
     today.setHours(0, 0, 0, 0);
 
     if (this.isSelfCheckinMode()) {
@@ -2535,7 +2606,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   }
 
   private initCalendarRules(): void {
-    const today = new Date();
+    const today = this.startOfToday();
     today.setHours(0, 0, 0, 0);
     this.maxDate = today;
     this.pageBlockedMessage = '';
@@ -2553,10 +2624,30 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.pageBlockedMessage = 'تسجيل الغياب مقفول اليوم حسب الإعدادات الحالية لهذه الأسرة.';
     }
 
-    this.minDate = today;
+    this.minDate = this.computeMinDate(today);
 
     this.updateCalendarForSelectedType(false);
     this.updateBlockedMessage();
+  }
+
+  private computeMinDate(today: Date): Date {
+    const selectedType = this.selectedAttendanceType();
+    const family = this.selectedFamily;
+    const scheduleDates = family && selectedType
+      ? this.attendanceContext?.scheduleCreatedDates?.[family]?.[selectedType]
+      : undefined;
+    if (scheduleDates) {
+      const values = Object.values(scheduleDates).filter(Boolean) as string[];
+      if (values.length) {
+        const earliest = values
+          .map(d => { const dt = new Date(d + 'T00:00:00'); dt.setHours(0, 0, 0, 0); return dt; })
+          .reduce((min, dt) => dt < min ? dt : min);
+        return earliest < today ? earliest : today;
+      }
+    }
+    const fallback = new Date(today);
+    fallback.setDate(fallback.getDate() - 30);
+    return fallback;
   }
 
   private findLatestAllowedDate(from: Date, allowed: number[], minDate: Date): Date | null {
@@ -2618,7 +2709,7 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       this.selectedFamily = 'خورس مارمرقس';
       this.loadMembersForFamily();
     } else if (this.selectedType === 'ATHANASIUS_KHORS') {
-      this.selectedFamily = 'خورس البابا أثناسيوس';
+      this.selectedFamily = 'خورس البابا اثناسيوس';
       this.loadMembersForFamily();
     }
   }
@@ -2630,10 +2721,120 @@ export class AttendanceComponent implements OnInit, OnDestroy {
     return `${yyyy}-${mm}-${dd}`;
   }
 
+  serverTimeString = '';
+  serverDateString = '';
+  serverTimeOffsetMinutes = 0;
+  timeOffsetInput = 0;
+  timeOffsetUnit: 'minutes' | 'hours' | 'days' | 'months' = 'days';
+  private _contextLoadClientTime = Date.now();
+
+  private getCurrentDate(): Date {
+    if (this.serverDateString) {
+      return new Date(this.serverDateString + 'T00:00:00');
+    }
+    return new Date();
+  }
+
+  private now(): Date {
+    if (this.serverTimeString) {
+      const base = new Date(this.serverTimeString);
+      const elapsed = Date.now() - this._contextLoadClientTime;
+      return new Date(base.getTime() + elapsed);
+    }
+    return this.getCurrentDate();
+  }
+
+  private refreshServerTime(): void {
+    this.attendance.getServerTime().subscribe({
+      next: (res) => {
+        this.serverTimeString = res.serverTime;
+        this.serverDateString = res.serverDate || res.serverTime.slice(0, 10);
+        this.serverTimeOffsetMinutes = res.timeOffsetMinutes || 0;
+        this.timeOffsetInput = this.serverTimeOffsetMinutes;
+        this._contextLoadClientTime = Date.now();
+      }
+    });
+  }
+
+  private unitToMinutes(value: number, unit: string): number {
+    switch (unit) {
+      case 'months': return value * 30 * 24 * 60;
+      case 'days': return value * 24 * 60;
+      case 'hours': return value * 60;
+      default: return value;
+    }
+  }
+
+  formatOffset(minutes: number): string {
+    if (minutes === 0) return '0';
+    const abs = Math.abs(minutes);
+    const sign = minutes < 0 ? '-' : '+';
+    const months = Math.floor(abs / (30 * 24 * 60));
+    const days = Math.floor((abs % (30 * 24 * 60)) / (24 * 60));
+    const hours = Math.floor((abs % (24 * 60)) / 60);
+    const mins = abs % 60;
+    const parts: string[] = [];
+    if (months) parts.push(`${months} شهر`);
+    if (days) parts.push(`${days} يوم`);
+    if (hours) parts.push(`${hours} ساعة`);
+    if (mins) parts.push(`${mins} دقيقة`);
+    return `${sign} ${parts.join(' ')}`;
+  }
+
+  setTimeOffset(): void {
+    const val = Number(this.timeOffsetInput) || 0;
+    this.attendance.setTimeOffset(val).subscribe({
+      next: (res) => {
+        this.serverTimeString = res.serverTime;
+        this.serverDateString = res.serverDate || res.serverTime.slice(0, 10);
+        this.serverTimeOffsetMinutes = res.timeOffsetMinutes || 0;
+        this._contextLoadClientTime = Date.now();
+        this.initCalendarRules();
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم تعديل إعدادات الوقت', life: 3000 });
+      },
+      error: () => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تعديل إعدادات الوقت', life: 3000 });
+      }
+    });
+  }
+
+  applyTimeOffset(): void {
+    const val = Number(this.timeOffsetInput) || 0;
+    const minutes = this.unitToMinutes(val, this.timeOffsetUnit);
+    this.attendance.setTimeOffset(minutes).subscribe({
+      next: (res) => {
+        this.serverTimeString = res.serverTime;
+        this.serverDateString = res.serverDate || res.serverTime.slice(0, 10);
+        this.serverTimeOffsetMinutes = res.timeOffsetMinutes || 0;
+        this._contextLoadClientTime = Date.now();
+        this.initCalendarRules();
+        this.message.add({ severity: 'success', summary: 'تم', detail: `تم تقديم الوقت ${this.formatOffset(minutes)}`, life: 3000 });
+      },
+      error: () => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل تعديل إعدادات الوقت', life: 3000 });
+      }
+    });
+  }
+
+  resetTimeOffset(): void {
+    this.timeOffsetInput = 0;
+    this.attendance.setTimeOffset(0).subscribe({
+      next: (res) => {
+        this.serverTimeString = res.serverTime;
+        this.serverDateString = res.serverDate || res.serverTime.slice(0, 10);
+        this.serverTimeOffsetMinutes = 0;
+        this._contextLoadClientTime = Date.now();
+        this.initCalendarRules();
+        this.message.add({ severity: 'success', summary: 'تم', detail: 'تم إلغاء تعديل الوقت', life: 3000 });
+      },
+      error: () => {
+        this.message.add({ severity: 'error', summary: 'خطأ', detail: 'فشل إلغاء تعديل الوقت', life: 3000 });
+      }
+    });
+  }
+
   private startOfToday(): Date {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
+    return this.getCurrentDate();
   }
 
   private isBeforeToday(value: Date | null | undefined): boolean {
