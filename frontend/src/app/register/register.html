@@ -158,6 +158,21 @@
               </div>
             </ng-container>
 
+            <!-- ordainYear -->
+            <ng-container *ngIf="f.fieldKey === 'ordainYear'">
+              <div class="input-group small">
+                <label class="field-label">{{ fieldLabel('ordainYear', 'سنة الرشامة') }}<span class="required-star" *ngIf="fieldRequired('ordainYear', true)"> *</span></label>
+                <input *ngIf="!isSelectField('ordainYear')" type="number" formControlName="ordainYear"
+                       placeholder="مثال: 2015"
+                       (click)="markInteracted('ordainYear')" (blur)="markTouched('ordainYear')" />
+                <select *ngIf="isSelectField('ordainYear')" formControlName="ordainYear" (change)="markTouchedFromList('ordainYear')">
+                  <option value="" disabled>{{ fieldLabel('ordainYear', 'سنة الرشامة') }}</option>
+                  <option *ngFor="let opt of fieldOptions('ordainYear')" [value]="opt">{{ opt }}</option>
+                </select>
+                <small class="error-text" *ngIf="shouldShowError('ordainYear')">{{ errorText('ordainYear','سنة الرشامة') }}</small>
+              </div>
+            </ng-container>
+
             <!-- yearsInFamily -->
             <ng-container *ngIf="f.fieldKey === 'yearsInFamily'">
               <div class="input-group small">

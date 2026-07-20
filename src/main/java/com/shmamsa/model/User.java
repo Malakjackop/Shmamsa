@@ -140,6 +140,9 @@ public class User {
     @Column(name = "khors_year")
     private Integer khorsYear;
 
+    @Column(name = "ordain_year")
+    private Integer ordainYear;
+
 
     @Column(length = 20)
     private String servingScope;

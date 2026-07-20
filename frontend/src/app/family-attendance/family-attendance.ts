@@ -23,6 +23,7 @@ type Member = {
   attendKhors?: string;
   khors?: string;
   khorsYear?: number | null;
+  ordainYear?: number | null;
   servingScope?: string;
 
   // iftekad
@@ -110,6 +111,7 @@ type ProfileView = {
   deaconFamily?: string;
   khors?: string;
   khorsYear?: number | string | null;
+  ordainYear?: number | string | null;
   deaconDegree?: string;
   yearsInFamily?: string;
   nationalId?: string;
@@ -277,6 +279,7 @@ export class FamilyAttendanceComponent implements OnInit {
   choirSelectedSeatIdx: number | null = null;
   choirPublished = false;
   choirTopPercent = 20;
+  choirSortMode: 'attendance_first' | 'seniority_first' = 'attendance_first';
   choirFrontAtTop = true;
   choirFrontOffset = 0;
   choirCrowdOffset = 0;
@@ -2002,7 +2005,7 @@ reloadDetails(): void {
   }
 
   // ===== Choir Standing =====
-  private get choirAttendanceType(): 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' {
+  get choirAttendanceType(): 'MARMARKOS_KHORS' | 'ATHANASIUS_KHORS' {
     return this.isMarmarkosChoir ? 'MARMARKOS_KHORS' : 'ATHANASIUS_KHORS';
   }
 
@@ -2063,28 +2066,51 @@ reloadDetails(): void {
     const withScore = [...this.members].map(m => {
       const present = type === 'MARMARKOS_KHORS' ? (m.marmarkosKhorsPresent ?? 0) : (m.athanasiusKhorsPresent ?? 0);
       const tot = type === 'MARMARKOS_KHORS' ? (m.marmarkosKhorsTotal ?? 0) : (m.athanasiusKhorsTotal ?? 0);
-      return { memberId: m.id, memberName: m.fullName, score: tot > 0 ? present / tot : 0, present, tot, khorsYear: m.khorsYear ?? null };
+      return { memberId: m.id, memberName: m.fullName, score: tot > 0 ? present / tot : 0, present, tot, khorsYear: m.khorsYear ?? null, ordainYear: m.ordainYear != null ? Number(m.ordainYear) : null };
     });
 
-    // sort by attendance desc to determine top-percent split
-    const byAttendance = [...withScore].sort((a, b) => b.score - a.score || b.present - a.present);
+    const isAthanasius = type === 'ATHANASIUS_KHORS';
 
-    const pct = Math.max(0, Math.min(100, this.choirTopPercent));
-    const topCount = Math.round(byAttendance.length * pct / 100);
-    const topGroup = byAttendance.slice(0, topCount);
-    const restGroup = byAttendance.slice(topCount);
-
-    // within each group sort by khorsYear DESCENDING (larger year = higher seniority = placed first)
-    // nulls go to the end
-    const bySeniority = (a: typeof topGroup[0], b: typeof topGroup[0]) => {
-      const aYear = a.khorsYear ?? -1;
-      const bYear = b.khorsYear ?? -1;
-      return bYear - aYear; // descending: bigger year first
+    // مارمرقس: khorsYear DESC (أكبر = أقدم) — أثناسيوس: ordainYear ASC (أصغر = رُشم أول = أقدم)
+    const bySeniority = (a: typeof withScore[0], b: typeof withScore[0]) => {
+      if (isAthanasius) {
+        const aY = a.ordainYear ?? Infinity;
+        const bY = b.ordainYear ?? Infinity;
+        return aY - bY; // ascending: smaller year (ordained first) → placed first
+      } else {
+        const aY = a.khorsYear ?? -1;
+        const bY = b.khorsYear ?? -1;
+        return bY - aY; // descending: larger year → placed first
+      }
     };
-    topGroup.sort(bySeniority);
-    restGroup.sort(bySeniority);
+    const byAtt = (a: typeof withScore[0], b: typeof withScore[0]) =>
+      b.score - a.score || b.present - a.present;
 
-    const sorted = [...topGroup, ...restGroup];
+    let sorted: typeof withScore;
+
+    if (this.choirSortMode === 'seniority_first') {
+      sorted = [...withScore].sort((a, b) => bySeniority(a, b) || byAtt(a, b));
+    } else {
+      const byAttendance = [...withScore].sort(byAtt);
+      const pct = Math.max(1, Math.min(100, this.choirTopPercent));
+
+      if (pct >= 100) {
+        // ترتيب كامل بالحضور، عند تعادل بالأقدمية
+        sorted = byAttendance.map(m => ({ ...m }));
+        sorted.sort((a, b) => byAtt(a, b) || bySeniority(a, b));
+      } else {
+        // تقسيم لمجموعات بحجم pct% كل واحدة، وجوا كل مجموعة ترتيب بالأقدمية
+        const bucketSize = Math.max(1, Math.round(byAttendance.length * pct / 100));
+        const buckets: typeof withScore[] = [];
+        for (let i = 0; i < byAttendance.length; i += bucketSize) {
+          buckets.push(byAttendance.slice(i, i + bucketSize));
+        }
+        for (const bucket of buckets) {
+          bucket.sort(bySeniority);
+        }
+        sorted = buckets.flat();
+      }
+    }
 
     const total = this.choirRows * this.choirCols;
     const seats: typeof this.choirSeats = new Array(total).fill(null).map(() => ({ memberId: null, memberName: null, score: 0 }));

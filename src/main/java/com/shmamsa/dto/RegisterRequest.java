@@ -42,6 +42,8 @@ public class RegisterRequest implements HasParentPhones {
 
     private String khors;
 
+    private Integer ordainYear;
+
     private String yearsInFamily;
 
     @Pattern(regexp = "^$|^\\d{11}$", message = "رقم الهاتف يجب أن يكون 11 رقم")

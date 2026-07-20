@@ -90,6 +90,7 @@ public class KhorsController {
             m.put("deaconFamily4", familyAccessService.fourthFamilyName(u));
             m.put("khors", u.getKhors());
             m.put("khorsYear", u.getKhorsYear());
+            m.put("ordainYear", u.getOrdainYear());
             m.put("attendKhors", u.getAttendKhors());
             return m;
         }).collect(Collectors.toList());

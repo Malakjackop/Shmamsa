@@ -45,6 +45,7 @@ const FALLBACK_SYSTEM_FIELD_KEYS = new Set([
   'guardiansPhone',
   'guardianRelation',
   'khorsYear',
+  'ordainYear',
   'yearsInFamily'
 ]);
 
@@ -228,6 +229,7 @@ export class RegisterComponent implements OnInit {
       guardiansPhone: ['', [this.optionalPhone11()]],
       guardianRelation: [''],
       khorsYear: [''],
+      ordainYear: [''],
       yearsInFamily: this.fb.control('', { updateOn: 'change' }),
 
       password: ['', Validators.required],
@@ -405,6 +407,7 @@ export class RegisterComponent implements OnInit {
       field('deaconFamily', 'الأسرة', 'SELECT', 10, { visibilityRule: 'MEMBER_ONLY' }),
       field('khors', 'الخورس', 'SELECT', 11, { visibilityRule: 'MEMBER_ONLY' }),
       field('khorsYear', 'سنة الخورس', 'TEXT', 12, { visibilityRule: 'MEMBER_ONLY' }),
+      field('ordainYear', 'سنة الرشامة', 'TEXT', 12.5, { visibilityRule: 'MEMBER_ONLY' }),
       field('servingWhere', 'بتخدم فين', 'SELECT', 13, { visibilityRule: 'SERVANT_ONLY' }),
       field('attendKhors', 'خورس الحضور', 'SELECT', 14, { visibilityRule: 'SERVANT_ONLY' }),
       field('status', 'الحالة', 'SELECT', 15),
@@ -1128,6 +1131,7 @@ private guardianNotSameAsPhone(): ValidatorFn {
       guardiansPhone: formValue.guardiansPhone,
       guardianRelation: formValue.guardianRelation,
       khorsYear: formValue.khorsYear,
+      ordainYear: formValue.ordainYear ? parseInt(formValue.ordainYear, 10) : null,
       yearsInFamily: formValue.yearsInFamily,
 
       secret: String(formValue.secret || '').trim(),

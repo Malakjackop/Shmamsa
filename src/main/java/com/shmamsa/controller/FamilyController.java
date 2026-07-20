@@ -618,6 +618,7 @@ public class  FamilyController {
             row.put("athanasiusKhorsTotal", athanasiusTotal);
             row.put("khors", u.getKhors());
             row.put("khorsYear", u.getKhorsYear());
+            row.put("ordainYear", u.getOrdainYear());
             row.put("servingScope", u.getServingScope());
             row.put("schoolGrade", u.getSchoolGrade());
             row.put("deaconDegree", u.getDeaconDegree());
@@ -706,6 +707,7 @@ public class  FamilyController {
         dto.put("workDetails", u.getWorkDetails());
         dto.put("khors", u.getKhors());
         dto.put("khorsYear", u.getKhorsYear());
+        dto.put("ordainYear", u.getOrdainYear());
         dto.put("yearsInFamily", u.getYearsInFamily());
         if (includeSensitive) {
             dto.put("nationalId", u.getNationalId());

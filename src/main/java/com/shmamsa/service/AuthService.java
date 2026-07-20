@@ -153,6 +153,7 @@ public class AuthService {
         user.setGraduateJob(request.getGraduateJob());
 
         user.setYearsInFamily(request.getYearsInFamily());
+        user.setOrdainYear(request.getOrdainYear());
 
         LocalDate dob = NationalIdUtils.extractBirthDate(request.getNationalId());
         if (dob != null) user.setDateOfBirth(dob);

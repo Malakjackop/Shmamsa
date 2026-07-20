@@ -100,6 +100,7 @@ public class AuthController {
         out.put("deaconDegree", user.getDeaconDegree());
         out.put("khors", user.getKhors());
         out.put("khorsYear", user.getKhorsYear());
+        out.put("ordainYear", user.getOrdainYear());
         out.put("servingScope", user.getServingScope());
         out.put("attendKhors", user.getAttendKhors());
         out.put("deaconFamily", familyAccessService.primaryFamilyName(user));

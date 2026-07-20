@@ -385,7 +385,14 @@
           </select>
         </div>
         <div class="choirConfigField">
-          <label>نسبة الأقدمية %</label>
+          <label>أولوية الترتيب</label>
+          <select [(ngModel)]="choirSortMode" [ngModelOptions]="{ standalone: true }" class="choirSelect">
+            <option value="attendance_first">الحضور أولاً</option>
+            <option value="seniority_first">{{ choirAttendanceType === 'ATHANASIUS_KHORS' ? 'سنة الرشامة أولاً' : 'سنة الخورس أولاً' }}</option>
+          </select>
+        </div>
+        <div class="choirConfigField" *ngIf="choirSortMode === 'attendance_first'">
+          <label>نسبة الحضور %</label>
           <div class="choirSpinner">
             <button type="button" class="choirSpinBtn" (click)="choirTopPercent = choirTopPercent > 0 ? choirTopPercent - 5 : 0">▼</button>
             <span class="choirSpinVal">{{ choirTopPercent }}%</span>
