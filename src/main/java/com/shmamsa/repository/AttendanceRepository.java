@@ -83,6 +83,21 @@ public interface AttendanceRepository extends JpaRepository<AttendanceRecord, Lo
     @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
     long countPresentByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
 
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT) and (a.attendanceMode is null or a.attendanceMode <> com.shmamsa.model.AttendanceMode.BONUS)")
+    long countPresentPrimaryByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
+
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.attendanceMode = com.shmamsa.model.AttendanceMode.BONUS) and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT)")
+    long countPresentBonusByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
+
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.attendanceMode is null or a.attendanceMode <> com.shmamsa.model.AttendanceMode.BONUS)")
+    long countNonBonusByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
+
+    @Query("select count(a) from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and ((a.attendanceMode is null or a.attendanceMode = com.shmamsa.model.AttendanceMode.PRIMARY) or a.status = com.shmamsa.model.AttendanceStatus.ABSENT)")
+    long countPrimarySlotsByUserAndTypeActive(@Param("userId") Long userId, @Param("type") AttendanceType type);
+
+    @Query("select count(a) > 0 from AttendanceRecord a where a.archived = false and a.user.id = :userId and a.type = :type and (a.status is null or a.status = com.shmamsa.model.AttendanceStatus.PRESENT) and (a.attendanceMode is null or a.attendanceMode <> com.shmamsa.model.AttendanceMode.BONUS)")
+    boolean hasPresentPrimaryOrAlternativeByUserAndType(@Param("userId") Long userId, @Param("type") AttendanceType type);
+
     long countByUser_IdAndTypeAndCustomTitleAndArchivedFalse(Long userId, AttendanceType type, String customTitle);
 
     // أرشفة سجل الحضور (بدل الحذف) وربطه بالأرشيف

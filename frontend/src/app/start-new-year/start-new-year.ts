@@ -25,6 +25,11 @@ export class StartNewYearComponent implements OnInit, OnDestroy {
   archiveName: string = '';
   archivesList: any[] = [];
 
+  showFilesDialog = false;
+  selectedArchive: any = null;
+  archiveFiles: Array<{ type: string; label: string; familyName: string }> = [];
+  loadingFiles = false;
+
   ngOnInit(): void {
     this.userSub = this.auth.getUserData().subscribe({
       next: (u) => {
@@ -64,30 +69,71 @@ export class StartNewYearComponent implements OnInit, OnDestroy {
     }).format(date);
   }
 
-  downloadPdf(a: any) {
-  this.attendanceSvc.downloadArchivePdf(a.id).subscribe({
-    next: (blob: Blob) => {
-      const url = window.URL.createObjectURL(blob);
+  openFilesDialog(a: any) {
+    this.selectedArchive = a;
+    this.archiveFiles = [];
+    this.loadingFiles = true;
+    this.showFilesDialog = true;
 
-      const link = document.createElement('a');
-      link.href = url;
+    this.attendanceSvc.getArchiveFiles(a.id).subscribe({
+      next: (res) => {
+        this.archiveFiles = Array.isArray(res?.files) ? res.files : [];
+        this.loadingFiles = false;
+      },
+      error: () => {
+        this.archiveFiles = [];
+        this.loadingFiles = false;
+      }
+    });
+  }
 
-      const safe = (a?.name || 'archive').toString().replace(/[\\/:*?"<>|]/g, '_');
-      link.download = `${safe}.pdf`;
+  closeFilesDialog() {
+    this.showFilesDialog = false;
+    this.selectedArchive = null;
+    this.archiveFiles = [];
+  }
 
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+  private triggerDownload(blob: Blob, filename: string) {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
 
-      window.URL.revokeObjectURL(url);
-    },
-    error: () => {
-      // toast فشل التحميل (لو عندك toast)
-      console.error('PDF download failed');
+  downloadFile(file: { type: string; label: string; familyName: string }) {
+    if (!this.selectedArchive) return;
+    const a = this.selectedArchive;
+    const safe = (a?.name || 'archive').toString().replace(/[\\/:*?"<>|]/g, '_');
+    const safeLabel = file.label.replace(/[\\/:*?"<>|]/g, '_');
+
+    if (file.type === 'family') {
+      this.attendanceSvc.downloadArchivePdf(a.id, file.familyName).subscribe({
+        next: (blob: Blob) => this.triggerDownload(blob, `${safe} - ${safeLabel}.pdf`),
+        error: () => console.error('PDF download failed')
+      });
+    } else if (file.type === 'servants') {
+      this.attendanceSvc.downloadArchivePdf(a.id, undefined, 'servants').subscribe({
+        next: (blob: Blob) => this.triggerDownload(blob, `${safe} - ${safeLabel}.pdf`),
+        error: () => console.error('PDF download failed')
+      });
     }
-  });
-}
+  }
 
+  downloadAll() {
+    if (!this.selectedArchive) return;
+    const a = this.selectedArchive;
+    this.attendanceSvc.downloadArchivePdfsZip(a.id).subscribe({
+      next: (blob: Blob) => {
+        const safe = (a?.name || 'archive').toString().replace(/[\\/:*?"<>|]/g, '_');
+        this.triggerDownload(blob, `${safe}.zip`);
+      },
+      error: () => console.error('ZIP download failed')
+    });
+  }
 
   startNewYear() {
     if (!this.isAllowed()) {

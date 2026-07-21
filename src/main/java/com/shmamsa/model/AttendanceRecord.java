@@ -31,6 +31,10 @@ public class AttendanceRecord {
     @Enumerated(EnumType.STRING)
     @Column
     private AttendanceStatus status = AttendanceStatus.PRESENT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AttendanceMode attendanceMode = AttendanceMode.PRIMARY;
     // For family-scoped records we persist the canonical family id, and keep the
     // base name only as a denormalized display value for legacy/API responses.
     @Column(name = "family_id")

@@ -1,5 +1,44 @@
 <p-toast position="top-left"></p-toast>
-<p-confirmDialog [draggable]="false"></p-confirmDialog>
+<p-confirmDialog [draggable]="false" styleClass="app-surface-dialog transfer-confirm-dialog" [style]="{ width: 'auto' }"></p-confirmDialog>
+
+<p-dialog
+  [(visible)]="showFilesDialog"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  header="ملفات الأرشيف"
+  styleClass="app-surface-dialog transfer-confirm-dialog"
+  (onHide)="closeFilesDialog()"
+>
+  <ng-template pTemplate="content">
+    <div class="files-dialog-body" *ngIf="!loadingFiles; else filesLoading">
+      <button type="button" class="download-all-btn" (click)="downloadAll()" *ngIf="archiveFiles.length">
+        <i class="pi pi-download"></i>
+        تحميل الكل
+      </button>
+
+      <div class="file-list">
+        <div class="file-row" *ngFor="let file of archiveFiles">
+          <span class="file-label">{{ file.label }}</span>
+          <button type="button" class="file-download-btn" (click)="downloadFile(file)">
+            <i class="pi pi-download"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="empty-files" *ngIf="!archiveFiles.length">
+        <p>لا توجد ملفات متاحة</p>
+      </div>
+    </div>
+
+    <ng-template #filesLoading>
+      <div class="files-loading">
+        <i class="pi pi-spin pi-spinner"></i>
+        <span>جاري تحميل قائمة الملفات...</span>
+      </div>
+    </ng-template>
+  </ng-template>
+</p-dialog>
 
 <div class="page-shell">
   <div class="page">
@@ -77,13 +116,13 @@
                 <td data-label="تاريخ الإنشاء">{{ formatArchiveCreatedAt(a?.createdAt) }}</td>
                 <td data-label="أنشأه">{{ a?.createdBy }}</td>
                 <td data-label="تحميل">
-                  <a
+                  <button
+                    type="button"
                     class="download-link"
-                    (click)="$event.preventDefault(); downloadPdf(a)"
-                    href="#"
+                    (click)="openFilesDialog(a)"
                   >
                     <i class="pi pi-download"></i>
-                  </a>
+                  </button>
                 </td>
               </tr>
             </tbody>

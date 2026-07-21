@@ -457,16 +457,40 @@ export class AttendanceService {
     );
   }
 
-  downloadArchivePdf(id: number) {
+  downloadArchivePdf(id: number, family?: string, group?: string) {
     if (!this.isBrowser) return of(new Blob());
+    let params = {};
+    if (family) params = { family };
+    else if (group) params = { group };
     return this.http.get(`${this.baseUrl}/archives/${id}/pdf`, {
+      params,
       responseType: 'blob',
       withCredentials: true
     });
   }
 
-  archivePdfUrl(id: number): string {
-    return `${this.baseUrl}/archives/${id}/pdf`;
+  archivePdfUrl(id: number, family?: string, group?: string): string {
+    let url = `${this.baseUrl}/archives/${id}/pdf`;
+    const q: string[] = [];
+    if (family) q.push(`family=${encodeURIComponent(family)}`);
+    else if (group) q.push(`group=${encodeURIComponent(group)}`);
+    if (q.length) url += '?' + q.join('&');
+    return url;
+  }
+
+  getArchiveFiles(id: number) {
+    if (!this.isBrowser) return of({ files: [] });
+    return this.http.get<{ files: Array<{ type: string; label: string; familyName: string }> }>(
+      `${this.baseUrl}/archives/${id}/files`, { withCredentials: true }
+    );
+  }
+
+  downloadArchivePdfsZip(id: number) {
+    if (!this.isBrowser) return of(new Blob());
+    return this.http.get(`${this.baseUrl}/archives/${id}/pdfs/zip`, {
+      responseType: 'blob',
+      withCredentials: true
+    });
   }
 
   cancelDay(

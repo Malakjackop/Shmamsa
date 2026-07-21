@@ -2,6 +2,7 @@ package com.shmamsa.controller;
 
 import com.shmamsa.exception.ApiException;
 import com.shmamsa.model.AttendanceArchive;
+import com.shmamsa.model.AttendanceMode;
 import com.shmamsa.model.AttendanceRecord;
 import com.shmamsa.model.AttendanceStatus;
 import com.shmamsa.model.AttendanceType;
@@ -201,6 +202,30 @@ public class AttendanceController {
         return date.getDayOfWeek().getValue() % 7;
     }
 
+    private AttendanceMode determineAttendanceMode(List<String> dayModes, Long userId, AttendanceType type) {
+        if (dayModes == null || dayModes.isEmpty()) return AttendanceMode.PRIMARY;
+
+        boolean isAlternative = dayModes.contains("ALTERNATIVE");
+        boolean isBonus = dayModes.contains("BONUS_ONLY");
+
+        if (isAlternative && isBonus) {
+            // ALTERNATIVE_BONUS: if user already has PRIMARY/ALTERNATIVE coverage → BONUS, else → ALTERNATIVE
+            boolean hasCoverage = attendanceRepo.hasPresentPrimaryOrAlternativeByUserAndType(userId, type);
+            return hasCoverage ? AttendanceMode.BONUS : AttendanceMode.ALTERNATIVE;
+        }
+        if (isAlternative) {
+            // Pure ALTERNATIVE: if user already has coverage → skip (null), else → ALTERNATIVE
+            boolean hasCoverage = attendanceRepo.hasPresentPrimaryOrAlternativeByUserAndType(userId, type);
+            return hasCoverage ? null : AttendanceMode.ALTERNATIVE;
+        }
+        if (isBonus) {
+            // Pure BONUS_ONLY
+            return AttendanceMode.BONUS;
+        }
+        // Default: PRIMARY
+        return AttendanceMode.PRIMARY;
+    }
+
     private LocalDate nearestDateForJavascriptDay(LocalDate reference, Integer jsDay) {
         if (reference == null || jsDay == null || jsDay < 0 || jsDay > 6) return null;
 
@@ -301,16 +326,36 @@ public class AttendanceController {
         Long meetingFamilyId = scopeResult.familyId;
 
 
+        // Determine per-day modes once (for non-custom events)
+        List<String> dayModes = (type != AttendanceType.CUSTOM_EVENT)
+                ? attendanceConfigService.getEffectiveModes(type.name(), toJavascriptDayOfWeek(selectedDate))
+                : List.of("PRIMARY");
+
         for (Long id : presentIds) {
             AttendanceRecord existing = (meetingFamilyId != null)
                     ? attendanceRepo.findFirstByUser_IdAndDateAndTypeAndFamilyIdAndArchivedFalse(id, selectedDate, type, meetingFamilyId)
                     : attendanceRepo.findFirstByUser_IdAndDateAndTypeAndArchivedFalse(id, selectedDate, type);
+
+            User target = userRepo.findById(id).orElse(null);
+            if (target == null) {
+                skipped++;
+                continue;
+            }
+            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) {
+                skipped++;
+                continue;
+            }
+
+            // Determine attendance mode based on day configuration and existing coverage
+            AttendanceMode mode = determineAttendanceMode(dayModes, target.getId(), type);
+
             if (existing != null) {
                 if (existing.getStatus() == AttendanceStatus.ABSENT) {
                     existing.setStatus(AttendanceStatus.PRESENT);
                     existing.setTime(now);
                     existing.setTakenBy(servant);
                     existing.setCustomTitle(type == AttendanceType.CUSTOM_EVENT ? customTitle : existing.getCustomTitle());
+                    if (mode != null) existing.setAttendanceMode(mode);
                     attendanceRepo.save(existing);
                     updatedToPresent++;
                 } else {
@@ -319,12 +364,8 @@ public class AttendanceController {
                 continue;
             }
 
-            User target = userRepo.findById(id).orElse(null);
-            if (target == null) {
-                skipped++;
-                continue;
-            }
-            if ("DEVELOPER".equalsIgnoreCase(target.getRole())) {
+            // For pure ALTERNATIVE day with existing coverage → skip entirely
+            if (mode == null) {
                 skipped++;
                 continue;
             }
@@ -341,6 +382,7 @@ public class AttendanceController {
             r.setCustomTitle(type == AttendanceType.CUSTOM_EVENT ? customTitle : null);
             r.setStatus(AttendanceStatus.PRESENT);
             r.setTakenBy(servant);
+            r.setAttendanceMode(mode);
             attendanceRepo.save(r);
             createdPresent++;
         }
@@ -524,26 +566,30 @@ public class AttendanceController {
             return false;
         };
 
-        long fPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.FRIDAY_LITURGY);
-        long mkPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.MARMARKOS_KHORS);
-        long akPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.ATHANASIUS_KHORS);
-        long tPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.TASBEEHA);
-        long mPresent = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), AttendanceType.FAMILY_MEETING);
+        // Main stats: count PRIMARY+ALTERNATIVE (non-BONUS) records only
+        long fPresent = attendanceRepo.countPresentPrimaryByUserAndTypeActive(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long mkPresent = attendanceRepo.countPresentPrimaryByUserAndTypeActive(me.getId(), AttendanceType.MARMARKOS_KHORS);
+        long akPresent = attendanceRepo.countPresentPrimaryByUserAndTypeActive(me.getId(), AttendanceType.ATHANASIUS_KHORS);
+        long tPresent = attendanceRepo.countPresentPrimaryByUserAndTypeActive(me.getId(), AttendanceType.TASBEEHA);
+        long mPresent = attendanceRepo.countPresentPrimaryByUserAndTypeActive(me.getId(), AttendanceType.FAMILY_MEETING);
 
-        long fTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FRIDAY_LITURGY);
-        long mkTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.MARMARKOS_KHORS);
-        long akTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.ATHANASIUS_KHORS);
-        long tTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.TASBEEHA);
-        long mTotal = attendanceRepo.countByUser_IdAndTypeAndArchivedFalse(me.getId(), AttendanceType.FAMILY_MEETING);
+        long fTotal = attendanceRepo.countPrimarySlotsByUserAndTypeActive(me.getId(), AttendanceType.FRIDAY_LITURGY);
+        long mkTotal = attendanceRepo.countPrimarySlotsByUserAndTypeActive(me.getId(), AttendanceType.MARMARKOS_KHORS);
+        long akTotal = attendanceRepo.countPrimarySlotsByUserAndTypeActive(me.getId(), AttendanceType.ATHANASIUS_KHORS);
+        long tTotal = attendanceRepo.countPrimarySlotsByUserAndTypeActive(me.getId(), AttendanceType.TASBEEHA);
+        long mTotal = attendanceRepo.countPrimarySlotsByUserAndTypeActive(me.getId(), AttendanceType.FAMILY_MEETING);
 
-        // FAMILY_MEETING broken down by familyBase (multi-family)
+        // FAMILY_MEETING broken down by familyBase (multi-family) — skip BONUS from both, skip ALTERNATIVE from total
         Map<String, Long> familyMeetingByFamily = new LinkedHashMap<>();
         Map<String, Long> familyMeetingTotalByFamily = new LinkedHashMap<>();
         for (AttendanceRecord r : attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), AttendanceType.FAMILY_MEETING)) {
+            if (r.getAttendanceMode() == AttendanceMode.BONUS) continue;
             String fb = familyAccessService.baseNameForId(r.getFamilyId(), r.getFamilyBase());
             fb = fb == null ? "" : fb.trim();
             if (fb.isBlank()) continue;
-            familyMeetingTotalByFamily.put(fb, familyMeetingTotalByFamily.getOrDefault(fb, 0L) + 1L);
+            if (r.getAttendanceMode() != AttendanceMode.ALTERNATIVE) {
+                familyMeetingTotalByFamily.put(fb, familyMeetingTotalByFamily.getOrDefault(fb, 0L) + 1L);
+            }
             if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
             familyMeetingByFamily.put(fb, familyMeetingByFamily.getOrDefault(fb, 0L) + 1L);
         }
@@ -584,13 +630,9 @@ public class AttendanceController {
             java.util.function.Predicate<AttendanceRecord> qualifiesForWeek = r -> {
                 if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) return false;
                 if (r.getDate() == null) return false;
-                if (hasPerDayAlternative) {
-                    int jsDay = toJavascriptDayOfWeek(r.getDate());
-                    List<String> modes = getDayModes.apply(type.name(), jsDay);
-                    if (modes.contains("BONUS_ONLY") && !modes.contains("ALTERNATIVE")) return false;
-                    return modes.contains("PRIMARY") || modes.contains("ALTERNATIVE") || modes.contains("ALTERNATIVE_BONUS");
-                }
-                return true;
+                AttendanceMode mode = r.getAttendanceMode();
+                // null mode defaults to PRIMARY for backward compatibility
+                return mode == null || mode == AttendanceMode.PRIMARY || mode == AttendanceMode.ALTERNATIVE;
             };
 
             long presentWeeks = 0;
@@ -604,61 +646,30 @@ public class AttendanceController {
             return result;
         };
 
-        // ====== BONUS_ONLY mode: count bonus records ======
+        // ====== Bonus stats: count records with mode=BONUS ======
         Map<String, Long> bonusStats = new LinkedHashMap<>();
         List<AttendanceType> allTypes = List.of(
                 AttendanceType.FRIDAY_LITURGY, AttendanceType.TASBEEHA, AttendanceType.FAMILY_MEETING,
                 AttendanceType.MARMARKOS_KHORS, AttendanceType.ATHANASIUS_KHORS
         );
         for (AttendanceType type : allTypes) {
-            List<Integer> configuredDays = absenceModeDays.getOrDefault(type.name(), List.of());
-            boolean hasPerDayBonus = false;
-            if (!configuredDays.isEmpty()) {
-                for (int day : configuredDays) {
-                    List<String> modes = getDayModes.apply(type.name(), day);
-                    if (modes.contains("BONUS_ONLY")) {
-                        hasPerDayBonus = true;
-                        break;
-                    }
-                }
-            }
-            if (hasMode.test(type.name(), "BONUS_ONLY") || hasPerDayBonus) {
-                long bonusCount = 0;
-                if (configuredDays.isEmpty() || !hasPerDayBonus) {
-                    bonusCount = attendanceRepo.countPresentByUserAndTypeActive(me.getId(), type);
-                } else {
-                    List<AttendanceRecord> records = attendanceRepo.findByUser_IdAndTypeAndArchivedFalseOrderByCreatedAtDesc(me.getId(), type);
-                    Set<Integer> bonusDays = new HashSet<>();
-                    for (int day : configuredDays) {
-                        List<String> modes = getDayModes.apply(type.name(), day);
-                        if (modes.contains("BONUS_ONLY")) {
-                            bonusDays.add(day);
-                        }
-                    }
-                    if (!bonusDays.isEmpty()) {
-                        for (AttendanceRecord r : records) {
-                            if (r.getDate() == null) continue;
-                            if (r.getStatus() != null && r.getStatus() == AttendanceStatus.ABSENT) continue;
-                            int jsDay = toJavascriptDayOfWeek(r.getDate());
-                            if (bonusDays.contains(jsDay)) {
-                                bonusCount++;
-                            }
-                        }
-                    }
-                }
+            long bonusCount = attendanceRepo.countPresentBonusByUserAndTypeActive(me.getId(), type);
+            if (bonusCount > 0) {
                 String label = config.getTypeLabels() == null ? type.name() : config.getTypeLabels().getOrDefault(type.name(), type.name());
                 bonusStats.put(label, bonusCount);
             }
         }
-        // Also count custom events with BONUS_ONLY mode
+        // Also count custom events with BONUS_ONLY mode (fallback for customs without per-day config)
         if (config.getCustomEvents() != null) {
             for (var ev : config.getCustomEvents()) {
                 if (ev.getId() == null) continue;
                 String customKey = "CUSTOM_GROUP:" + (ev.getTitle() == null ? "" : ev.getTitle().trim().toLowerCase(Locale.ROOT))
                         + "|" + (ev.getFamilyBase() == null ? "__all__" : canonicalFamilyName(ev.getFamilyBase()));
-                if (hasMode.test(customKey, "BONUS_ONLY")) {
+                if (hasMode.test(customKey, "BONUS_ONLY") || hasMode.test(customKey, "ALTERNATIVE_BONUS")) {
                     long cnt = attendanceRepo.countByUser_IdAndTypeAndCustomTitleAndArchivedFalse(me.getId(), AttendanceType.CUSTOM_EVENT, ev.getTitle());
-                    bonusStats.merge(ev.getTitle() == null ? "مناسبة مخصصة" : ev.getTitle(), cnt, Long::sum);
+                    if (cnt > 0) {
+                        bonusStats.merge(ev.getTitle() == null ? "مناسبة مخصصة" : ev.getTitle(), cnt, Long::sum);
+                    }
                 }
             }
         }
@@ -713,15 +724,12 @@ public class AttendanceController {
             row.put("takenBy", r.getTakenBy() == null ? null : r.getTakenBy().getFullName());
             row.put("familyBase", familyAccessService.baseNameForId(r.getFamilyId(), r.getFamilyBase()));
             String modeLabel = null;
-            if (r.getType() != null && r.getDate() != null && r.getType() != AttendanceType.CUSTOM_EVENT && r.getStatus() != AttendanceStatus.ABSENT) {
-                List<String> modes = attendanceConfigService.getEffectiveModes(r.getType().name(), toJavascriptDayOfWeek(r.getDate()));
-                if (modes.contains("ALTERNATIVE") && modes.contains("BONUS_ONLY")) {
-                    modeLabel = "بديل وبونص";
-                } else if (modes.contains("ALTERNATIVE")) {
-                    modeLabel = "بديل";
-                } else if (modes.contains("BONUS_ONLY")) {
-                    modeLabel = "بونص";
-                }
+            if (r.getStatus() != AttendanceStatus.ABSENT && r.getAttendanceMode() != null) {
+                modeLabel = switch (r.getAttendanceMode()) {
+                    case ALTERNATIVE -> "بديل";
+                    case BONUS -> "بونص";
+                    default -> null;
+                };
             }
             row.put("absenceMode", modeLabel);
             out.add(row);
@@ -2153,9 +2161,65 @@ public class AttendanceController {
         return ResponseEntity.ok(out);
     }
 
-    // Download archive as PDF
+    // List families (and servants) available in an archive for per-group PDF download
+    @GetMapping("/archives/{id}/files")
+    public ResponseEntity<?> archiveFiles(@PathVariable Long id, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User actor = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String role = actor.getRole();
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(role);
+        if (!(isDev || isAminKhedma)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        AttendanceArchive archive = archiveRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Archive not found"));
+
+        List<Map<String, Object>> usersSnap = parseUsersSnap(archive);
+
+        // Family names (MAKHDOM users only)
+        Set<String> families = new LinkedHashSet<>();
+        boolean hasServants = false;
+        for (Map<String, Object> u : usersSnap) {
+            String userRole = safeStr(u.get("role")).toUpperCase(Locale.ROOT);
+            String family = safeStr(u.get("deaconFamily"));
+            if ("MAKHDOM".equals(userRole)) {
+                if (!family.isBlank()) families.add(family);
+            } else if ("KHADIM".equals(userRole) || "AMIN_OSRA".equals(userRole) || "AMIN_KHEDMA".equals(userRole)) {
+                hasServants = true;
+            }
+        }
+
+        List<Map<String, Object>> fileList = new ArrayList<>();
+        for (String f : families) {
+            fileList.add(Map.of(
+                    "type", "family",
+                    "label", f,
+                    "familyName", f
+            ));
+        }
+        if (hasServants) {
+            fileList.add(Map.of(
+                    "type", "servants",
+                    "label", "الخدام",
+                    "familyName", ""
+            ));
+        }
+
+        return ResponseEntity.ok(Map.of("files", fileList));
+    }
+
+    // Download archive as PDF (optionally filtered by family or group)
     @GetMapping("/archives/{id}/pdf")
-    public ResponseEntity<?> archivePdf(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<?> archivePdf(
+            @PathVariable Long id,
+            @RequestParam(name = "family", required = false) String family,
+            @RequestParam(name = "group", required = false) String group,
+            Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
 
         User actor = userRepo.findByUsername(auth.getName())
@@ -2172,8 +2236,32 @@ public class AttendanceController {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Archive not found"));
 
         byte[] pdfBytes;
+        String label;
+
+        // Build predicate for filtering
+        java.util.function.Predicate<Map<String, Object>> filter;
+        if (family != null && !family.isBlank()) {
+            String familyNorm = normalizeArabicText(family);
+            filter = u -> {
+                String userRole = safeStr(u.get("role")).toUpperCase(Locale.ROOT);
+                if (!"MAKHDOM".equals(userRole)) return false;
+                return normalizeArabicText(safeStr(u.get("deaconFamily"))).equals(familyNorm);
+            };
+            String safeFamilyLabel = family.replaceAll("[\\\\/:*?\"<>|]", "_");
+            label = " - " + safeFamilyLabel;
+        } else if ("servants".equalsIgnoreCase(group)) {
+            filter = u -> {
+                String userRole = safeStr(u.get("role")).toUpperCase(Locale.ROOT);
+                return "KHADIM".equals(userRole) || "AMIN_OSRA".equals(userRole) || "AMIN_KHEDMA".equals(userRole);
+            };
+            label = " - الخدام";
+        } else {
+            filter = u -> true;
+            label = "";
+        }
+
         try {
-            pdfBytes = buildArchivePdf(archive);
+            pdfBytes = buildArchivePdf(archive, filter, label);
         } catch (Exception e) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate pdf");
         }
@@ -2181,6 +2269,9 @@ public class AttendanceController {
         String safeName = archive.getName() == null ? "archive" : archive.getName().trim();
         if (safeName.isEmpty()) safeName = "archive";
         safeName = safeName.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (!label.isBlank()) {
+            safeName = safeName + label.replaceAll("[\\\\/:*?\"<>|]", "_");
+        }
 
         String contentDisposition = buildContentDisposition(safeName + ".pdf");
 
@@ -2190,7 +2281,103 @@ public class AttendanceController {
                 .body(pdfBytes);
     }
 
+    // Download all per-group PDFs as a ZIP
+    @GetMapping("/archives/{id}/pdfs/zip")
+    public ResponseEntity<?> archivePdfsZip(@PathVariable Long id, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+
+        User actor = userRepo.findByUsername(auth.getName())
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        String role = actor.getRole();
+        boolean isDev = "DEVELOPER".equalsIgnoreCase(role);
+        boolean isAminKhedma = "AMIN_KHEDMA".equalsIgnoreCase(role);
+        if (!(isDev || isAminKhedma)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
+
+        AttendanceArchive archive = archiveRepo.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Archive not found"));
+
+        List<Map<String, Object>> usersSnap = parseUsersSnap(archive);
+
+        // Collect groups: family name -> list of user maps
+        Map<String, List<java.util.function.Predicate<Map<String, Object>>>> groupFilters = new LinkedHashMap<>();
+
+        Set<String> families = new LinkedHashSet<>();
+        boolean hasServants = false;
+        for (Map<String, Object> u : usersSnap) {
+            String userRole = safeStr(u.get("role")).toUpperCase(Locale.ROOT);
+            String family = safeStr(u.get("deaconFamily"));
+            if ("MAKHDOM".equals(userRole)) {
+                if (!family.isBlank()) families.add(family);
+            } else if ("KHADIM".equals(userRole) || "AMIN_OSRA".equals(userRole) || "AMIN_KHEDMA".equals(userRole)) {
+                hasServants = true;
+            }
+        }
+
+        byte[] zipBytes;
+        try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+             java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(baos)) {
+
+            String archiveName = archive.getName() == null ? "archive" : archive.getName().trim();
+            if (archiveName.isEmpty()) archiveName = "archive";
+            String safeBase = archiveName.replaceAll("[\\\\/:*?\"<>|]", "_");
+
+            for (String f : families) {
+                String familyNorm = normalizeArabicText(f);
+                java.util.function.Predicate<Map<String, Object>> filter = u -> {
+                    String ur = safeStr(u.get("role")).toUpperCase(Locale.ROOT);
+                    if (!"MAKHDOM".equals(ur)) return false;
+                    return normalizeArabicText(safeStr(u.get("deaconFamily"))).equals(familyNorm);
+                };
+                byte[] pdf = buildArchivePdf(archive, filter, " - " + f);
+                String safeFamily = f.replaceAll("[\\\\/:*?\"<>|]", "_");
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(safeBase + " - " + safeFamily + ".pdf");
+                zos.putNextEntry(entry);
+                zos.write(pdf);
+                zos.closeEntry();
+            }
+
+            if (hasServants) {
+                java.util.function.Predicate<Map<String, Object>> filter = u -> {
+                    String ur = safeStr(u.get("role")).toUpperCase(Locale.ROOT);
+                    return "KHADIM".equals(ur) || "AMIN_OSRA".equals(ur) || "AMIN_KHEDMA".equals(ur);
+                };
+                byte[] pdf = buildArchivePdf(archive, filter, " - الخدام");
+                java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(safeBase + " - الخدام.pdf");
+                zos.putNextEntry(entry);
+                zos.write(pdf);
+                zos.closeEntry();
+            }
+
+            zos.finish();
+            zipBytes = baos.toByteArray();
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate zip");
+        }
+
+        String safeName = archive.getName() == null ? "archive" : archive.getName().trim();
+        if (safeName.isEmpty()) safeName = "archive";
+        safeName = safeName.replaceAll("[\\\\/:*?\"<>|]", "_");
+
+        String contentDisposition = buildContentDisposition(safeName + ".zip");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(zipBytes);
+    }
+
     private byte[] buildArchivePdf(AttendanceArchive archive) throws Exception {
+        return buildArchivePdf(archive, u -> true, "");
+    }
+
+    private byte[] buildArchivePdf(
+            AttendanceArchive archive,
+            java.util.function.Predicate<Map<String, Object>> userFilter,
+            String titleSuffix
+    ) throws Exception {
 
         silenceOpenHtmlToPdfLogs();
 
@@ -2199,13 +2386,7 @@ public class AttendanceController {
         List<Map<String, Object>> gradesSnap = List.of();
 
         try {
-            if (archive.getUsersJson() != null && !archive.getUsersJson().isBlank()) {
-                usersSnap = objectMapper.readValue(
-                        archive.getUsersJson(),
-                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {
-                        }
-                );
-            }
+            usersSnap = parseUsersSnap(archive);
             if (archive.getRecordsJson() != null && !archive.getRecordsJson().isBlank()) {
                 recordsSnap = objectMapper.readValue(
                         archive.getRecordsJson(),
@@ -2224,9 +2405,20 @@ public class AttendanceController {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse archive json");
         }
 
-        // Group records by userId
+        // Filter users by predicate
+        List<Map<String, Object>> filteredUsers = usersSnap.stream()
+                .filter(userFilter)
+                .collect(Collectors.toList());
+
+        Set<Long> validUserIds = filteredUsers.stream()
+                .map(u -> asLong(u.get("id")))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Group records by userId (only for valid users)
         Map<Long, List<Map<String, Object>>> recordsByUser = recordsSnap.stream()
                 .filter(r -> r.get("userId") != null)
+                .filter(r -> validUserIds.contains(asLong(r.get("userId"))))
                 .collect(Collectors.groupingBy(r -> {
                     Object v = r.get("userId");
                     if (v instanceof Number n) return n.longValue();
@@ -2235,6 +2427,7 @@ public class AttendanceController {
 
         Map<Long, Map<String, Object>> gradesByUser = gradesSnap.stream()
                 .filter(g -> g.get("userId") != null)
+                .filter(g -> validUserIds.contains(asLong(g.get("userId"))))
                 .collect(Collectors.toMap(
                         g -> asLong(g.get("userId")),
                         g -> g,
@@ -2243,8 +2436,8 @@ public class AttendanceController {
                 ));
 
         // Build HTML (Arabic RTL)
-        String html = buildArchiveHtmlArabic(archive, usersSnap, recordsByUser, gradesByUser);
-        html = html.replace("\uFEFF", "").trim(); // ✅ remove BOM + trim
+        String html = buildArchiveHtmlArabic(archive, filteredUsers, recordsByUser, gradesByUser, titleSuffix);
+        html = html.replace("\uFEFF", "").trim(); // remove BOM + trim
         // Render to PDF
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
@@ -2268,6 +2461,20 @@ public class AttendanceController {
         }
     }
 
+    private List<Map<String, Object>> parseUsersSnap(AttendanceArchive archive) {
+        try {
+            if (archive.getUsersJson() != null && !archive.getUsersJson().isBlank()) {
+                return objectMapper.readValue(
+                        archive.getUsersJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {}
+                );
+            }
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to parse users json");
+        }
+        return List.of();
+    }
+
     private static void silenceOpenHtmlToPdfLogs() {
         if (OPENHTMLTOPDF_LOGS_SILENCED) return;
         synchronized (AttendanceController.class) {
@@ -2288,11 +2495,14 @@ public class AttendanceController {
             AttendanceArchive archive,
             List<Map<String, Object>> usersSnap,
             Map<Long, List<Map<String, Object>>> recordsByUser,
-            Map<Long, Map<String, Object>> gradesByUser
+            Map<Long, Map<String, Object>> gradesByUser,
+            String titleSuffix
     ) {
         String name = safeStr(archive.getName());
         String createdAt = archive.getCreatedAt() == null ? "" : archive.getCreatedAt().toString();
         String createdBy = safeStr(archive.getCreatedByFullName());
+
+        int totalRecords = recordsByUser.values().stream().mapToInt(List::size).sum();
 
         StringBuilder sb = new StringBuilder();
         sb.append("""
@@ -2320,8 +2530,8 @@ public class AttendanceController {
                 </head>
                 <body>
                 
-                <h1>أرشيف الحضور</h1>
-                """);
+                <h1>أرشيف الحضور
+                """ + esc(titleSuffix) + "</h1>");
 
         sb.append("<div class=\"meta\">");
         sb.append("<div><b>اسم الأرشيف:</b> ").append(esc(name)).append("</div>");
@@ -2330,8 +2540,8 @@ public class AttendanceController {
         sb.append("</div>");
 
         sb.append("<div class=\"summary\">");
-        sb.append("<div><b>عدد المستخدمين:</b> ").append(archive.getTotalUsers() == null ? 0 : archive.getTotalUsers()).append("</div>");
-        sb.append("<div><b>عدد سجلات الحضور:</b> ").append(archive.getTotalRecords() == null ? 0 : archive.getTotalRecords()).append("</div>");
+        sb.append("<div><b>عدد المستخدمين:</b> ").append(usersSnap.size()).append("</div>");
+        sb.append("<div><b>عدد سجلات الحضور:</b> ").append(totalRecords).append("</div>");
         sb.append("</div>");
 
         usersSnap = new ArrayList<>(usersSnap);
